@@ -5,7 +5,7 @@
 
 {% block extrahead %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@x.x.x/dist/select2-bootstrap4.min.css" />
 <link rel="stylesheet" href="{% static 'viewer/css/multiselect-filters.css' %}" />
 {% endblock %}
 
@@ -237,9 +237,9 @@
                                         <label for="batch_name_from_vendor" class="form-label">Batch Name From Vendor</label>
                                         <div class="select-container">
                                             <select name="batch_name_from_vendor" id="batch_name_from_vendor" class="form-select filter-select" multiple="multiple" data-placeholder="Select options">
-                                                {% for batch_name in batch_names_from_vendor %}
-                                                    <option value="{{ batch_name }}" {% if batch_name in current_filters.batch_name_from_vendor_list %}selected{% endif %}>
-                                                        {{ batch_name }}
+                                                {% for vendor_batch in batch_name_from_vendors %}
+                                                    <option value="{{ vendor_batch }}" {% if vendor_batch in current_filters.batch_name_from_vendor_list %}selected{% endif %}>
+                                                        {{ vendor_batch }}
                                                     </option>
                                                 {% endfor %}
                                             </select>
@@ -413,39 +413,14 @@
     height: 38px;
 }
 
-/* Consistent styling for Select2 */
-.select2-container--bootstrap-5 .select2-selection--multiple {
+.select2-container--bootstrap4 .select2-selection--multiple {
     overflow: hidden;
-    min-height: 38px;
-    border-color: #ced4da;
 }
 
-.select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
+.select2-container--bootstrap4 .select2-selection--multiple .select2-selection__rendered {
     overflow-x: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-}
-
-/* Consistent dropdown appearance */
-.select2-container--bootstrap-5 .select2-dropdown {
-    border-color: #80bdff;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-}
-
-/* Consistent selected item styling */
-.select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
-    background-color: #e9ecef;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    padding: 2px 6px;
-    margin-right: 5px;
-    margin-top: 3px;
-}
-
-/* Consistent item hover */
-.select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] {
-    background-color: #007bff;
-    color: white;
 }
 
 /* Column Settings Dropdown Styling */
@@ -775,29 +750,11 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`Table ${index} parent: ${table.parentElement.className}`);
     });
     
-    // Initialize all filter-select elements with consistent options
+    // Initialize multiselect filters
     $('.filter-select').select2({
-        theme: 'bootstrap-5',
+        theme: 'bootstrap4',
         width: '100%',
-        dropdownAutoWidth: true,
-        placeholder: function() {
-            return $(this).data('placeholder') || 'Select options';
-        },
-        allowClear: true,
-        closeOnSelect: false
-    });
-    
-    // Additional initialization for specific filters to ensure consistency
-    $('#batch_name_from_vendor, #organism, #study_set, #library_prep_method, #alignment_status, #postqc_status, #ingest_status').each(function() {
-        // Apply the same options to each filter to ensure they look consistent
-        $(this).select2({
-            theme: 'bootstrap-5',
-            width: '100%',
-            dropdownAutoWidth: true,
-            placeholder: 'Select options',
-            allowClear: true,
-            closeOnSelect: false
-        });
+        placeholder: $(this).data('placeholder')
     });
     
     // Fix for dropdown scrolling issue

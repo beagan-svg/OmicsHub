@@ -117,15 +117,14 @@ class MainListView(FilterView):
         else:
             context['current_page_count'] = 0
         
-        # Add batch_name_from_vendor options to context
-        context['batch_names_from_vendor'] = sorted(Metadata.objects.filter(
-            batch_name_from_vendor__isnull=False
-        ).exclude(batch_name_from_vendor='').values_list('batch_name_from_vendor', flat=True).distinct())
-        
         # Add filter options to context
         context['study_sets'] = sorted(Main.objects.filter(
             study_set__isnull=False
         ).exclude(study_set='').values_list('study_set', flat=True).distinct())
+        
+        context['batch_name_from_vendors'] = sorted(Metadata.objects.filter(
+            batch_name_from_vendor__isnull=False
+        ).exclude(batch_name_from_vendor='').values_list('batch_name_from_vendor', flat=True).distinct())
         
         context['organisms'] = sorted(Main.objects.filter(
             organism__isnull=False
@@ -156,7 +155,8 @@ class MainListView(FilterView):
         
         # Handle multiple selection values for the multi-select filters
         multi_select_filters = ['study_set', 'organism', 'library_prep_method', 
-                               'alignment_status', 'postqc_status', 'ingest_status', 'batch_name_from_vendor']
+                               'alignment_status', 'postqc_status', 'ingest_status',
+                               'batch_name_from_vendor']
         
         has_active_filters = False
         

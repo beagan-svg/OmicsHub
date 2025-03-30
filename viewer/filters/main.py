@@ -218,7 +218,6 @@ class MainFilter(django_filters.FilterSet):
         if not values:
             return queryset
         
-        # Use the fastq_name__batch_name_from_vendor relationship
         filtered_qs = queryset.filter(fastq_name__batch_name_from_vendor__in=values)
         return self.apply_distinct(filtered_qs)
 
