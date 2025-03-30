@@ -1,0 +1,15 @@
+name: database_ocs
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - django>=4.2.0
+  - psycopg2>=2.9.9
+  - django-crispy-forms>=2.1
+  - crispy-bootstrap5>=2023.10
+  - django-filter>=23.5
+  - pip
+  - pip:
+    - django-debug-toolbar
+    - django-environ 

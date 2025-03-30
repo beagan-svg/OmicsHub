@@ -1,0 +1,371 @@
+{% extends "viewer/base.html" %}
+{% load django_tables2 %}
+{% load static %}
+{% load viewer_filters %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Sample Browser</h5>
+                    <span class="badge bg-light text-dark">{{ table.rows|length }} of {{ paginator.count }} samples</span>
+                </div>
+                <div class="card-body">
+                    <!-- Filter Form -->
+                    <form method="get" id="filter-form" class="mb-4">
+                        <!-- Search row -->
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <div class="input-group">
+                                    <input 
+                                        type="text" 
+                                        name="search" 
+                                        class="form-control" 
+                                        placeholder="Search fastq name, load name, organism, or library prep method" 
+                                        value="{{ current_filters.search|default:'' }}"
+                                    >
+                                    <button class="btn btn-primary" type="submit">
+                                        <i class="bi bi-search"></i> Search
+                                    </button>
+                                </div>
+                                <small class="text-muted">Enter at least 3 characters to search</small>
+                            </div>
+                            
+                            <div class="col-md-4 text-end">
+                                <button type="button" id="advanced-filters-toggle" class="btn btn-outline-secondary me-2">
+                                    <i class="bi bi-sliders"></i> Advanced Filters
+                                </button>
+                                <button type="button" id="column-settings-toggle" class="btn btn-outline-secondary">
+                                    <i class="bi bi-gear"></i> Column Settings
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Advanced filters section -->
+                        <div id="advanced-filters" class="mb-3" style="display: {% if current_filters %}block{% else %}none{% endif %};">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label for="fastq_name" class="form-label">Fastq Name</label>
+                                    <input 
+                                        type="text" 
+                                        name="fastq_name" 
+                                        id="fastq_name" 
+                                        class="form-control" 
+                                        value="{{ current_filters.fastq_name|default:'' }}"
+                                    >
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <label for="load_name" class="form-label">Load Name</label>
+                                    <input 
+                                        type="text" 
+                                        name="load_name" 
+                                        id="load_name" 
+                                        class="form-control" 
+                                        value="{{ current_filters.load_name|default:'' }}"
+                                    >
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label for="study_set" class="form-label">Study Set</label>
+                                    <select name="study_set" id="study_set" class="form-select">
+                                        <option value="">All Study Sets</option>
+                                        {% for study_set in study_sets %}
+                                            <option value="{{ study_set }}" {% if current_filters.study_set == study_set %}selected{% endif %}>
+                                                {{ study_set }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label for="organism" class="form-label">Organism</label>
+                                    <select name="organism" id="organism" class="form-select">
+                                        <option value="">All Organisms</option>
+                                        {% for organism in organisms %}
+                                            <option value="{{ organism }}" {% if current_filters.organism == organism %}selected{% endif %}>
+                                                {{ organism }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <label for="library_prep_method" class="form-label">Library Prep Method</label>
+                                    <select name="library_prep_method" id="library_prep_method" class="form-select">
+                                        <option value="">All Library Prep Methods</option>
+                                        {% for method in library_prep_methods %}
+                                            <option value="{{ method }}" {% if current_filters.library_prep_method == method %}selected{% endif %}>
+                                                {{ method }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <label for="alignment_status" class="form-label">Alignment Status</label>
+                                    <select name="alignment_status" id="alignment_status" class="form-select">
+                                        <option value="">All Statuses</option>
+                                        {% for status in alignment_status_options %}
+                                            <option value="{{ status }}" {% if current_filters.alignment_status == status %}selected{% endif %}>
+                                                {{ status }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label for="postqc_status" class="form-label">PostQC Status</label>
+                                    <select name="postqc_status" id="postqc_status" class="form-select">
+                                        <option value="">All Statuses</option>
+                                        {% for status in postqc_status_options %}
+                                            <option value="{{ status }}" {% if current_filters.postqc_status == status %}selected{% endif %}>
+                                                {{ status }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label for="ingest_status" class="form-label">Ingest Status</label>
+                                    <select name="ingest_status" id="ingest_status" class="form-select">
+                                        <option value="">All Statuses</option>
+                                        {% for status in ingest_status_options %}
+                                            <option value="{{ status }}" {% if current_filters.ingest_status == status %}selected{% endif %}>
+                                                {{ status }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="d-flex gap-2">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="bi bi-funnel"></i> Apply Filters
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
+                                            <i class="bi bi-x-circle"></i> Clear Filters
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Column Settings Panel -->
+                        <div id="column-settings-panel" class="column-settings-panel mb-3" style="display: none;">
+                            <h6 class="mb-3">Toggle Column Visibility</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="column-toggle-option">
+                                        <input type="checkbox" id="toggleBatchName" checked>
+                                        <label for="toggleBatchName">Batch Name</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="column-toggle-option">
+                                        <input type="checkbox" id="toggleCellCapture" checked>
+                                        <label for="toggleCellCapture">Cell Capture</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Active filters display -->
+                        {% if current_filters %}
+                        <div class="mb-3">
+                            <div class="active-filters">
+                                <strong>Active filters:</strong>
+                                {% if current_filters.search %}
+                                    <span class="badge bg-info text-dark">Search: {{ current_filters.search }}</span>
+                                {% endif %}
+                                {% if current_filters.fastq_name %}
+                                    <span class="badge bg-info text-dark">Fastq Name: {{ current_filters.fastq_name }}</span>
+                                {% endif %}
+                                {% if current_filters.load_name %}
+                                    <span class="badge bg-info text-dark">Load Name: {{ current_filters.load_name }}</span>
+                                {% endif %}
+                                {% if current_filters.study_set %}
+                                    <span class="badge bg-info text-dark">Study Set: {{ current_filters.study_set }}</span>
+                                {% endif %}
+                                {% if current_filters.organism %}
+                                    <span class="badge bg-info text-dark">Organism: {{ current_filters.organism }}</span>
+                                {% endif %}
+                                {% if current_filters.library_prep_method %}
+                                    <span class="badge bg-info text-dark">Library Prep: {{ current_filters.library_prep_method }}</span>
+                                {% endif %}
+                                {% if current_filters.alignment_status %}
+                                    <span class="badge bg-info text-dark">Alignment: {{ current_filters.alignment_status }}</span>
+                                {% endif %}
+                                {% if current_filters.postqc_status %}
+                                    <span class="badge bg-info text-dark">PostQC: {{ current_filters.postqc_status }}</span>
+                                {% endif %}
+                                {% if current_filters.ingest_status %}
+                                    <span class="badge bg-info text-dark">Ingest: {{ current_filters.ingest_status }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </form>
+                    
+                    <!-- Results Table with Additional Columns -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Fastq Name</th>
+                                    <th>Study Set</th>
+                                    <th>Load Name</th>
+                                    <th>Library Prep Method</th>
+                                    <th>Organism</th>
+                                    <th class="column-batch_name">Batch Name</th>
+                                    <th class="column-cell_capture">Cell Capture</th>
+                                    <th>Ingest Status</th>
+                                    <th>Alignment Status</th>
+                                    <th>PostQC Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in table.rows %}
+                                    <tr>
+                                        <td>{{ row.record.fastq_name }}</td>
+                                        <td>{{ row.record.fastq_name.studies }}</td>
+                                        <td>
+                                            {% for load_assoc in row.record.fastq_name.loadassociation_set.all %}
+                                                {{ load_assoc.load_name }}{% if not forloop.last %}, {% endif %}
+                                            {% endfor %}
+                                        </td>
+                                        <td>{{ row.record.fastq_name.library_prep_method_name }}</td>
+                                        <td>{{ row.record.fastq_name.organism_name }}</td>
+                                        <td class="field-batch_name">{{ row.record.batch_name }}</td>
+                                        <td class="field-cell_capture">{{ row.record.cell_capture }}</td>
+                                        <td>
+                                            <span class="status-badge {% if row.record.ingest_status == 'COMPLETED' %}status-completed{% else %}status-not-completed{% endif %}">
+                                                {{ row.record.ingest_status }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="status-badge {% if row.record.alignment_status == 'COMPLETED' %}status-completed{% else %}status-not-completed{% endif %}">
+                                                {{ row.record.alignment_status }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="status-badge {% if row.record.postqc_status == 'COMPLETED' %}status-completed{% else %}status-not-completed{% endif %}">
+                                                {{ row.record.postqc_status }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        
+                        <!-- Pagination -->
+                        {% if is_paginated %}
+                        <nav aria-label="Page navigation">
+                            <ul class="pagination justify-content-center">
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% param_replace page=1 %}" aria-label="First">
+                                            <span aria-hidden="true">&laquo;&laquo;</span>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% param_replace page=page_obj.previous_page_number %}" aria-label="Previous">
+                                            <span aria-hidden="true">&laquo;</span>
+                                        </a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <a class="page-link" href="#" aria-label="First">
+                                            <span aria-hidden="true">&laquo;&laquo;</span>
+                                        </a>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <a class="page-link" href="#" aria-label="Previous">
+                                            <span aria-hidden="true">&laquo;</span>
+                                        </a>
+                                    </li>
+                                {% endif %}
+                                
+                                {% for num in paginator.page_range %}
+                                    {% if page_obj.number == num %}
+                                        <li class="page-item active">
+                                            <a class="page-link" href="?{% param_replace page=num %}">{{ num }}</a>
+                                        </li>
+                                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?{% param_replace page=num %}">{{ num }}</a>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% param_replace page=page_obj.next_page_number %}" aria-label="Next">
+                                            <span aria-hidden="true">&raquo;</span>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% param_replace page=paginator.num_pages %}" aria-label="Last">
+                                            <span aria-hidden="true">&raquo;&raquo;</span>
+                                        </a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <a class="page-link" href="#" aria-label="Next">
+                                            <span aria-hidden="true">&raquo;</span>
+                                        </a>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <a class="page-link" href="#" aria-label="Last">
+                                            <span aria-hidden="true">&raquo;&raquo;</span>
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'viewer/js/column-toggle.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle advanced filters
+    const advancedFiltersToggle = document.getElementById('advanced-filters-toggle');
+    const advancedFilters = document.getElementById('advanced-filters');
+    
+    advancedFiltersToggle.addEventListener('click', function() {
+        if (advancedFilters.style.display === 'none') {
+            advancedFilters.style.display = 'block';
+            advancedFiltersToggle.innerHTML = '<i class="bi bi-sliders"></i> Hide Advanced Filters';
+        } else {
+            advancedFilters.style.display = 'none';
+            advancedFiltersToggle.innerHTML = '<i class="bi bi-sliders"></i> Advanced Filters';
+        }
+    });
+    
+    // Apply initial column visibility
+    const showBatchName = localStorage.getItem('showBatchName') !== 'false';
+    const showCellCapture = localStorage.getItem('showCellCapture') !== 'false';
+    
+    toggleColumnVisibility('batch_name', showBatchName);
+    toggleColumnVisibility('cell_capture', showCellCapture);
+});
+
+function clearFilters() {
+    window.location.href = window.location.pathname;
+}
+</script>
+{% endblock %} 
