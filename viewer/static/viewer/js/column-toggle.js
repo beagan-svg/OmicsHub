@@ -90,9 +90,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set up column visibility toggle event listeners
     setupColumnToggleListeners();
     
-    // Add search functionality
-    setupColumnSearch();
-    
     // Add toggle all and reset buttons functionality
     setupToggleAllAndReset();
     
@@ -217,56 +214,6 @@ function setupColumnToggleListeners() {
             console.warn(`Toggle element not found: ${toggleId}`);
         }
     });
-}
-
-/**
- * Set up search functionality for column toggles
- */
-function setupColumnSearch() {
-    const searchInput = document.getElementById('column-toggle-search-input');
-    
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            console.log(`Filtering toggle elements for: "${searchTerm}"`);
-            
-            // Find the categories container
-            const categoriesContainer = document.querySelector('.column-categories-container');
-            if (!categoriesContainer) {
-                console.error('Categories container not found');
-                return;
-            }
-            
-            // Filter toggle elements based on search term
-            Object.keys(columnMappings).forEach(columnClass => {
-                const toggleId = `toggle${toCamelCase(columnClass)}`;
-                const toggleElement = document.getElementById(toggleId);
-                
-                if (toggleElement) {
-                    const formCheck = toggleElement.closest('.form-check');
-                    
-                    if (formCheck) {
-                        const columnTitle = columnMappings[columnClass].title.toLowerCase();
-                        const isMatch = columnTitle.includes(searchTerm);
-                        
-                        // Show/hide the form-check element
-                        formCheck.style.display = isMatch || searchTerm === '' ? '' : 'none';
-                        console.log(`Toggle ${toggleId} ${isMatch ? 'matches' : 'does not match'} search term`);
-                    }
-                }
-            });
-            
-            // Show/hide category headers based on whether they have visible items
-            categoriesContainer.querySelectorAll('.column-category').forEach(category => {
-                const hasVisibleItems = Array.from(category.querySelectorAll('.form-check')).some(
-                    check => check.style.display !== 'none'
-                );
-                
-                category.style.display = hasVisibleItems ? '' : 'none';
-                console.log(`Category ${category.querySelector('h6')?.textContent.trim()} ${hasVisibleItems ? 'has' : 'has no'} visible items`);
-            });
-        });
-    }
 }
 
 /**
