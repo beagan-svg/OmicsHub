@@ -6,7 +6,9 @@
         <thead>
             <tr>
                 {% for column in table.columns %}
-                    <th>{{ column.header }}</th>
+                    <th {% if column.attrs.th.class %}class="{{ column.attrs.th.class }}"{% endif %}>
+                        {{ column.header }}
+                    </th>
                 {% endfor %}
             </tr>
         </thead>
@@ -14,34 +16,12 @@
             {% for row in table.rows %}
                 <tr>
                     {% for column, cell in row.items %}
-                        <td>{{ cell|safe }}</td>
+                        <td {% if column.attrs.td.class %}class="{{ column.attrs.td.class }}"{% endif %}>
+                            {{ cell|safe }}
+                        </td>
                     {% endfor %}
                 </tr>
             {% endfor %}
         </tbody>
     </table>
-</div>
-
-{% if table.page and table.paginator.num_pages > 1 %}
-<nav aria-label="Table navigation">
-    <ul class="pagination justify-content-center">
-        {% if table.page.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="{% querystring table.prefixed_page_field=table.page.previous_page_number %}">&laquo;</a>
-        </li>
-        {% endif %}
-
-        {% for p in table.page.paginator.page_range %}
-        <li class="page-item{% if table.page.number == p %} active{% endif %}">
-            <a class="page-link" href="{% querystring table.prefixed_page_field=p %}">{{ p }}</a>
-        </li>
-        {% endfor %}
-
-        {% if table.page.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="{% querystring table.prefixed_page_field=table.page.next_page_number %}">&raquo;</a>
-        </li>
-        {% endif %}
-    </ul>
-</nav>
-{% endif %} 
+</div> 
