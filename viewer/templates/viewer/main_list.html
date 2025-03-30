@@ -32,7 +32,7 @@
                                         name="search" 
                                         id="search-input" 
                                         class="form-control form-control-lg" 
-                                        placeholder="Search batch name, load name, organism, library prep..." 
+                                        placeholder="Search fastq name, load name, organism, library prep..." 
                                         value="{{ search_term }}"
                                         aria-label="Search"
                                     >
@@ -54,6 +54,13 @@
                                         <i class="bi bi-columns"></i> Columns
                                     </button>
                                     <div class="dropdown-menu dropdown-menu-end" aria-labelledby="column-settings-toggle" id="column-settings-dropdown">
+                                        <div class="column-toggle-header">
+                                            <div class="column-toggle-search">
+                                                <i class="bi bi-search"></i>
+                                                <input type="text" class="form-control form-control-sm" id="column-toggle-search-input" placeholder="Search columns...">
+                                            </div>
+                                        </div>
+                                        
                                         <div class="column-categories-container">
                                             <!-- Sample Information Category -->
                                             <div class="column-category">
@@ -227,16 +234,15 @@
                                 
                                 <div class="row g-3">
                                     <div class="col-md-4">
-                                        <label for="batch_name_from_vendor" class="form-label">Batch Name From Vendor</label>
-                                        <div class="select-container">
-                                            <select name="batch_name_from_vendor" id="batch_name_from_vendor" class="form-select filter-select" multiple="multiple" data-placeholder="Select options">
-                                                {% for vendor_batch in batch_name_from_vendors %}
-                                                    <option value="{{ vendor_batch }}" {% if vendor_batch in current_filters.batch_name_from_vendor_list %}selected{% endif %}>
-                                                        {{ vendor_batch }}
-                                                    </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
+                                        <label for="fastq_name" class="form-label">Fastq Name</label>
+                                        <input 
+                                            type="text" 
+                                            name="fastq_name" 
+                                            id="fastq_name" 
+                                            class="form-control" 
+                                            value="{{ current_filters.fastq_name|default:'' }}"
+                                            placeholder="Enter fastq name..."
+                                        >
                                     </div>
                                     
                                     <div class="col-md-4">
@@ -744,11 +750,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Initialize multiselect filters
-    $('.filter-select').select2({
-        theme: 'bootstrap4',
-        width: '100%',
-        placeholder: $(this).data('placeholder')
-    });
+    /* 
+     * Select2 initialization is now handled in the multiselect-filters.js file
+     * for better control over backspace behavior and keyboard interactions
+     */
     
     // Fix for dropdown scrolling issue
     const columnDropdown = document.getElementById('column-settings-dropdown');

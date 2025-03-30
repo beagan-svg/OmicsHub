@@ -166,6 +166,7 @@
     margin: 0;
     padding: 0 2px;
     overflow: visible;
+    width: 100%;
 }
 
 .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice {
@@ -211,52 +212,99 @@
 
 /* Fix select2 placeholder */
 .select2-container--bootstrap4 .select2-selection--multiple .select2-search--inline {
-    line-height: calc(var(--input-height) - 10px);
-    height: calc(var(--input-height) - 10px);
-    min-height: unset;
+    margin: 0;
+    padding: 0;
+    float: none;
+    flex: 1 1 auto;
+    min-width: 50px;
 }
 
 .select2-container--bootstrap4 .select2-selection--multiple .select2-search--inline .select2-search__field {
-    margin-top: 1px;
-    height: calc(var(--input-height) - 12px);
-    min-height: unset;
+    margin: 0;
+    padding: 0 4px;
+    height: 24px;
+    min-width: 100%;
+    width: 100% !important;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    background: transparent;
     font-size: 14px;
 }
 
-/* Improved dropdown styling */
-.select2-container--bootstrap4 .select2-dropdown {
-    border-color: var(--primary-color);
-    box-shadow: var(--shadow-lg);
-    border-radius: var(--radius-sm);
-    margin-top: 2px;
-    animation: fadeInUp 0.2s ease;
-    /* Force dropdown to always appear below the select element */
-    top: 100% !important;
-    bottom: auto !important;
+/* Fix for cursor and focus issues in Select2 */
+.select2-container--bootstrap4.select2-container--focus .select2-selection--multiple {
+    border: 1px solid var(--primary-color);
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25);
 }
 
-@keyframes fadeInUp {
-    from {
+/* Ensure proper spacing in multi-select dropdown */
+.select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice {
+    margin-top: 2px;
+    margin-bottom: 2px;
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Fix dropdown appearance */
+.select2-container--bootstrap4.select2-container--open .select2-dropdown {
+    border-color: var(--primary-color);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+    animation: dropdownAppear 0.2s ease;
+}
+
+@keyframes dropdownAppear {
+    0% {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(-5px);
     }
-    to {
+    100% {
         opacity: 1;
         transform: translateY(0);
     }
 }
 
-.select2-container--bootstrap4 .select2-results__option {
-    padding: 8px 12px;
-    transition: all var(--transition-fast);
-    border-radius: var(--radius-sm);
-    margin: 2px 4px;
-    font-size: 13px; /* Smaller text size in dropdown options */
+/* Prevent text jumping when selecting an option */
+.select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice__remove {
+    float: none;
+    margin-right: 4px;
+    font-weight: 700;
+    display: inline-block;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 4px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
 }
 
-.select2-container--bootstrap4 .select2-results__option--highlighted[aria-selected] {
-    background-color: var(--primary-color);
-    color: white;
+.select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice__remove:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+    color: var(--danger-color);
+}
+
+/* Fix focus indicator */
+.select2-search__field:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Ensure there's no text jumping when adding/removing items */
+.select2-container--bootstrap4 .select2-selection--multiple {
+    display: flex !important;
+    align-items: center;
+}
+
+/* Set a fixed width for the empty search input to prevent jumping */
+.select2-container--bootstrap4 .select2-selection--multiple .select2-search--inline .select2-search__field[placeholder=""] {
+    width: 100% !important;
+    min-width: 100%;
+}
+
+/* Adjust padding for a cleaner appearance */
+.select2-container--bootstrap4 .select2-results__option {
+    padding: 6px 12px;
+    transition: background-color 0.2s ease;
 }
 
 /* Status color coding with enhanced visuals */
