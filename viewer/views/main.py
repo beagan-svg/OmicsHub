@@ -7,23 +7,32 @@ from django.db.models import Prefetch, Q
 import subprocess
 from viewer.models import Main, Metadata, LoadAssociation
 from viewer.tables import MainTable
-from viewer.filters import MainFilter
+from viewer.filters import MainFilter, DISTINCT_ON_SUPPORTED
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
+from django_tables2.config import RequestConfig
+from django.core.paginator import Paginator
 
-class MainListView(SingleTableMixin, FilterView):
+class MainListView(FilterView):
+    """
+    Main view for displaying the sample browser.
+    
+    Note: We are inheriting from FilterView directly and manually handling
+    the table rendering, rather than using SingleTableMixin which was causing
+    pagination issues.
+    """
     model = Main
-    table_class = MainTable
     template_name = 'viewer/main_list.html'
     filterset_class = MainFilter
     paginate_by = 25
+    strict = False  # Allow non-model fields to be used in ordering
 
     def get_queryset(self):
         """
         Optimize the queryset with select_related and prefetch_related
         """
         queryset = Main.objects.select_related(
-            'fastq_name'
+            'fastq_name'  # This will fetch all metadata fields from the Metadata model
         ).prefetch_related(
             Prefetch(
                 'fastq_name__loadassociation_set',
@@ -33,9 +42,85 @@ class MainListView(SingleTableMixin, FilterView):
         
         return queryset
 
+    def get_filtered_queryset(self):
+        """
+        Get the filtered queryset and ensure proper ordering
+        for use with distinct() on fields
+        """
+        # Get the original filtered queryset
+        filtered_qs = self.filterset.qs
+        
+        # If using PostgreSQL with DISTINCT ON
+        if DISTINCT_ON_SUPPORTED:
+            # If the queryset uses distinct on fields, we need to make sure the ordering is consistent
+            # with the distinct fields to avoid database errors
+            if hasattr(filtered_qs, 'query') and hasattr(filtered_qs.query, 'distinct_fields') and filtered_qs.query.distinct_fields:
+                # Get the distinct fields
+                distinct_fields = filtered_qs.query.distinct_fields
+                
+                # Add the distinct fields to the ordering to ensure consistency
+                if distinct_fields:
+                    # Create a new ordered queryset based on the distinct fields, maintaining the original ordering as a secondary sort
+                    ordered_fields = list(distinct_fields)
+                    if filtered_qs.query.order_by:
+                        # Add existing ordering as secondary
+                        for field in filtered_qs.query.order_by:
+                            if field not in ordered_fields and f"-{field}" not in ordered_fields:
+                                ordered_fields.append(field)
+                    
+                    # Apply the ordering
+                    filtered_qs = filtered_qs.order_by(*ordered_fields)
+        else:
+            # For non-PostgreSQL databases, we need to handle duplicates manually
+            # Get the fastq_name values as a set to ensure uniqueness
+            unique_fastq_names = set(filtered_qs.values_list('fastq_name__fastq_name', flat=True))
+            
+            # Filter the original queryset to include only one record per fastq_name
+            # This is less efficient but works on all databases
+            filtered_qs = filtered_qs.filter(
+                fastq_name__fastq_name__in=unique_fastq_names
+            ).order_by('fastq_name__fastq_name')
+        
+        return filtered_qs
+
     def get_context_data(self, **kwargs):
-        """Add filter data to context"""
+        """
+        Add filter data and table to context.
+        
+        This is where we handle both filtering and table rendering,
+        ensuring pagination works correctly.
+        """
         context = super().get_context_data(**kwargs)
+        
+        # The FilterView already puts the filterset and filtered queryset in the context,
+        # along with the paginated page_obj. We need to create a table from the
+        # paginated data (object_list).
+        
+        # Create table from the paginated data
+        table = MainTable(data=context['object_list'])
+        
+        # Configure the table without pagination (the view already handles pagination)
+        # We don't pass per_page or enable parameter to avoid errors
+        RequestConfig(self.request).configure(table)
+        
+        context['table'] = table
+        
+        # Calculate the number of items on the current page
+        if context.get('page_obj'):
+            page_obj = context['page_obj']
+            if page_obj.number == page_obj.paginator.num_pages:
+                # Last page - might have fewer items
+                context['current_page_count'] = len(page_obj.object_list)
+            else:
+                # Full page
+                context['current_page_count'] = self.paginate_by
+        else:
+            context['current_page_count'] = 0
+        
+        # Add batch_name_from_vendor options to context
+        context['batch_names_from_vendor'] = sorted(Metadata.objects.filter(
+            batch_name_from_vendor__isnull=False
+        ).exclude(batch_name_from_vendor='').values_list('batch_name_from_vendor', flat=True).distinct())
         
         # Add filter options to context
         context['study_sets'] = sorted(Main.objects.filter(
@@ -68,6 +153,32 @@ class MainListView(SingleTableMixin, FilterView):
         
         # Add request parameters to context for form persistence
         context['current_filters'] = dict(self.request.GET.items())
+        
+        # Handle multiple selection values for the multi-select filters
+        multi_select_filters = ['study_set', 'organism', 'library_prep_method', 
+                               'alignment_status', 'postqc_status', 'ingest_status', 'batch_name_from_vendor']
+        
+        has_active_filters = False
+        
+        for filter_name in multi_select_filters:
+            # Use getlist directly which properly handles multiple values
+            list_values = self.request.GET.getlist(filter_name)
+            
+            list_name = f"{filter_name}_list"
+            
+            # Use list values if present
+            if list_values:
+                context['current_filters'][list_name] = list_values
+                has_active_filters = True
+            else:
+                context['current_filters'][list_name] = []
+        
+        # Check other filters to determine if any are active
+        for key, value in self.request.GET.items():
+            if key not in ['page', 'per_page'] and value and not context.get('has_active_filters', False):
+                has_active_filters = True
+        
+        context['has_active_filters'] = has_active_filters
         
         return context
 

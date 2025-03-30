@@ -1,6 +1,24 @@
 import django_filters
-from django.db.models import Q
+from django.db.models import Q, Count
+from django.forms.widgets import CheckboxSelectMultiple
+from django.db import connections
 from viewer.models import Main, Metadata, LoadAssociation
+
+# Check if the database supports DISTINCT ON
+def supports_distinct_on():
+    """Check if the database supports DISTINCT ON (primarily PostgreSQL)"""
+    try:
+        # Get the default database connection
+        db = connections['default']
+        
+        # Check database vendor
+        return db.vendor == 'postgresql'
+    except Exception:
+        # Default to False if unable to determine
+        return False
+
+# Global flag for distinct on support
+DISTINCT_ON_SUPPORTED = supports_distinct_on()
 
 class MainFilter(django_filters.FilterSet):
     """
@@ -12,10 +30,11 @@ class MainFilter(django_filters.FilterSet):
         label='Search'
     )
     
-    fastq_name = django_filters.CharFilter(
-        field_name='fastq_name__fastq_name',
-        lookup_expr='icontains',
-        label='Fastq Name'
+    batch_name_from_vendor = django_filters.MultipleChoiceFilter(
+        method='filter_batch_name_from_vendor',
+        label='Batch Name From Vendor',
+        choices=lambda: [(x, x) for x in Metadata.objects.filter(batch_name_from_vendor__isnull=False)
+            .exclude(batch_name_from_vendor='').values_list('batch_name_from_vendor', flat=True).distinct()]
     )
     
     load_name = django_filters.CharFilter(
@@ -23,40 +42,66 @@ class MainFilter(django_filters.FilterSet):
         label='Load Name'
     )
     
-    study_set = django_filters.CharFilter(
+    # For all multi-select filters, use method filtering
+    study_set = django_filters.MultipleChoiceFilter(
         method='filter_study_set',
-        label='Study Set'
+        label='Study Set',
+        choices=lambda: [(x, x) for x in Main.objects.filter(study_set__isnull=False)
+            .exclude(study_set='').values_list('study_set', flat=True).distinct()]
     )
     
-    organism = django_filters.CharFilter(
-        lookup_expr='iexact',
-        label='Organism'
+    organism = django_filters.MultipleChoiceFilter(
+        method='filter_organism',
+        label='Organism',
+        choices=lambda: [(x, x) for x in Main.objects.filter(organism__isnull=False)
+            .exclude(organism='').values_list('organism', flat=True).distinct()]
     )
     
-    library_prep_method = django_filters.CharFilter(
-        lookup_expr='iexact',
-        label='Library Prep Method'
+    library_prep_method = django_filters.MultipleChoiceFilter(
+        method='filter_library_prep_method',
+        label='Library Prep Method',
+        choices=lambda: [(x, x) for x in Main.objects.filter(library_prep_method__isnull=False)
+            .exclude(library_prep_method='').values_list('library_prep_method', flat=True).distinct()]
     )
     
-    alignment_status = django_filters.CharFilter(
-        lookup_expr='iexact',
-        label='Alignment Status'
+    alignment_status = django_filters.MultipleChoiceFilter(
+        method='filter_alignment_status',
+        label='Alignment Status',
+        choices=lambda: [(x, x) for x in Main.objects.filter(alignment_status__isnull=False)
+            .exclude(alignment_status='').values_list('alignment_status', flat=True).distinct()]
     )
     
-    postqc_status = django_filters.CharFilter(
-        lookup_expr='iexact',
-        label='PostQC Status'
+    postqc_status = django_filters.MultipleChoiceFilter(
+        method='filter_postqc_status',
+        label='PostQC Status',
+        choices=lambda: [(x, x) for x in Main.objects.filter(postqc_status__isnull=False)
+            .exclude(postqc_status='').values_list('postqc_status', flat=True).distinct()]
     )
     
-    ingest_status = django_filters.CharFilter(
-        lookup_expr='iexact',
-        label='Ingest Status'
+    ingest_status = django_filters.MultipleChoiceFilter(
+        method='filter_ingest_status',
+        label='Ingest Status',
+        choices=lambda: [(x, x) for x in Main.objects.filter(ingest_status__isnull=False)
+            .exclude(ingest_status='').values_list('ingest_status', flat=True).distinct()]
     )
+
+    def apply_distinct(self, queryset):
+        """
+        Apply distinct on fastq_name__fastq_name if supported,
+        otherwise use regular distinct and handle in view
+        """
+        if DISTINCT_ON_SUPPORTED:
+            return queryset.distinct('fastq_name__fastq_name')
+        else:
+            # For databases that don't support DISTINCT ON, 
+            # we'll need to handle the distinct processing at the view level
+            return queryset.distinct()
 
     def filter_search(self, queryset, name, value):
         """
         Filter queryset by searching across multiple fields:
         - fastq_name
+        - batch_name_from_vendor
         - load_name
         - organism
         - library_prep_method
@@ -64,13 +109,21 @@ class MainFilter(django_filters.FilterSet):
         if not value:
             return queryset
         
-        # Search across multiple fields
-        return queryset.filter(
+        # Get fastq_names that match the load_name search
+        matching_load_fastq_names = Metadata.objects.filter(
+            loadassociation__load_name__icontains=value
+        ).values_list('fastq_name', flat=True)
+        
+        # Search across multiple fields, avoiding duplicates by using primary key filtering
+        filtered_qs = queryset.filter(
             Q(fastq_name__fastq_name__icontains=value) |
-            Q(fastq_name__loadassociation__load_name__icontains=value) |
+            Q(fastq_name__batch_name_from_vendor__icontains=value) |
+            Q(fastq_name__fastq_name__in=matching_load_fastq_names) |
             Q(organism__icontains=value) |
             Q(library_prep_method__icontains=value)
-        ).distinct()
+        )
+        
+        return self.apply_distinct(filtered_qs)
     
     def filter_load_name(self, queryset, name, value):
         """
@@ -79,28 +132,101 @@ class MainFilter(django_filters.FilterSet):
         if not value:
             return queryset
         
-        # Filter by load_name in LoadAssociation
-        return queryset.filter(
-            fastq_name__loadassociation__load_name__icontains=value
-        ).distinct()
+        # Get fastq_names that match the load_name
+        matching_fastq_names = Metadata.objects.filter(
+            loadassociation__load_name__icontains=value
+        ).values_list('fastq_name', flat=True)
+        
+        # Filter by these fastq_names to avoid duplicates
+        filtered_qs = queryset.filter(
+            fastq_name__fastq_name__in=matching_fastq_names
+        )
+        
+        return self.apply_distinct(filtered_qs)
     
-    def filter_study_set(self, queryset, name, value):
+    def filter_study_set(self, queryset, name, values):
         """
-        Filter queryset by study_set field
+        Filter queryset by multiple study_set values
         """
-        if not value:
+        if not values:
             return queryset
         
-        # Filter by study_set
-        return queryset.filter(
-            study_set__iexact=value
-        ).distinct()
+        # Create a Q object for OR conditions
+        q_objects = Q()
+        for value in values:
+            q_objects |= Q(study_set__iexact=value)
+        
+        # Filter by Q object
+        filtered_qs = queryset.filter(q_objects)
+        
+        return self.apply_distinct(filtered_qs)
+    
+    def filter_organism(self, queryset, name, values):
+        """
+        Filter queryset by multiple organism values
+        """
+        if not values:
+            return queryset
+        
+        filtered_qs = queryset.filter(organism__in=values)
+        return self.apply_distinct(filtered_qs)
+    
+    def filter_library_prep_method(self, queryset, name, values):
+        """
+        Filter queryset by multiple library_prep_method values
+        """
+        if not values:
+            return queryset
+        
+        filtered_qs = queryset.filter(library_prep_method__in=values)
+        return self.apply_distinct(filtered_qs)
+    
+    def filter_alignment_status(self, queryset, name, values):
+        """
+        Filter queryset by multiple alignment_status values
+        """
+        if not values:
+            return queryset
+        
+        filtered_qs = queryset.filter(alignment_status__in=values)
+        return self.apply_distinct(filtered_qs)
+    
+    def filter_postqc_status(self, queryset, name, values):
+        """
+        Filter queryset by multiple postqc_status values
+        """
+        if not values:
+            return queryset
+        
+        filtered_qs = queryset.filter(postqc_status__in=values)
+        return self.apply_distinct(filtered_qs)
+    
+    def filter_ingest_status(self, queryset, name, values):
+        """
+        Filter queryset by multiple ingest_status values
+        """
+        if not values:
+            return queryset
+        
+        filtered_qs = queryset.filter(ingest_status__in=values)
+        return self.apply_distinct(filtered_qs)
+
+    def filter_batch_name_from_vendor(self, queryset, name, values):
+        """
+        Filter queryset by multiple batch_name_from_vendor values
+        """
+        if not values:
+            return queryset
+        
+        # Use the fastq_name__batch_name_from_vendor relationship
+        filtered_qs = queryset.filter(fastq_name__batch_name_from_vendor__in=values)
+        return self.apply_distinct(filtered_qs)
 
     class Meta:
         model = Main
         fields = [
             'search', 
-            'fastq_name', 
+            'batch_name_from_vendor', 
             'load_name', 
             'study_set', 
             'organism',

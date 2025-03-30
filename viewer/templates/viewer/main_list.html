@@ -32,7 +32,7 @@
                                         name="search" 
                                         id="search-input" 
                                         class="form-control form-control-lg" 
-                                        placeholder="Search fastq name, load name, organism, library prep..." 
+                                        placeholder="Search batch name, load name, organism, library prep..." 
                                         value="{{ search_term }}"
                                         aria-label="Search"
                                     >
@@ -66,11 +66,11 @@
                                             <div class="column-category">
                                                 <h6><i class="bi bi-info-circle me-2"></i>Sample Information</h6>
                                                 
-                                                <div class="form-check form-switch">
-                                                    <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleBatchName" checked>
-                                                        <span class="toggle-slider"></span>
-                                                    </label>
+                                        <div class="form-check form-switch">
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="toggleBatchName" checked>
+                                                <span class="toggle-slider"></span>
+                                            </label>
                                                     <label class="form-check-label" for="toggleBatchName">
                                                         Batch Name
                                                     </label>
@@ -84,13 +84,13 @@
                                                     <label class="form-check-label" for="toggleBatchNameFromVendor">
                                                         Batch Name From Vendor
                                                     </label>
-                                                </div>
-                                                
-                                                <div class="form-check form-switch">
-                                                    <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleCellCapture" checked>
-                                                        <span class="toggle-slider"></span>
-                                                    </label>
+                                        </div>
+                                        
+                                        <div class="form-check form-switch">
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="toggleCellCapture" checked>
+                                                <span class="toggle-slider"></span>
+                                            </label>
                                                     <label class="form-check-label" for="toggleCellCapture">
                                                         Cell Capture
                                                     </label>
@@ -234,15 +234,16 @@
                                 
                                 <div class="row g-3">
                                     <div class="col-md-4">
-                                        <label for="fastq_name" class="form-label">Fastq Name</label>
-                                        <input 
-                                            type="text" 
-                                            name="fastq_name" 
-                                            id="fastq_name" 
-                                            class="form-control" 
-                                            value="{{ current_filters.fastq_name|default:'' }}"
-                                            placeholder="Enter fastq name..."
-                                        >
+                                        <label for="batch_name_from_vendor" class="form-label">Batch Name From Vendor</label>
+                                        <div class="select-container">
+                                            <select name="batch_name_from_vendor" id="batch_name_from_vendor" class="form-select filter-select" multiple="multiple" data-placeholder="Select options">
+                                                {% for batch_name in batch_names_from_vendor %}
+                                                    <option value="{{ batch_name }}" {% if batch_name in current_filters.batch_name_from_vendor_list %}selected{% endif %}>
+                                                        {{ batch_name }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
                                     </div>
                                     
                                     <div class="col-md-4">
@@ -751,9 +752,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize multiselect filters
     $('.filter-select').select2({
-        theme: 'bootstrap4',
+        theme: 'bootstrap-5',
         width: '100%',
-        placeholder: $(this).data('placeholder')
+        dropdownAutoWidth: true,
+        placeholder: $(this).data('placeholder'),
+        allowClear: true
     });
     
     // Fix for dropdown scrolling issue
