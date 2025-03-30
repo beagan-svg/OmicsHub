@@ -50,104 +50,172 @@
                                 
                                 <!-- Column Settings Dropdown -->
                                 <div class="dropdown column-settings-dropdown d-inline-block">
-                                    <button type="button" id="column-settings-toggle" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <button type="button" id="column-settings-toggle" class="btn btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="bi bi-columns"></i> Columns
                                     </button>
-                                    <div class="dropdown-menu dropdown-menu-end compact-dropdown" aria-labelledby="column-settings-toggle" id="column-settings-dropdown">
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleBatchName" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleBatchName">Batch Name</label>
+                                    <div class="dropdown-menu dropdown-menu-end" aria-labelledby="column-settings-toggle" id="column-settings-dropdown">
+                                        <div class="column-toggle-header">
+                                            <div class="column-toggle-search">
+                                                <i class="bi bi-search"></i>
+                                                <input type="text" class="form-control form-control-sm" id="column-toggle-search-input" placeholder="Search columns...">
+                                            </div>
                                         </div>
                                         
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleBatchNameFromVendor" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleBatchNameFromVendor">Batch Name From Vendor</label>
+                                        <div class="column-categories-container">
+                                            <!-- Sample Information Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-info-circle me-2"></i>Sample Information</h6>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleBatchName" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleBatchName">
+                                                        Batch Name
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleBatchNameFromVendor" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleBatchNameFromVendor">
+                                                        Batch Name From Vendor
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleCellCapture" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleCellCapture">
+                                                        Cell Capture
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleSampleId" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleSampleId">
+                                                        Sample ID
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Amplification Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-layers me-2"></i>Amplification</h6>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAmplificationName" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAmplificationName">
+                                                        Amplification
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAmplificationId" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAmplificationId">
+                                                        Amplification ID
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Preparation Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-tools me-2"></i>Preparation</h6>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleCellPrepType" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleCellPrepType">
+                                                        Cell Prep Type
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleSequencingVendor" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleSequencingVendor">
+                                                        Sequencing Vendor
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAlignmentMethod" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAlignmentMethod">
+                                                        Alignment Method
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Library Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-journal me-2"></i>Library</h6>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleLibraryPrepMethodId" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleLibraryPrepMethodId">
+                                                        Library Prep Method ID
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleLibraryPrepName" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleLibraryPrepName">
+                                                        Library Prep Name
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Organism Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-bug me-2"></i>Organism</h6>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleOrganismCommonName" checked>
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleOrganismCommonName">
+                                                        Organism Common Name
+                                                    </label>
+                                                </div>
+                                            </div>
                                         </div>
                                         
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleCellCapture" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleCellCapture">Cell Capture</label>
-                                        </div>
-                                        
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleSampleId" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleSampleId">Sample ID</label>
-                                        </div>
-                                        
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleAmplificationName" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleAmplificationName">Amplification</label>
-                                        </div>
-                                        
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleAmplificationId" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleAmplificationId">Amplification ID</label>
-                                        </div>
-                                        
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleCellPrepType" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleCellPrepType">Cell Prep Type</label>
-                                        </div>
-                                        
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleSequencingVendor" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleSequencingVendor">Sequencing Vendor</label>
-                                        </div>
-                                        
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleAlignmentMethod" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleAlignmentMethod">Alignment Method</label>
-                                        </div>
-                                        
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleLibraryPrepMethodId" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleLibraryPrepMethodId">Library Prep Method ID</label>
-                                        </div>
-                                        
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleLibraryPrepName" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleLibraryPrepName">Library Prep Name</label>
-                                        </div>
-                                        
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleOrganismCommonName" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
-                                            <label class="form-check-label" for="toggleOrganismCommonName">Organism Common Name</label>
+                                        <!-- Action Buttons -->
+                                        <div class="d-flex justify-content-between mt-3 pt-2 border-top">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleAllColumns">
+                                                Toggle All
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-primary" id="resetColumnDefaults">
+                                                Reset to Default
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -337,7 +405,7 @@
     </div>
 </div>
 
-<!-- Additional CSS for select container -->
+<!-- Additional CSS for select container and column toggles -->
 <style>
 .select-container {
     position: relative;
@@ -354,22 +422,310 @@
     text-overflow: ellipsis;
 }
 
+/* Column Settings Dropdown Styling */
+.column-settings-dropdown .dropdown-menu {
+    padding: 0;
+    min-width: 300px;
+    border-radius: 8px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+    border: none;
+    max-height: 60vh;
+    overflow: hidden;
+    /* Fix for scrolling issue */
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+}
+
+/* Make sure pointer events work properly inside the dropdown */
+.column-settings-dropdown .dropdown-menu * {
+    pointer-events: auto;
+}
+
+/* Contains the scrollable categories */
+.column-categories-container {
+    padding: 1rem;
+    max-height: calc(60vh - 60px - 52px); /* 60px for header, 52px for footer */
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Header containing the search box */
+.column-toggle-header {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    background-color: white;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* Fix for category headers */
+.column-category {
+    margin-bottom: 1.5rem;
+    position: relative;
+    padding-top: 2.5rem;
+}
+
+/* Last category needs less bottom margin */
+.column-category:last-of-type {
+    margin-bottom: 0.5rem;
+}
+
+.column-settings-dropdown h6 {
+    color: #6c757d;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e9ecef;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    background-color: white;
+    z-index: 10;
+    margin-top: 0;
+    padding-top: 0.5rem;
+}
+
+/* Fix for the search box which should always be at the top */
+.column-toggle-search {
+    position: relative;
+    background-color: white;
+    z-index: 20;
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+}
+
+.column-toggle-search i {
+    position: absolute;
+    left: 1.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6c757d;
+    z-index: 21;
+}
+
+.column-toggle-search input {
+    width: 100%;
+    padding-left: 30px;
+    border-radius: 5px;
+    height: 38px;
+}
+
+/* Action buttons at the bottom */
+.column-settings-dropdown .dropdown-menu .d-flex.justify-content-between {
+    position: sticky;
+    bottom: 0;
+    background-color: white;
+    padding: 0.75rem 1rem;
+    margin-top: 0 !important;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
+    z-index: 30;
+}
+
+/* Toggle switch form-check styling */
+.column-settings-dropdown .form-check {
+    padding: 0.5rem 0.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.column-settings-dropdown .form-check:hover {
+    background-color: #f8f9fa;
+}
+
+.column-settings-dropdown .form-check-label {
+    margin-left: 0.5rem;
+    font-weight: 500;
+    flex-grow: 1;
+    cursor: pointer;
+}
+
+/* Modern Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 38px;
+    height: 22px;
+    margin: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 22px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+input:checked + .toggle-slider {
+    background-color: #007bff;
+}
+
+input:focus + .toggle-slider {
+    box-shadow: 0 0 1px #007bff;
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(16px);
+}
+
+/* Column toggle button */
+#column-settings-toggle {
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+#column-settings-toggle:hover {
+    background-color: #e9ecef;
+}
+
+#column-settings-toggle i {
+    transition: transform 0.3s ease;
+}
+
+#column-settings-toggle[aria-expanded="true"] i {
+    transform: rotate(180deg);
+}
+
+/* Toggle Feedback Animation */
 .toggle-feedback {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    background-color: rgba(40, 40, 40, 0.8);
+    background-color: rgba(40, 40, 40, 0.9);
     color: white;
     padding: 10px 15px;
-    border-radius: 4px;
+    border-radius: 6px;
     z-index: 9999;
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform: translateY(20px);
     pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-weight: 500;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toggle-feedback:before {
+    content: "";
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    background-color: #4CAF50;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+}
+
+.toggle-feedback.error {
+    background-color: rgba(220, 53, 69, 0.9);
+}
+
+.toggle-feedback.error:before {
+    background-color: #fff;
+    animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both;
 }
 
 .toggle-feedback.show {
     opacity: 1;
+    transform: translateY(0);
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+    }
+    
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+    }
+    
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+    }
+}
+
+@keyframes shake {
+  10%, 90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+  
+  20%, 80% {
+    transform: translate3d(2px, 0, 0);
+  }
+
+  30%, 50%, 70% {
+    transform: translate3d(-4px, 0, 0);
+  }
+
+  40%, 60% {
+    transform: translate3d(4px, 0, 0);
+  }
+}
+
+/* Column visibility animation */
+.animate-column-toggle {
+    transition: opacity 0.3s ease, transform 0.3s ease !important;
+}
+
+/* Additional fixes for the column toggle dropdown */
+.column-category.header-hover h6 {
+    background-color: #f8f9fa;
+}
+
+.column-settings-dropdown .column-category:first-of-type {
+    padding-top: 0;
+}
+
+.column-settings-dropdown .column-category:first-of-type h6 {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+/* Improved spacing for toggle buttons */
+.column-settings-dropdown .form-check {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0.5rem;
+    border-radius: 6px;
 }
 </style>
 
@@ -380,34 +736,111 @@
 <script src="{% static 'viewer/js/column-toggle.js' %}"></script>
 <script src="{% static 'viewer/js/multiselect-filters.js' %}"></script>
 <script>
-// Simple initialization for column visibility
+// Additional initialization for animations and UI effects
 document.addEventListener('DOMContentLoaded', function() {
-    // Apply initial column visibility
-    const showBatchName = localStorage.getItem('showBatchName') !== 'false';
-    const showBatchNameFromVendor = localStorage.getItem('showBatchNameFromVendor') !== 'false';
-    const showCellCapture = localStorage.getItem('showCellCapture') !== 'false';
-    const showSampleId = localStorage.getItem('showSampleId') !== 'false';
-    const showAmplificationName = localStorage.getItem('showAmplificationName') !== 'false';
-    const showAmplificationId = localStorage.getItem('showAmplificationId') !== 'false';
-    const showCellPrepType = localStorage.getItem('showCellPrepType') !== 'false';
-    const showSequencingVendor = localStorage.getItem('showSequencingVendor') !== 'false';
-    const showAlignmentMethod = localStorage.getItem('showAlignmentMethod') !== 'false';
-    const showLibraryPrepMethodId = localStorage.getItem('showLibraryPrepMethodId') !== 'false';
-    const showLibraryPrepName = localStorage.getItem('showLibraryPrepName') !== 'false';
-    const showOrganismCommonName = localStorage.getItem('showOrganismCommonName') !== 'false';
+    console.log('Main list template script initialized');
     
-    applyColumnVisibility('batch_name', showBatchName);
-    applyColumnVisibility('batch_name_from_vendor', showBatchNameFromVendor);
-    applyColumnVisibility('cell_capture', showCellCapture);
-    applyColumnVisibility('sample_id', showSampleId);
-    applyColumnVisibility('amplification_name', showAmplificationName);
-    applyColumnVisibility('amplification_id', showAmplificationId);
-    applyColumnVisibility('cell_prep_type', showCellPrepType);
-    applyColumnVisibility('sequencing_vendor', showSequencingVendor);
-    applyColumnVisibility('alignment_method', showAlignmentMethod);
-    applyColumnVisibility('library_prep_method_id', showLibraryPrepMethodId);
-    applyColumnVisibility('library_prep_name', showLibraryPrepName);
-    applyColumnVisibility('organism_common_name', showOrganismCommonName);
+    // Find and log table for debugging column toggle issues
+    const tables = document.querySelectorAll('table');
+    console.log(`Found ${tables.length} tables on the page`);
+    tables.forEach((table, index) => {
+        console.log(`Table ${index} classes: ${table.className}`);
+        console.log(`Table ${index} ID: ${table.id}`);
+        console.log(`Table ${index} parent: ${table.parentElement.className}`);
+    });
+    
+    // Initialize multiselect filters
+    $('.filter-select').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        placeholder: $(this).data('placeholder')
+    });
+    
+    // Fix for dropdown scrolling issue
+    const columnDropdown = document.getElementById('column-settings-dropdown');
+    const categoriesContainer = columnDropdown?.querySelector('.column-categories-container');
+    
+    if (categoriesContainer) {
+        // Ensure proper scrolling in the categories container
+        categoriesContainer.addEventListener('wheel', function(e) {
+            // Only if the dropdown is open and has scrollable content
+            if (columnDropdown.classList.contains('show') && 
+                this.scrollHeight > this.clientHeight) {
+                // Check if scroll will hit top or bottom boundaries
+                const scrollTop = this.scrollTop;
+                const scrollHeight = this.scrollHeight;
+                const clientHeight = this.clientHeight;
+                
+                // If at top and trying to scroll up, or at bottom and trying to scroll down
+                if ((scrollTop <= 0 && e.deltaY < 0) || 
+                    (scrollTop + clientHeight >= scrollHeight && e.deltaY > 0)) {
+                    // Let the page scroll default
+                } else {
+                    // Otherwise prevent default scroll behavior to keep scroll within dropdown
+                    e.preventDefault();
+                    this.scrollTop += e.deltaY;
+                }
+            }
+        });
+        
+        // Fix hover state on section headers
+        const categoryHeaders = categoriesContainer.querySelectorAll('.column-category h6');
+        categoryHeaders.forEach(header => {
+            header.addEventListener('mouseenter', () => {
+                const category = header.closest('.column-category');
+                if (category) {
+                    category.classList.add('header-hover');
+                }
+            });
+            
+            header.addEventListener('mouseleave', () => {
+                const category = header.closest('.column-category');
+                if (category) {
+                    category.classList.remove('header-hover');
+                }
+            });
+        });
+    }
+    
+    // Animate dropdown when opened
+    $('#column-settings-toggle').on('click', function() {
+        console.log('Column settings toggle clicked');
+    });
+    
+    // Animate dropdown when opened
+    $('#column-settings-toggle').on('shown.bs.dropdown', function() {
+        console.log('Column settings dropdown shown');
+        const dropdown = $('#column-settings-dropdown');
+        dropdown.find('.column-category').each(function(index) {
+            const category = $(this);
+            setTimeout(function() {
+                category.css({
+                    opacity: 1,
+                    transform: 'translateY(0)'
+                });
+            }, index * 50);
+        });
+        
+        // Ensure proper z-index stacking for headers
+        dropdown.find('.column-category h6').css('z-index', function(index) {
+            return 10 + (dropdown.find('.column-category').length - index);
+        });
+        
+        // Fix for search input focus
+        setTimeout(() => {
+            const searchInput = document.getElementById('column-toggle-search-input');
+            if (searchInput) {
+                searchInput.focus();
+            }
+        }, 100);
+    });
+    
+    // Initialize any other UI effects
+    $('#column-settings-dropdown .column-category').css({
+        opacity: 0,
+        transform: 'translateY(10px)',
+        transition: 'opacity 0.3s ease, transform 0.3s ease'
+    });
 });
 </script>
 {% endblock %} 
