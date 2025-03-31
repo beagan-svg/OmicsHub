@@ -22,6 +22,8 @@ wheels/
 
 # Django
 *.log
+*.pot
+*.pyc
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -32,6 +34,8 @@ staticfiles/
 venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 
 # IDE
 .idea/
@@ -47,4 +51,11 @@ Desktop.ini
 
 # Project specific
 *.env
-*.bak 
+*.bak
+tests/html/
+tests/scripts/
+data/
+logs/*.log
+
+# Exclude staticfiles in debug
+staticfiles/ 

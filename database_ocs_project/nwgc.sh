@@ -13,13 +13,12 @@ metadata_file="nwgc.csv"
 # Column headers for the metadata file
 header="Fastq Name,Library Prep Method,Study Set,Alignment Method,Amplification ID,Amplification,Batch Name,Batch Name From Vendor,Cell Capture,Cell Prep Type,Library Prep Method ID,Library Prep Name,Load Name,Organism Common Name,Organism Name,Sample ID,Sequencing Vendor"
 echo "$header" > "$metadata_file"
- 
+
 # Fetch all batch metadata
 json_output=$(ocs batches list NWGC --format json)
 
 # Process each dataset
 echo "$json_output" | jq -r '.[].dataset_name' | while read -r dataset_name; do
-    echo $dataset_name
     batch_name=$(echo "$dataset_name" | awk -F'_' '{print $2}')
     echo "Processing batch: $batch_name"
 
@@ -52,6 +51,8 @@ echo "$json_output" | jq -r '.[].dataset_name' | while read -r dataset_name; do
             "$(jq -r '.organism_common_name' <<< "$record")"
             "$(jq -r '.organism_name' <<< "$record")"
             "$(jq -r '.sample_id' <<< "$record")"
+            "$(jq -r '.sample_name' <<< "$record")"
+            "$(jq -r '.sample_type' <<< "$record")"
             "$(jq -r '.sequencing_vendor' <<< "$record")"
         )
 

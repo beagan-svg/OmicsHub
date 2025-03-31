@@ -1,3 +1,27 @@
+#!/usr/bin/env python
+"""
+OCS Database - Timestamp Comparison Tool
+
+This script compares timestamps between JSON data and database records to verify
+data integrity. It normalizes timestamps, extracts study sets, and identifies
+mismatches between JSON data and database records, providing a detailed
+verification report.
+
+Usage:
+    python scripts/data_verification/compare_timestamps.py
+
+Output:
+    A comparison report showing:
+    - Total records in JSON and database
+    - Match/mismatch counts
+    - Details of any discrepancies found
+
+Requirements:
+    - Django environment must be properly configured
+    - JSON file must exist at the specified path
+    - PostgreSQL command-line tools must be available if exporting database records
+"""
+
 import json
 import os
 from datetime import datetime

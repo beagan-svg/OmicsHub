@@ -46,30 +46,65 @@ const columnMappings = {
         title: 'Library Prep Name',
         category: 'library'
     },
+    'library_prep_method': {
+        title: 'Library Prep Method',
+        category: 'library'
+    },
     'organism_common_name': {
         title: 'Organism Common Name',
         category: 'organism'
+    },
+    'fastq_name': {
+        title: 'Fastq Name',
+        category: 'sample'
+    },
+    'study_set': {
+        title: 'Study Set',
+        category: 'sample'
+    },
+    'load_name': {
+        title: 'Load Name',
+        category: 'sample'
+    },
+    'ingest_status': {
+        title: 'Ingest Status',
+        category: 'status'
+    },
+    'alignment_status': {
+        title: 'Alignment Status',
+        category: 'status'
+    },
+    'postqc_status': {
+        title: 'PostQC Status',
+        category: 'status'
     }
 };
 
 // Default visibility state for columns
 const defaultColumnVisibility = {
-    'batch_name': true,
-    'batch_name_from_vendor': true,
-    'cell_capture': true,
-    'sample_id': true,
-    'amplification_name': true,
-    'amplification_id': true,
-    'cell_prep_type': true,
-    'sequencing_vendor': true,
-    'alignment_method': true,
-    'library_prep_method_id': true,
-    'library_prep_name': true,
-    'organism_common_name': true
+    'fastq_name': true,
+    'study_set': true,
+    'load_name': true,
+    'library_prep_method': true,
+    'organism_common_name': true,
+    'ingest_status': true,
+    'alignment_status': true,
+    'postqc_status': true,
+    'batch_name': false,
+    'batch_name_from_vendor': false,
+    'cell_capture': false,
+    'sample_id': false,
+    'amplification_name': false,
+    'amplification_id': false,
+    'cell_prep_type': false,
+    'sequencing_vendor': false,
+    'alignment_method': false,
+    'library_prep_method_id': false,
+    'library_prep_name': false
 };
 
 // Track if all columns are currently visible
-let allColumnsVisible = true;
+let allColumnsVisible = false;
 
 // Track if columns are being initialized to avoid showing messages during load
 let isInitializing = true;
@@ -78,11 +113,53 @@ let isInitializing = true;
 let lastMessage = '';
 let lastMessageTime = 0;
 
+// Flag to track if we've initialized the default columns
+const COLUMNS_INITIALIZED_KEY = 'columnsInitialized';
+
+/**
+ * Check if this is the first visit and initialize defaults
+ */
+function checkFirstVisitAndInitialize() {
+    // Check if we've already initialized the columns
+    if (!localStorage.getItem(COLUMNS_INITIALIZED_KEY)) {
+        console.log('First visit detected, initializing default column settings');
+        
+        // Set default column visibility in localStorage
+        Object.keys(defaultColumnVisibility).forEach(columnClass => {
+            const storageKey = `show${toCamelCase(columnClass)}`;
+            localStorage.setItem(storageKey, defaultColumnVisibility[columnClass]);
+        });
+        
+        // Mark as initialized
+        localStorage.setItem(COLUMNS_INITIALIZED_KEY, 'true');
+    } else {
+        console.log('Not first visit, using stored column preferences');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM content loaded - initializing column toggle functionality');
     
+    // Check and print toggle-all-columns element and checkbox
+    const toggleAllContainer = document.querySelector('.toggle-all-columns');
+    const toggleAllCheckbox = document.getElementById('toggleAllColumns');
+    if (toggleAllContainer) {
+        console.log('Found .toggle-all-columns container');
+    } else {
+        console.error('⚠️ .toggle-all-columns container NOT found');
+    }
+    
+    if (toggleAllCheckbox) {
+        console.log('Found #toggleAllColumns checkbox');
+    } else {
+        console.error('⚠️ #toggleAllColumns checkbox NOT found');
+    }
+    
     // Set initializing flag to prevent unnecessary notifications during page load
     isInitializing = true;
+    
+    // Check if this is the first visit and initialize defaults
+    checkFirstVisitAndInitialize();
     
     // Initialize column visibility from localStorage
     initializeColumnVisibility();
@@ -108,6 +185,18 @@ document.addEventListener('DOMContentLoaded', function() {
         debugTableColumns();
         // No longer initializing, now user interactions should show messages
         isInitializing = false;
+        
+        // Final check of toggle all checkbox state
+        const toggleAllCheckbox = document.getElementById('toggleAllColumns');
+        if (toggleAllCheckbox) {
+            console.log(`Final check - Toggle All checkbox state: ${toggleAllCheckbox.checked}, allColumnsVisible: ${allColumnsVisible}`);
+            
+            // Force alignment if needed
+            if (toggleAllCheckbox.checked !== allColumnsVisible) {
+                console.warn('Inconsistency detected, fixing toggle all checkbox state');
+                toggleAllCheckbox.checked = allColumnsVisible;
+            }
+        }
     }, 1000);
     
     // Check if form submission is happening (filtering)
@@ -138,10 +227,15 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeColumnVisibility() {
     console.log('Initializing column visibility');
 
-    // Initialize all toggle controls from localStorage
+    // Initialize all toggle controls from localStorage or defaults
     Object.keys(columnMappings).forEach(columnClass => {
         const storageKey = `show${toCamelCase(columnClass)}`;
-        const isVisible = localStorage.getItem(storageKey) !== 'false';
+        // Check if we have a stored preference
+        const storedValue = localStorage.getItem(storageKey);
+        // If no stored value, use the default; otherwise use the stored value
+        const isVisible = storedValue === null ? 
+            defaultColumnVisibility[columnClass] : 
+            storedValue !== 'false';
         
         // Update checkbox state
         const toggleId = `toggle${toCamelCase(columnClass)}`;
@@ -160,6 +254,13 @@ function initializeColumnVisibility() {
     
     // Update the "all columns visible" state
     updateAllColumnsState();
+    
+    // Explicitly ensure the Toggle All checkbox state is correct
+    const toggleAllCheckbox = document.getElementById('toggleAllColumns');
+    if (toggleAllCheckbox) {
+        console.log(`Setting initial toggleAllColumns state to ${allColumnsVisible}`);
+        toggleAllCheckbox.checked = allColumnsVisible;
+    }
 }
 
 /**
@@ -220,14 +321,19 @@ function setupColumnToggleListeners() {
  * Set up Toggle All and Reset to Default buttons
  */
 function setupToggleAllAndReset() {
-    // Toggle All button
-    const toggleAllButton = document.getElementById('toggleAllColumns');
+    // Toggle All checkbox
+    const toggleAllCheckbox = document.getElementById('toggleAllColumns');
     
-    if (toggleAllButton) {
-        toggleAllButton.addEventListener('click', function() {
-            // If all columns are visible, hide all; otherwise, show all
-            const newState = !allColumnsVisible;
+    if (toggleAllCheckbox) {
+        // Force initial state
+        toggleAllCheckbox.checked = allColumnsVisible;
+        
+        toggleAllCheckbox.addEventListener('change', function(event) {
+            // Get current state
+            const newState = this.checked;
+            console.log(`Toggle All clicked - changing all columns to: ${newState}`);
             
+            // Update all column toggles and apply changes
             Object.keys(columnMappings).forEach(columnClass => {
                 // Update checkbox state
                 const toggleId = `toggle${toCamelCase(columnClass)}`;
@@ -245,15 +351,19 @@ function setupToggleAllAndReset() {
                 localStorage.setItem(storageKey, newState);
             });
             
-            // Show feedback message
-            showToggleMessage(`${newState ? 'Showing' : 'Hiding'} all columns`);
+            // Show feedback message with more descriptive text
+            if (!isInitializing && event.isTrusted) {
+                showToggleMessage(newState ? 'Showing all columns' : 'Hiding all columns');
+            }
             
-            // Update button text
-            this.textContent = newState ? 'Hide All' : 'Show All';
-            
-            // Update the "all columns visible" state
+            // Update allColumnsVisible
             allColumnsVisible = newState;
+            
+            // Update label text
+            updateToggleAllButtonText();
         });
+    } else {
+        console.error('Toggle All checkbox not found in the DOM');
     }
     
     // Reset to Default button
@@ -261,6 +371,12 @@ function setupToggleAllAndReset() {
     
     if (resetButton) {
         resetButton.addEventListener('click', function() {
+            // Clear all localStorage column visibility settings
+            Object.keys(columnMappings).forEach(columnClass => {
+                const storageKey = `show${toCamelCase(columnClass)}`;
+                localStorage.removeItem(storageKey);
+            });
+            
             Object.keys(columnMappings).forEach(columnClass => {
                 const defaultState = defaultColumnVisibility[columnClass];
                 
@@ -275,7 +391,7 @@ function setupToggleAllAndReset() {
                 // Apply visibility to column
                 applyColumnVisibility(columnClass, defaultState, true);
                 
-                // Save preference to localStorage
+                // Save preference to localStorage (explicitly set to the default)
                 const storageKey = `show${toCamelCase(columnClass)}`;
                 localStorage.setItem(storageKey, defaultState);
             });
@@ -293,15 +409,63 @@ function setupToggleAllAndReset() {
  * Update the state tracking if all columns are visible
  */
 function updateAllColumnsState() {
+    // Count visible columns for debugging
+    let visibleCount = 0;
+    let totalCount = 0;
+    
+    console.group('Column Visibility Check');
     allColumnsVisible = Object.keys(columnMappings).every(columnClass => {
+        totalCount++;
         const storageKey = `show${toCamelCase(columnClass)}`;
-        return localStorage.getItem(storageKey) !== 'false';
+        const storedValue = localStorage.getItem(storageKey);
+        
+        // If not in localStorage, use default; otherwise check if it's not 'false'
+        const isVisible = storedValue === null ? 
+            defaultColumnVisibility[columnClass] : 
+            storedValue !== 'false';
+            
+        if (isVisible) visibleCount++;
+        
+        console.log(`Column "${columnClass}": localStorage=${storedValue}, isVisible=${isVisible}`);
+        
+        return isVisible;
     });
     
-    // Update Toggle All button text
-    const toggleAllButton = document.getElementById('toggleAllColumns');
-    if (toggleAllButton) {
-        toggleAllButton.textContent = allColumnsVisible ? 'Hide All' : 'Show All';
+    console.log(`Column visibility summary: ${visibleCount}/${totalCount} columns visible, allColumnsVisible=${allColumnsVisible}`);
+    console.groupEnd();
+    
+    // Update Toggle All checkbox and label
+    const toggleAllCheckbox = document.getElementById('toggleAllColumns');
+    if (toggleAllCheckbox) {
+        console.log(`Setting Toggle All checkbox to ${allColumnsVisible}`);
+        toggleAllCheckbox.checked = allColumnsVisible;
+    }
+    
+    updateToggleAllButtonText();
+}
+
+/**
+ * Update the Toggle All button text based on current state
+ */
+function updateToggleAllButtonText() {
+    const toggleAllCheckbox = document.getElementById('toggleAllColumns');
+    const toggleAllLabel = document.getElementById('toggleAllColumnsLabel');
+    
+    if (toggleAllCheckbox && toggleAllLabel) {
+        // Make sure the checkbox matches our state variable
+        toggleAllCheckbox.checked = allColumnsVisible;
+        
+        if (allColumnsVisible) {
+            // Update label for "Hide All" state
+            console.log('Setting toggle to "Hide All" state');
+            toggleAllLabel.textContent = 'Hide All Columns';
+        } else {
+            // Update label for "Show All" state
+            console.log('Setting toggle to "Show All" state');
+            toggleAllLabel.textContent = 'Show All Columns';
+        }
+    } else {
+        console.warn('Toggle All checkbox or label not found in the DOM');
     }
 }
 

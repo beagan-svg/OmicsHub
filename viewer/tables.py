@@ -9,6 +9,13 @@ class MainTable(tables.Table):
     study_set = Column(verbose_name='Study Set')
     organism = Column(verbose_name='Organism')
     library_prep_method = Column(verbose_name='Library Prep Method')
+    batch_name = Column(verbose_name='Batch Name', attrs={'th': {'class': 'column-batch_name'}, 'td': {'class': 'field-batch_name'}})
+    cell_capture = Column(verbose_name='Cell Capture', attrs={'th': {'class': 'column-cell_capture'}, 'td': {'class': 'field-cell_capture'}})
+    sample_name = Column(accessor='fastq_name.sample_name', verbose_name='Sample Name', attrs={'th': {'class': 'column-sample_name'}, 'td': {'class': 'field-sample_name'}})
+    sample_type = Column(accessor='fastq_name.sample_type', verbose_name='Sample Type', attrs={'th': {'class': 'column-sample_type'}, 'td': {'class': 'field-sample_type'}})
+    amplification_name = Column(accessor='fastq_name.amplification_name', verbose_name='Amplification', attrs={'th': {'class': 'column-amplification_name'}, 'td': {'class': 'field-amplification_name'}})
+    cell_prep_type = Column(accessor='fastq_name.cell_prep_type', verbose_name='Cell Prep Type', attrs={'th': {'class': 'column-cell_prep_type'}, 'td': {'class': 'field-cell_prep_type'}})
+    sequencing_vendor = Column(accessor='fastq_name.sequencing_vendor', verbose_name='Sequencing Vendor', attrs={'th': {'class': 'column-sequencing_vendor'}, 'td': {'class': 'field-sequencing_vendor'}})
     alignment_status = Column(verbose_name='Alignment Status')
     postqc_status = Column(verbose_name='PostQC Status')
     ingest_status = Column(verbose_name='Ingest Status')
@@ -16,9 +23,10 @@ class MainTable(tables.Table):
     class Meta:
         model = Main
         fields = ('fastq_name', 'load_name', 'study_set', 'organism', 'library_prep_method', 
-                 'alignment_status', 'postqc_status', 'ingest_status')
+                 'batch_name', 'cell_capture', 'sample_name', 'sample_type', 'amplification_name',
+                 'cell_prep_type', 'sequencing_vendor', 'alignment_status', 'postqc_status', 'ingest_status')
         attrs = {
-            'class': 'table table-hover',
+            'class': 'table table-striped table-bordered',
             'thead': {'class': 'table-light'},
         }
         row_attrs = {

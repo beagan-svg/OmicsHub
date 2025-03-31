@@ -1,3 +1,25 @@
+#!/usr/bin/env python
+"""
+OCS Database - Data Fixer Utility
+
+This script fixes data issues in the database by reading records from a JSON file
+and updating corresponding database records. It includes functions for parsing
+timestamps and processing each record with appropriate error handling.
+
+Usage:
+    python scripts/utilities/fix_data.py
+
+Features:
+    - Reads JSON data and updates database records
+    - Parses and normalizes timestamps
+    - Skips non-existent metadata
+    - Reports statistics on processed records and errors
+
+Requirements:
+    - Django environment must be properly configured
+    - JSON file must exist at the specified path
+"""
+
 from viewer.models import Metadata, Alignment, PostQC, Ingest, LoadAssociation, Main
 import json
 from datetime import datetime

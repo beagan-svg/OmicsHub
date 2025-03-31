@@ -133,7 +133,7 @@ class Command(BaseCommand):
                         alignment = Alignment.objects.create(
                             fastq_name=metadata,
                             status_id=record['Alignment'],
-                            start_time=parse_datetime(record.get('Alignment Time')),
+                            start_time=None,
                             end_time=parse_datetime(record.get('Alignment Time')),
                             fid=record.get('FID-Alignment')
                         )
@@ -144,7 +144,7 @@ class Command(BaseCommand):
                         postqc = PostQC.objects.create(
                             fastq_name=metadata,
                             status_id=record['Post-Alignment'],
-                            start_time=parse_datetime(record.get('Post Alignment Time')),
+                            start_time=None,
                             end_time=parse_datetime(record.get('Post Alignment Time')),
                             fid=record.get('FID-Post-Alignment')
                         )
@@ -155,7 +155,7 @@ class Command(BaseCommand):
                         ingest = Ingest.objects.create(
                             fastq_name=metadata,
                             status_id=record['Ingest'],
-                            start_time=parse_datetime(record.get('Ingest Time')),
+                            start_time=None,
                             end_time=parse_datetime(record.get('Ingest Time')),
                             fid=record.get('FID-Ingest')
                         )

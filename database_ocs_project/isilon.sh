@@ -19,7 +19,7 @@ json_output=$(ocs batches list isilon-s3-backup --format json)
 
 # Process each dataset
 echo "$json_output" | jq -r '.[].dataset_name' | while read -r dataset_name; do
-    batch_name="${dataset_name%%#*}"
+    batch_name=$(echo "$dataset_name" | awk -F'#' '{print $1}')
     echo "Processing batch: $batch_name"
 
     metadata_json=$(ocs fastqs list metadata --batch-name-from-vendor "$batch_name" --detail --format json)
@@ -51,6 +51,8 @@ echo "$json_output" | jq -r '.[].dataset_name' | while read -r dataset_name; do
             "$(jq -r '.organism_common_name' <<< "$record")"
             "$(jq -r '.organism_name' <<< "$record")"
             "$(jq -r '.sample_id' <<< "$record")"
+            "$(jq -r '.sample_name' <<< "$record")"
+            "$(jq -r '.sample_type' <<< "$record")"
             "$(jq -r '.sequencing_vendor' <<< "$record")"
         )
 

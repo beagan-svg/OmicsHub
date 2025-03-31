@@ -1,4 +1,18 @@
 #!/usr/bin/env python
+"""
+OCS Database - Study Data Loader
+
+This script loads study data from a JSON file into the Django database.
+It reads each record from the JSON file and creates corresponding database
+entries for Metadata, Main, LoadAssociation, Alignment, Ingest, and PostQC models.
+
+Usage:
+    python scripts/data_import/load_study_data.py
+
+Requirements:
+    - Django environment must be properly configured
+    - JSON file must exist at the specified path
+"""
 
 import os
 import json
@@ -77,8 +91,8 @@ def load_study_data():
                     Alignment.objects.create(
                         fastq_name=metadata,
                         status_id=alignment_status,
-                        start_time=parse_datetime(data.get('Alignment Time')),
-                        end_time=parse_datetime(data.get('Alignment Time')),  # Using same time for demo
+                        start_time=None,
+                        end_time=parse_datetime(data.get('Alignment Time')),
                         fid=data.get('FID-Alignment', '')
                     )
                     print(f"Created Alignment record for {fastq_name}: {alignment_status}")
@@ -89,8 +103,8 @@ def load_study_data():
                     Ingest.objects.create(
                         fastq_name=metadata,
                         status_id=ingest_status,
-                        start_time=parse_datetime(data.get('Ingest Time')),
-                        end_time=parse_datetime(data.get('Ingest Time')),  # Using same time for demo
+                        start_time=None,
+                        end_time=parse_datetime(data.get('Ingest Time')),
                         fid=data.get('FID-Ingest', '')
                     )
                     print(f"Created Ingest record for {fastq_name}: {ingest_status}")
@@ -101,8 +115,8 @@ def load_study_data():
                     PostQC.objects.create(
                         fastq_name=metadata,
                         status_id=postqc_status,
-                        start_time=parse_datetime(data.get('Post Alignment Time')),
-                        end_time=parse_datetime(data.get('Post Alignment Time')),  # Using same time for demo
+                        start_time=None,
+                        end_time=parse_datetime(data.get('Post Alignment Time')),
                         fid=data.get('FID-Post-Alignment', '')
                     )
                     print(f"Created PostQC record for {fastq_name}: {postqc_status}")

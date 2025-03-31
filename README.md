@@ -12,56 +12,54 @@ database_ocs/
 │   │   ├── development.py         # Development settings
 │   │   └── production.py          # Production settings
 │   ├── urls.py                    # Main URL configuration
+│   ├── asgi.py                    # ASGI configuration
 │   └── wsgi.py                    # WSGI configuration
 ├── viewer/                         # Main application
-│   ├── models/                    # Database models
-│   │   ├── __init__.py
-│   │   ├── metadata.py
-│   │   └── main.py
+│   ├── migrations/                # Database migrations
 │   ├── views/                     # View logic
 │   │   ├── __init__.py
-│   │   └── main.py
+│   │   ├── main.py                # Main views
+│   │   ├── api.py                 # API views
+│   │   ├── toggle_views.py        # Toggle functionality
+│   │   └── debug_views.py         # Debug views
+│   ├── models.py                  # Database models
+│   ├── tables.py                  # Table configurations
 │   ├── filters/                   # Custom filters
-│   │   ├── __init__.py
-│   │   └── main.py
-│   ├── tables/                    # Table configurations
-│   │   ├── __init__.py
-│   │   └── main.py
+│   ├── templatetags/              # Custom template tags
 │   ├── templates/                 # HTML templates
-│   │   └── viewer/
-│   │       ├── base/             # Base templates
-│   │       ├── components/       # Reusable components
-│   │       └── main_list.html    # Main view template
+│   │   ├── viewer/               # App-specific templates
+│   │   └── django_tables2/       # Custom django-tables2 templates
 │   ├── static/                    # Application-specific static files
 │   │   └── viewer/
 │   │       ├── css/             # Stylesheets
 │   │       ├── js/              # JavaScript files
 │   │       └── img/             # Images
 │   ├── tests/                    # Test files
-│   │   ├── __init__.py
-│   │   ├── test_study_sets.py
-│   │   ├── test_load_name.py
-│   │   └── verify_load_associations.py
 │   └── management/               # Management commands
 │       └── commands/
+├── tests/                         # Project-wide tests
+│   ├── scripts/                  # Test scripts
+│   └── html/                     # Test HTML output
+├── data/                         # Data files
+│   └── raw/                      # Raw data files
 ├── scripts/                      # Utility scripts
 │   ├── generate.py              # Data generation scripts
-│   ├── import_json_data.py
-│   └── compare_timestamps.py
+│   ├── import_json_data.py      # JSON import script
+│   ├── load_study_data.py       # Study data loader
+│   ├── fix_data.py              # Data fixing script
+│   └── compare_timestamps.py    # Timestamp comparison
 ├── sql/                         # SQL files
-│   ├── schema_fixed.sql        # Database schema
-│   ├── sample.sql              # Sample data
-│   ├── study.sql               # Study data
-│   └── alter.sql               # Schema alterations
+│   ├── schema.sql              # Database schema
+│   └── alignment_model.txt     # Alignment model definition
 ├── static/                      # Project-wide static files
-│   ├── css/                    # Global stylesheets
-│   ├── js/                     # Global JavaScript
-│   └── img/                    # Global images
-├── media/                      # User-uploaded files
-├── venv/                       # Python virtual environment
-├── manage.py                   # Django management script
-├── requirements.txt            # Python dependencies
-└── README.md                   # Project documentation
+├── staticfiles/                 # Collected static files
+├── logs/                        # Log files
+├── media/                       # User-uploaded files
+├── venv/                        # Python virtual environment
+├── manage.py                    # Django management script
+├── requirements.txt             # Python dependencies
+├── process_batch.sh             # Batch processing script
+└── README.md                    # Project documentation
 ```
 
 ## Setup
@@ -84,7 +82,7 @@ database_ocs/
 
 4. Start development server:
    ```bash
-   python manage.py runserver 0.0.0.0:8081
+   python manage.py runserver 0.0.0.0:8090
    ```
 
 ## Features
@@ -94,6 +92,8 @@ database_ocs/
 - Filter by study set, organism, and status
 - Sortable table columns
 - Responsive design
+- Column visibility toggle controls
+- User preference persistence
 
 ## Development
 

@@ -30,8 +30,14 @@ class MainFilter(django_filters.FilterSet):
         label='Search'
     )
     
+    fastq_name = django_filters.CharFilter(
+        field_name='fastq_name__fastq_name',
+        lookup_expr='icontains',
+        label='Fastq Name'
+    )
+    
     batch_name_from_vendor = django_filters.MultipleChoiceFilter(
-        method='filter_batch_name_from_vendor',
+        method='filter_batch_name',
         label='Batch Name From Vendor',
         choices=lambda: [(x, x) for x in Metadata.objects.filter(batch_name_from_vendor__isnull=False)
             .exclude(batch_name_from_vendor='').values_list('batch_name_from_vendor', flat=True).distinct()]
@@ -53,8 +59,8 @@ class MainFilter(django_filters.FilterSet):
     organism = django_filters.MultipleChoiceFilter(
         method='filter_organism',
         label='Organism',
-        choices=lambda: [(x, x) for x in Main.objects.filter(organism__isnull=False)
-            .exclude(organism='').values_list('organism', flat=True).distinct()]
+        choices=lambda: [(x, x) for x in Metadata.objects.filter(organism_common_name__isnull=False)
+            .exclude(organism_common_name='').values_list('organism_common_name', flat=True).distinct()]
     )
     
     library_prep_method = django_filters.MultipleChoiceFilter(
@@ -103,7 +109,7 @@ class MainFilter(django_filters.FilterSet):
         - fastq_name
         - batch_name_from_vendor
         - load_name
-        - organism
+        - organism_common_name
         - library_prep_method
         """
         if not value:
@@ -119,7 +125,7 @@ class MainFilter(django_filters.FilterSet):
             Q(fastq_name__fastq_name__icontains=value) |
             Q(fastq_name__batch_name_from_vendor__icontains=value) |
             Q(fastq_name__fastq_name__in=matching_load_fastq_names) |
-            Q(organism__icontains=value) |
+            Q(fastq_name__organism_common_name__icontains=value) |
             Q(library_prep_method__icontains=value)
         )
         
@@ -168,7 +174,8 @@ class MainFilter(django_filters.FilterSet):
         if not values:
             return queryset
         
-        filtered_qs = queryset.filter(organism__in=values)
+        # Filter by organism_common_name from the related Metadata model
+        filtered_qs = queryset.filter(fastq_name__organism_common_name__in=values)
         return self.apply_distinct(filtered_qs)
     
     def filter_library_prep_method(self, queryset, name, values):
@@ -211,7 +218,7 @@ class MainFilter(django_filters.FilterSet):
         filtered_qs = queryset.filter(ingest_status__in=values)
         return self.apply_distinct(filtered_qs)
 
-    def filter_batch_name_from_vendor(self, queryset, name, values):
+    def filter_batch_name(self, queryset, name, values):
         """
         Filter queryset by multiple batch_name_from_vendor values
         """
@@ -225,6 +232,7 @@ class MainFilter(django_filters.FilterSet):
         model = Main
         fields = [
             'search', 
+            'fastq_name', 
             'batch_name_from_vendor', 
             'load_name', 
             'study_set', 

@@ -1,3 +1,21 @@
+#!/usr/bin/env python
+"""
+OCS Database - JSON Data Importer
+
+This script directly imports data from a JSON file into a PostgreSQL database
+without using Django ORM. It establishes a direct database connection and
+inserts records into multiple tables (metadata, alignment, postqc, ingest,
+and load_association).
+
+Usage:
+    python scripts/data_import/import_json_data.py
+
+Requirements:
+    - PostgreSQL database must be accessible
+    - JSON file must exist at the specified path
+    - Required Python packages: psycopg2, json
+"""
+
 import json
 import psycopg2
 from psycopg2.extras import Json

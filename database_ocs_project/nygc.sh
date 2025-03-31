@@ -13,20 +13,18 @@ metadata_file="nygc.csv"
 # Column headers for the metadata file
 header="Fastq Name,Library Prep Method,Study Set,Alignment Method,Amplification ID,Amplification,Batch Name,Batch Name From Vendor,Cell Capture,Cell Prep Type,Library Prep Method ID,Library Prep Name,Load Name,Organism Common Name,Organism Name,Sample ID,Sequencing Vendor"
 echo "$header" > "$metadata_file"
- 
+
 # Fetch all batch metadata
 json_output=$(ocs batches list NYGC --format json)
 
 # Process each dataset
 echo "$json_output" | jq -r '.[].dataset_name' | while read -r dataset_name; do
-    echo $dataset_name
     batch_name=$(echo "$dataset_name" | awk -F'_' '{print $4}')
     echo "Processing batch: $batch_name"
 
     metadata_json=$(ocs fastqs list metadata --batch-name-from-vendor "$batch_name" --detail --format json)
 
     echo "$metadata_json" | jq -c '.[]' | while read -r record; do
-        
         library_prep_method_name=$(jq -r '.library_prep_method_name' <<< "$record")
 
         # Skip batches with NexteraXT
@@ -53,6 +51,8 @@ echo "$json_output" | jq -r '.[].dataset_name' | while read -r dataset_name; do
             "$(jq -r '.organism_common_name' <<< "$record")"
             "$(jq -r '.organism_name' <<< "$record")"
             "$(jq -r '.sample_id' <<< "$record")"
+            "$(jq -r '.sample_name' <<< "$record")"
+            "$(jq -r '.sample_type' <<< "$record")"
             "$(jq -r '.sequencing_vendor' <<< "$record")"
         )
 

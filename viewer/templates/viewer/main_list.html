@@ -4,6 +4,7 @@
 {% load viewer_filters %}
 
 {% block extrahead %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@x.x.x/dist/select2-bootstrap4.min.css" />
 <link rel="stylesheet" href="{% static 'viewer/css/multiselect-filters.css' %}" />
@@ -32,7 +33,7 @@
                                         name="search" 
                                         id="search-input" 
                                         class="form-control form-control-lg" 
-                                        placeholder="Search fastq name, load name, organism, library prep..." 
+                                        placeholder="Search batch name from vendor, load name, organism, library prep..." 
                                         value="{{ search_term }}"
                                         aria-label="Search"
                                     >
@@ -50,27 +51,50 @@
                                 
                                 <!-- Column Settings Dropdown -->
                                 <div class="dropdown column-settings-dropdown d-inline-block">
-                                    <button type="button" id="column-settings-toggle" class="btn btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <button type="button" id="column-settings-toggle" class="btn btn-outline-secondary" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
                                         <i class="bi bi-columns"></i> Columns
                                     </button>
-                                    <div class="dropdown-menu dropdown-menu-end" aria-labelledby="column-settings-toggle" id="column-settings-dropdown">
-                                        <div class="column-toggle-header">
-                                            <div class="column-toggle-search">
-                                                <i class="bi bi-search"></i>
-                                                <input type="text" class="form-control form-control-sm" id="column-toggle-search-input" placeholder="Search columns...">
-                                            </div>
-                                        </div>
-                                        
+                                    <div class="dropdown-menu dropdown-menu-end column-settings-dropdown-menu" aria-labelledby="column-settings-toggle" id="column-settings-dropdown">
                                         <div class="column-categories-container">
                                             <!-- Sample Information Category -->
                                             <div class="column-category">
                                                 <h6><i class="bi bi-info-circle me-2"></i>Sample Information</h6>
                                                 
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleBatchName" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleFastqName" class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleFastqName">
+                                                        Fastq Name
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleStudySet" class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleStudySet">
+                                                        Study Set
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleLoadName" class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleLoadName">
+                                                        Load Name
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleBatchName" class="column-toggle-checkbox" data-default-visible="false">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
                                                     <label class="form-check-label" for="toggleBatchName">
                                                         Batch Name
                                                     </label>
@@ -78,19 +102,19 @@
                                                 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleBatchNameFromVendor" checked>
+                                                        <input type="checkbox" id="toggleBatchNameFromVendor" class="column-toggle-checkbox" data-default-visible="false">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleBatchNameFromVendor">
                                                         Batch Name From Vendor
                                                     </label>
-                                        </div>
-                                        
-                                        <div class="form-check form-switch">
-                                            <label class="toggle-switch">
-                                                <input type="checkbox" id="toggleCellCapture" checked>
-                                                <span class="toggle-slider"></span>
-                                            </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleCellCapture" class="column-toggle-checkbox" data-default-visible="false">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
                                                     <label class="form-check-label" for="toggleCellCapture">
                                                         Cell Capture
                                                     </label>
@@ -98,7 +122,7 @@
                                                 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleSampleId" checked>
+                                                        <input type="checkbox" id="toggleSampleId" class="column-toggle-checkbox" data-default-visible="false">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleSampleId">
@@ -113,7 +137,7 @@
                                                 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleAmplificationName" checked>
+                                                        <input type="checkbox" id="toggleAmplificationName" class="column-toggle-checkbox" data-default-visible="false">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleAmplificationName">
@@ -123,7 +147,7 @@
                                                 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleAmplificationId" checked>
+                                                        <input type="checkbox" id="toggleAmplificationId" class="column-toggle-checkbox" data-default-visible="false">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleAmplificationId">
@@ -138,7 +162,7 @@
                                                 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleCellPrepType" checked>
+                                                        <input type="checkbox" id="toggleCellPrepType" class="column-toggle-checkbox" data-default-visible="false">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleCellPrepType">
@@ -148,7 +172,7 @@
                                                 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleSequencingVendor" checked>
+                                                        <input type="checkbox" id="toggleSequencingVendor" class="column-toggle-checkbox" data-default-visible="false">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleSequencingVendor">
@@ -158,7 +182,7 @@
                                                 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleAlignmentMethod" checked>
+                                                        <input type="checkbox" id="toggleAlignmentMethod" class="column-toggle-checkbox" data-default-visible="true">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleAlignmentMethod">
@@ -173,7 +197,17 @@
                                                 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleLibraryPrepMethodId" checked>
+                                                        <input type="checkbox" id="toggleLibraryPrepMethod" class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleLibraryPrepMethod">
+                                                        Library Prep Method
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleLibraryPrepMethodId" class="column-toggle-checkbox" data-default-visible="true">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleLibraryPrepMethodId">
@@ -183,7 +217,7 @@
                                                 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleLibraryPrepName" checked>
+                                                        <input type="checkbox" id="toggleLibraryPrepName" class="column-toggle-checkbox" data-default-visible="true">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleLibraryPrepName">
@@ -198,7 +232,17 @@
                                                 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleOrganismCommonName" checked>
+                                                        <input type="checkbox" id="toggleOrganism" class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleOrganism">
+                                                        Organism
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleOrganismCommonName" class="column-toggle-checkbox" data-default-visible="true">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleOrganismCommonName">
@@ -206,17 +250,75 @@
                                                     </label>
                                                 </div>
                                             </div>
+                                            
+                                            <!-- Status Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-check2-circle me-2"></i>Status</h6>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleIngestStatus" class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleIngestStatus">
+                                                        Ingest Status
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAlignmentStatus" class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAlignmentStatus">
+                                                        Alignment Status
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="togglePostqcStatus" class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="togglePostqcStatus">
+                                                        PostQC Status
+                                                    </label>
+                                                </div>
+                                            </div>
                                         </div>
                                         
                                         <!-- Action Buttons -->
-                                        <div class="d-flex justify-content-between mt-3 pt-2 border-top">
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleAllColumns">
-                                                Toggle All
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-primary" id="resetColumnDefaults">
-                                                Reset to Default
+                                        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                            <div class="toggle-all-columns">
+                                                <label class="toggle-switch toggle-switch-lg" for="toggleAllColumns">
+                                                    <input type="checkbox" id="toggleAllColumns" class="column-toggle-all-checkbox">
+                                                    <span class="toggle-slider"></span>
+                                                </label>
+                                                <label class="toggle-label" for="toggleAllColumns">
+                                                    <span id="toggleAllColumnsLabel">Show All Columns</span>
+                                                </label>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="resetColumnDefaults" title="Reset to default column visibility">
+                                                <i class="bi bi-arrow-counterclockwise"></i> Reset to Default
                                             </button>
                                         </div>
+                                        
+                                        <!-- Default Column Documentation (not visible to users, for devs only) -->
+                                        <!-- 
+                                            Default visible columns:
+                                            - FASTQ NAME
+                                            - STUDY SET
+                                            - LOAD NAME
+                                            - LIBRARY PREP METHOD
+                                            - ORGANISM COMMON NAME
+                                            - INGEST STATUS
+                                            - ALIGNMENT STATUS
+                                            - POSTQC STATUS
+                                            
+                                            Note: These default settings are configured in:
+                                            1. HTML data-default-visible attributes
+                                            2. The defaultVisibleColumns array in column-settings-rebuild.js
+                                        -->
                                     </div>
                                 </div>
                             </div>
@@ -233,31 +335,20 @@
                                 <h6 class="filter-section-heading"><i class="bi bi-info-circle"></i> Sample Information</h6>
                                 
                                 <div class="row g-3">
-                                    <div class="col-md-4">
-                                        <label for="fastq_name" class="form-label">Fastq Name</label>
-                                        <input 
-                                            type="text" 
-                                            name="fastq_name" 
-                                            id="fastq_name" 
-                                            class="form-control" 
-                                            value="{{ current_filters.fastq_name|default:'' }}"
-                                            placeholder="Enter fastq name..."
-                                        >
+                                    <div class="col-md-6">
+                                        <label for="batch_name_from_vendor" class="form-label">Batch Name From Vendor</label>
+                                        <div class="select-container">
+                                            <select name="batch_name_from_vendor" id="batch_name_from_vendor_info" class="form-select filter-select" multiple="multiple" data-placeholder="Select options">
+                                                {% for batch_name in batch_names_from_vendor %}
+                                                    <option value="{{ batch_name }}" {% if batch_name in current_filters.batch_name_from_vendor_list %}selected{% endif %}>
+                                                        {{ batch_name }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
                                     </div>
                                     
-                                    <div class="col-md-4">
-                                        <label for="load_name" class="form-label">Load Name</label>
-                                        <input 
-                                            type="text" 
-                                            name="load_name" 
-                                            id="load_name" 
-                                            class="form-control" 
-                                            value="{{ current_filters.load_name|default:'' }}"
-                                            placeholder="Enter load name..."
-                                        >
-                                    </div>
-                                    
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <label for="study_set" class="form-label">Study Set</label>
                                         <div class="select-container">
                                             <select name="study_set" id="study_set" class="form-select filter-select" multiple="multiple" data-placeholder="Select options">
@@ -278,7 +369,7 @@
                                 
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label for="organism" class="form-label">Organism</label>
+                                        <label for="organism" class="form-label">Organism Common Name</label>
                                         <div class="select-container">
                                             <select name="organism" id="organism" class="form-select filter-select" multiple="multiple" data-placeholder="Select options">
                                                 {% for organism in organisms %}
@@ -311,6 +402,19 @@
                                 
                                 <div class="row g-3">
                                     <div class="col-md-4">
+                                        <label for="ingest_status" class="form-label">Ingest Status</label>
+                                        <div class="select-container">
+                                            <select name="ingest_status" id="ingest_status" class="form-select filter-select" multiple="multiple" data-placeholder="Select options">
+                                                {% for status in ingest_status_options %}
+                                                    <option value="{{ status }}" {% if status in current_filters.ingest_status_list %}selected{% endif %}>
+                                                        {{ status }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
                                         <label for="alignment_status" class="form-label">Alignment Status</label>
                                         <div class="select-container">
                                             <select name="alignment_status" id="alignment_status" class="form-select filter-select" multiple="multiple" data-placeholder="Select options">
@@ -329,19 +433,6 @@
                                             <select name="postqc_status" id="postqc_status" class="form-select filter-select" multiple="multiple" data-placeholder="Select options">
                                                 {% for status in postqc_status_options %}
                                                     <option value="{{ status }}" {% if status in current_filters.postqc_status_list %}selected{% endif %}>
-                                                        {{ status }}
-                                                    </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="col-md-4">
-                                        <label for="ingest_status" class="form-label">Ingest Status</label>
-                                        <div class="select-container">
-                                            <select name="ingest_status" id="ingest_status" class="form-select filter-select" multiple="multiple" data-placeholder="Select options">
-                                                {% for status in ingest_status_options %}
-                                                    <option value="{{ status }}" {% if status in current_filters.ingest_status_list %}selected{% endif %}>
                                                         {{ status }}
                                                     </option>
                                                 {% endfor %}
@@ -444,20 +535,9 @@
 /* Contains the scrollable categories */
 .column-categories-container {
     padding: 1rem;
-    max-height: calc(60vh - 60px - 52px); /* 60px for header, 52px for footer */
+    max-height: calc(60vh - 52px); /* Adjusted height without header */
     overflow-y: auto;
     overflow-x: hidden;
-}
-
-/* Header containing the search box */
-.column-toggle-header {
-    position: sticky;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 30;
-    background-color: white;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
 /* Fix for category headers */
@@ -490,33 +570,6 @@
     padding-top: 0.5rem;
 }
 
-/* Fix for the search box which should always be at the top */
-.column-toggle-search {
-    position: relative;
-    background-color: white;
-    z-index: 20;
-    padding: 1rem;
-    border-bottom: 1px solid #e9ecef;
-    display: flex;
-    align-items: center;
-}
-
-.column-toggle-search i {
-    position: absolute;
-    left: 1.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #6c757d;
-    z-index: 21;
-}
-
-.column-toggle-search input {
-    width: 100%;
-    padding-left: 30px;
-    border-radius: 5px;
-    height: 38px;
-}
-
 /* Action buttons at the bottom */
 .column-settings-dropdown .dropdown-menu .d-flex.justify-content-between {
     position: sticky;
@@ -547,6 +600,92 @@
     font-weight: 500;
     flex-grow: 1;
     cursor: pointer;
+}
+
+/* Toggle All Columns section */
+.toggle-all-columns {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    min-width: 140px;
+}
+
+.toggle-all-columns:hover {
+    background-color: #f8f9fa;
+}
+
+@media (max-width: 576px) {
+    .toggle-all-columns {
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .toggle-label {
+        margin-left: 0;
+        margin-top: 0.25rem;
+    }
+}
+
+/* Highlight when all columns are visible */
+input#toggleAllColumns:checked ~ .toggle-label {
+    color: #007bff;
+    font-weight: 700;
+}
+
+.toggle-all-columns input:checked + .toggle-slider {
+    background-color: #007bff;
+}
+
+.toggle-label {
+    margin-left: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #495057;
+    transition: color 0.2s ease;
+}
+
+/* Larger Toggle Switch for Show All - make it smaller but still distinct */
+.toggle-switch-lg {
+    width: 42px;
+    height: 24px;
+}
+
+.toggle-switch-lg .toggle-slider:before {
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+}
+
+/* Add eye icons to the toggle slider */
+.toggle-switch-lg .toggle-slider:after {
+    font-family: "bootstrap-icons";
+    position: absolute;
+    color: white;
+    font-size: 11px;
+    right: 6px;
+    top: 4px;
+    content: "\F341"; /* eye icon */
+}
+
+.toggle-switch-lg input:checked + .toggle-slider:after {
+    content: "\F340"; /* eye-slash icon */
+    left: 6px;
+    right: auto;
+}
+
+.toggle-switch-lg input:checked + .toggle-slider:before {
+    transform: translateX(18px);
+}
+
+.column-settings-dropdown .form-check:hover {
+    background-color: #f8f9fa;
 }
 
 /* Modern Toggle Switch */
@@ -733,82 +872,65 @@ input:checked + .toggle-slider:before {
 
 {% block extrascripts %}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="{% static 'viewer/js/column-toggle.js' %}"></script>
+<script src="{% static 'viewer/js/table-column-classes.js' %}"></script>
+<script src="{% static 'viewer/js/column-settings-rebuild.js' %}"></script>
 <script src="{% static 'viewer/js/multiselect-filters.js' %}"></script>
 <script>
 // Additional initialization for animations and UI effects
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Main list template script initialized');
-    
-    // Find and log table for debugging column toggle issues
-    const tables = document.querySelectorAll('table');
-    console.log(`Found ${tables.length} tables on the page`);
-    tables.forEach((table, index) => {
-        console.log(`Table ${index} classes: ${table.className}`);
-        console.log(`Table ${index} ID: ${table.id}`);
-        console.log(`Table ${index} parent: ${table.parentElement.className}`);
-    });
-    
     // Initialize multiselect filters
-    /* 
-     * Select2 initialization is now handled in the multiselect-filters.js file
-     * for better control over backspace behavior and keyboard interactions
-     */
+    $('.filter-select').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        placeholder: $(this).data('placeholder')
+    });
     
     // Fix for dropdown scrolling issue
     const columnDropdown = document.getElementById('column-settings-dropdown');
     const categoriesContainer = columnDropdown?.querySelector('.column-categories-container');
     
     if (categoriesContainer) {
-        // Ensure proper scrolling in the categories container
+        // Add class to help with initial load
+        categoriesContainer.classList.add('initializing');
+        
+        // Handle proper scrolling
         categoriesContainer.addEventListener('wheel', function(e) {
-            // Only if the dropdown is open and has scrollable content
-            if (columnDropdown.classList.contains('show') && 
-                this.scrollHeight > this.clientHeight) {
-                // Check if scroll will hit top or bottom boundaries
-                const scrollTop = this.scrollTop;
-                const scrollHeight = this.scrollHeight;
-                const clientHeight = this.clientHeight;
-                
-                // If at top and trying to scroll up, or at bottom and trying to scroll down
-                if ((scrollTop <= 0 && e.deltaY < 0) || 
-                    (scrollTop + clientHeight >= scrollHeight && e.deltaY > 0)) {
-                    // Let the page scroll default
-                } else {
-                    // Otherwise prevent default scroll behavior to keep scroll within dropdown
-                    e.preventDefault();
-                    this.scrollTop += e.deltaY;
-                }
+            const isScrollable = this.scrollHeight > this.clientHeight;
+            if (!isScrollable) return;
+            
+            // Check if at top or bottom boundary
+            const atTop = this.scrollTop === 0 && e.deltaY < 0;
+            const atBottom = this.scrollTop + this.clientHeight >= this.scrollHeight - 1 && e.deltaY > 0;
+            
+            if (!atTop && !atBottom) {
+                e.stopPropagation();
             }
         });
         
-        // Fix hover state on section headers
-        const categoryHeaders = categoriesContainer.querySelectorAll('.column-category h6');
-        categoryHeaders.forEach(header => {
-            header.addEventListener('mouseenter', () => {
-                const category = header.closest('.column-category');
-                if (category) {
-                    category.classList.add('header-hover');
-                }
-            });
-            
-            header.addEventListener('mouseleave', () => {
-                const category = header.closest('.column-category');
-                if (category) {
-                    category.classList.remove('header-hover');
-                }
-            });
-        });
+        // Remove initializing class after animation
+        setTimeout(() => {
+            categoriesContainer.classList.remove('initializing');
+        }, 500);
     }
     
-    // Animate dropdown when opened
-    $('#column-settings-toggle').on('click', function() {
-        console.log('Column settings toggle clicked');
+    // Clean up dropdown behavior
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('#column-settings-dropdown') && 
+            !event.target.closest('#column-settings-toggle')) {
+            
+            // Get the Bootstrap dropdown instance and manually hide it if open
+            const dropdownMenu = document.getElementById('column-settings-dropdown');
+            if (dropdownMenu && dropdownMenu.classList.contains('show')) {
+                const dropdown = bootstrap.Dropdown.getInstance(document.getElementById('column-settings-toggle'));
+                if (dropdown) {
+                    dropdown.hide();
+                }
+            }
+        }
     });
     
     // Animate dropdown when opened
     $('#column-settings-toggle').on('shown.bs.dropdown', function() {
-        console.log('Column settings dropdown shown');
         const dropdown = $('#column-settings-dropdown');
         dropdown.find('.column-category').each(function(index) {
             const category = $(this);
@@ -824,14 +946,6 @@ document.addEventListener('DOMContentLoaded', function() {
         dropdown.find('.column-category h6').css('z-index', function(index) {
             return 10 + (dropdown.find('.column-category').length - index);
         });
-        
-        // Fix for search input focus
-        setTimeout(() => {
-            const searchInput = document.getElementById('column-toggle-search-input');
-            if (searchInput) {
-                searchInput.focus();
-            }
-        }, 100);
     });
     
     // Initialize any other UI effects

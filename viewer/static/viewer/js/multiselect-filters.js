@@ -107,57 +107,12 @@ function initEnhancedSelect2() {
             dropdownCssClass: 'enhanced-dropdown',
             selectionCssClass: 'select2-selection-fixed-height',
             minimumResultsForSearch: 5,
-            containerCssClass: 'select2-fixed-height',
-            tags: false
+            containerCssClass: 'select2-fixed-height'
         });
         
         // Fix placeholder appearance
         jQuery('.filter-select').on('select2:open', function() {
             document.querySelector('.select2-search__field').placeholder = 'Search...';
-        });
-        
-        // Handle keyboard events to improve backspace behavior
-        jQuery(document).on('keydown', '.select2-selection--multiple .select2-search__field', function(e) {
-            // Get the select element
-            const $select = jQuery(this).closest('.select2-container').siblings('select.filter-select');
-            
-            // If backspace key pressed and input is empty
-            if (e.keyCode === 8 && this.value.length === 0) {
-                // Get current values
-                const values = $select.val() || [];
-                
-                // If there are selected values
-                if (values.length > 0) {
-                    // Create a new array without the last value
-                    const newValues = values.slice(0, -1);
-                    
-                    // Set the new values without opening dropdown
-                    $select.val(newValues).trigger('change.select2');
-                    
-                    // Prevent default backspace action which might cause cursor behavior issues
-                    e.preventDefault();
-                }
-            }
-        });
-        
-        // Close dropdown when pressing ESC or Tab
-        jQuery(document).on('keydown', '.select2-selection--multiple', function(e) {
-            if (e.keyCode === 27 || e.keyCode === 9) { // ESC or Tab
-                const $select = jQuery(this).closest('.select2-container').siblings('select.filter-select');
-                $select.select2('close');
-            }
-        });
-        
-        // Fix input field focus when clicking on selection area
-        jQuery(document).on('click', '.select2-selection--multiple', function(e) {
-            if (jQuery(e.target).hasClass('select2-selection--multiple')) {
-                const searchField = jQuery(this).find('.select2-search__field')[0];
-                if (searchField) {
-                    setTimeout(() => {
-                        searchField.focus();
-                    }, 0);
-                }
-            }
         });
         
         // Handle on-change events for dynamic interface updates

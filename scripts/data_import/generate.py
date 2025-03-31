@@ -1,3 +1,22 @@
+#!/usr/bin/env python
+"""
+OCS Database - SQL Generation Script
+
+This script generates an SQL file for database population from a JSON data source.
+It reads study data from a JSON file and converts it into SQL INSERT statements
+for multiple tables (metadata, load_association, ingest, alignment, and postqc).
+The generated SQL handles null values properly and includes conflict resolution.
+
+Usage:
+    python scripts/data_import/generate.py
+
+Output:
+    Creates a file named 'study.sql' with SQL INSERT statements
+
+Requirements:
+    - JSON file must exist at the specified path
+"""
+
 import json
 
 # Load JSON file

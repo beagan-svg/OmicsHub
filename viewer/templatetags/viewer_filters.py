@@ -1,4 +1,5 @@
 from django import template
+import json
 
 register = template.Library()
 
@@ -22,4 +23,9 @@ def param_replace(context, **kwargs):
     for k in list(d.keys()):
         if not d[k]:
             del d[k]
-    return d.urlencode() 
+    return d.urlencode()
+
+@register.filter(name='jsonify')
+def jsonify(obj):
+    """Convert a Python object to JSON string for use in JavaScript"""
+    return json.dumps(obj) 

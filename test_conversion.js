@@ -1,0 +1,1 @@
+console.log("Test conversion from toggle ID to column class"); const toggleId = "toggleAmplificationName"; const columnClass = "column_" + toggleId.replace("toggle", "").replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase(); console.log(`${toggleId} -> ${columnClass}`);
