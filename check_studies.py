@@ -3,12 +3,14 @@ import sys
 import django
 
 # Set up Django environment
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(current_dir)
+# Add the project root directory to the Python path
+project_root = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, project_root)
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.development')
 django.setup()
 
-from database_ocs.models import Metadata
+from viewer.models import Metadata
 
 # Get the first record and print its studies field
 record = Metadata.objects.first()
