@@ -20,14 +20,14 @@ import django
 from datetime import datetime
 
 # Set up Django environment
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'database_ocs_project.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'database_ocs_project.settings.development')
 django.setup()
 
 from django.db import transaction
 from viewer.models import Metadata, Alignment, PostQC, Ingest, LoadAssociation, Main
 
 def parse_datetime(datetime_str):
-    if datetime_str == "NA":
+    if not datetime_str or datetime_str == "NA":
         return None
     try:
         return datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
@@ -45,18 +45,9 @@ def load_study_data():
     with open(json_path, 'r') as f:
         study_data = json.load(f)
     
-    # Limit to first 20 records for testing
-    limited_data = {}
-    counter = 0
-    for key, value in study_data.items():
-        limited_data[key] = value
-        counter += 1
-        if counter >= 20:  # Only load 20 records
-            break
-    
     # Process each record
     count = 0
-    for fastq_name, data in limited_data.items():
+    for fastq_name, data in study_data.items():
         try:
             with transaction.atomic():
                 # Create metadata record
@@ -64,7 +55,7 @@ def load_study_data():
                     fastq_name=fastq_name,
                     organism_name=data.get('Organism'),
                     library_prep_method_name=data.get('Library Prep Method'),
-                    studies=[data.get('Study Set')] if data.get('Study Set') else []
+                    studies=data.get('Study Set', '')
                 )
                 
                 # Create main record
@@ -95,7 +86,6 @@ def load_study_data():
                         end_time=parse_datetime(data.get('Alignment Time')),
                         fid=data.get('FID-Alignment', '')
                     )
-                    print(f"Created Alignment record for {fastq_name}: {alignment_status}")
                 
                 # Create ingest record if data exists
                 ingest_status = data.get('Ingest')
@@ -107,7 +97,6 @@ def load_study_data():
                         end_time=parse_datetime(data.get('Ingest Time')),
                         fid=data.get('FID-Ingest', '')
                     )
-                    print(f"Created Ingest record for {fastq_name}: {ingest_status}")
                 
                 # Create post-alignment QC record if data exists
                 postqc_status = data.get('Post-Alignment')
@@ -119,7 +108,6 @@ def load_study_data():
                         end_time=parse_datetime(data.get('Post Alignment Time')),
                         fid=data.get('FID-Post-Alignment', '')
                     )
-                    print(f"Created PostQC record for {fastq_name}: {postqc_status}")
                 
                 count += 1
                 print(f"Added record {count}: {fastq_name}")

@@ -6,60 +6,33 @@ A Django web application for viewing and managing OCS database records.
 
 ```
 database_ocs/
-├── database_ocs_project/           # Main Django project directory
-│   ├── settings/                   # Project settings
-│   │   ├── base.py                # Base settings
-│   │   ├── development.py         # Development settings
-│   │   └── production.py          # Production settings
-│   ├── urls.py                    # Main URL configuration
-│   ├── asgi.py                    # ASGI configuration
-│   └── wsgi.py                    # WSGI configuration
-├── viewer/                         # Main application
-│   ├── migrations/                # Database migrations
-│   ├── views/                     # View logic
-│   │   ├── __init__.py
-│   │   ├── main.py                # Main views
-│   │   ├── api.py                 # API views
-│   │   ├── toggle_views.py        # Toggle functionality
-│   │   └── debug_views.py         # Debug views
-│   ├── models.py                  # Database models
-│   ├── tables.py                  # Table configurations
-│   ├── filters/                   # Custom filters
-│   ├── templatetags/              # Custom template tags
-│   ├── templates/                 # HTML templates
-│   │   ├── viewer/               # App-specific templates
-│   │   └── django_tables2/       # Custom django-tables2 templates
-│   ├── static/                    # Application-specific static files
-│   │   └── viewer/
-│   │       ├── css/             # Stylesheets
-│   │       ├── js/              # JavaScript files
-│   │       └── img/             # Images
-│   ├── tests/                    # Test files
-│   └── management/               # Management commands
-│       └── commands/
-├── tests/                         # Project-wide tests
-│   ├── scripts/                  # Test scripts
-│   └── html/                     # Test HTML output
-├── data/                         # Data files
-│   └── raw/                      # Raw data files
-├── scripts/                      # Utility scripts
-│   ├── generate.py              # Data generation scripts
-│   ├── import_json_data.py      # JSON import script
-│   ├── load_study_data.py       # Study data loader
-│   ├── fix_data.py              # Data fixing script
-│   └── compare_timestamps.py    # Timestamp comparison
-├── sql/                         # SQL files
-│   ├── schema.sql              # Database schema
-│   └── alignment_model.txt     # Alignment model definition
-├── static/                      # Project-wide static files
-├── staticfiles/                 # Collected static files
-├── logs/                        # Log files
-├── media/                       # User-uploaded files
-├── venv/                        # Python virtual environment
-├── manage.py                    # Django management script
-├── requirements.txt             # Python dependencies
-├── process_batch.sh             # Batch processing script
-└── README.md                    # Project documentation
+├── config/                    # All configuration files
+│   ├── settings/             # Django settings
+│   ├── urls.py               # URL configuration
+│   ├── wsgi.py               # WSGI configuration
+│   └── asgi.py               # ASGI configuration
+├── viewer/                    # Main Django app
+├── scripts/                   # All scripts
+│   ├── shell/                # Shell scripts (*.sh)
+│   ├── management/           # Django management commands
+│   ├── data_import/          # Data import scripts
+│   ├── data_verification/    # Data verification scripts
+│   └── debug_tools/          # Debugging utilities
+├── static/                    # Static files
+├── staticfiles/              # Collected static files
+├── media/                    # Media files
+├── data/                     # Data files
+│   └── csv/                  # CSV files
+├── tests/                    # Test files
+├── logs/                     # Log files
+├── sql/                      # SQL files
+├── docs/                     # Documentation
+│   └── database_schema.md
+├── requirements.txt          # Python dependencies
+├── environment.yml           # Conda environment
+├── Makefile                  # Build commands
+├── manage.py                 # Django management script
+└── README.md                 # Project documentation
 ```
 
 ## Setup
@@ -123,7 +96,7 @@ python manage.py migrate
 
 1. Set environment variables:
    ```bash
-   export DJANGO_SETTINGS_MODULE=database_ocs_project.settings.production
+   export DJANGO_SETTINGS_MODULE=config.settings.production
    ```
 
 2. Collect static files:
@@ -133,7 +106,7 @@ python manage.py migrate
 
 3. Run with production server:
    ```bash
-   gunicorn database_ocs_project.wsgi:application
+   gunicorn config.wsgi:application
    ```
 
 ## Contributing
@@ -174,7 +147,7 @@ This guide provides instructions for importing study data into the Django databa
 ### 1. Set Environment Variables
 ```bash
 export PYTHONPATH=$PYTHONPATH:$(pwd)
-export DJANGO_SETTINGS_MODULE=database_ocs_project.settings.development
+export DJANGO_SETTINGS_MODULE=config.settings.development
 ```
 
 ### 2. Run the Import Script
@@ -204,7 +177,7 @@ After successful import, you should see:
 
 If you encounter any issues:
 
-1. Check database settings in `database_ocs_project/settings/development.py`
+1. Check database settings in `config/settings/development.py`
 2. Verify the study.json file exists and is readable
 3. Ensure all required packages are installed in your virtual environment
 4. Check Django logs for error messages

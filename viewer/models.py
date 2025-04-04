@@ -27,7 +27,7 @@ class Metadata(models.Model):
         return self.fastq_name
 
 class Alignment(models.Model):
-    fastq_name = models.ForeignKey(Metadata, on_delete=models.CASCADE)
+    fastq_name = models.OneToOneField(Metadata, on_delete=models.CASCADE, primary_key=True)
     status_id = models.CharField(max_length=255)
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
@@ -40,7 +40,7 @@ class Alignment(models.Model):
         return f"{self.fastq_name} - {self.status_id}"
 
 class PostQC(models.Model):
-    fastq_name = models.ForeignKey(Metadata, on_delete=models.CASCADE)
+    fastq_name = models.OneToOneField(Metadata, on_delete=models.CASCADE, primary_key=True)
     status_id = models.CharField(max_length=255)
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
@@ -53,7 +53,7 @@ class PostQC(models.Model):
         return f"{self.fastq_name} - {self.status_id}"
 
 class Ingest(models.Model):
-    fastq_name = models.ForeignKey(Metadata, on_delete=models.CASCADE)
+    fastq_name = models.OneToOneField(Metadata, on_delete=models.CASCADE, primary_key=True)
     status_id = models.CharField(max_length=255)
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
