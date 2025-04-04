@@ -7,7 +7,12 @@ It reads each record from the JSON file and creates corresponding database
 entries for Metadata, Main, LoadAssociation, Alignment, Ingest, and PostQC models.
 
 Usage:
-    python scripts/data_import/load_study_data.py
+    python scripts/data_import/load_study_data.py [options]
+    
+Options:
+    --no-clear         Don't clear existing data before import
+    --file PATH        Import from a specific JSON file
+    --dry-run          Simulate import without making changes to the database
 
 Requirements:
     - Django environment must be properly configured
@@ -17,6 +22,7 @@ Requirements:
 import os
 import sys
 import json
+import argparse
 import django
 from datetime import datetime
 
@@ -39,12 +45,17 @@ def parse_datetime(datetime_str):
     except (ValueError, TypeError):
         return None
 
-def load_study_data():
-    json_path = '/allen/programs/celltypes/workgroups/rnaseqanalysis/bnguy/Projects/ocs/batch_csv/study.json'
+def load_study_data(json_path=None, dry_run=False):
+    if json_path is None:
+        json_path = '/allen/programs/celltypes/workgroups/rnaseqanalysis/bnguy/Projects/ocs/batch_csv/study.json'
     
     if not os.path.exists(json_path):
-        print(f"Warning: {json_path} does not exist")
+        print(f"Error: {json_path} does not exist")
         return
+    
+    print(f"Loading data from: {json_path}")
+    if dry_run:
+        print("DRY RUN MODE - No changes will be made to the database")
     
     # Load the JSON data
     with open(json_path, 'r') as f:
@@ -54,6 +65,13 @@ def load_study_data():
     count = 0
     for fastq_name, data in study_data.items():
         try:
+            # Skip database operations in dry run mode
+            if dry_run:
+                count += 1
+                if count % 100 == 0 or count < 10:  # Show only a few records in dry run
+                    print(f"Would add record {count}: {fastq_name}")
+                continue
+                
             with transaction.atomic():
                 # Create metadata record
                 metadata = Metadata.objects.create(
@@ -115,25 +133,40 @@ def load_study_data():
                     )
                 
                 count += 1
-                print(f"Added record {count}: {fastq_name}")
+                if count % 100 == 0 or count < 10:  # Show progress less frequently
+                    print(f"Added record {count}: {fastq_name}")
                 
         except Exception as e:
             print(f"Error processing {fastq_name}: {e}")
     
     print(f"Total records processed: {count}")
-    print(f"Metadata records: {Metadata.objects.count()}")
-    print(f"Main records: {Main.objects.count()}")
-    print(f"LoadAssociation records: {LoadAssociation.objects.count()}")
-    print(f"Alignment records: {Alignment.objects.count()}")
-    print(f"PostQC records: {PostQC.objects.count()}")
-    print(f"Ingest records: {Ingest.objects.count()}")
+    
+    if not dry_run:
+        print(f"Metadata records: {Metadata.objects.count()}")
+        print(f"Main records: {Main.objects.count()}")
+        print(f"LoadAssociation records: {LoadAssociation.objects.count()}")
+        print(f"Alignment records: {Alignment.objects.count()}")
+        print(f"PostQC records: {PostQC.objects.count()}")
+        print(f"Ingest records: {Ingest.objects.count()}")
+    else:
+        print("Dry run completed. No changes were made to the database.")
 
 if __name__ == "__main__":
-    # Clear existing data first
-    print("Clearing existing data...")
-    Metadata.objects.all().delete()
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Import study data from JSON file')
+    parser.add_argument('--no-clear', action='store_true', help="Don't clear existing data before import")
+    parser.add_argument('--file', type=str, help='Path to JSON file to import')
+    parser.add_argument('--dry-run', action='store_true', help='Simulate import without making changes')
+    args = parser.parse_args()
+    
+    # Clear existing data unless --no-clear flag is provided
+    if not args.no_clear and not args.dry_run:
+        print("Clearing existing data...")
+        Metadata.objects.all().delete()
+    elif args.no_clear:
+        print("Skipping data clearing (--no-clear flag provided)")
     
     # Load new data
     print("Loading study data...")
-    load_study_data()
+    load_study_data(json_path=args.file, dry_run=args.dry_run)
     print("Done!") 

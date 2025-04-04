@@ -124,6 +124,39 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 This guide provides instructions for importing study data into the Django database.
 
+## Project Structure
+
+```
+database_ocs/                  # Root project directory
+├── config/                    # All configuration files
+│   ├── settings/             # Django settings
+│   ├── urls.py               # URL configuration
+│   ├── wsgi.py               # WSGI configuration
+│   └── asgi.py               # ASGI configuration
+├── viewer/                    # Main Django app
+├── scripts/                   # All scripts
+│   ├── shell/                # Shell scripts (*.sh)
+│   ├── management/           # Django management commands
+│   ├── data_import/          # Data import scripts
+│   ├── data_verification/    # Data verification scripts
+│   └── debug_tools/          # Debugging utilities
+├── static/                    # Static files
+├── staticfiles/              # Collected static files
+├── media/                    # Media files
+├── data/                     # Data files
+│   └── csv/                  # CSV files
+├── tests/                    # Test files
+├── logs/                     # Log files
+├── sql/                      # SQL files
+├── docs/                     # Documentation
+│   └── database_schema.md
+├── requirements.txt          # Python dependencies
+├── environment.yml           # Conda environment
+├── Makefile                  # Build commands
+├── manage.py                 # Django management script
+└── README.md                 # Project documentation
+```
+
 ## Prerequisites
 
 1. Access to the Django project at:
@@ -142,23 +175,25 @@ This guide provides instructions for importing study data into the Django databa
    source venv/bin/activate
    ```
 
-## Import Process
+## Data Import Quick Guide
 
-### 1. Set Environment Variables
+For importing study data:
+
 ```bash
+# Set environment variables
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 export DJANGO_SETTINGS_MODULE=config.settings.development
-```
 
-### 2. Run the Import Script
-```bash
+# Run the import script
 python scripts/data_import/load_study_data.py
+
+# Advanced options available:
+python scripts/data_import/load_study_data.py --dry-run  # Test without making changes
+python scripts/data_import/load_study_data.py --no-clear  # Don't clear existing data
+python scripts/data_import/load_study_data.py --file /path/to/custom.json  # Use custom file
 ```
 
-### 3. Verify the Import
-```bash
-python verify_import.py
-```
+For detailed instructions, see [Importing Study Data](docs/importing_study_data.md).
 
 ## Expected Results
 
