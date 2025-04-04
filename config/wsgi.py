@@ -1,5 +1,5 @@
 """
-WSGI config for database_ocs_project project.
+WSGI config for database_ocs project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 

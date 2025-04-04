@@ -3,7 +3,7 @@ import django
 from django.conf import settings
 
 # Set up Django environment
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'database_ocs_project.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
 from viewer.models import Main, LoadAssociation, Metadata

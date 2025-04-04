@@ -4,7 +4,7 @@
 PORT ?= 8090
 
 # Default settings module
-SETTINGS ?= database_ocs_project.settings.development
+SETTINGS ?= config.settings.development
 
 # Run the development server
 run:
@@ -16,7 +16,7 @@ test:
 
 # Run linting
 lint:
-	flake8 viewer/ database_ocs_project/
+	flake8 viewer/ config/
 
 # Clean up Python cache files
 clean:

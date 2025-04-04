@@ -28,7 +28,7 @@ import datetime
 
 # Set up Django environment
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "database_ocs_project.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 try:
     import django

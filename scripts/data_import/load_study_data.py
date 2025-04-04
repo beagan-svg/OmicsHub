@@ -20,7 +20,7 @@ import django
 from datetime import datetime
 
 # Set up Django environment
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'database_ocs_project.settings.development')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.development')
 django.setup()
 
 from django.db import transaction

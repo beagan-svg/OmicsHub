@@ -1,5 +1,5 @@
 """
-ASGI config for database_ocs_project project.
+ASGI config for database_ocs project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 

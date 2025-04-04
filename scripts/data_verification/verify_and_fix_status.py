@@ -28,7 +28,7 @@ from datetime import datetime
 import sys
 
 # Set up Django environment
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'database_ocs_project.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
 from django.db import transaction
