@@ -121,7 +121,7 @@ def process_csv_file(csv_path, source_name, dry_run=False):
 def main():
     """Main execution function."""
     parser = argparse.ArgumentParser(description='Import vendor data from CSV files')
-    parser.add_argument('--source', type=str, choices=['isilon', 'nwgc', 'nygc', 'all'], 
+    parser.add_argument('--source', type=str, choices=['isilon', 'nwgc', 'nygc', 'sample', 'all'], 
                       default='all', help='Specify which source to import')
     parser.add_argument('--no-clear', action='store_true', help="Don't clear existing data before import")
     parser.add_argument('--dry-run', action='store_true', help='Simulate import without making changes')
@@ -132,7 +132,8 @@ def main():
     csv_files = {
         'isilon': os.path.join(data_dir, 'isilon.csv'),
         'nwgc': os.path.join(data_dir, 'nwgc.csv'),
-        'nygc': os.path.join(data_dir, 'nygc.csv')
+        'nygc': os.path.join(data_dir, 'nygc.csv'),
+        'sample': os.path.join(data_dir, 'sample.csv')
     }
     
     # Clear existing data unless --no-clear flag is provided

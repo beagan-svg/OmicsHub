@@ -231,3 +231,24 @@ The verification script (`verify_import.py`) checks:
 - The import process clears existing data before importing new records
 - The studies field is stored as a plain string, not a list
 - All timestamps are properly formatted during import 
+
+## Vendor Data Import
+
+To collect data from vendor sources (isilon, NWGC, NYGC) and import it into the database:
+
+```bash
+# Set environment variables
+export PYTHONPATH=$PYTHONPATH:$(pwd)
+export DJANGO_SETTINGS_MODULE=config.settings.development
+
+# Run the automated collection and import script
+./scripts/shell/run_vendor_data_collection.sh --all
+
+# Or collect from a specific source
+./scripts/shell/run_vendor_data_collection.sh --collect isilon
+
+# Or import existing CSV files
+./scripts/shell/run_vendor_data_collection.sh --import nwgc
+```
+
+For detailed instructions, see [Vendor Data Import Guide](docs/vendor_data_import.md). 

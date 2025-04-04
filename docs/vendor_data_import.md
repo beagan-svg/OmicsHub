@@ -207,6 +207,23 @@ The scripts output detailed logs to the console. For more thorough debugging:
                   └─────────────────┘
 ```
 
+## Testing the Import Process
+
+For testing purposes, you can use the sample CSV generator to create a test file:
+
+```bash
+# Generate a sample CSV file
+python scripts/data_import/create_sample_csv.py
+
+# Test the import process in dry-run mode
+python scripts/data_import/import_vendor_data.py --source sample --dry-run
+
+# Import the sample data
+python scripts/data_import/import_vendor_data.py --source sample
+```
+
+This generates a CSV file with 10 random records in `data/csv/sample.csv` that can be used to test the import process without needing to run the actual vendor data collection scripts.
+
 ## Performance Considerations
 
 - Data collection scripts can take several minutes to run
