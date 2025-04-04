@@ -145,4 +145,81 @@ python manage.py migrate
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+# Study Data Import Guide
+
+This guide provides instructions for importing study data into the Django database.
+
+## Prerequisites
+
+1. Access to the Django project at:
+   ```
+   /allen/programs/celltypes/workgroups/rnaseqanalysis/bnguy/Projects/database_ocs
+   ```
+
+2. Access to the study.json file at:
+   ```
+   /allen/programs/celltypes/workgroups/rnaseqanalysis/bnguy/Projects/ocs/batch_csv/study.json
+   ```
+
+3. Virtual environment setup:
+   ```bash
+   cd /allen/programs/celltypes/workgroups/rnaseqanalysis/bnguy/Projects/database_ocs
+   source venv/bin/activate
+   ```
+
+## Import Process
+
+### 1. Set Environment Variables
+```bash
+export PYTHONPATH=$PYTHONPATH:$(pwd)
+export DJANGO_SETTINGS_MODULE=database_ocs_project.settings.development
+```
+
+### 2. Run the Import Script
+```bash
+python scripts/data_import/load_study_data.py
+```
+
+### 3. Verify the Import
+```bash
+python verify_import.py
+```
+
+## Expected Results
+
+After successful import, you should see:
+- Approximately 11,817 records processed
+- Confirmation messages for each record added
+- A summary showing the total counts for each model:
+  - Metadata records: 11,817
+  - Main records: 11,817
+  - LoadAssociation records: ~11,521
+  - Alignment records: ~11,768
+  - PostQC records: ~11,766
+  - Ingest records: ~11,768
+
+## Troubleshooting
+
+If you encounter any issues:
+
+1. Check database settings in `database_ocs_project/settings/development.py`
+2. Verify the study.json file exists and is readable
+3. Ensure all required packages are installed in your virtual environment
+4. Check Django logs for error messages
+
+## Verification Script
+
+The verification script (`verify_import.py`) checks:
+- Total record counts for each model
+- Sample record details including:
+  - FASTQ Name
+  - Studies
+  - Organism Name
+
+## Notes
+
+- The import process clears existing data before importing new records
+- The studies field is stored as a plain string, not a list
+- All timestamps are properly formatted during import 
