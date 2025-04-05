@@ -498,51 +498,102 @@
 
                     <!-- Pagination controls -->
                     <div class="d-flex justify-content-between align-items-center mt-3">
-                        <div>
+                        <div class="pagination-navigation">
                             {% if page_obj.has_previous %}
                             <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page=1"
-                                class="btn btn-sm btn-outline-primary me-1">
+                                class="btn btn-sm btn-outline-secondary page-nav" title="First page">
                                 <i class="bi bi-chevron-double-left"></i>
                             </a>
                             <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
-                                class="btn btn-sm btn-outline-primary me-3">
+                                class="btn btn-sm btn-outline-secondary page-nav ms-1" title="Previous page">
                                 <i class="bi bi-chevron-left"></i>
                             </a>
+                            {% else %}
+                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
+                                title="First page">
+                                <i class="bi bi-chevron-double-left"></i>
+                            </button>
+                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled ms-1"
+                                title="Previous page">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
                             {% endif %}
 
-                            <span class="text-muted">
-                                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                            <span class="page-indicator mx-2">
+                                <span class="current-page">{{ page_obj.number }}</span>
+                                <span class="text-muted">/</span>
+                                <span class="total-pages">{{ page_obj.paginator.num_pages }}</span>
                             </span>
 
                             {% if page_obj.has_next %}
                             <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
-                                class="btn btn-sm btn-outline-primary ms-3">
+                                class="btn btn-sm btn-outline-secondary page-nav me-1" title="Next page">
                                 <i class="bi bi-chevron-right"></i>
                             </a>
                             <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}"
-                                class="btn btn-sm btn-outline-primary">
+                                class="btn btn-sm btn-outline-secondary page-nav" title="Last page">
                                 <i class="bi bi-chevron-double-right"></i>
                             </a>
+                            {% else %}
+                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled me-1"
+                                title="Next page">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
+                                title="Last page">
+                                <i class="bi bi-chevron-double-right"></i>
+                            </button>
                             {% endif %}
                         </div>
 
                         <div class="d-flex align-items-center">
                             <!-- Rows per page selector -->
-                            <div class="dropdown me-3">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
-                                    id="rowsPerPageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                                    {{ current_per_page }} rows
-                                </button>
-                                <ul class="dropdown-menu" aria-labelledby="rowsPerPageDropdown">
-                                    {% for option in '10,25,50,100'|split:',' %}
-                                    <li>
-                                        <a class="dropdown-item{% if current_per_page == option|add:0 %} active{% endif %}"
-                                            href="?{% for key, value in request.GET.items %}{% if key != 'page' and key != 'per_page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'per_page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}per_page={{ option }}&page=1">
-                                            {{ option }} rows
-                                        </a>
-                                    </li>
+                            <div class="pagination-control d-flex align-items-center me-3">
+                                <label for="rowsPerPageDropdown" class="text-muted me-2 mb-0">Rows per page:</label>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-3" type="button"
+                                        id="rowsPerPageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                        {{ current_per_page }}
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end pagination-dropdown"
+                                        aria-labelledby="rowsPerPageDropdown">
+                                        {% for option in '10,25,50,100'|split:',' %}
+                                        <li>
+                                            <a class="dropdown-item{% if current_per_page == option|add:0 %} active{% endif %}"
+                                                href="?{% for key, value in request.GET.items %}{% if key != 'page' and key != 'per_page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'per_page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}per_page={{ option }}&page=1">
+                                                {{ option }}
+                                            </a>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Go to page input -->
+                            <div class="goto-page d-flex align-items-center me-3">
+                                <form id="gotoPageForm" class="d-flex align-items-center">
+                                    {% for key, value in request.GET.items %}
+                                    {% if key != 'page' and value %}
+                                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                                    {% endif %}
                                     {% endfor %}
-                                </ul>
+
+                                    {% for key, values in request.GET.lists %}
+                                    {% if key != 'page' and key != 'csrfmiddlewaretoken' %}
+                                    {% for value in values %}
+                                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                                    {% endfor %}
+                                    {% endif %}
+                                    {% endfor %}
+
+                                    <label for="gotoPage" class="text-muted me-2 mb-0">Go to:</label>
+                                    <input type="number" id="gotoPage" name="page"
+                                        class="form-control form-control-sm goto-page-input" min="1"
+                                        max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary ms-1 goto-btn">
+                                        <i class="bi bi-arrow-right"></i>
+                                    </button>
+                                </form>
                             </div>
 
                             <span class="text-muted pagination-info">
@@ -936,6 +987,171 @@
         padding: 0.5rem 0.5rem;
         border-radius: 6px;
     }
+
+    /* Pagination styling */
+    .pagination-control {
+        font-size: 0.875rem;
+    }
+
+    .pagination-control .btn {
+        min-width: 50px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-left: 0.75rem;
+        padding-right: 0.5rem;
+        background-color: white;
+        transition: all 0.2s ease;
+    }
+
+    .pagination-control .btn:hover {
+        background-color: #f8f9fa;
+    }
+
+    .pagination-dropdown {
+        min-width: unset;
+        width: 90px;
+        border-radius: 6px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        padding: 0.25rem 0;
+    }
+
+    .pagination-dropdown .dropdown-item {
+        padding: 0.4rem 1rem;
+        text-align: center;
+        transition: all 0.15s ease;
+    }
+
+    .pagination-dropdown .dropdown-item:hover {
+        background-color: #f1f3f5;
+    }
+
+    .pagination-dropdown .dropdown-item.active {
+        background-color: #e9ecef;
+        color: #495057;
+        font-weight: 500;
+    }
+
+    .pagination-info {
+        font-size: 0.875rem;
+    }
+
+    /* Pagination navigation */
+    .pagination-navigation {
+        display: flex;
+        align-items: center;
+    }
+
+    .pagination-navigation .page-nav {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-color: #dee2e6;
+        color: #495057;
+        transition: all 0.2s ease;
+    }
+
+    .pagination-navigation .page-nav:hover:not(.disabled) {
+        background-color: #e9ecef;
+        border-color: #ced4da;
+        color: #212529;
+    }
+
+    .pagination-navigation .page-nav.disabled {
+        color: #adb5bd;
+        cursor: not-allowed;
+    }
+
+    .pagination-navigation .page-indicator {
+        font-size: 0.875rem;
+        font-weight: 500;
+        min-width: 65px;
+        text-align: center;
+    }
+
+    .pagination-navigation .current-page {
+        color: #212529;
+    }
+
+    .pagination-navigation .total-pages {
+        color: #6c757d;
+    }
+
+    /* Go to page input */
+    .goto-page {
+        font-size: 0.875rem;
+    }
+
+    .goto-page-input {
+        width: 50px;
+        text-align: center;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        border-color: #dee2e6;
+    }
+
+    .goto-page-input:focus {
+        border-color: #adb5bd;
+        box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.1);
+    }
+
+    .goto-page-input::-webkit-inner-spin-button,
+    .goto-page-input::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .goto-page-input[type=number] {
+        -moz-appearance: textfield;
+    }
+
+    .goto-btn {
+        width: 30px;
+        height: 31px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-color: #dee2e6;
+    }
+
+    .goto-btn:hover {
+        background-color: #e9ecef;
+        border-color: #ced4da;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .pagination-navigation {
+            flex-wrap: wrap;
+        }
+
+        .d-flex.justify-content-between.align-items-center.mt-3 {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 1rem;
+        }
+
+        .d-flex.align-items-center {
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .pagination-control,
+        .goto-page {
+            margin-right: 0 !important;
+        }
+
+        .pagination-info {
+            margin-top: 0.5rem;
+            width: 100%;
+        }
+    }
 </style>
 
 {% endblock %}
@@ -954,6 +1170,35 @@
             width: '100%',
             placeholder: $(this).data('placeholder')
         });
+
+        // Go to page form validation
+        const gotoPageForm = document.getElementById('gotoPageForm');
+        const gotoPageInput = document.getElementById('gotoPage');
+
+        if (gotoPageForm && gotoPageInput) {
+            const maxPage = parseInt(gotoPageInput.getAttribute('max'));
+
+            gotoPageForm.addEventListener('submit', function (e) {
+                const pageValue = parseInt(gotoPageInput.value);
+
+                if (isNaN(pageValue) || pageValue < 1) {
+                    e.preventDefault();
+                    gotoPageInput.value = 1;
+                } else if (pageValue > maxPage) {
+                    e.preventDefault();
+                    gotoPageInput.value = maxPage;
+                }
+            });
+
+            // Better UX: Submit form when user presses Enter
+            gotoPageInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    gotoPageForm.dispatchEvent(new Event('submit'));
+                    gotoPageForm.submit();
+                }
+            });
+        }
 
         // Fix for dropdown scrolling issue
         const columnDropdown = document.getElementById('column-settings-dropdown');
