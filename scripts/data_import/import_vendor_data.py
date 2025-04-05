@@ -74,6 +74,7 @@ def process_csv_file(csv_path, source_name, dry_run=False):
                         fastq_name=fastq_name,
                         defaults={
                             'organism_name': row.get('Organism Name', ''),
+                            'organism_common_name': row.get('Organism Name', ''),
                             'library_prep_method_name': row.get('Library Prep Method', ''),
                             'studies': row.get('Study Set', '')
                         }
@@ -82,6 +83,7 @@ def process_csv_file(csv_path, source_name, dry_run=False):
                     # If record already exists, update it
                     if not created_flag:
                         metadata.organism_name = row.get('Organism Name', '') or metadata.organism_name
+                        metadata.organism_common_name = row.get('Organism Name', '') or metadata.organism_common_name
                         metadata.library_prep_method_name = row.get('Library Prep Method', '') or metadata.library_prep_method_name
                         metadata.studies = row.get('Study Set', '') or metadata.studies
                         metadata.save()

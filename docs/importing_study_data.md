@@ -111,7 +111,7 @@ The study.json file contains records with the following key fields:
 |-------|-------------|-------|
 | FASTQ Name | Unique identifier for the record | Metadata |
 | Study Set | Associated studies | Metadata, Main |
-| Organism | Organism name | Metadata, Main |
+| Organism | Organism name | Metadata (organism_common_name), Main |
 | Library Prep Method | Method used | Metadata, Main |
 | Load Name | Name of the load | LoadAssociation |
 | Alignment | Alignment status | Main, Alignment |
@@ -121,6 +121,11 @@ The study.json file contains records with the following key fields:
 | Post Alignment Time | Timestamp for post-alignment | PostQC |
 | Ingest Time | Timestamp for ingest | Ingest |
 | FID values | Additional identifiers | Various models |
+
+**Note:** The "Organism" field from study.json is mapped to both:
+- `organism_common_name` in the Metadata model (primary mapping)
+- `organism_name` in the Metadata model (for backwards compatibility)
+- `organism` in the Main model
 
 ## Advanced Usage
 
