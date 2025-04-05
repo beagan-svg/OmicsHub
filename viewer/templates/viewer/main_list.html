@@ -18,8 +18,8 @@
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Sample Browser</h5>
-                    <span class="badge bg-light text-dark">{{ current_page_count }} of {{ page_obj.paginator.count }}
-                        samples</span>
+                    <span class="badge bg-light text-dark">{{ page_obj.start_index }} to {{ page_obj.end_index }} of {{
+                        page_obj.paginator.count }} samples</span>
                 </div>
                 <div class="card-body">
                     <form method="get" id="filter-form">
@@ -597,7 +597,8 @@
                             </div>
 
                             <span class="text-muted pagination-info">
-                                Showing {{ current_page_count }} of {{ page_obj.paginator.count }} results
+                                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{
+                                page_obj.paginator.count }} results
                             </span>
                         </div>
                     </div>
