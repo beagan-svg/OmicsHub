@@ -251,4 +251,14 @@ export DJANGO_SETTINGS_MODULE=config.settings.development
 ./scripts/shell/run_vendor_data_collection.sh --import nwgc
 ```
 
+For testing purposes, you can use the sample data generator:
+
+```bash
+# Generate a sample CSV file with test data
+python scripts/data_import/create_sample_csv.py
+
+# Import the sample data
+python scripts/data_import/import_vendor_data.py --source sample
+```
+
 For detailed instructions, see [Vendor Data Import Guide](docs/vendor_data_import.md). 
