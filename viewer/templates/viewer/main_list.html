@@ -367,9 +367,9 @@
                                                 class="form-select filter-select" multiple="multiple"
                                                 data-placeholder="Select options">
                                                 {% for batch_name in batch_names_from_vendor %}
-                                                <option value="{{ batch_name }}" {% if batch_name in
-                                                    current_filters.batch_name_from_vendor_list %}selected{% endif %}>{{
-                                                    batch_name }}</option>
+                                                <option value="{{ batch_name }}" {{
+                                                    batch_name|is_selected:current_filters.batch_name_from_vendor_list
+                                                    }}>{{ batch_name }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -381,9 +381,9 @@
                                             <select name="study_set" id="study_set" class="form-select filter-select"
                                                 multiple="multiple" data-placeholder="Select options">
                                                 {% for study_set in study_sets %}
-                                                <option value="{{ study_set }}" {% if study_set in
-                                                    current_filters.study_set_list %}selected{% endif %}>{{ study_set }}
-                                                </option>
+                                                <option value="{{ study_set }}" {{
+                                                    study_set|is_selected:current_filters.study_set_list }}>{{ study_set
+                                                    }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -402,8 +402,8 @@
                                             <select name="organism" id="organism" class="form-select filter-select"
                                                 multiple="multiple" data-placeholder="Select options">
                                                 {% for organism in organisms %}
-                                                <option value="{{ organism }}" {% if organism in
-                                                    current_filters.organism_list %}selected{% endif %}>{{ organism }}
+                                                <option value="{{ organism }}" {{
+                                                    organism|is_selected:current_filters.organism_list }}>{{ organism }}
                                                 </option>
                                                 {% endfor %}
                                             </select>
@@ -417,8 +417,8 @@
                                                 class="form-select filter-select" multiple="multiple"
                                                 data-placeholder="Select options">
                                                 {% for method in library_prep_methods %}
-                                                <option value="{{ method }}" {% if method in
-                                                    current_filters.library_prep_method_list %}selected{% endif %}>{{
+                                                <option value="{{ method }}" {{
+                                                    method|is_selected:current_filters.library_prep_method_list }}>{{
                                                     method }}</option>
                                                 {% endfor %}
                                             </select>
@@ -440,8 +440,8 @@
                                                 class="form-select filter-select" multiple="multiple"
                                                 data-placeholder="Select options">
                                                 {% for status in ingest_status_options %}
-                                                <option value="{{ status }}" {% if status in
-                                                    current_filters.ingest_status_list %}selected{% endif %}>{{ status
+                                                <option value="{{ status }}" {{
+                                                    status|is_selected:current_filters.ingest_status_list }}>{{ status
                                                     }}</option>
                                                 {% endfor %}
                                             </select>
@@ -455,8 +455,8 @@
                                                 class="form-select filter-select" multiple="multiple"
                                                 data-placeholder="Select options">
                                                 {% for status in alignment_status_options %}
-                                                <option value="{{ status }}" {% if status in
-                                                    current_filters.alignment_status_list %}selected{% endif %}>{{
+                                                <option value="{{ status }}" {{
+                                                    status|is_selected:current_filters.alignment_status_list }}>{{
                                                     status }}</option>
                                                 {% endfor %}
                                             </select>
@@ -470,8 +470,8 @@
                                                 class="form-select filter-select" multiple="multiple"
                                                 data-placeholder="Select options">
                                                 {% for status in postqc_status_options %}
-                                                <option value="{{ status }}" {% if status in
-                                                    current_filters.postqc_status_list %}selected{% endif %}>{{ status
+                                                <option value="{{ status }}" {{
+                                                    status|is_selected:current_filters.postqc_status_list }}>{{ status
                                                     }}</option>
                                                 {% endfor %}
                                             </select>
@@ -536,7 +536,7 @@
                                 <ul class="dropdown-menu" aria-labelledby="rowsPerPageDropdown">
                                     {% for option in '10,25,50,100'|split:',' %}
                                     <li>
-                                        <a class="dropdown-item {% if current_per_page == option|add:0 %}active{% endif %}"
+                                        <a class="dropdown-item{% if current_per_page == option|add:0 %} active{% endif %}"
                                             href="?{% for key, value in request.GET.items %}{% if key != 'page' and key != 'per_page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'per_page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}per_page={{ option }}&page=1">
                                             {{ option }} rows
                                         </a>

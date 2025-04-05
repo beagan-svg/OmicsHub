@@ -21,6 +21,23 @@ def split(value, key):
     """
     return value.split(key)
 
+@register.filter(name='is_selected')
+def is_selected(value, options_list):
+    """
+    Check if a value is in the provided list and return 'selected' if true.
+    
+    Usage:
+       {{ value|is_selected:list }}
+    
+    Example:
+       {{ "option1"|is_selected:selected_options }}
+       Returns 'selected' if "option1" is in selected_options, otherwise ''
+    """
+    if not options_list:
+        return ''
+    
+    return 'selected' if value in options_list else ''
+
 @register.simple_tag(takes_context=True)
 def param_replace(context, **kwargs):
     """
