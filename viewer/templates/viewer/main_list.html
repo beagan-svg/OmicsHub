@@ -1149,6 +1149,20 @@
             width: 100%;
         }
     }
+
+    /* Timing columns styling */
+    .field-alignment_time,
+    .field-postqc_time,
+    .field-ingest_time {
+        min-width: 100px;
+        white-space: nowrap;
+    }
+
+    .column-alignment_time,
+    .column-postqc_time,
+    .column-ingest_time {
+        min-width: 100px;
+    }
 </style>
 
 {% endblock %}
@@ -1265,6 +1279,15 @@
             opacity: 0,
             transform: 'translateY(10px)',
             transition: 'opacity 0.3s ease, transform 0.3s ease'
+        });
+
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl, {
+                placement: 'top',
+                boundary: 'window'
+            });
         });
     });
 </script>

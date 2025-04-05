@@ -48,6 +48,19 @@ class MainListView(FilterView):
             Prefetch(
                 'fastq_name__loadassociation_set',
                 queryset=LoadAssociation.objects.select_related('fastq_name')
+            ),
+            # Prefetch related models for timing information
+            Prefetch(
+                'fastq_name__alignment',
+                to_attr='alignment_info'
+            ),
+            Prefetch(
+                'fastq_name__postqc',
+                to_attr='postqc_info'
+            ),
+            Prefetch(
+                'fastq_name__ingest',
+                to_attr='ingest_info'
             )
         ).order_by('fastq_name__fastq_name')  # Order by fastq_name for consistent pagination
         
