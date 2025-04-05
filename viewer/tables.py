@@ -67,40 +67,52 @@ class MainTable(tables.Table):
         return cleaned_value
 
     def render_alignment_status(self, value):
-        """Render alignment status with color coding"""
+        """Render alignment status with color coding, clock icon, and animation for completed processes"""
         if value == 'COMPLETED':
-            status_class = 'text-success'
+            status_class = 'text-success status-completed'
+            icon = '<i class="bi bi-clock-history me-1"></i>'
         elif value == 'NOT COMPLETED':
             status_class = 'text-warning'
+            icon = '<i class="bi bi-clock me-1"></i>'
         elif value == 'FAILED':
             status_class = 'text-danger'
+            icon = '<i class="bi bi-clock-fill me-1"></i>'
         else:
             status_class = 'text-secondary'
+            icon = '<i class="bi bi-dash-circle me-1"></i>'
             
-        return format_html('<span class="{}">{}</span>', status_class, value or "—")
+        return format_html('<span class="{}">{}{}</span>', status_class, icon, value or "—")
 
     def render_postqc_status(self, value):
-        """Render PostQC status with color coding"""
+        """Render PostQC status with color coding, clock icon, and animation for completed processes"""
         if value == 'COMPLETED':
-            status_class = 'text-success'
+            status_class = 'text-success status-completed'
+            icon = '<i class="bi bi-clock-history me-1"></i>'
         elif value == 'NOT COMPLETED':
             status_class = 'text-warning'
+            icon = '<i class="bi bi-clock me-1"></i>'
         elif value == 'FAILED':
             status_class = 'text-danger'
+            icon = '<i class="bi bi-clock-fill me-1"></i>'
         else:
             status_class = 'text-secondary'
+            icon = '<i class="bi bi-dash-circle me-1"></i>'
             
-        return format_html('<span class="{}">{}</span>', status_class, value or "—")
+        return format_html('<span class="{}">{}{}</span>', status_class, icon, value or "—")
 
     def render_ingest_status(self, value):
-        """Render Ingest status with color coding"""
+        """Render Ingest status with color coding, clock icon, and animation for completed processes"""
         if value == 'COMPLETED':
-            status_class = 'text-success'
+            status_class = 'text-success status-completed'
+            icon = '<i class="bi bi-clock-history me-1"></i>'
         elif value == 'NOT COMPLETED':
             status_class = 'text-warning'
+            icon = '<i class="bi bi-clock me-1"></i>'
         elif value == 'FAILED':
             status_class = 'text-danger'
+            icon = '<i class="bi bi-clock-fill me-1"></i>'
         else:
             status_class = 'text-secondary'
+            icon = '<i class="bi bi-dash-circle me-1"></i>'
             
-        return format_html('<span class="{}">{}</span>', status_class, value or "—") 
+        return format_html('<span class="{}">{}{}</span>', status_class, icon, value or "—") 

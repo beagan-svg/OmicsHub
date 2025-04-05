@@ -596,8 +596,7 @@
                                 </form>
                             </div>
 
-                            <span class="text-muted pagination-info">Showing {{ page_obj.start_index }} to {{
-                                page_obj.end_index }} of {{ page_obj.paginator.count }} results</span>
+                            <span class="text-muted pagination-info">{% pagination_info page_obj %}</span>
                         </div>
                     </div>
                 </div>
@@ -1148,6 +1147,57 @@
         .pagination-info {
             margin-top: 0.5rem;
             width: 100%;
+        }
+    }
+
+    /* Status icons and animations */
+    .status-completed {
+        position: relative;
+    }
+
+    .status-completed i {
+        animation: status-pulse 2s infinite;
+    }
+
+    @keyframes status-pulse {
+        0% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.6;
+        }
+
+        100% {
+            opacity: 1;
+        }
+    }
+
+    /* Add a subtle glow effect for completed status */
+    .status-completed::after {
+        content: "";
+        position: absolute;
+        top: -3px;
+        left: -3px;
+        right: -3px;
+        bottom: -3px;
+        border-radius: 4px;
+        background: rgba(25, 135, 84, 0.1);
+        animation: status-glow 2s infinite;
+        z-index: -1;
+    }
+
+    @keyframes status-glow {
+        0% {
+            opacity: 0.5;
+        }
+
+        50% {
+            opacity: 0.2;
+        }
+
+        100% {
+            opacity: 0.5;
         }
     }
 </style>
