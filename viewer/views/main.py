@@ -27,6 +27,17 @@ class MainListView(FilterView):
     paginate_by = 25
     strict = False  # Allow non-model fields to be used in ordering
 
+    def get_paginate_by(self, queryset):
+        """
+        Get the number of items to paginate by, or the default.
+        """
+        # Try to get the per_page parameter from the request
+        per_page = self.request.GET.get('per_page')
+        # Validate the per_page parameter
+        if per_page in ['10', '25', '50', '100']:
+            return int(per_page)
+        return self.paginate_by
+
     def get_queryset(self):
         """
         Optimize the queryset with select_related and prefetch_related
@@ -92,6 +103,9 @@ class MainListView(FilterView):
         """
         context = super().get_context_data(**kwargs)
         
+        # Add the current paginate_by value to the context
+        context['current_per_page'] = self.get_paginate_by(None)
+        
         # The FilterView already puts the filterset and filtered queryset in the context,
         # along with the paginated page_obj. We need to create a table from the
         # paginated data (object_list).
@@ -152,6 +166,10 @@ class MainListView(FilterView):
         
         # Add request parameters to context for form persistence
         context['current_filters'] = dict(self.request.GET.items())
+        
+        # Add per_page to current_filters if not present
+        if 'per_page' not in context['current_filters'] and context['current_per_page'] != self.paginate_by:
+            context['current_filters']['per_page'] = str(context['current_per_page'])
         
         # Handle multiple selection values for the multi-select filters
         multi_select_filters = ['study_set', 'organism', 'batch_name_from_vendor', 'library_prep_method', 

@@ -7,6 +7,20 @@ register = template.Library()
 def get_item(dictionary, key):
     return dictionary.get(key, '')
 
+@register.filter(name='split')
+def split(value, key):
+    """
+    Split a string into a list based on a delimiter.
+    
+    Usage:
+       {{ value|split:'delimiter' }}
+    
+    Example:
+       {{ "a,b,c"|split:',' }}
+       Returns ['a', 'b', 'c']
+    """
+    return value.split(key)
+
 @register.simple_tag(takes_context=True)
 def param_replace(context, **kwargs):
     """
