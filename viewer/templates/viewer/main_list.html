@@ -1149,61 +1149,6 @@
             width: 100%;
         }
     }
-
-    /* Status icons and animations - v2 */
-    .status-completed {
-        position: relative;
-        display: inline-block;
-        /* Ensure proper positioning */
-        padding: 2px 4px;
-        border-radius: 3px;
-    }
-
-    .status-completed i {
-        animation: status-pulse 2s infinite;
-    }
-
-    @keyframes status-pulse {
-        0% {
-            opacity: 1;
-        }
-
-        50% {
-            opacity: 0.6;
-        }
-
-        100% {
-            opacity: 1;
-        }
-    }
-
-    /* Add a more visible glow effect for completed status */
-    .status-completed::after {
-        content: "";
-        position: absolute;
-        top: -2px;
-        left: -2px;
-        right: -2px;
-        bottom: -2px;
-        border-radius: 4px;
-        background: rgba(25, 135, 84, 0.2);
-        animation: status-glow 2s infinite;
-        z-index: -1;
-    }
-
-    @keyframes status-glow {
-        0% {
-            opacity: 0.7;
-        }
-
-        50% {
-            opacity: 0.3;
-        }
-
-        100% {
-            opacity: 0.7;
-        }
-    }
 </style>
 
 {% endblock %}

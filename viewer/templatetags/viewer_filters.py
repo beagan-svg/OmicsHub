@@ -38,6 +38,16 @@ def is_selected(value, options_list):
     
     return 'selected' if value in options_list else ''
 
+@register.simple_tag
+def pagination_info(page_obj):
+    """
+    Generate pagination info text.
+    
+    Usage:
+       {% pagination_info page_obj %}
+    """
+    return f"Results {page_obj.start_index()}-{page_obj.end_index()} of {page_obj.paginator.count}"
+
 @register.simple_tag(takes_context=True)
 def param_replace(context, **kwargs):
     """
