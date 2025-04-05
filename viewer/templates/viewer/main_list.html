@@ -1150,9 +1150,13 @@
         }
     }
 
-    /* Status icons and animations */
+    /* Status icons and animations - v2 */
     .status-completed {
         position: relative;
+        display: inline-block;
+        /* Ensure proper positioning */
+        padding: 2px 4px;
+        border-radius: 3px;
     }
 
     .status-completed i {
@@ -1173,31 +1177,31 @@
         }
     }
 
-    /* Add a subtle glow effect for completed status */
+    /* Add a more visible glow effect for completed status */
     .status-completed::after {
         content: "";
         position: absolute;
-        top: -3px;
-        left: -3px;
-        right: -3px;
-        bottom: -3px;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
         border-radius: 4px;
-        background: rgba(25, 135, 84, 0.1);
+        background: rgba(25, 135, 84, 0.2);
         animation: status-glow 2s infinite;
         z-index: -1;
     }
 
     @keyframes status-glow {
         0% {
-            opacity: 0.5;
+            opacity: 0.7;
         }
 
         50% {
-            opacity: 0.2;
+            opacity: 0.3;
         }
 
         100% {
-            opacity: 0.5;
+            opacity: 0.7;
         }
     }
 </style>

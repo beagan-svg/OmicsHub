@@ -69,7 +69,7 @@ class MainTable(tables.Table):
     def render_alignment_status(self, value):
         """Render alignment status with color coding, clock icon, and animation for completed processes"""
         if value == 'COMPLETED':
-            status_class = 'text-success status-completed'
+            status_class = 'text-success status-completed fw-bold'
             icon = '<i class="bi bi-clock-history me-1"></i>'
         elif value == 'NOT COMPLETED':
             status_class = 'text-warning'
@@ -86,7 +86,7 @@ class MainTable(tables.Table):
     def render_postqc_status(self, value):
         """Render PostQC status with color coding, clock icon, and animation for completed processes"""
         if value == 'COMPLETED':
-            status_class = 'text-success status-completed'
+            status_class = 'text-success status-completed fw-bold'
             icon = '<i class="bi bi-clock-history me-1"></i>'
         elif value == 'NOT COMPLETED':
             status_class = 'text-warning'
@@ -103,7 +103,7 @@ class MainTable(tables.Table):
     def render_ingest_status(self, value):
         """Render Ingest status with color coding, clock icon, and animation for completed processes"""
         if value == 'COMPLETED':
-            status_class = 'text-success status-completed'
+            status_class = 'text-success status-completed fw-bold'
             icon = '<i class="bi bi-clock-history me-1"></i>'
         elif value == 'NOT COMPLETED':
             status_class = 'text-warning'
