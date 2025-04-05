@@ -122,9 +122,8 @@ The study.json file contains records with the following key fields:
 | Ingest Time | Timestamp for ingest | Ingest |
 | FID values | Additional identifiers | Various models |
 
-**Note:** The "Organism" field from study.json is mapped to both:
-- `organism_common_name` in the Metadata model (primary mapping)
-- `organism_name` in the Metadata model (for backwards compatibility)
+**Note:** The "Organism" field from study.json is mapped to:
+- `organism_common_name` in the Metadata model
 - `organism` in the Main model
 
 ## Advanced Usage

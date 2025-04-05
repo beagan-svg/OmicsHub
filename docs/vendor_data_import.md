@@ -63,9 +63,8 @@ Each script extracts the following fields:
 - Sample ID
 - Sequencing Vendor
 
-**Note:** The "Organism Name" field from CSV files is mapped to both:
-- `organism_common_name` in the Metadata model (primary mapping)
-- `organism_name` in the Metadata model (for backwards compatibility)
+**Note:** The "Organism Name" field from CSV files is mapped to:
+- `organism_common_name` in the Metadata model
 - `organism` in the Main model
 
 ## Automated Collection and Import

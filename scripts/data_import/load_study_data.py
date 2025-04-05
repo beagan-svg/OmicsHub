@@ -77,7 +77,6 @@ def load_study_data(json_path=None, dry_run=False):
                 metadata = Metadata.objects.create(
                     fastq_name=fastq_name,
                     organism_common_name=data.get('Organism'),
-                    organism_name=data.get('Organism'),  # Keep organism_name as well for backwards compatibility
                     library_prep_method_name=data.get('Library Prep Method'),
                     studies=data.get('Study Set', '')
                 )
