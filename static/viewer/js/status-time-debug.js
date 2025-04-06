@@ -10,16 +10,25 @@ document.addEventListener('DOMContentLoaded', function () {
     const timeToggles = document.querySelectorAll('[id^="toggle"][id$="Time"]');
     console.log(`Found ${timeToggles.length} time-related toggles`);
 
+    // Add a debugging button to inspect the table state
+    addDebugControls();
+
     // Log initial state of each toggle
     timeToggles.forEach(toggle => {
         console.log(`Toggle ${toggle.id}: checked=${toggle.checked}, visible=${isColumnVisible(toggle)}`);
+        validateColumnClasses(toggle);
 
-        // Ensure event listeners are properly set up
-        toggle.addEventListener('change', function (event) {
-            console.log(`Time toggle changed: ${toggle.id} -> ${toggle.checked}`);
+        // Ensure event listeners are properly set up - override any existing listeners
+        toggle.addEventListener('click', function (event) {
+            // Stop event propagation to prevent multiple handlers
+            event.stopPropagation();
+
+            console.log(`Time toggle clicked: ${toggle.id} -> ${toggle.checked}`);
             const columnClass = getColumnClassFromToggle(toggle);
+
             if (columnClass) {
-                applyTimeColumnVisibility(columnClass, toggle.checked);
+                // Force toggle the column visibility directly
+                forceColumnVisibility(columnClass, toggle.checked);
 
                 // Save to localStorage
                 const storageKey = `show${snakeToCamelCase(columnClass)}`;
@@ -46,9 +55,267 @@ document.addEventListener('DOMContentLoaded', function () {
             // Toggle all time toggles to the opposite state
             timeToggles.forEach(toggle => {
                 toggle.checked = !allTimeTogglesOn;
-                toggle.dispatchEvent(new Event('change'));
+                const columnClass = getColumnClassFromToggle(toggle);
+                if (columnClass) {
+                    forceColumnVisibility(columnClass, toggle.checked);
+
+                    // Save to localStorage
+                    const storageKey = `show${snakeToCamelCase(columnClass)}`;
+                    localStorage.setItem(storageKey, toggle.checked);
+                }
             });
+
+            // Show feedback
+            showFeedbackMessage(`${allTimeTogglesOn ? 'Hidden' : 'Shown'} all Status Time columns`);
         });
+    }
+
+    /**
+     * Add debug controls to the page
+     */
+    function addDebugControls() {
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'debug-controls';
+        controlsDiv.style.position = 'fixed';
+        controlsDiv.style.bottom = '10px';
+        controlsDiv.style.left = '10px';
+        controlsDiv.style.zIndex = '9999';
+        controlsDiv.style.display = 'flex';
+        controlsDiv.style.flexDirection = 'column';
+        controlsDiv.style.gap = '5px';
+
+        // Inspect Table Button
+        const inspectButton = document.createElement('button');
+        inspectButton.innerText = 'Inspect Table';
+        inspectButton.style.padding = '5px 10px';
+        inspectButton.style.backgroundColor = '#007bff';
+        inspectButton.style.color = 'white';
+        inspectButton.style.border = 'none';
+        inspectButton.style.borderRadius = '4px';
+        inspectButton.style.cursor = 'pointer';
+        inspectButton.addEventListener('click', inspectTableState);
+        controlsDiv.appendChild(inspectButton);
+
+        // Fix All Button
+        const fixButton = document.createElement('button');
+        fixButton.innerText = 'Fix All Columns';
+        fixButton.style.padding = '5px 10px';
+        fixButton.style.backgroundColor = '#28a745';
+        fixButton.style.color = 'white';
+        fixButton.style.border = 'none';
+        fixButton.style.borderRadius = '4px';
+        fixButton.style.cursor = 'pointer';
+        fixButton.addEventListener('click', fixAllColumns);
+        controlsDiv.appendChild(fixButton);
+
+        // Show/Hide Debug Controls Button
+        const toggleControlsButton = document.createElement('button');
+        toggleControlsButton.innerText = '👁️';
+        toggleControlsButton.style.position = 'fixed';
+        toggleControlsButton.style.bottom = '10px';
+        toggleControlsButton.style.left = '10px';
+        toggleControlsButton.style.zIndex = '10000';
+        toggleControlsButton.style.width = '30px';
+        toggleControlsButton.style.height = '30px';
+        toggleControlsButton.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        toggleControlsButton.style.color = 'white';
+        toggleControlsButton.style.border = 'none';
+        toggleControlsButton.style.borderRadius = '50%';
+        toggleControlsButton.style.display = 'flex';
+        toggleControlsButton.style.alignItems = 'center';
+        toggleControlsButton.style.justifyContent = 'center';
+        toggleControlsButton.style.cursor = 'pointer';
+
+        // Initially hide the controls div
+        controlsDiv.style.display = 'none';
+
+        toggleControlsButton.addEventListener('click', function () {
+            if (controlsDiv.style.display === 'none') {
+                controlsDiv.style.display = 'flex';
+                toggleControlsButton.style.display = 'none';
+            } else {
+                controlsDiv.style.display = 'none';
+            }
+        });
+
+        // Hide button when controls are shown
+        const hideButton = document.createElement('button');
+        hideButton.innerText = '✖️';
+        hideButton.style.alignSelf = 'flex-end';
+        hideButton.style.backgroundColor = 'transparent';
+        hideButton.style.border = 'none';
+        hideButton.style.color = '#555';
+        hideButton.style.cursor = 'pointer';
+        hideButton.addEventListener('click', function () {
+            controlsDiv.style.display = 'none';
+            toggleControlsButton.style.display = 'flex';
+        });
+        controlsDiv.appendChild(hideButton);
+
+        document.body.appendChild(toggleControlsButton);
+        document.body.appendChild(controlsDiv);
+    }
+
+    /**
+     * Inspect the current state of the table
+     */
+    function inspectTableState() {
+        console.group('Table Inspection');
+
+        // Get all table headers
+        const table = document.querySelector('table.table');
+        if (!table) {
+            console.error('Table not found');
+            console.groupEnd();
+            return;
+        }
+
+        const headers = table.querySelectorAll('th');
+        console.log(`Found ${headers.length} table headers`);
+
+        // Get all time-related headers
+        const timeHeaders = Array.from(headers).filter(th => th.className.includes('time'));
+        console.log(`Found ${timeHeaders.length} time-related headers`);
+
+        timeHeaders.forEach(header => {
+            const columnClass = header.className.split(' ').find(cls => cls.includes('column-'));
+            const isVisible = window.getComputedStyle(header).display !== 'none';
+            console.log(`Header: ${header.textContent.trim()}, Class: ${columnClass}, Visible: ${isVisible}`);
+
+            // Check if the corresponding cells are visible
+            const fieldClass = `field-${columnClass.replace('column-', '')}`;
+            const cells = table.querySelectorAll(`td.${fieldClass}`);
+
+            console.log(`  Found ${cells.length} cells with class ${fieldClass}`);
+
+            // Check the first cell visibility
+            if (cells.length > 0) {
+                const firstCell = cells[0];
+                const isCellVisible = window.getComputedStyle(firstCell).display !== 'none';
+                console.log(`  First cell content: "${firstCell.textContent.trim()}", Visible: ${isCellVisible}`);
+
+                // Check for mismatch
+                if (isVisible !== isCellVisible) {
+                    console.error(`  MISMATCH: Header visible: ${isVisible}, Cell visible: ${isCellVisible}`);
+                }
+            }
+        });
+
+        // Get toggle state
+        const timeToggles = document.querySelectorAll('[id^="toggle"][id$="Time"]');
+        timeToggles.forEach(toggle => {
+            const columnClass = getColumnClassFromToggle(toggle);
+
+            // Find the corresponding header and cell
+            const header = table.querySelector(`th.${columnClass}`);
+            const cells = table.querySelectorAll(`td.field-${columnClass.replace('column-', '')}`);
+
+            const headerVisible = header ? window.getComputedStyle(header).display !== 'none' : false;
+            const cellsVisible = cells.length > 0 ?
+                window.getComputedStyle(cells[0]).display !== 'none' : false;
+
+            console.log(`Toggle ${toggle.id}: checked=${toggle.checked}, header visible=${headerVisible}, cells visible=${cellsVisible}`);
+
+            // Check for mismatch
+            if (toggle.checked !== headerVisible || toggle.checked !== cellsVisible) {
+                console.error(`  MISMATCH: Toggle checked: ${toggle.checked}, Header visible: ${headerVisible}, Cells visible: ${cellsVisible}`);
+            }
+        });
+
+        console.groupEnd();
+
+        // Show feedback
+        showFeedbackMessage('Table inspection complete. Check console.');
+    }
+
+    /**
+     * Fix all column visibility issues
+     */
+    function fixAllColumns() {
+        console.group('Fixing All Columns');
+
+        // Get all time toggles
+        const timeToggles = document.querySelectorAll('[id^="toggle"][id$="Time"]');
+
+        timeToggles.forEach(toggle => {
+            const columnClass = getColumnClassFromToggle(toggle);
+            if (columnClass) {
+                // Force the visibility to match the toggle state
+                forceColumnVisibility(columnClass, toggle.checked);
+                console.log(`Fixed visibility for ${columnClass}: ${toggle.checked}`);
+            }
+        });
+
+        console.groupEnd();
+
+        // Show feedback
+        showFeedbackMessage('All columns fixed. Check console for details.');
+    }
+
+    /**
+     * Force visibility of column cells
+     */
+    function forceColumnVisibility(columnClass, isVisible) {
+        console.log(`Forcing visibility for ${columnClass}: ${isVisible ? 'SHOW' : 'HIDE'}`);
+
+        // Get the field class
+        const fieldClass = `field-${columnClass.replace('column-', '')}`;
+
+        // Find all cells and headers
+        const table = document.querySelector('table.table');
+        if (!table) {
+            console.error('Table not found');
+            return;
+        }
+
+        const headers = table.querySelectorAll(`th.${columnClass}`);
+        const cells = table.querySelectorAll(`td.${fieldClass}`);
+
+        console.log(`Found ${headers.length} headers and ${cells.length} cells for ${columnClass}`);
+
+        // Apply to headers
+        headers.forEach(header => {
+            header.style.display = isVisible ? '' : 'none';
+        });
+
+        // Apply to cells
+        cells.forEach(cell => {
+            cell.style.display = isVisible ? '' : 'none';
+        });
+    }
+
+    /**
+     * Validate column classes for a toggle
+     */
+    function validateColumnClasses(toggle) {
+        const columnClass = getColumnClassFromToggle(toggle);
+        if (!columnClass) {
+            console.error(`No column class found for toggle: ${toggle.id}`);
+            return;
+        }
+
+        const fieldClass = `field-${columnClass.replace('column-', '')}`;
+
+        // Find table
+        const table = document.querySelector('table.table');
+        if (!table) {
+            console.error('Table not found');
+            return;
+        }
+
+        // Count headers and cells
+        const headers = table.querySelectorAll(`th.${columnClass}`);
+        const cells = table.querySelectorAll(`td.${fieldClass}`);
+
+        if (headers.length === 0) {
+            console.error(`No headers found with class: ${columnClass}`);
+        }
+
+        if (cells.length === 0) {
+            console.error(`No cells found with class: ${fieldClass}`);
+        }
+
+        console.log(`Validation for ${toggle.id}: ${headers.length} headers and ${cells.length} cells found`);
     }
 
     /**
@@ -77,32 +344,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const columnClass = getColumnClassFromToggle(toggle);
         if (!columnClass) return false;
 
-        const cell = document.querySelector(`.${columnClass}`);
-        return cell && window.getComputedStyle(cell).display !== 'none';
-    }
+        const table = document.querySelector('table.table');
+        if (!table) return false;
 
-    /**
-     * Apply visibility change to time column
-     */
-    function applyTimeColumnVisibility(columnClass, isVisible) {
-        console.log(`Applying visibility for ${columnClass}: ${isVisible}`);
-
-        // Find all cells with this class (both th and td)
-        const cells = document.querySelectorAll(`.${columnClass}`);
-
-        cells.forEach(cell => {
-            if (isVisible) {
-                cell.style.display = '';
-                cell.style.opacity = '1';
-                cell.style.width = '';
-            } else {
-                cell.style.opacity = '0';
-                cell.style.width = '0';
-                setTimeout(() => {
-                    cell.style.display = 'none';
-                }, 300);
-            }
-        });
+        const header = table.querySelector(`th.${columnClass}`);
+        return header && window.getComputedStyle(header).display !== 'none';
     }
 
     /**

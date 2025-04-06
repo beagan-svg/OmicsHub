@@ -411,12 +411,15 @@ function applyColumnVisibility(columnClass, isVisible, animate = false) {
     // Check if this is a time column
     const isTimeColumn = columnClass.includes('time');
 
+    // Get the field class pattern (column-xxx becomes field-xxx)
+    const fieldClass = `field-${columnClass.replace('column-', '')}`;
+
     if (isTimeColumn) {
-        console.log(`Found time column: ${columnClass}`);
+        console.log(`Found time column: ${columnClass} -> field class: ${fieldClass}`);
     }
 
-    // Find all cells with this class
-    const cells = document.querySelectorAll(`td.field-${columnClass.replace('column-', '')}`);
+    // Find all cells with this field class
+    const cells = document.querySelectorAll(`td.${fieldClass}`);
     const headers = document.querySelectorAll(`th.${columnClass}`);
 
     console.log(`Found ${cells.length} cells and ${headers.length} headers for ${columnClass}`);
