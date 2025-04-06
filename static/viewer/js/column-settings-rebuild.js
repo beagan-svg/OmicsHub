@@ -102,8 +102,9 @@ function extractColumnConfiguration() {
         'column-ingest_status',
         'column-alignment_status',
         'column-postqc_status'
-        // Note: All timestamp columns are hidden by default
+        // Note: All timestamp columns and FID columns are hidden by default
         // Status Time columns: ingest_start_time, ingest_end_time, etc.
+        // Status FID columns: ingest_fid, alignment_fid, postqc_fid
     ];
 
     // Get all toggle elements within the dropdown
@@ -154,6 +155,38 @@ function extractColumnConfiguration() {
         // Add event listener
         toggle.addEventListener('change', event => handleColumnToggleChange(event, columnClass));
     });
+
+    // Status columns
+    columnConfig.mappings['column-ingest_status'] = {
+        label: 'Ingest Status',
+        category: 'status',
+        visible: true
+    };
+    columnConfig.mappings['column-ingest_fid'] = {
+        label: 'Ingest FID',
+        category: 'status_fid',
+        visible: false
+    };
+    columnConfig.mappings['column-alignment_status'] = {
+        label: 'Alignment Status',
+        category: 'status',
+        visible: true
+    };
+    columnConfig.mappings['column-alignment_fid'] = {
+        label: 'Alignment FID',
+        category: 'status_fid',
+        visible: false
+    };
+    columnConfig.mappings['column-postqc_status'] = {
+        label: 'PostQC Status',
+        category: 'status',
+        visible: true
+    };
+    columnConfig.mappings['column-postqc_fid'] = {
+        label: 'PostQC FID',
+        category: 'status_fid',
+        visible: false
+    };
 }
 
 /**
@@ -411,16 +444,46 @@ function applyColumnVisibility(columnClass, isVisible, animate = false) {
     // Check if this is a time column
     const isTimeColumn = columnClass.includes('time');
 
+    // Check if this is a FID column
+    const isFidColumn = columnClass.includes('fid');
+
     // Get the field class pattern (column-xxx becomes field-xxx)
-    const fieldClass = `field-${columnClass.replace('column-', '')}`;
+    let fieldClass = `field-${columnClass.replace('column-', '')}`;
+
+    // For status FID columns, also try the class directly since they have custom styling
+    const fidClasses = ['ingest-fid', 'alignment-fid', 'postqc-fid'];
 
     if (isTimeColumn) {
         console.log(`Found time column: ${columnClass} -> field class: ${fieldClass}`);
     }
 
+    if (isFidColumn) {
+        console.log(`Found FID column: ${columnClass} -> field class: ${fieldClass}`);
+    }
+
     // Find all cells with this field class
-    const cells = document.querySelectorAll(`td.${fieldClass}`);
-    const headers = document.querySelectorAll(`th.${columnClass}`);
+    let cells = document.querySelectorAll(`td.${fieldClass}`);
+    let headers = document.querySelectorAll(`th.${columnClass}`);
+
+    // If it's a FID column, also search by the fid-column class
+    if (isFidColumn) {
+        // Get the specific FID type (ingest, alignment, postqc)
+        const fidType = columnClass.replace('column-', '').replace('_fid', '');
+        const specificFidClass = `${fidType}-fid`;
+
+        const fidCells = document.querySelectorAll(`td.fid-column.${specificFidClass}`);
+        const fidHeaders = document.querySelectorAll(`th.fid-column.${specificFidClass}`);
+
+        if (fidCells.length > 0) {
+            cells = fidCells;
+            console.log(`Found ${fidCells.length} FID cells using class ${specificFidClass}`);
+        }
+
+        if (fidHeaders.length > 0) {
+            headers = fidHeaders;
+            console.log(`Found ${fidHeaders.length} FID headers using class ${specificFidClass}`);
+        }
+    }
 
     console.log(`Found ${cells.length} cells and ${headers.length} headers for ${columnClass}`);
 

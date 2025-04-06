@@ -305,6 +305,47 @@
                                                 </div>
                                             </div>
 
+                                            <!-- Status FID Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-hash me-2"></i>Status FID</h6>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleIngestFid"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-ingest_fid">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleIngestFid">
+                                                        Ingest FID
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAlignmentFid"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-alignment_fid">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAlignmentFid">
+                                                        Alignment FID
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="togglePostqcFid"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-postqc_fid">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="togglePostqcFid">
+                                                        PostQC FID
+                                                    </label>
+                                                </div>
+                                            </div>
+
                                             <!-- Status Time Category -->
                                             <div class="column-category">
                                                 <h6><i class="bi bi-clock-history me-2"></i>Status Time</h6>
@@ -1237,25 +1278,124 @@
 
     /* Status badge styling */
     .status-badge {
-        display: inline-block;
-        padding: 0.35em 0.65em;
-        font-size: 0.75em;
-        font-weight: 700;
-        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        line-height: 1.2;
         text-align: center;
         white-space: nowrap;
         vertical-align: baseline;
-        border-radius: 0.25rem;
+        border-radius: 16px;
+        min-width: 90px;
+        letter-spacing: 0.02em;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
+    .status-badge::before {
+        content: "";
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Google style color scheme */
     .status-completed {
-        background-color: #198754;
-        color: white;
+        background-color: rgba(52, 168, 83, 0.12);
+        color: #1e8e3e;
+        border: 1px solid rgba(52, 168, 83, 0.2);
+        border-left: 3px solid #34A853;
+        /* Google Green */
+    }
+
+    .status-completed::before {
+        background-color: #34A853;
+        /* Google Green */
     }
 
     .status-not-completed {
-        background-color: #6c757d;
-        color: white;
+        background-color: rgba(234, 67, 53, 0.12);
+        color: #c5221f;
+        border: 1px solid rgba(234, 67, 53, 0.2);
+        border-left: 3px solid #EA4335;
+        /* Google Red */
+    }
+
+    .status-not-completed::before {
+        background-color: #EA4335;
+        /* Google Red */
+    }
+
+    .status-in-progress {
+        background-color: rgba(251, 188, 5, 0.12);
+        color: #e37400;
+        border: 1px solid rgba(251, 188, 5, 0.2);
+        border-left: 3px solid #FBBC05;
+        /* Google Yellow */
+    }
+
+    .status-in-progress::before {
+        background-color: #FBBC05;
+        /* Google Yellow */
+    }
+
+    .status-pending {
+        background-color: rgba(66, 133, 244, 0.12);
+        color: #1a73e8;
+        border: 1px solid rgba(66, 133, 244, 0.2);
+        border-left: 3px solid #4285F4;
+        /* Google Blue */
+    }
+
+    .status-pending::before {
+        background-color: #4285F4;
+        /* Google Blue */
+    }
+
+    .status-error {
+        background-color: rgba(95, 99, 104, 0.12);
+        color: #5f6368;
+        border: 1px solid rgba(95, 99, 104, 0.2);
+        border-left: 3px solid #5F6368;
+        /* Google Gray */
+    }
+
+    .status-error::before {
+        background-color: #5F6368;
+        /* Google Gray */
+    }
+
+    /* Special status styles for different process types */
+    .status-column.ingest-status .status-badge {
+        border-left-color: #4285F4;
+        /* Google Blue for ingest */
+    }
+
+    .status-column.alignment-status .status-badge {
+        border-left-color: #FBBC05;
+        /* Google Yellow for alignment */
+    }
+
+    .status-column.postqc-status .status-badge {
+        border-left-color: #34A853;
+        /* Google Green for postqc */
+    }
+
+    /* Hover effects */
+    .status-badge:hover {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        transform: translateY(-1px);
+    }
+
+    /* Tooltip on hover */
+    tr td .status-badge {
+        position: relative;
     }
 
     /* Timestamp field styling */
@@ -1272,19 +1412,239 @@
     }
 
     /* Add a subtle background color to time cells for better readability */
-    td[class*="_start_time"] {
-        background-color: rgba(13, 110, 253, 0.05);
-        border-left: 2px solid rgba(13, 110, 253, 0.3);
+    td[class*="ingest_start_time"],
+    td[class*="ingest_end_time"] {
+        background-color: rgba(66, 133, 244, 0.05);
+        /* Google Blue for ingest */
+        border-left: 2px solid rgba(66, 133, 244, 0.3);
     }
 
-    td[class*="_end_time"] {
-        background-color: rgba(25, 135, 84, 0.05);
-        border-left: 2px solid rgba(25, 135, 84, 0.3);
+    td[class*="alignment_start_time"],
+    td[class*="alignment_end_time"] {
+        background-color: rgba(251, 188, 5, 0.05);
+        /* Google Yellow for alignment */
+        border-left: 2px solid rgba(251, 188, 5, 0.3);
+    }
+
+    td[class*="postqc_start_time"],
+    td[class*="postqc_end_time"] {
+        background-color: rgba(52, 168, 83, 0.05);
+        /* Google Green for postqc */
+        border-left: 2px solid rgba(52, 168, 83, 0.3);
     }
 
     /* Highlight time pairs on hover */
     tr:hover td[class*="_time"] {
         background-color: #f8f9fa;
+    }
+
+    .time-column {
+        font-family: monospace;
+        white-space: nowrap;
+    }
+
+    td.time-column,
+    th.time-column {
+        text-align: center;
+        min-width: 150px;
+    }
+
+    .time-column:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* FID column styling - Google Material Design inspired */
+    .fid-column {
+        font-family: inherit;
+        font-size: 0.875rem;
+        letter-spacing: normal;
+        white-space: nowrap;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 4px;
+        padding: 0.4rem 0.75rem !important;
+        position: relative;
+    }
+
+    td.fid-column,
+    th.fid-column {
+        text-align: left;
+        min-width: 150px;
+        background-color: #f5f5f5;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Material design inspired styling for different FID types */
+    td.ingest-fid,
+    th.ingest-fid {
+        background-color: rgba(66, 133, 244, 0.05);
+    }
+
+    td.alignment-fid,
+    th.alignment-fid {
+        background-color: rgba(251, 188, 5, 0.05);
+    }
+
+    td.postqc-fid,
+    th.postqc-fid {
+        background-color: rgba(52, 168, 83, 0.05);
+    }
+
+    /* Material ripple effect on hover */
+    td.fid-column {
+        position: relative;
+        overflow: hidden;
+        transform: translate3d(0, 0, 0);
+    }
+
+    td.fid-column::after {
+        content: "";
+        display: block;
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        background-image: radial-gradient(circle, #000 10%, transparent 10.01%);
+        background-repeat: no-repeat;
+        background-position: 50%;
+        transform: scale(10, 10);
+        opacity: 0;
+        transition: transform 0.5s, opacity 0.8s;
+    }
+
+    td.fid-column:active::after {
+        transform: scale(0, 0);
+        opacity: 0.1;
+        transition: 0s;
+    }
+
+    /* Enhance hover with Material Design elevation */
+    td.fid-column:hover {
+        background-color: #fafafa;
+        box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.16), 0 2px 10px 0 rgba(0, 0, 0, 0.12);
+        z-index: 10;
+        max-width: none;
+        overflow: visible;
+        white-space: normal;
+        word-break: break-all;
+    }
+
+    /* Clean Material tooltip on hover */
+    td.fid-column:hover::before {
+        content: attr(title);
+        position: absolute;
+        top: -32px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 4px 8px;
+        background-color: rgba(97, 97, 97, 0.9);
+        color: white;
+        border-radius: 2px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        z-index: 11;
+        opacity: 1;
+        pointer-events: none;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        font-family: inherit;
+        font-weight: 400;
+    }
+
+    /* Copy indicator */
+    td.fid-column.copied {
+        background-color: rgba(52, 168, 83, 0.1) !important;
+    }
+
+    td.fid-column.copied::after {
+        content: "✓";
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 2px 5px;
+        background-color: #34A853;
+        color: white;
+        border-radius: 0 0 0 4px;
+        font-size: 0.7rem;
+        opacity: 1;
+        transform: none;
+    }
+
+    /* Empty FID styling */
+    td.fid-column:empty::before,
+    td.fid-column:contains("—")::before {
+        content: "No ID";
+        display: block;
+        color: #9e9e9e;
+        text-align: center;
+        font-style: italic;
+        font-size: 0.8rem;
+    }
+
+    /* Material Design ripple effect */
+    .ripple {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 50%;
+        transform: scale(0);
+        animation: ripple 0.6s linear;
+        pointer-events: none;
+    }
+
+    @keyframes ripple {
+        to {
+            transform: scale(4);
+            opacity: 0;
+        }
+    }
+
+    /* Material Design toast notification */
+    .material-toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background-color: #323232;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 4px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        min-width: 200px;
+        max-width: 80%;
+        opacity: 0;
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+            opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 9999;
+        font-family: inherit;
+        font-size: 14px;
+    }
+
+    .material-toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    .material-toast-icon {
+        margin-right: 12px;
+        color: #4caf50;
+        font-size: 18px;
+    }
+
+    .material-toast-message {
+        flex-grow: 1;
+    }
+
+    /* Material Design empty FID styling */
+    td.fid-column.fid-empty,
+    td.fid-column:empty {
+        color: #9e9e9e;
+        text-align: center;
+        font-style: italic;
     }
 </style>
 
@@ -1304,6 +1664,83 @@
             theme: 'bootstrap4',
             width: '100%',
             placeholder: $(this).data('placeholder')
+        });
+
+        // Enhanced Google-style FID handling
+        document.querySelectorAll('td.fid-column').forEach(cell => {
+            const fidValue = cell.textContent.trim();
+            if (fidValue && fidValue !== '—') {
+                // Set tooltip title
+                cell.setAttribute('title', fidValue);
+
+                // Add ripple effect
+                cell.addEventListener('mousedown', function (e) {
+                    const x = e.pageX - this.offsetLeft;
+                    const y = e.pageY - this.offsetTop;
+
+                    const rippleElement = document.createElement('div');
+                    rippleElement.classList.add('ripple');
+                    rippleElement.style.top = y + 'px';
+                    rippleElement.style.left = x + 'px';
+
+                    this.appendChild(rippleElement);
+
+                    setTimeout(() => {
+                        rippleElement.remove();
+                    }, 600);
+                });
+
+                // Add a click handler to copy FID to clipboard with Material Design feedback
+                cell.addEventListener('click', function (e) {
+                    const textToCopy = this.textContent.trim();
+                    if (textToCopy && textToCopy !== '—') {
+                        navigator.clipboard.writeText(textToCopy)
+                            .then(() => {
+                                // Add copy animation
+                                this.classList.add('copied');
+
+                                // Show Material Design toast message
+                                const toast = document.createElement('div');
+                                toast.className = 'material-toast';
+                                toast.innerHTML = `
+                                    <div class="material-toast-icon">
+                                        <i class="bi bi-clipboard-check"></i>
+                                    </div>
+                                    <div class="material-toast-message">
+                                        FID copied to clipboard
+                                    </div>
+                                `;
+
+                                document.body.appendChild(toast);
+
+                                // Show toast
+                                setTimeout(() => {
+                                    toast.classList.add('show');
+                                }, 10);
+
+                                // Remove toast after delay
+                                setTimeout(() => {
+                                    toast.classList.remove('show');
+                                    setTimeout(() => {
+                                        toast.remove();
+                                    }, 300);
+                                }, 2500);
+
+                                // Remove copied class after animation
+                                setTimeout(() => {
+                                    this.classList.remove('copied');
+                                }, 1500);
+                            })
+                            .catch(err => {
+                                console.error('Failed to copy: ', err);
+                                showFeedbackMessage('Failed to copy to clipboard', true);
+                            });
+                    }
+                });
+            } else {
+                // Add special styling for empty values
+                cell.classList.add('fid-empty');
+            }
         });
 
         // Go to page form validation
