@@ -7,22 +7,22 @@
 const columnConfig = {
     // Column mappings - populated from data attributes
     mappings: {},
-    
+
     // Default visibility settings - populated from data attributes
     defaults: {},
-    
+
     // Track if all columns are currently visible
     allVisible: false,
-    
+
     // Flag to prevent feedback during initialization
     initializing: true,
-    
+
     // Store previous column state before "Show All" was toggled
     previousState: {},
-    
+
     // Flag to track if we're in "Show All" mode
     inShowAllMode: false,
-    
+
     // Cache for DOM elements
     elements: {
         table: null,
@@ -45,19 +45,19 @@ function initializeColumnSettings() {
         console.error('Table not found in the DOM');
         return;
     }
-    
+
     // Get the toggle elements
     fetchToggleElements();
-    
+
     // Get column configuration from data attributes
     extractColumnConfiguration();
-    
+
     // Initialize column visibility from localStorage
     initializeVisibility();
-    
+
     // Prevent dropdown from closing when toggles are clicked
     preventDropdownClosing();
-    
+
     // Initialize is complete - enable feedback
     setTimeout(() => {
         columnConfig.initializing = false;
@@ -73,16 +73,16 @@ function fetchToggleElements() {
     columnConfig.elements.toggleAllLabel = document.getElementById('toggleAllColumnsLabel');
     columnConfig.elements.resetButton = document.getElementById('resetColumnDefaults');
     columnConfig.elements.dropdown = document.querySelector('.column-settings-dropdown .dropdown-menu');
-    
+
     // Check if we found the main controls
     if (!columnConfig.elements.toggleAll) {
         console.error('Toggle All checkbox not found');
     }
-    
+
     if (!columnConfig.elements.resetButton) {
         console.error('Reset button not found');
     }
-    
+
     // Set up event listeners for main controls
     setupMainControlListeners();
 }
@@ -93,44 +93,61 @@ function fetchToggleElements() {
 function extractColumnConfiguration() {
     // Define the list of default visible columns
     const defaultVisibleColumns = [
-        'column_fastq_name',
-        'column_study_set',
-        'column_load_name',
-        'column_library_prep_method',
-        'column_organism',
-        'column_organism_common_name',
-        'column_ingest_status',
-        'column_alignment_status',
-        'column_postqc_status'
+        'column-fastq_name',
+        'column-study_set',
+        'column-load_name',
+        'column-library_prep_method',
+        'column-organism',
+        'column-organism_common_name',
+        'column-ingest_status',
+        'column-alignment_status',
+        'column-postqc_status'
     ];
-    
+
     // Get all toggle elements within the dropdown
     const toggles = document.querySelectorAll('.column-toggle-checkbox');
-    
+
     toggles.forEach(toggle => {
         // Extract column class from toggle ID
         const toggleId = toggle.id;
         if (!toggleId.startsWith('toggle')) return;
-        
-        // Convert camelCase to snake_case (e.g. toggleFastqName -> column_fastq_name)
-        const columnClassBase = camelToSnakeCase(toggleId.replace('toggle', ''));
-        const columnClass = `column_${columnClassBase.toLowerCase()}`;
-        
+
+        // Check if there's a data-column attribute that directly maps to a column class
+        let columnClass = toggle.dataset.column;
+
+        // If no data-column attribute, convert from toggle ID
+        if (!columnClass) {
+            // Convert camelCase to snake_case (e.g. toggleFastqName -> column-fastq_name)
+            const columnClassBase = camelToSnakeCase(toggleId.replace('toggle', ''));
+            columnClass = `column-${columnClassBase.toLowerCase()}`;
+        }
+
+        // Add debugging for timestamp fields
+        if (columnClass.includes('time')) {
+            console.log(`Processing timestamp toggle: ${toggleId} → ${columnClass}`);
+        }
+
         // Skip if this doesn't look like a valid column toggle
         if (!columnClass) return;
-        
+
         // Add to mappings
         columnConfig.mappings[columnClass] = {
             toggle: toggle,
             title: toggle.closest('.form-check')?.querySelector('.form-check-label')?.textContent.trim() || columnClass
         };
-        
-        // Set default to true only for columns in the defaultVisibleColumns list
-        columnConfig.defaults[columnClass] = defaultVisibleColumns.includes(columnClass);
-        
-        // Update the data attribute for consistency
-        toggle.dataset.defaultVisible = defaultVisibleColumns.includes(columnClass) ? "true" : "false";
-        
+
+        // Check if this is a timestamp column that should be hidden by default
+        const isTimestamp = toggleId.toLowerCase().includes('time');
+
+        // Set default based on whether it's in defaultVisibleColumns
+        // For timestamp columns, check data-default-visible attribute first
+        if (isTimestamp) {
+            columnConfig.defaults[columnClass] = toggle.dataset.defaultVisible === "true";
+            console.log(`Setting default for timestamp: ${columnClass} = ${columnConfig.defaults[columnClass]}`);
+        } else {
+            columnConfig.defaults[columnClass] = defaultVisibleColumns.includes(columnClass);
+        }
+
         // Add event listener
         toggle.addEventListener('change', event => handleColumnToggleChange(event, columnClass));
     });
@@ -144,7 +161,7 @@ function setupMainControlListeners() {
     if (columnConfig.elements.toggleAll) {
         columnConfig.elements.toggleAll.addEventListener('change', handleToggleAllChange);
     }
-    
+
     // Reset button
     if (columnConfig.elements.resetButton) {
         columnConfig.elements.resetButton.addEventListener('click', handleResetClick);
@@ -157,7 +174,7 @@ function setupMainControlListeners() {
 function initializeVisibility() {
     let visibleCount = 0;
     let totalColumns = 0;
-    
+
     // First, check if this is the first visit (no column settings in localStorage)
     let isFirstVisit = true;
     for (let i = 0; i < localStorage.length; i++) {
@@ -167,7 +184,7 @@ function initializeVisibility() {
             break;
         }
     }
-    
+
     // If first visit, populate localStorage with default settings
     if (isFirstVisit) {
         Object.keys(columnConfig.mappings).forEach(columnClass => {
@@ -176,41 +193,41 @@ function initializeVisibility() {
             localStorage.setItem(storageKey, defaultState);
         });
     }
-    
+
     // Process each column
     Object.keys(columnConfig.mappings).forEach(columnClass => {
         totalColumns++;
-        
+
         // Get stored visibility preference
         const storageKey = `show${snakeToCamelCase(columnClass)}`;
         const storedValue = localStorage.getItem(storageKey);
-        
+
         // Determine if visible - use default if no stored value
-        const isVisible = storedValue === null 
-            ? columnConfig.defaults[columnClass] 
+        const isVisible = storedValue === null
+            ? columnConfig.defaults[columnClass]
             : storedValue !== 'false';
-        
+
         if (isVisible) visibleCount++;
-        
+
         // Update toggle state
         const toggle = columnConfig.mappings[columnClass].toggle;
         if (toggle) {
             toggle.checked = isVisible;
         }
-        
+
         // Apply visibility to column
         applyColumnVisibility(columnClass, isVisible, false);
-        
+
         // Also save to previousState for use when toggling off "Show All"
         columnConfig.previousState[columnClass] = isVisible;
     });
-    
+
     // Update all columns visibility state
     columnConfig.allVisible = (visibleCount === totalColumns);
-    
+
     // If all columns are visible, mark as being in show all mode
     columnConfig.inShowAllMode = columnConfig.allVisible;
-    
+
     // Update Toggle All state
     updateToggleAllState();
 }
@@ -221,24 +238,24 @@ function initializeVisibility() {
 function handleColumnToggleChange(event, columnClass) {
     const isVisible = event.target.checked;
     const storageKey = `show${snakeToCamelCase(columnClass)}`;
-    
+
     // Apply column visibility
     applyColumnVisibility(columnClass, isVisible, true);
-    
+
     // Save to localStorage
     localStorage.setItem(storageKey, isVisible);
-    
+
     // Update previousState if we're not in Show All mode
     if (!columnConfig.inShowAllMode) {
         columnConfig.previousState[columnClass] = isVisible;
     }
-    
+
     // Show feedback message
     if (!columnConfig.initializing && event.isTrusted) {
         const title = columnConfig.mappings[columnClass]?.title || columnClass;
         showFeedbackMessage(`${title} ${isVisible ? 'shown' : 'hidden'}`);
     }
-    
+
     // Update all columns visibility state
     updateAllColumnsState();
 }
@@ -248,12 +265,12 @@ function handleColumnToggleChange(event, columnClass) {
  */
 function handleToggleAllChange(event) {
     const newState = event.target.checked;
-    
+
     if (newState) {
         // Switching to "Show All" mode - save current state first
         saveCurrentState();
         columnConfig.inShowAllMode = true;
-        
+
         // Show all columns
         Object.keys(columnConfig.mappings).forEach(columnClass => {
             // Update toggle state
@@ -261,15 +278,15 @@ function handleToggleAllChange(event) {
             if (toggle) {
                 toggle.checked = true;
             }
-            
+
             // Apply visibility
             applyColumnVisibility(columnClass, true, true);
-            
+
             // Save to localStorage
             const storageKey = `show${snakeToCamelCase(columnClass)}`;
             localStorage.setItem(storageKey, true);
         });
-        
+
         // Show feedback
         if (!columnConfig.initializing && event.isTrusted) {
             showFeedbackMessage('Showing all columns');
@@ -277,16 +294,16 @@ function handleToggleAllChange(event) {
     } else {
         // Switching back to previous state
         columnConfig.inShowAllMode = false;
-        
+
         // Restore previous state
         restorePreviousState();
-        
+
         // Show feedback
         if (!columnConfig.initializing && event.isTrusted) {
             showFeedbackMessage('Restored previous column visibility');
         }
     }
-    
+
     // Update tracking variable and UI
     updateAllColumnsState();
 }
@@ -296,7 +313,7 @@ function handleToggleAllChange(event) {
  */
 function saveCurrentState() {
     columnConfig.previousState = {};
-    
+
     Object.keys(columnConfig.mappings).forEach(columnClass => {
         const toggle = columnConfig.mappings[columnClass].toggle;
         if (toggle) {
@@ -315,22 +332,22 @@ function restorePreviousState() {
         handleResetClick({ isTrusted: false });
         return;
     }
-    
+
     Object.keys(columnConfig.mappings).forEach(columnClass => {
         // Get previous state (or default if not found)
-        const previousState = columnConfig.previousState[columnClass] !== undefined 
-            ? columnConfig.previousState[columnClass] 
+        const previousState = columnConfig.previousState[columnClass] !== undefined
+            ? columnConfig.previousState[columnClass]
             : columnConfig.defaults[columnClass];
-        
+
         // Update toggle state
         const toggle = columnConfig.mappings[columnClass].toggle;
         if (toggle) {
             toggle.checked = previousState;
         }
-        
+
         // Apply visibility
         applyColumnVisibility(columnClass, previousState, true);
-        
+
         // Save to localStorage
         const storageKey = `show${snakeToCamelCase(columnClass)}`;
         localStorage.setItem(storageKey, previousState);
@@ -350,34 +367,34 @@ function handleResetClick(event) {
             i--;
         }
     }
-    
+
     // Track visibility status
     let visibleCount = 0;
     let totalColumns = 0;
-    
+
     // Reset all columns to defaults
     Object.keys(columnConfig.mappings).forEach(columnClass => {
         totalColumns++;
         const defaultState = columnConfig.defaults[columnClass];
-        
+
         if (defaultState) visibleCount++;
-        
+
         // Update toggle state
         const toggle = columnConfig.mappings[columnClass].toggle;
         if (toggle) {
             toggle.checked = defaultState;
         }
-        
+
         // Apply visibility
         applyColumnVisibility(columnClass, defaultState, true);
     });
-    
+
     // Update all columns visibility state
     columnConfig.allVisible = (visibleCount === totalColumns);
-    
+
     // Update Toggle All state
     updateToggleAllState();
-    
+
     // Show feedback
     showFeedbackMessage('Reset to default columns');
 }
@@ -389,13 +406,13 @@ function applyColumnVisibility(columnClass, isVisible, animate = false) {
     // Find all cells with this class
     const cells = document.querySelectorAll(`.${columnClass}`);
     const headers = document.querySelectorAll(`th.${columnClass}`);
-    
+
     // Apply visibility to cells
     cells.forEach(cell => {
         if (animate) {
             cell.style.transition = 'width 0.3s ease, opacity 0.3s ease';
         }
-        
+
         if (isVisible) {
             cell.style.display = '';
             setTimeout(() => {
@@ -410,13 +427,13 @@ function applyColumnVisibility(columnClass, isVisible, animate = false) {
             }, animate ? 300 : 0);
         }
     });
-    
+
     // Apply visibility to headers
     headers.forEach(header => {
         if (animate) {
             header.style.transition = 'width 0.3s ease, opacity 0.3s ease';
         }
-        
+
         if (isVisible) {
             header.style.display = '';
             setTimeout(() => {
@@ -439,20 +456,20 @@ function applyColumnVisibility(columnClass, isVisible, animate = false) {
 function updateAllColumnsState() {
     let visibleCount = 0;
     let totalColumns = 0;
-    
+
     // Count visible columns
     Object.keys(columnConfig.mappings).forEach(columnClass => {
         totalColumns++;
         const toggle = columnConfig.mappings[columnClass].toggle;
-        
+
         if (toggle && toggle.checked) {
             visibleCount++;
         }
     });
-    
+
     // Update state
     columnConfig.allVisible = (visibleCount === totalColumns && totalColumns > 0);
-    
+
     // Update Toggle All state
     updateToggleAllState();
 }
@@ -463,11 +480,11 @@ function updateAllColumnsState() {
 function updateToggleAllState() {
     const toggleAll = columnConfig.elements.toggleAll;
     const toggleLabel = columnConfig.elements.toggleAllLabel;
-    
+
     if (toggleAll) {
         toggleAll.checked = columnConfig.allVisible;
     }
-    
+
     if (toggleLabel) {
         toggleLabel.textContent = columnConfig.allVisible ? 'Hide All Columns' : 'Show All Columns';
     }
@@ -479,33 +496,33 @@ function updateToggleAllState() {
 function preventDropdownClosing() {
     // Prevent dropdown from closing when clicking inside
     const dropdown = columnConfig.elements.dropdown;
-    
+
     if (dropdown) {
         // Ensure dropdown doesn't close when clicked inside
-        dropdown.addEventListener('click', function(event) {
+        dropdown.addEventListener('click', function (event) {
             // Stop propagation to prevent dropdown from closing
             event.stopPropagation();
         });
-        
+
         // Also prevent event from bubbling up from toggle switches
         const toggles = dropdown.querySelectorAll('.toggle-switch, .form-check-label, .form-check');
         toggles.forEach(toggle => {
-            toggle.addEventListener('click', function(event) {
+            toggle.addEventListener('click', function (event) {
                 event.stopPropagation();
             });
         });
-        
+
         // Prevent propagation from toggle-all and reset button
         const toggleAll = document.querySelector('.toggle-all-columns');
         if (toggleAll) {
-            toggleAll.addEventListener('click', function(event) {
+            toggleAll.addEventListener('click', function (event) {
                 event.stopPropagation();
             });
         }
-        
+
         const resetButton = document.getElementById('resetColumnDefaults');
         if (resetButton) {
-            resetButton.addEventListener('click', function(event) {
+            resetButton.addEventListener('click', function (event) {
                 event.stopPropagation();
             });
         }
@@ -517,20 +534,20 @@ function preventDropdownClosing() {
  */
 function showFeedbackMessage(message) {
     let feedbackElement = document.querySelector('.toggle-feedback');
-    
+
     // Create feedback element if it doesn't exist
     if (!feedbackElement) {
         feedbackElement = document.createElement('div');
         feedbackElement.className = 'toggle-feedback';
         document.body.appendChild(feedbackElement);
     }
-    
+
     // Set message
     feedbackElement.textContent = message;
-    
+
     // Show feedback
     feedbackElement.classList.add('show');
-    
+
     // Hide after delay
     setTimeout(() => {
         feedbackElement.classList.remove('show');
@@ -556,6 +573,6 @@ function snakeToCamelCase(str) {
 }
 
 // Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     initializeColumnSettings();
 });

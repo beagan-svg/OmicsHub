@@ -285,7 +285,8 @@
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
                                                         <input type="checkbox" id="toggleIngestStartTime"
-                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-ingest_start_time">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleIngestStartTime">
@@ -296,7 +297,8 @@
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
                                                         <input type="checkbox" id="toggleIngestEndTime"
-                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-ingest_end_time">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleIngestEndTime">
@@ -318,7 +320,8 @@
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
                                                         <input type="checkbox" id="toggleAlignmentStartTime"
-                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-alignment_start_time">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleAlignmentStartTime">
@@ -329,7 +332,8 @@
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
                                                         <input type="checkbox" id="toggleAlignmentEndTime"
-                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-alignment_end_time">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleAlignmentEndTime">
@@ -351,7 +355,8 @@
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
                                                         <input type="checkbox" id="togglePostqcStartTime"
-                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-postqc_start_time">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="togglePostqcStartTime">
@@ -362,7 +367,8 @@
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
                                                         <input type="checkbox" id="togglePostqcEndTime"
-                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-postqc_end_time">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="togglePostqcEndTime">
@@ -1334,4 +1340,17 @@
         });
     });
 </script>
+
+<!-- Scripts to support filtering and table functionality -->
+<script src="{% static 'viewer/js/filters-advanced.js' %}?v={{ version }}"></script>
+<script src="{% static 'viewer/js/column-settings-rebuild.js' %}?v={{ version }}"></script>
+<script src="{% static 'viewer/js/keyboard-shortcuts.js' %}?v={{ version }}"></script>
+<script src="{% static 'viewer/js/theme-toggle.js' %}?v={{ version }}"></script>
+
+<!-- Debug script for timestamp columns -->
+<script src="{% static 'viewer/js/test-columns.js' %}?v={{ version }}"></script>
+
+</body>
+
+</html>
 {% endblock %}
