@@ -1226,6 +1226,58 @@
             width: 100%;
         }
     }
+
+    /* Status badge styling */
+    .status-badge {
+        display: inline-block;
+        padding: 0.35em 0.65em;
+        font-size: 0.75em;
+        font-weight: 700;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 0.25rem;
+    }
+
+    .status-completed {
+        background-color: #198754;
+        color: white;
+    }
+
+    .status-not-completed {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    /* Timestamp field styling */
+    td.field-ingest_start_time,
+    td.field-ingest_end_time,
+    td.field-alignment_start_time,
+    td.field-alignment_end_time,
+    td.field-postqc_start_time,
+    td.field-postqc_end_time {
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        white-space: nowrap;
+        min-width: 150px;
+    }
+
+    /* Add a subtle background color to time cells for better readability */
+    td[class*="_start_time"] {
+        background-color: rgba(13, 110, 253, 0.05);
+        border-left: 2px solid rgba(13, 110, 253, 0.3);
+    }
+
+    td[class*="_end_time"] {
+        background-color: rgba(25, 135, 84, 0.05);
+        border-left: 2px solid rgba(25, 135, 84, 0.3);
+    }
+
+    /* Highlight time pairs on hover */
+    tr:hover td[class*="_time"] {
+        background-color: #f8f9fa;
+    }
 </style>
 
 {% endblock %}

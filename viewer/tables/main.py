@@ -60,7 +60,7 @@ class MainTable(tables.Table):
         try:
             ingest_record = Ingest.objects.get(fastq_name=record.fastq_name)
             if ingest_record.start_time:
-                return ingest_record.start_time.strftime('%Y-%m-%d %H:%M:%S')
+                return ingest_record.start_time.strftime('%Y-%m-%d %H:%M:%S %Z')
         except Ingest.DoesNotExist:
             pass
         return "—"
@@ -70,7 +70,7 @@ class MainTable(tables.Table):
         try:
             ingest_record = Ingest.objects.get(fastq_name=record.fastq_name)
             if ingest_record.end_time:
-                return ingest_record.end_time.strftime('%Y-%m-%d %H:%M:%S')
+                return ingest_record.end_time.strftime('%Y-%m-%d %H:%M:%S %Z')
         except Ingest.DoesNotExist:
             pass
         return "—"
@@ -80,7 +80,7 @@ class MainTable(tables.Table):
         try:
             alignment_record = Alignment.objects.get(fastq_name=record.fastq_name)
             if alignment_record.start_time:
-                return alignment_record.start_time.strftime('%Y-%m-%d %H:%M:%S')
+                return alignment_record.start_time.strftime('%Y-%m-%d %H:%M:%S %Z')
         except Alignment.DoesNotExist:
             pass
         return "—"
@@ -90,7 +90,7 @@ class MainTable(tables.Table):
         try:
             alignment_record = Alignment.objects.get(fastq_name=record.fastq_name)
             if alignment_record.end_time:
-                return alignment_record.end_time.strftime('%Y-%m-%d %H:%M:%S')
+                return alignment_record.end_time.strftime('%Y-%m-%d %H:%M:%S %Z')
         except Alignment.DoesNotExist:
             pass
         return "—"
@@ -100,7 +100,7 @@ class MainTable(tables.Table):
         try:
             postqc_record = PostQC.objects.get(fastq_name=record.fastq_name)
             if postqc_record.start_time:
-                return postqc_record.start_time.strftime('%Y-%m-%d %H:%M:%S')
+                return postqc_record.start_time.strftime('%Y-%m-%d %H:%M:%S %Z')
         except PostQC.DoesNotExist:
             pass
         return "—"
@@ -110,7 +110,7 @@ class MainTable(tables.Table):
         try:
             postqc_record = PostQC.objects.get(fastq_name=record.fastq_name)
             if postqc_record.end_time:
-                return postqc_record.end_time.strftime('%Y-%m-%d %H:%M:%S')
+                return postqc_record.end_time.strftime('%Y-%m-%d %H:%M:%S %Z')
         except PostQC.DoesNotExist:
             pass
         return "—"
