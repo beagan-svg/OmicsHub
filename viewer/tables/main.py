@@ -21,13 +21,64 @@ class MainTable(tables.Table):
     alignment_method = tables.Column(verbose_name='Alignment Method', accessor='fastq_name.alignment_method', attrs={'th': {'class': 'column-alignment_method'}, 'td': {'class': 'field-alignment_method'}})
     library_prep_method_id = tables.Column(verbose_name='Library Prep Method ID', accessor='fastq_name.library_prep_method_id', attrs={'th': {'class': 'column-library_prep_method_id'}, 'td': {'class': 'field-library_prep_method_id'}})
     library_prep_name = tables.Column(verbose_name='Library Prep Name', accessor='fastq_name.library_prep_name', attrs={'th': {'class': 'column-library_prep_name'}, 'td': {'class': 'field-library_prep_name'}})
-    ingest_status = tables.Column(verbose_name='Ingest Status', attrs={'th': {'class': 'column-ingest_status'}, 'td': {'class': 'field-ingest_status'}})
+    ingest_status = tables.Column(
+        accessor='ingest_status',
+        verbose_name='Ingest Status',
+        attrs={
+            'td': {'class': 'status-column ingest-status'},
+            'th': {'class': 'status-column ingest-status'}
+        },
+        empty_values=('', None)
+    )
+    ingest_fid = tables.Column(
+        accessor='fastq_name__ingest__fid',
+        verbose_name='Ingest FID',
+        attrs={
+            'td': {'class': 'fid-column ingest-fid'},
+            'th': {'class': 'fid-column ingest-fid'}
+        },
+        empty_values=('', None)
+    )
     ingest_start_time = tables.Column(verbose_name='Ingest Start', empty_values=(), attrs={'th': {'class': 'column-ingest_start_time'}, 'td': {'class': 'field-ingest_start_time'}})
     ingest_end_time = tables.Column(verbose_name='Ingest End', empty_values=(), attrs={'th': {'class': 'column-ingest_end_time'}, 'td': {'class': 'field-ingest_end_time'}})
-    alignment_status = tables.Column(verbose_name='Alignment Status', attrs={'th': {'class': 'column-alignment_status'}, 'td': {'class': 'field-alignment_status'}})
+    alignment_status = tables.Column(
+        accessor='alignment_status',
+        verbose_name='Alignment Status',
+        attrs={
+            'td': {'class': 'status-column alignment-status'},
+            'th': {'class': 'status-column alignment-status'}
+        },
+        empty_values=('', None)
+    )
+    alignment_fid = tables.Column(
+        accessor='fastq_name__alignment__fid',
+        verbose_name='Alignment FID',
+        attrs={
+            'td': {'class': 'fid-column alignment-fid'},
+            'th': {'class': 'fid-column alignment-fid'}
+        },
+        empty_values=('', None)
+    )
     alignment_start_time = tables.Column(verbose_name='Alignment Start', empty_values=(), attrs={'th': {'class': 'column-alignment_start_time'}, 'td': {'class': 'field-alignment_start_time'}})
     alignment_end_time = tables.Column(verbose_name='Alignment End', empty_values=(), attrs={'th': {'class': 'column-alignment_end_time'}, 'td': {'class': 'field-alignment_end_time'}})
-    postqc_status = tables.Column(verbose_name='PostQC Status', attrs={'th': {'class': 'column-postqc_status'}, 'td': {'class': 'field-postqc_status'}})
+    postqc_status = tables.Column(
+        accessor='postqc_status',
+        verbose_name='PostQC Status',
+        attrs={
+            'td': {'class': 'status-column postqc-status'},
+            'th': {'class': 'status-column postqc-status'}
+        },
+        empty_values=('', None)
+    )
+    postqc_fid = tables.Column(
+        accessor='fastq_name__postqc__fid',
+        verbose_name='PostQC FID',
+        attrs={
+            'td': {'class': 'fid-column postqc-fid'},
+            'th': {'class': 'fid-column postqc-fid'}
+        },
+        empty_values=('', None)
+    )
     postqc_start_time = tables.Column(verbose_name='PostQC Start', empty_values=(), attrs={'th': {'class': 'column-postqc_start_time'}, 'td': {'class': 'field-postqc_start_time'}})
     postqc_end_time = tables.Column(verbose_name='PostQC End', empty_values=(), attrs={'th': {'class': 'column-postqc_end_time'}, 'td': {'class': 'field-postqc_end_time'}})
 
@@ -44,16 +95,76 @@ class MainTable(tables.Table):
             return ''
 
     def render_ingest_status(self, value):
-        status_class = 'status-completed' if value == 'COMPLETED' else 'status-not-completed'
-        return mark_safe(f'<span class="status-badge {status_class}">{value}</span>')
+        if value:
+            status = value.lower()
+            if status == 'completed' or status == 'complete':
+                status_class = 'status-completed'
+                label = 'Completed'
+            elif status == 'not completed':
+                status_class = 'status-not-completed'
+                label = 'Not Completed'
+            elif 'in progress' in status or status == 'running':
+                status_class = 'status-in-progress'
+                label = 'In Progress'
+            elif 'pending' in status or status == 'submitted' or status == 'queued':
+                status_class = 'status-pending'
+                label = 'Pending'
+            elif 'error' in status or 'fail' in status or 'killed' in status:
+                status_class = 'status-error'
+                label = value
+            else:
+                status_class = 'status-not-completed'
+                label = value
+            return mark_safe(f'<span class="status-badge {status_class}">{label}</span>')
+        return mark_safe('<span class="status-badge status-not-completed">Not Started</span>')
 
     def render_alignment_status(self, value):
-        status_class = 'status-completed' if value == 'COMPLETED' else 'status-not-completed'
-        return mark_safe(f'<span class="status-badge {status_class}">{value}</span>')
+        if value:
+            status = value.lower()
+            if status == 'completed' or status == 'complete':
+                status_class = 'status-completed'
+                label = 'Completed'
+            elif status == 'not completed':
+                status_class = 'status-not-completed'
+                label = 'Not Completed'
+            elif 'in progress' in status or status == 'running':
+                status_class = 'status-in-progress'
+                label = 'In Progress'
+            elif 'pending' in status or status == 'submitted' or status == 'queued':
+                status_class = 'status-pending'
+                label = 'Pending'
+            elif 'error' in status or 'fail' in status or 'killed' in status:
+                status_class = 'status-error'
+                label = value
+            else:
+                status_class = 'status-not-completed'
+                label = value
+            return mark_safe(f'<span class="status-badge {status_class}">{label}</span>')
+        return mark_safe('<span class="status-badge status-not-completed">Not Started</span>')
 
     def render_postqc_status(self, value):
-        status_class = 'status-completed' if value == 'COMPLETED' else 'status-not-completed'
-        return mark_safe(f'<span class="status-badge {status_class}">{value}</span>')
+        if value:
+            status = value.lower()
+            if status == 'completed' or status == 'complete':
+                status_class = 'status-completed'
+                label = 'Completed'
+            elif status == 'not completed':
+                status_class = 'status-not-completed'
+                label = 'Not Completed'
+            elif 'in progress' in status or status == 'running':
+                status_class = 'status-in-progress'
+                label = 'In Progress'
+            elif 'pending' in status or status == 'submitted' or status == 'queued':
+                status_class = 'status-pending'
+                label = 'Pending'
+            elif 'error' in status or 'fail' in status or 'killed' in status:
+                status_class = 'status-error'
+                label = value
+            else:
+                status_class = 'status-not-completed'
+                label = value
+            return mark_safe(f'<span class="status-badge {status_class}">{label}</span>')
+        return mark_safe('<span class="status-badge status-not-completed">Not Started</span>')
     
     def render_ingest_start_time(self, value, record):
         """Render Ingest start time"""
@@ -132,7 +243,7 @@ class MainTable(tables.Table):
                  'cell_capture', 'sample_id', 'amplification_name', 'amplification_id', 
                  'cell_prep_type', 'sequencing_vendor', 'alignment_method', 
                  'library_prep_method_id', 'library_prep_name', 
-                 'ingest_status', 'ingest_start_time', 'ingest_end_time',
-                 'alignment_status', 'alignment_start_time', 'alignment_end_time', 
-                 'postqc_status', 'postqc_start_time', 'postqc_end_time')
+                 'ingest_status', 'ingest_fid', 'ingest_start_time', 'ingest_end_time',
+                 'alignment_status', 'alignment_fid', 'alignment_start_time', 'alignment_end_time', 
+                 'postqc_status', 'postqc_fid', 'postqc_start_time', 'postqc_end_time')
         attrs = {'class': 'table table-striped table-bordered'} 

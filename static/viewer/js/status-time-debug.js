@@ -380,4 +380,39 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     console.log("Status Time Debug - Initialized");
-}); 
+});
+
+// Update status badges to Google Material Design style
+function createStatusBadge(status) {
+    // Default values
+    let badgeClass = 'status-not-completed';
+    let label = status || 'Not Started';
+
+    // Map status strings to badge classes and labels
+    if (status) {
+        status = status.toLowerCase();
+
+        if (status === 'completed' || status === 'complete') {
+            badgeClass = 'status-completed';
+            label = 'Completed';
+        } else if (status === 'not completed') {
+            badgeClass = 'status-not-completed';
+            label = 'Not Completed';
+        } else if (status.includes('in progress') || status === 'running') {
+            badgeClass = 'status-in-progress';
+            label = 'In Progress';
+        } else if (status.includes('pending') || status === 'submitted' || status === 'queued') {
+            badgeClass = 'status-pending';
+            label = 'Pending';
+        } else if (status.includes('error') || status.includes('fail') || status.includes('killed')) {
+            badgeClass = 'status-error';
+            label = status.charAt(0).toUpperCase() + status.slice(1);
+        } else {
+            badgeClass = 'status-not-completed';
+            label = status.charAt(0).toUpperCase() + status.slice(1);
+        }
+    }
+
+    // Create the badge element
+    return `<span class="status-badge ${badgeClass}">${label}</span>`;
+} 
