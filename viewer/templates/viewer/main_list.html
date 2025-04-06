@@ -284,6 +284,33 @@
 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAlignmentStatus"
+                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAlignmentStatus">
+                                                        Alignment Status
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="togglePostqcStatus"
+                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="togglePostqcStatus">
+                                                        PostQC Status
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Status Time Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-clock-history me-2"></i>Status Time</h6>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
                                                         <input type="checkbox" id="toggleIngestStartTime"
                                                             class="column-toggle-checkbox" data-default-visible="false"
                                                             data-column="column-ingest_start_time">
@@ -308,17 +335,6 @@
 
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
-                                                        <input type="checkbox" id="toggleAlignmentStatus"
-                                                            class="column-toggle-checkbox" data-default-visible="true">
-                                                        <span class="toggle-slider"></span>
-                                                    </label>
-                                                    <label class="form-check-label" for="toggleAlignmentStatus">
-                                                        Alignment Status
-                                                    </label>
-                                                </div>
-
-                                                <div class="form-check form-switch">
-                                                    <label class="toggle-switch">
                                                         <input type="checkbox" id="toggleAlignmentStartTime"
                                                             class="column-toggle-checkbox" data-default-visible="false"
                                                             data-column="column-alignment_start_time">
@@ -338,17 +354,6 @@
                                                     </label>
                                                     <label class="form-check-label" for="toggleAlignmentEndTime">
                                                         Alignment End
-                                                    </label>
-                                                </div>
-
-                                                <div class="form-check form-switch">
-                                                    <label class="toggle-switch">
-                                                        <input type="checkbox" id="togglePostqcStatus"
-                                                            class="column-toggle-checkbox" data-default-visible="true">
-                                                        <span class="toggle-slider"></span>
-                                                    </label>
-                                                    <label class="form-check-label" for="togglePostqcStatus">
-                                                        PostQC Status
                                                     </label>
                                                 </div>
 
@@ -1230,6 +1235,7 @@
 <script src="{% static 'viewer/js/table-column-classes.js' %}"></script>
 <script src="{% static 'viewer/js/column-settings-rebuild.js' %}"></script>
 <script src="{% static 'viewer/js/multiselect-filters.js' %}"></script>
+<script src="{% static 'viewer/js/status-time-debug.js' %}"></script>
 <script>
     // Additional initialization for animations and UI effects
     document.addEventListener('DOMContentLoaded', function () {
@@ -1341,14 +1347,9 @@
     });
 </script>
 
-<!-- Scripts to support filtering and table functionality -->
-<script src="{% static 'viewer/js/filters-advanced.js' %}?v={{ version }}"></script>
-<script src="{% static 'viewer/js/column-settings-rebuild.js' %}?v={{ version }}"></script>
-<script src="{% static 'viewer/js/keyboard-shortcuts.js' %}?v={{ version }}"></script>
-<script src="{% static 'viewer/js/theme-toggle.js' %}?v={{ version }}"></script>
-
-<!-- Debug script for timestamp columns -->
-<script src="{% static 'viewer/js/test-columns.js' %}?v={{ version }}"></script>
+<!-- Ensure all script references are valid -->
+<script src="{% static 'viewer/js/column-settings-rebuild.js' %}"></script>
+<script src="{% static 'viewer/js/status-time-debug.js' %}"></script>
 
 </body>
 

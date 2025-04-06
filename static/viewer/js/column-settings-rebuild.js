@@ -102,6 +102,8 @@ function extractColumnConfiguration() {
         'column-ingest_status',
         'column-alignment_status',
         'column-postqc_status'
+        // Note: All timestamp columns are hidden by default
+        // Status Time columns: ingest_start_time, ingest_end_time, etc.
     ];
 
     // Get all toggle elements within the dropdown
@@ -125,6 +127,7 @@ function extractColumnConfiguration() {
         // Add debugging for timestamp fields
         if (columnClass.includes('time')) {
             console.log(`Processing timestamp toggle: ${toggleId} → ${columnClass}`);
+            console.log(`- Toggle belongs to Status Time category`);
         }
 
         // Skip if this doesn't look like a valid column toggle
@@ -403,9 +406,20 @@ function handleResetClick(event) {
  * Apply visibility change to column
  */
 function applyColumnVisibility(columnClass, isVisible, animate = false) {
+    console.log(`Applying visibility for ${columnClass}: ${isVisible ? 'show' : 'hide'}`);
+
+    // Check if this is a time column
+    const isTimeColumn = columnClass.includes('time');
+
+    if (isTimeColumn) {
+        console.log(`Found time column: ${columnClass}`);
+    }
+
     // Find all cells with this class
-    const cells = document.querySelectorAll(`.${columnClass}`);
+    const cells = document.querySelectorAll(`td.field-${columnClass.replace('column-', '')}`);
     const headers = document.querySelectorAll(`th.${columnClass}`);
+
+    console.log(`Found ${cells.length} cells and ${headers.length} headers for ${columnClass}`);
 
     // Apply visibility to cells
     cells.forEach(cell => {
