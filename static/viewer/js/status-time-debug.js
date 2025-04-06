@@ -33,11 +33,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Save to localStorage
                 const storageKey = `show${snakeToCamelCase(columnClass)}`;
                 localStorage.setItem(storageKey, toggle.checked);
-
-                // Show feedback
-                const label = toggle.closest('.form-check')?.querySelector('.form-check-label');
-                const title = label ? label.textContent.trim() : toggle.id;
-                showFeedbackMessage(`${title} ${toggle.checked ? 'shown' : 'hidden'}`);
             } else {
                 console.error(`Could not find column class for toggle: ${toggle.id}`);
             }
@@ -64,9 +59,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     localStorage.setItem(storageKey, toggle.checked);
                 }
             });
-
-            // Show feedback
-            showFeedbackMessage(`${allTimeTogglesOn ? 'Hidden' : 'Shown'} all Status Time columns`);
         });
     }
 
@@ -223,9 +215,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         console.groupEnd();
-
-        // Show feedback
-        showFeedbackMessage('Table inspection complete. Check console.');
     }
 
     /**
@@ -247,9 +236,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         console.groupEnd();
-
-        // Show feedback
-        showFeedbackMessage('All columns fixed. Check console for details.');
     }
 
     /**
@@ -349,28 +335,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const header = table.querySelector(`th.${columnClass}`);
         return header && window.getComputedStyle(header).display !== 'none';
-    }
-
-    /**
-     * Show feedback message to user
-     */
-    function showFeedbackMessage(message) {
-        console.log(`Toggle feedback: ${message}`);
-
-        let feedbackElement = document.querySelector('.toggle-feedback');
-
-        if (!feedbackElement) {
-            feedbackElement = document.createElement('div');
-            feedbackElement.className = 'toggle-feedback';
-            document.body.appendChild(feedbackElement);
-        }
-
-        feedbackElement.textContent = message;
-        feedbackElement.classList.add('show');
-
-        setTimeout(() => {
-            feedbackElement.classList.remove('show');
-        }, 2000);
     }
 
     /**

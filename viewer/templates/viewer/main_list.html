@@ -440,13 +440,15 @@
                                         <label for="batch_name_from_vendor" class="form-label">Batch Name From
                                             Vendor</label>
                                         <div class="select-container">
-                                            <select name="batch_name_from_vendor" id="batch_name_from_vendor_info"
+                                            <select name="batch_name_from_vendor" id="batch_name_from_vendor"
                                                 class="form-select filter-select" multiple="multiple"
                                                 data-placeholder="Select options">
                                                 {% for batch_name in batch_names_from_vendor %}
                                                 <option value="{{ batch_name }}" {{
                                                     batch_name|is_selected:current_filters.batch_name_from_vendor_list
-                                                    }}>{{ batch_name }}</option>
+                                                    }}>
+                                                    {{ batch_name }}
+                                                </option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -459,8 +461,9 @@
                                                 multiple="multiple" data-placeholder="Select options">
                                                 {% for study_set in study_sets %}
                                                 <option value="{{ study_set }}" {{
-                                                    study_set|is_selected:current_filters.study_set_list }}>{{ study_set
-                                                    }}</option>
+                                                    study_set|is_selected:current_filters.study_set_list }}>
+                                                    {{ study_set }}
+                                                </option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -480,7 +483,8 @@
                                                 multiple="multiple" data-placeholder="Select options">
                                                 {% for organism in organisms %}
                                                 <option value="{{ organism }}" {{
-                                                    organism|is_selected:current_filters.organism_list }}>{{ organism }}
+                                                    organism|is_selected:current_filters.organism_list }}>
+                                                    {{ organism }}
                                                 </option>
                                                 {% endfor %}
                                             </select>
@@ -495,8 +499,9 @@
                                                 data-placeholder="Select options">
                                                 {% for method in library_prep_methods %}
                                                 <option value="{{ method }}" {{
-                                                    method|is_selected:current_filters.library_prep_method_list }}>{{
-                                                    method }}</option>
+                                                    method|is_selected:current_filters.library_prep_method_list }}>
+                                                    {{ method }}
+                                                </option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -518,8 +523,9 @@
                                                 data-placeholder="Select options">
                                                 {% for status in ingest_status_options %}
                                                 <option value="{{ status }}" {{
-                                                    status|is_selected:current_filters.ingest_status_list }}>{{ status
-                                                    }}</option>
+                                                    status|is_selected:current_filters.ingest_status_list }}>
+                                                    {{ status }}
+                                                </option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -533,8 +539,9 @@
                                                 data-placeholder="Select options">
                                                 {% for status in alignment_status_options %}
                                                 <option value="{{ status }}" {{
-                                                    status|is_selected:current_filters.alignment_status_list }}>{{
-                                                    status }}</option>
+                                                    status|is_selected:current_filters.alignment_status_list }}>
+                                                    {{ status }}
+                                                </option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -548,8 +555,9 @@
                                                 data-placeholder="Select options">
                                                 {% for status in postqc_status_options %}
                                                 <option value="{{ status }}" {{
-                                                    status|is_selected:current_filters.postqc_status_list }}>{{ status
-                                                    }}</option>
+                                                    status|is_selected:current_filters.postqc_status_list }}>
+                                                    {{ status }}
+                                                </option>
                                                 {% endfor %}
                                             </select>
                                         </div>
