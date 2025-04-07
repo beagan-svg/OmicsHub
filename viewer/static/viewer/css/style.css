@@ -972,7 +972,7 @@ td[class*="postqc_end_time"] {
     border-left: 2px solid rgba(52, 168, 83, 0.3);
 }
 
-/* Navbar styling - updated for better active state indicator */
+/* Navbar styling - fixed version */
 .navbar-dark .navbar-nav .nav-link {
     color: rgba(255, 255, 255, 0.85);
     transition: all 0.2s ease-in-out;
@@ -993,35 +993,27 @@ td[class*="postqc_end_time"] {
     transition: transform 0.2s ease;
 }
 
-/* Enhanced active state with absolute positioning for the dot */
+/* Active state styling */
 .navbar-dark .navbar-nav .nav-link.active {
-    color: #ffffff !important;
+    color: #ffffff;
     font-weight: 500;
-    position: relative;
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
 }
 
-/* Always visible dot indicator for active items */
+/* Dot indicator - fixed implementation */
 .navbar-dark .navbar-nav .nav-link.active::after {
     content: '';
     position: absolute;
-    width: 6px;
-    height: 6px;
-    background-color: #fff;
-    border-radius: 50%;
-    bottom: 6px;
+    bottom: 0.25rem;
     left: 50%;
-    margin-left: -3px;
-    box-shadow: 0 0 5px rgba(255, 255, 255, 0.7);
+    transform: translateX(-50%);
+    width: 5px;
+    height: 5px;
+    background-color: #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 5px 1px rgba(255, 255, 255, 0.5);
 }
 
-/* Override previous .active::before style */
-.navbar-dark .navbar-nav .nav-link.active::before {
-    display: none;
-}
-
-/* Icon animation - separate from the dot indicator */
+/* Icon animation */
 .navbar-dark .navbar-nav .nav-link.active i {
     transform: translateY(-2px);
 }
@@ -1030,9 +1022,8 @@ td[class*="postqc_end_time"] {
     transform: translateY(-2px);
 }
 
-/* Remove any previous styling that might conflict */
-.navbar-dark .navbar-nav .nav-link::after,
-.navbar-dark .navbar-nav .nav-link:not(.active)::after {
+/* Remove any previous styles that might conflict */
+.navbar-dark .navbar-nav .nav-link::before {
     display: none;
 }
 

@@ -38,14 +38,14 @@
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == '/' or not '/pipeline/' in request.path %}active{% endif %}"
-                            href="{% url 'viewer:main_list' %}">
+                            href="{% url 'viewer:main_list' %}" id="samples-link">
                             <i class="bi bi-table"></i>
                             <span>Samples</span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if '/pipeline/' in request.path %}active{% endif %}"
-                            href="{% url 'viewer:pipeline_dashboard' %}">
+                            href="{% url 'viewer:pipeline_dashboard' %}" id="pipeline-link">
                             <i class="bi bi-diagram-3"></i>
                             <span>Pipeline</span>
                         </a>
@@ -79,37 +79,30 @@
 
             // Get navigation links
             const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
+            const samplesLink = document.getElementById('samples-link');
+            const pipelineLink = document.getElementById('pipeline-link');
 
-            // Clean approach: first remove active class from all links
+            // Reset all links (in case template logic doesn't capture all cases)
             navLinks.forEach(link => {
                 link.classList.remove('active');
             });
 
-            // Then apply active class based on current path
-            if (path.includes('/pipeline/')) {
-                // Pipeline page - Find link to pipeline dashboard
-                const pipelineLink = document.querySelector('a[href="{% url "viewer:pipeline_dashboard" %}"]');
-                if (pipelineLink) pipelineLink.classList.add('active');
-            } else {
-                // Default to Samples page for any non-pipeline path
-                const samplesLink = document.querySelector('a[href="{% url "viewer:main_list" %}"]');
-                if (samplesLink) samplesLink.classList.add('active');
+            // Set active class based on current path
+            if (path === '/' || (path !== '/' && !path.includes('/pipeline/'))) {
+                samplesLink.classList.add('active');
+            } else if (path.includes('/pipeline/')) {
+                pipelineLink.classList.add('active');
             }
 
-            // Add hover animation for icons
-            navLinks.forEach(link => {
-                const icon = link.querySelector('i');
+            // Add click listeners to ensure active class persists after click
+            samplesLink.addEventListener('click', function (e) {
+                navLinks.forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+            });
 
-                // Only set up hover animation for non-active links
-                if (!link.classList.contains('active') && icon) {
-                    link.addEventListener('mouseenter', function () {
-                        icon.style.transform = 'translateY(-2px)';
-                    });
-
-                    link.addEventListener('mouseleave', function () {
-                        icon.style.transform = '';
-                    });
-                }
+            pipelineLink.addEventListener('click', function (e) {
+                navLinks.forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
             });
         });
     </script>
