@@ -20,7 +20,7 @@ body {
 /* Header styling */
 .navbar {
     background-color: #fff;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     padding: 8px 16px;
 }
 
@@ -74,6 +74,12 @@ body {
     text-transform: uppercase;
     font-size: 0.875rem;
     letter-spacing: 0.025em;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    text-align: left !important;
+    padding: 0.75rem !important;
 }
 
 .table tbody tr:hover {
@@ -93,17 +99,19 @@ body {
     font-weight: 500;
 }
 
-.filter-form select, .filter-form input {
+.filter-form select,
+.filter-form input {
     border: 1px solid var(--google-border);
     border-radius: 4px;
     padding: 8px 12px;
     color: var(--google-gray);
 }
 
-.filter-form select:focus, .filter-form input:focus {
+.filter-form select:focus,
+.filter-form input:focus {
     border-color: var(--google-blue);
     outline: none;
-    box-shadow: 0 0 0 2px rgba(66,133,244,0.2);
+    box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
 }
 
 /* Button styling */
@@ -186,12 +194,12 @@ body {
 .card {
     border: none;
     border-radius: 8px;
-    box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+    box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
     transition: box-shadow 0.2s ease-in-out;
 }
 
 .card:hover {
-    box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+    box-shadow: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
 }
 
 .card-header {
@@ -241,7 +249,7 @@ body {
 
 .form-control:focus {
     border-color: #1a73e8;
-    box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
 }
 
 /* Buttons */
@@ -276,7 +284,7 @@ body {
     .container {
         padding: 0 10px;
     }
-    
+
     .table-responsive {
         display: block;
         width: 100%;
@@ -294,12 +302,12 @@ body {
 .card {
     border: none;
     border-radius: 8px;
-    box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+    box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
     transition: box-shadow 0.2s ease-in-out;
 }
 
 .card:hover {
-    box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+    box-shadow: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
 }
 
 /* Table container */
@@ -314,7 +322,8 @@ body {
 .table {
     border-radius: 8px;
     overflow: hidden;
-    min-width: 1000px; /* Ensures minimum width for scrolling */
+    min-width: 1000px;
+    /* Ensures minimum width for scrolling */
 }
 
 .table thead th {
@@ -329,6 +338,8 @@ body {
     position: sticky;
     top: 0;
     z-index: 1;
+    text-align: left !important;
+    padding: 0.75rem !important;
 }
 
 .table tbody tr:hover {
@@ -364,7 +375,7 @@ body {
 
 .form-control:focus {
     border-color: #1a73e8;
-    box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
 }
 
 /* Pagination */
@@ -426,7 +437,7 @@ body {
     border-radius: 8px;
     padding: 1.5rem;
     margin-bottom: 1.5rem;
-    box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+    box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
     position: sticky;
     top: 1rem;
 }
@@ -473,7 +484,7 @@ body {
 
 .filter-group select:focus {
     border-color: #1a73e8;
-    box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
     outline: none;
 }
 
@@ -721,15 +732,15 @@ body {
     border-radius: 50%;
 }
 
-input:checked + .toggle-slider {
+input:checked+.toggle-slider {
     background-color: var(--google-blue);
 }
 
-input:focus + .toggle-slider {
+input:focus+.toggle-slider {
     box-shadow: 0 0 1px var(--google-blue);
 }
 
-input:checked + .toggle-slider:before {
+input:checked+.toggle-slider:before {
     transform: translateX(16px);
 }
 
@@ -866,4 +877,97 @@ input:checked + .toggle-slider:before {
 
 .filter-badge .badge-remove:hover {
     opacity: 1;
-} 
+}
+
+/* FID column styling - Google Material Design inspired */
+.fid-column {
+    font-family: inherit;
+    font-size: 0.875rem;
+    letter-spacing: normal;
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 4px;
+    position: relative;
+}
+
+td.fid-column {
+    text-align: left !important;
+    /* Left align cell content */
+    min-width: 150px;
+    background-color: #f5f5f5;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+    padding: 0.4rem 0.75rem !important;
+}
+
+th.fid-column {
+    text-align: left !important;
+    min-width: 150px;
+    background-color: #f5f5f5;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+    padding: 0.75rem !important;
+    vertical-align: middle !important;
+    line-height: 1.2 !important;
+}
+
+/* Material design inspired styling for different FID types */
+td.ingest-fid,
+th.ingest-fid {
+    background-color: rgba(66, 133, 244, 0.05);
+}
+
+td.alignment-fid,
+th.alignment-fid {
+    background-color: rgba(251, 188, 5, 0.05);
+}
+
+td.postqc-fid,
+th.postqc-fid {
+    background-color: rgba(52, 168, 83, 0.05);
+}
+
+/* Time column styling */
+td[class*="_time"],
+td[class*="field-"][class*="_time"] {
+    text-align: left !important;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    min-width: 150px;
+    padding: 0.4rem 0.75rem !important;
+}
+
+th[class*="_time"],
+th[class*="column-"][class*="_time"] {
+    text-align: left !important;
+    font-family: inherit;
+    white-space: nowrap;
+    min-width: 150px;
+    padding: 0.75rem !important;
+    vertical-align: middle !important;
+    line-height: 1.2 !important;
+}
+
+/* Add a subtle background color to time cells for better readability */
+td[class*="ingest_start_time"],
+td[class*="ingest_end_time"] {
+    background-color: rgba(66, 133, 244, 0.05);
+    /* Google Blue for ingest */
+    border-left: 2px solid rgba(66, 133, 244, 0.3);
+}
+
+td[class*="alignment_start_time"],
+td[class*="alignment_end_time"] {
+    background-color: rgba(251, 188, 5, 0.05);
+    /* Google Yellow for alignment */
+    border-left: 2px solid rgba(251, 188, 5, 0.3);
+}
+
+td[class*="postqc_start_time"],
+td[class*="postqc_end_time"] {
+    background-color: rgba(52, 168, 83, 0.05);
+    /* Google Green for postqc */
+    border-left: 2px solid rgba(52, 168, 83, 0.3);
+}
