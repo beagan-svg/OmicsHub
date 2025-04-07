@@ -37,7 +37,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/' %}active{% endif %}"
+                        <a class="nav-link {% if request.path == '/' or not '/pipeline/' in request.path %}active{% endif %}"
                             href="{% url 'viewer:main_list' %}">
                             <i class="bi bi-table"></i>
                             <span>Samples</span>
@@ -86,7 +86,7 @@
             });
 
             // Set active class based on current path
-            if (path === '/') {
+            if (path === '/' || (path !== '/' && !path.includes('/pipeline/'))) {
                 document.querySelector('a[href="{% url "viewer:main_list" %}"]').classList.add('active');
             } else if (path.includes('/pipeline/')) {
                 document.querySelector('a[href="{% url "viewer:pipeline_dashboard" %}"]').classList.add('active');

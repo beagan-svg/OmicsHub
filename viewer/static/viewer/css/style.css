@@ -1003,6 +1003,13 @@ td[class*="postqc_end_time"] {
     background-color: #ffffff;
     border-radius: 50%;
     box-shadow: 0 0 5px 1px rgba(255, 255, 255, 0.5);
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+/* Ensure active icon always has transform applied */
+.navbar-dark .navbar-nav .nav-link.active i {
+    transform: translateY(-2px) !important;
 }
 
 /* Navbar link hover effect */
@@ -1015,7 +1022,6 @@ td[class*="postqc_end_time"] {
     transition: transform 0.2s ease;
 }
 
-.navbar-dark .navbar-nav .nav-link.active i,
 .navbar-dark .navbar-nav .nav-link:hover i {
     transform: translateY(-2px);
 }
