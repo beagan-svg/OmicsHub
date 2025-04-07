@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initialize card hover animations
     initCardAnimations();
+
+    // Initialize selection panel if it exists
+    initSelectionPanel();
 });
 
 // Initialize the advanced filters toggle with animation
@@ -613,5 +616,124 @@ function initApplyFiltersButton() {
                 document.getElementById('filter-form').submit();
             }, 300);
         });
+    }
+}
+
+/**
+ * Initializes the floating selection action panel
+ */
+function initSelectionPanel() {
+    const selectionPanel = document.getElementById('selection-actions');
+    if (!selectionPanel) return;
+
+    const selectionCount = selectionPanel.querySelector('.selection-count');
+    const clearSelectionBtn = selectionPanel.querySelector('.clear-selection');
+    const sendToPipelineBtn = selectionPanel.querySelector('.send-to-pipeline');
+
+    // Initialize panel state
+    selectionPanel.style.display = 'none';
+    let selectedSamples = [];
+
+    // Handle clear selection button
+    if (clearSelectionBtn) {
+        clearSelectionBtn.addEventListener('click', function () {
+            // Uncheck all checkboxes
+            document.querySelectorAll('.sample-select').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+
+            // Clear "Select All" checkbox if present
+            const selectAllCheckbox = document.getElementById('select-all-samples');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+            }
+
+            // Update selection panel
+            selectedSamples = [];
+            updateSelectionPanel();
+        });
+    }
+
+    // Handle send to pipeline button
+    if (sendToPipelineBtn) {
+        sendToPipelineBtn.addEventListener('click', function () {
+            if (selectedSamples.length === 0) return;
+
+            // Store selected samples in localStorage
+            localStorage.setItem('selectedSamplesForPipeline', JSON.stringify(selectedSamples));
+
+            // Show feedback message
+            showFeedbackMessage('success', `${selectedSamples.length} samples sent to Pipeline Dashboard`);
+
+            // Redirect to pipeline dashboard
+            window.location.href = '/viewer/pipeline/';
+        });
+    }
+
+    // Initialize sample checkboxes
+    document.querySelectorAll('.sample-select').forEach(checkbox => {
+        checkbox.addEventListener('change', function () {
+            const row = this.closest('tr');
+            const data = getSampleDataFromRow(row);
+
+            if (this.checked) {
+                // Add to selected samples if not already there
+                if (!selectedSamples.some(s => s.id === data.id)) {
+                    selectedSamples.push(data);
+                }
+            } else {
+                // Remove from selected samples
+                selectedSamples = selectedSamples.filter(s => s.id !== data.id);
+            }
+
+            updateSelectionPanel();
+        });
+    });
+
+    // Initialize "Select All" checkbox
+    const selectAllCheckbox = document.getElementById('select-all-samples');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function () {
+            document.querySelectorAll('.sample-select').forEach(checkbox => {
+                checkbox.checked = this.checked;
+
+                const row = checkbox.closest('tr');
+                const data = getSampleDataFromRow(row);
+
+                if (this.checked && !selectedSamples.some(s => s.id === data.id)) {
+                    selectedSamples.push(data);
+                }
+            });
+
+            if (!this.checked) {
+                selectedSamples = [];
+            }
+
+            updateSelectionPanel();
+        });
+    }
+
+    // Helper function to extract sample data from a row
+    function getSampleDataFromRow(row) {
+        return {
+            id: row.dataset.fastqId || row.dataset.id || '',
+            name: row.dataset.fastqName || '',
+            batchName: row.dataset.batchName || '',
+            organism: row.dataset.organism || '',
+            libraryPrep: row.dataset.libraryPrep || '',
+            ingestStatus: row.dataset.ingestStatus || ''
+        };
+    }
+
+    // Helper function to update the selection panel UI
+    function updateSelectionPanel() {
+        if (selectedSamples.length > 0) {
+            selectionPanel.style.display = 'flex';
+            if (selectionCount) {
+                selectionCount.textContent = selectedSamples.length;
+            }
+        } else {
+            selectionPanel.style.display = 'none';
+        }
     }
 } 
