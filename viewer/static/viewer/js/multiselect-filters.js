@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialize reset filters button
     initResetFiltersButton();
 
+    // Initialize apply filters button
+    initApplyFiltersButton();
+
     // Initialize active filters display
     updateActiveFiltersDisplay();
 
@@ -292,14 +295,52 @@ function updateActiveFiltersDisplay() {
     // Clear existing content
     container.innerHTML = '';
 
-    // Create title if filters are active
+    // Check URL parameters first
+    const urlParams = new URLSearchParams(window.location.search);
     let hasActiveFilters = false;
+
+    // Set to track unique filter combinations (filter:value)
+    const uniqueFilters = new Set();
+
+    // Process URL parameters
+    for (const [key, value] of urlParams.entries()) {
+        if (key !== 'page' && key !== 'per_page' && value) {
+            hasActiveFilters = true;
+            // For multi-select parameters that end with _list
+            if (key.endsWith('_list')) {
+                const baseKey = key.replace('_list', '');
+                const values = value.split(',');
+                values.forEach(val => {
+                    if (val) {
+                        const filterKey = `${baseKey}:${val}`;
+                        if (!uniqueFilters.has(filterKey)) {
+                            uniqueFilters.add(filterKey);
+                            const select = document.getElementById(baseKey);
+                            const option = select ? select.querySelector(`option[value="${val}"]`) : null;
+                            const displayText = option ? option.textContent : val;
+                            createFilterTag(container, baseKey, val, displayText);
+                        }
+                    }
+                });
+            } else {
+                const filterKey = `${key}:${value}`;
+                if (!uniqueFilters.has(filterKey)) {
+                    uniqueFilters.add(filterKey);
+                    createFilterTag(container, key, null, value);
+                }
+            }
+        }
+    }
 
     // Process text filters
     document.querySelectorAll('input[type="text"][name]').forEach(input => {
         if (input.value) {
-            hasActiveFilters = true;
-            createFilterTag(container, input.name, null, input.value);
+            const filterKey = `${input.name}:${input.value}`;
+            if (!uniqueFilters.has(filterKey)) {
+                uniqueFilters.add(filterKey);
+                hasActiveFilters = true;
+                createFilterTag(container, input.name, null, input.value);
+            }
         }
     });
 
@@ -309,10 +350,14 @@ function updateActiveFiltersDisplay() {
         if (values && values.length) {
             hasActiveFilters = true;
             values.forEach(value => {
-                // Find the option text for this value
-                const option = select.querySelector(`option[value="${value}"]`);
-                const displayText = option ? option.textContent : value;
-                createFilterTag(container, select.name, value, displayText);
+                const filterKey = `${select.name}:${value}`;
+                if (!uniqueFilters.has(filterKey)) {
+                    uniqueFilters.add(filterKey);
+                    // Find the option text for this value
+                    const option = select.querySelector(`option[value="${value}"]`);
+                    const displayText = option ? option.textContent : value;
+                    createFilterTag(container, select.name, value, displayText);
+                }
             });
         }
     });
@@ -329,6 +374,12 @@ function updateActiveFiltersDisplay() {
         }
     } else {
         container.style.display = 'none';
+    }
+
+    // Update the data attribute on the advanced filters container
+    const advancedFilters = document.getElementById('advancedFilters');
+    if (advancedFilters) {
+        advancedFilters.dataset.hasActiveFilters = hasActiveFilters.toString();
     }
 }
 
@@ -366,6 +417,118 @@ function formatLabelFromName(name) {
         .replace(/\b\w/g, l => l.toUpperCase());
 }
 
+// Show a feedback message to the user
+function showFeedbackMessage(message, type = 'info') {
+    // Create or get the message container
+    let messageContainer = document.getElementById('filter-feedback-message');
+
+    if (!messageContainer) {
+        messageContainer = document.createElement('div');
+        messageContainer.id = 'filter-feedback-message';
+        messageContainer.className = 'toast-message';
+        document.body.appendChild(messageContainer);
+    }
+
+    // Set message content with enhanced icons
+    let icon = '';
+    switch (type) {
+        case 'success':
+            icon = '<i class="bi bi-check2-circle"></i>';  // Changed to nicer checkmark
+            break;
+        case 'info':
+            icon = '<i class="bi bi-stars"></i>';  // Changed to stars icon
+            break;
+        case 'warning':
+            icon = '<i class="bi bi-exclamation-circle"></i>';
+            break;
+    }
+
+    messageContainer.innerHTML = `${icon} ${message}`;
+    messageContainer.className = `toast-message ${type} show`;
+
+    // Google Material Design style positioning and appearance
+    messageContainer.style.position = 'fixed';
+    messageContainer.style.bottom = '24px';
+    messageContainer.style.left = '50%';
+    messageContainer.style.transform = 'translate(-50%, 100%)';
+    messageContainer.style.zIndex = '9999';
+
+    // Updated styling to match page theme
+    messageContainer.style.backgroundColor = '#1976D2';
+    messageContainer.style.color = '#fff';
+    messageContainer.style.padding = '14px 24px';
+    messageContainer.style.borderRadius = '8px';
+    messageContainer.style.minWidth = '200px';
+    messageContainer.style.maxWidth = '600px';
+    messageContainer.style.boxShadow = '0 3px 5px -1px rgba(25, 118, 210, 0.2), 0 6px 10px 0 rgba(25, 118, 210, 0.14), 0 1px 18px 0 rgba(25, 118, 210, 0.12)';
+    messageContainer.style.display = 'flex';
+    messageContainer.style.alignItems = 'center';
+    messageContainer.style.justifyContent = 'center';
+    messageContainer.style.gap = '12px';
+    messageContainer.style.fontSize = '15px';
+    messageContainer.style.lineHeight = '1.4';
+    messageContainer.style.fontWeight = '500';
+    messageContainer.style.textAlign = 'center';
+    messageContainer.style.transition = 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1)';
+    messageContainer.style.opacity = '0';
+
+    // Slide up animation
+    requestAnimationFrame(() => {
+        messageContainer.style.opacity = '1';
+        messageContainer.style.transform = 'translate(-50%, 0)';
+    });
+
+    // Hide with slide down animation after 1.5 seconds
+    setTimeout(() => {
+        messageContainer.style.opacity = '0';
+        messageContainer.style.transform = 'translate(-50%, 100%)';
+
+        // Remove from DOM after animation
+        setTimeout(() => {
+            if (messageContainer.parentNode) {
+                messageContainer.parentNode.removeChild(messageContainer);
+            }
+        }, 150);
+    }, 1500);  // Changed from 3000 to 1500 for faster disappearance
+}
+
+// Add styles to the document
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes sparkle {
+        0%, 100% { transform: scale(1) rotate(0deg); }
+        25% { transform: scale(1.2) rotate(-5deg); }
+        50% { transform: scale(1.1) rotate(5deg); }
+        75% { transform: scale(1.2) rotate(-3deg); }
+    }
+
+    .toast-message i {
+        font-size: 1.2em;
+        margin-right: 4px;
+        animation: sparkle 2s infinite;
+        display: inline-block;
+        color: #fff;
+    }
+
+    .toast-message.success {
+        background-color: #1976D2 !important;
+    }
+
+    .toast-message.info {
+        background-color: #1976D2 !important;
+    }
+
+    .toast-message.warning {
+        background-color: #1976D2 !important;
+    }
+
+    .toast-message {
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+`;
+document.head.appendChild(style);
+
 // Initialize the reset filters button with enhanced feedback
 function initResetFiltersButton() {
     const resetButton = document.getElementById('resetFilters');
@@ -391,7 +554,7 @@ function initResetFiltersButton() {
                 input.value = '';
             });
 
-            // Show feedback message
+            // Show feedback message with success style
             showFeedbackMessage('Filters cleared', 'success');
 
             // Animate filter cards reset
@@ -416,26 +579,39 @@ function initResetFiltersButton() {
     }
 }
 
-// Show a feedback message to the user
-function showFeedbackMessage(message, type = 'info') {
-    // Create or get the message container
-    let messageContainer = document.getElementById('filter-feedback-message');
+// Initialize the apply filters button with feedback
+function initApplyFiltersButton() {
+    const applyButton = document.querySelector('.filter-actions button[type="submit"]');
 
-    if (!messageContainer) {
-        messageContainer = document.createElement('div');
-        messageContainer.id = 'filter-feedback-message';
-        messageContainer.className = 'filter-message';
-        document.body.appendChild(messageContainer);
+    if (applyButton) {
+        applyButton.addEventListener('click', function (e) {
+            e.preventDefault();
+
+            // Add button press effect
+            this.classList.add('btn-press-effect');
+
+            // Show feedback message
+            showFeedbackMessage('Applying filters...', 'info');
+
+            // Animate filter cards
+            const filterCards = document.querySelectorAll('.filter-card');
+            filterCards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.transition = 'transform 0.2s ease';
+                    card.style.transform = 'scale(0.98)';
+                    setTimeout(() => {
+                        card.style.transform = 'scale(1)';
+                    }, 200);
+                }, index * 50);
+            });
+
+            setTimeout(() => {
+                // Remove button effect
+                this.classList.remove('btn-press-effect');
+
+                // Submit the form
+                document.getElementById('filter-form').submit();
+            }, 300);
+        });
     }
-
-    // Set message content and style
-    messageContainer.textContent = message;
-    messageContainer.className = `filter-message ${type}`;
-
-    // Show and then hide after delay
-    messageContainer.classList.add('show');
-
-    setTimeout(() => {
-        messageContainer.classList.remove('show');
-    }, 3000);
 } 

@@ -469,7 +469,8 @@
                         </div>
 
                         <!-- Active filters display -->
-                        <div class="active-filters-container mb-3" style="display: none;"></div>
+                        <div class="active-filters-container mb-3" {% if has_active_filters %}style="display: flex;" {%
+                            else %}style="display: none;" {% endif %}></div>
 
                         <!-- Advanced Filters Section with card-based layout -->
                         <div id="advancedFilters" class="advanced-filters-container" style="display: none;"
