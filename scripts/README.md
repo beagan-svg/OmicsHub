@@ -1,82 +1,114 @@
-# Scripts Directory
+# OCS Database Scripts
 
-This directory contains various scripts for data management, import, verification, and utility purposes for the OCS Database project.
+This directory contains scripts for managing and operating the OCS database system.
 
 ## Directory Structure
 
 ```
 scripts/
-├── data_import/      # Scripts for importing data into the database
-├── data_verification/# Scripts for verifying data integrity
-└── utilities/        # Utility scripts for maintenance tasks
-└── debug_tools/      # Scripts for debugging and fixing application issues
+├── data_import/          # Data import scripts
+├── data_verification/    # Data verification scripts
+├── debug_tools/          # Debugging utilities
+├── management/           # Django management commands
+├── shell/                # Shell scripts
+└── utilities/            # Utility modules
 ```
 
 ## Data Import Scripts
 
-### `data_import/load_study_data.py`
-- **Purpose**: Loads study data from a JSON file into the Django database
-- **Description**: Sets up a Django environment, reads a JSON file containing study data, and creates database records for Metadata, Main, LoadAssociation, Alignment, Ingest, and PostQC models.
-- **Usage**: `python scripts/data_import/load_study_data.py`
+Scripts for importing data into the database.
 
-### `data_import/import_json_data.py`
-- **Purpose**: Imports data from a JSON file directly into a PostgreSQL database
-- **Description**: Establishes a connection to the database, reads study data from a JSON file, and inserts records into multiple tables, with error handling and transaction management.
-- **Usage**: `python scripts/data_import/import_json_data.py`
-
-### `data_import/generate.py`
-- **Purpose**: Generates an SQL file for database population
-- **Description**: Reads study data from a JSON file and converts it into SQL INSERT statements, handling null values and ensuring no conflicts during insertion.
-- **Usage**: `python scripts/data_import/generate.py`
+| Script | Description | Usage |
+|--------|-------------|-------|
+| `load_study_data.py` | Import study data from JSON | `python scripts/data_import/load_study_data.py [--no-clear] [--file PATH] [--dry-run] [--debug]` |
+| `import_vendor_data.py` | Import vendor data from CSV | `python scripts/data_import/import_vendor_data.py [--source SOURCE] [--clear] [--dry-run] [--debug]` |
+| `create_sample_csv.py` | Generate sample CSV data | `python scripts/data_import/create_sample_csv.py` |
+| `import_json_data.py` | Generic JSON importer | `python scripts/data_import/import_json_data.py [--file PATH] [--model MODEL]` |
+| `generate.py` | Generate test data | `python scripts/data_import/generate.py [--count COUNT] [--output PATH]` |
 
 ## Data Verification Scripts
 
-### `data_verification/compare_timestamps.py`
-- **Purpose**: Compares timestamps between JSON data and database records
-- **Description**: Normalizes timestamps, extracts study sets, and identifies mismatches between JSON data and database records, providing a verification report.
-- **Usage**: `python scripts/data_verification/compare_timestamps.py`
+Scripts for verifying data integrity and status.
 
-### `data_verification/verify_and_fix_status.py`
-- **Purpose**: Verifies and fixes status discrepancies between JSON data and database records
-- **Description**: Compares status values in the database with those in the JSON file, displays current status counts, and allows the user to fix any discrepancies.
-- **Usage**: `python scripts/data_verification/verify_and_fix_status.py`
+| Script | Description | Usage |
+|--------|-------------|-------|
+| `verify_and_fix_status.py` | Verify and fix status discrepancies | `python scripts/data_verification/verify_and_fix_status.py [--json-path PATH] [--auto-fix] [--dry-run] [--debug]` |
+| `compare_timestamps.py` | Compare timestamps between sources | `python scripts/data_verification/compare_timestamps.py [--source SOURCE]` |
 
-## Utility Scripts
+## Shell Scripts
 
-### `utilities/fix_data.py`
-- **Purpose**: Fixes data issues in the database
-- **Description**: Reads records from a JSON file and updates corresponding database records, with functions for parsing timestamps and processing each record.
-- **Usage**: `python scripts/utilities/fix_data.py`
+Shell scripts for automating data collection and import.
 
-## Debug Tools
+| Script | Description | Usage |
+|--------|-------------|-------|
+| `run_vendor_data_collection.sh` | Collect and import vendor data | `./scripts/shell/run_vendor_data_collection.sh [--collect SOURCE] [--import SOURCE] [--all] [--debug] [--skip-venv]` |
+| `isilon.sh` | Collect data from Isilon | `./scripts/shell/isilon.sh` |
+| `nwgc.sh` | Collect data from NWGC | `./scripts/shell/nwgc.sh` |
+| `nygc.sh` | Collect data from NYGC | `./scripts/shell/nygc.sh` |
 
-These scripts help diagnose and fix issues with the application functionality:
+## Utility Modules
 
-### `debug_tools/verify_toggle_html.py`
+Utility modules for common operations.
 
-This script checks the HTML output of the application for proper column classes and toggle functionality. It examines both the main page and debug page for toggle elements, column classes, and JavaScript functions.
+| Module | Description |
+|--------|-------------|
+| `db_utils.py` | Database utility functions |
+| `file_utils.py` | File handling utility functions |
+| `schema_utils.py` | Database schema utility functions |
+| `fix_data.py` | Data cleanup and repair functions |
 
-Usage:
+## Example Workflows
+
+### Complete Vendor Data Import
+
 ```bash
-python scripts/debug_tools/verify_toggle_html.py
+# Collect and import all vendor data
+./scripts/shell/run_vendor_data_collection.sh --all
+
+# Collect from a specific source
+./scripts/shell/run_vendor_data_collection.sh --collect isilon
+
+# Import from a specific source
+./scripts/shell/run_vendor_data_collection.sh --import nwgc
 ```
 
-### `debug_tools/fix_toggle_columns.py`
+### Study Data Import
 
-This script fixes issues with toggle column functionality by updating the table.html template to properly include column classes in the rendered table cells.
-
-Usage:
 ```bash
-python scripts/debug_tools/fix_toggle_columns.py
+# Import study data (preserving existing data)
+python scripts/data_import/load_study_data.py --no-clear
+
+# Import from a custom JSON file
+python scripts/data_import/load_study_data.py --file /path/to/custom.json
 ```
 
-### `debug_tools/create_debug_page.py`
+### Data Verification
 
-This script creates a debug page for toggle functionality testing by adding a new view, template, and URL pattern to the Django application. The debug page displays all toggle controls and their corresponding table columns in a simplified layout.
-
-Usage:
 ```bash
-python scripts/debug_tools/create_debug_page.py
+# Verify and fix status discrepancies
+python scripts/data_verification/verify_and_fix_status.py
+
+# Automatically fix status discrepancies
+python scripts/data_verification/verify_and_fix_status.py --auto-fix
+
+# Simulate fixes without making changes
+python scripts/data_verification/verify_and_fix_status.py --dry-run
+```
+
+### Schema Management
+
+```python
+# Generate schema documentation
+from scripts.utilities.schema_utils import document_schema
+document_schema()
+
+# Check database constraints
+from scripts.utilities.schema_utils import check_constraints
+check_constraints()
+
+# Generate entity-relationship diagram
+from scripts.utilities.schema_utils import generate_erd
+generate_erd()
 ```
 
 ## Running Scripts
