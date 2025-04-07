@@ -971,3 +971,81 @@ td[class*="postqc_end_time"] {
     /* Google Green for postqc */
     border-left: 2px solid rgba(52, 168, 83, 0.3);
 }
+
+/* Navbar styling */
+.navbar-dark .navbar-nav .nav-link {
+    color: rgba(255, 255, 255, 0.85);
+    transition: all 0.2s ease-in-out;
+    border-radius: 4px;
+    padding: 0.5rem 0.8rem;
+    position: relative;
+    font-weight: 400;
+    margin: 0 0.2rem;
+}
+
+.navbar-dark .navbar-nav .nav-link:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Active indicator using an underline */
+.navbar-dark .navbar-nav .nav-link.active {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.15);
+    font-weight: 500;
+}
+
+.navbar-dark .navbar-nav .nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0.8rem;
+    right: 0.8rem;
+    height: 3px;
+    background-color: #ffffff;
+    border-radius: 2px 2px 0 0;
+    transform: scaleX(1);
+    transform-origin: center;
+    transition: transform 0.3s ease;
+}
+
+.navbar-dark .navbar-nav .nav-link:not(.active)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0.8rem;
+    right: 0.8rem;
+    height: 3px;
+    background-color: #ffffff;
+    border-radius: 2px 2px 0 0;
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 0.3s ease;
+}
+
+.navbar-dark .navbar-nav .nav-link:hover::after {
+    transform: scaleX(0.6);
+}
+
+/* Navbar link ripple effect */
+.navbar-dark .navbar-nav .nav-link {
+    overflow: hidden;
+    /* Contain the ripple */
+}
+
+.nav-ripple {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    transform: scale(0);
+    animation: nav-ripple 0.6s linear;
+    pointer-events: none;
+    z-index: 0;
+}
+
+@keyframes nav-ripple {
+    to {
+        transform: scale(4);
+        opacity: 0;
+    }
+}

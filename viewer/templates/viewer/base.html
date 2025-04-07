@@ -37,12 +37,14 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link active" href="{% url 'viewer:main_list' %}">
+                        <a class="nav-link {% if request.path == '/' %}active{% endif %}"
+                            href="{% url 'viewer:main_list' %}">
                             <i class="bi bi-table me-1"></i> Samples
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'viewer:pipeline_dashboard' %}">
+                        <a class="nav-link {% if '/pipeline/' in request.path %}active{% endif %}"
+                            href="{% url 'viewer:pipeline_dashboard' %}">
                             <i class="bi bi-diagram-3 me-1"></i> Pipeline
                         </a>
                     </li>
@@ -66,6 +68,51 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <!-- Additional scripts -->
     {% block extrascripts %}{% endblock %}
+
+    <!-- Navigation Scripts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Get current path
+            const path = window.location.pathname;
+
+            // Get navigation links
+            const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
+
+            // Reset all links (in case template logic doesn't capture all cases)
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+            });
+
+            // Set active class based on current path
+            if (path === '/') {
+                document.querySelector('a[href="{% url "viewer:main_list" %}"]').classList.add('active');
+            } else if (path.includes('/pipeline/')) {
+                document.querySelector('a[href="{% url "viewer:pipeline_dashboard" %}"]').classList.add('active');
+            }
+
+            // Add click handler for better user feedback
+            navLinks.forEach(link => {
+                link.addEventListener('click', function (e) {
+                    // Add ripple effect for better user feedback
+                    const ripple = document.createElement('span');
+                    ripple.classList.add('nav-ripple');
+
+                    const rect = this.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    ripple.style.left = x + 'px';
+                    ripple.style.top = y + 'px';
+
+                    this.appendChild(ripple);
+
+                    setTimeout(() => {
+                        ripple.remove();
+                    }, 600);
+                });
+            });
+        });
+    </script>
 </body>
 
 </html>
