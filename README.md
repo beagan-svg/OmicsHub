@@ -22,7 +22,8 @@ database_ocs/
 ├── staticfiles/              # Collected static files
 ├── media/                    # Media files
 ├── data/                     # Data files
-│   └── csv/                  # CSV files
+│   ├── csv/                  # CSV files
+│   └── raw/                  # Raw data files
 ├── tests/                    # Test files
 ├── logs/                     # Log files
 ├── sql/                      # SQL files
@@ -144,7 +145,8 @@ database_ocs/                  # Root project directory
 ├── staticfiles/              # Collected static files
 ├── media/                    # Media files
 ├── data/                     # Data files
-│   └── csv/                  # CSV files
+│   ├── csv/                  # CSV files
+│   └── raw/                  # Raw data files
 ├── tests/                    # Test files
 ├── logs/                     # Log files
 ├── sql/                      # SQL files
@@ -193,29 +195,79 @@ python scripts/data_import/load_study_data.py --no-clear  # Don't clear existing
 python scripts/data_import/load_study_data.py --file /path/to/custom.json  # Use custom file
 ```
 
-For detailed instructions, see [Importing Study Data](docs/importing_study_data.md).
+## Data Import Process
+
+The import process handles the following data types:
+
+1. **Metadata Records**
+   - Fastq name
+   - Organism common name
+   - Library prep method
+   - Study set
+
+2. **Main Records**
+   - Study set
+   - Organism
+   - Library prep method
+   - Alignment status
+   - Post-QC status
+   - Ingest status
+
+3. **Load Association Records**
+   - Fastq name
+   - Load name
+
+4. **Alignment Records**
+   - Status ID
+   - Start time
+   - End time
+   - FID
+
+5. **Post-QC Records**
+   - Status ID
+   - Start time
+   - End time
+   - FID
+
+6. **Ingest Records**
+   - Status ID
+   - Start time
+   - End time
+   - FID
 
 ## Expected Results
 
 After successful import, you should see:
-- Approximately 11,817 records processed
-- Confirmation messages for each record added
-- A summary showing the total counts for each model:
-  - Metadata records: 11,817
-  - Main records: 11,817
-  - LoadAssociation records: ~11,521
-  - Alignment records: ~11,768
-  - PostQC records: ~11,766
-  - Ingest records: ~11,768
+- Metadata records: ~11,800
+- Main records: ~11,800
+- Load association records: ~11,500
+- Alignment records: ~11,700
+- Post-QC records: ~11,700
+- Ingest records: ~11,700
+
+## Recent Updates
+
+- Added support for updating existing records without clearing data
+- Improved error handling for duplicate records
+- Added dry-run mode for testing imports
+- Enhanced data validation during import
+- Added support for custom JSON file paths
 
 ## Troubleshooting
 
-If you encounter any issues:
+1. **Duplicate Key Errors**
+   - Use `--no-clear` flag to update existing records
+   - Check for data consistency in the JSON file
 
-1. Check database settings in `config/settings/development.py`
-2. Verify the study.json file exists and is readable
-3. Ensure all required packages are installed in your virtual environment
-4. Check Django logs for error messages
+2. **Missing Data**
+   - Verify JSON file path and format
+   - Check field mappings in the import script
+
+3. **Type Conversion Errors**
+   - Ensure date formats are correct
+   - Check for invalid status values
+
+For detailed instructions, see [Importing Study Data](docs/importing_study_data.md).
 
 ## Verification Script
 
