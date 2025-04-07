@@ -1,0 +1,9 @@
+// Manual Test Plan for Active Filters Visibility
+1. Select some filters in the advanced filters section
+2. Verify active filters section appears
+3. Click Apply Filters button
+4. Verify active filters section remains visible after page reload
+5. Remove one filter by clicking X
+6. Verify active filters section still shows remaining filters
+7. Click Apply Filters
+8. Verify active filters section persists after reload

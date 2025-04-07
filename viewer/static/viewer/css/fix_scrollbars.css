@@ -1,0 +1,29 @@
+/* Fix for double scrollbars in Select2 components */
+.select2-container--bootstrap4 .select2-selection--multiple {
+    overflow-y: hidden !important;
+}
+
+.select2-container--bootstrap4 .select2-selection--multiple .select2-selection__rendered {
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 68px;
+    /* Allow showing multiple tags */
+}
+
+/* Fix for double scrollbars in Select2 dropdowns */
+.select2-container--bootstrap4 .select2-results {
+    max-height: 200px;
+    overflow-y: hidden !important;
+}
+
+.select2-container--bootstrap4 .select2-results__options {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Fix for double scrollbars in tables */
+.table-responsive .table-container {
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+}

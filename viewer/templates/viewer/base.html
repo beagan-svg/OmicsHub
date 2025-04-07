@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,13 +14,15 @@
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <!-- Django Tables2 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/django-tables2@2.4.1/dist/bootstrap5/css/django-tables2.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/django-tables2@2.4.1/dist/bootstrap5/css/django-tables2.min.css"
+        rel="stylesheet">
     <!-- Custom CSS -->
     {% load static %}
     <link href="{% static 'viewer/css/style.css' %}" rel="stylesheet">
     <!-- Additional head content -->
     {% block extrahead %}{% endblock %}
 </head>
+
 <body class="bg-light">
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
         <div class="container">
@@ -27,7 +30,8 @@
                 <i class="bi bi-database me-2"></i>
                 Database OCS
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
@@ -58,4 +62,5 @@
     <!-- Additional scripts -->
     {% block extrascripts %}{% endblock %}
 </body>
-</html> 
+
+</html>

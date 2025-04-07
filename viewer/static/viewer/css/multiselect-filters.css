@@ -1,26 +1,39 @@
 /* Modern, colorful styles for multiselect filters - Card style */
 :root {
-    --primary-color: #1976D2;       /* Material Blue */
-    --primary-light: #E3F2FD;       /* Light Blue */
-    --primary-dark: #0D47A1;        /* Dark Blue */
-    --secondary-color: #9C27B0;     /* Purple */
-    --success-color: #2E7D32;       /* Green */
-    --warning-color: #FF9800;       /* Orange */
-    --danger-color: #D32F2F;        /* Red */
-    --neutral-color: #455A64;       /* Blue Grey */
-    --light-bg: #F5F7FA;            /* Light Background */
-    --dark-bg: #263238;             /* Dark Background */
-    --border-color: #E0E0E0;        /* Border Color */
-    --card-bg: #FFFFFF;             /* Card Background */
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06);
-    --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+    --primary-color: #1976D2;
+    /* Material Blue */
+    --primary-light: #E3F2FD;
+    /* Light Blue */
+    --primary-dark: #0D47A1;
+    /* Dark Blue */
+    --secondary-color: #9C27B0;
+    /* Purple */
+    --success-color: #2E7D32;
+    /* Green */
+    --warning-color: #FF9800;
+    /* Orange */
+    --danger-color: #D32F2F;
+    /* Red */
+    --neutral-color: #455A64;
+    /* Blue Grey */
+    --light-bg: #F5F7FA;
+    /* Light Background */
+    --dark-bg: #263238;
+    /* Dark Background */
+    --border-color: #E0E0E0;
+    /* Border Color */
+    --card-bg: #FFFFFF;
+    /* Card Background */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
     --radius-sm: 4px;
     --radius-md: 8px;
     --radius-lg: 16px;
     --transition-fast: 0.2s ease;
     --transition-normal: 0.3s ease;
-    --input-height: 38px;          /* Standard input height */
+    --input-height: 38px;
+    /* Standard input height */
 }
 
 /* Main container for advanced filters */
@@ -94,7 +107,7 @@
 }
 
 /* Form controls with consistent styling */
-.form-control, 
+.form-control,
 .form-select {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
@@ -102,7 +115,7 @@
     transition: all var(--transition-fast);
     background-color: #FFFFFF;
     height: var(--input-height);
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.075);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.075);
 }
 
 .select2-container--bootstrap4 .select2-selection {
@@ -112,10 +125,10 @@
     transition: all var(--transition-fast);
     background-color: #FFFFFF;
     height: var(--input-height) !important;
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.075);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.075);
 }
 
-.form-control:focus, 
+.form-control:focus,
 .form-select:focus,
 .select2-container--bootstrap4.select2-container--focus .select2-selection {
     border-color: var(--primary-color);
@@ -142,7 +155,7 @@
     min-height: var(--input-height) !important;
     height: var(--input-height) !important;
     line-height: 1.5;
-    overflow-y: auto !important;
+    overflow-y: hidden !important;
     max-height: var(--input-height);
 }
 
@@ -240,6 +253,7 @@
         opacity: 0;
         transform: translateY(10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -251,7 +265,8 @@
     transition: all var(--transition-fast);
     border-radius: var(--radius-sm);
     margin: 2px 4px;
-    font-size: 13px; /* Smaller text size in dropdown options */
+    font-size: 13px;
+    /* Smaller text size in dropdown options */
 }
 
 .select2-container--bootstrap4 .select2-results__option--highlighted[aria-selected] {
@@ -306,8 +321,13 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 .filter-heading {
@@ -455,11 +475,13 @@
 }
 
 .filter-message.success::before {
-    content: "\F270"; /* Bootstrap icons check-circle */
+    content: "\F270";
+    /* Bootstrap icons check-circle */
 }
 
 .filter-message.info::before {
-    content: "\F430"; /* Bootstrap icons info-circle */
+    content: "\F430";
+    /* Bootstrap icons info-circle */
 }
 
 /* Card focus and animation effects */
@@ -482,10 +504,12 @@
     0% {
         transform: translateY(0);
     }
+
     50% {
         transform: translateY(-5px);
         box-shadow: var(--shadow-lg);
     }
+
     100% {
         transform: translateY(0);
     }
@@ -508,7 +532,8 @@
     color: #6c757d;
     font-style: italic;
     line-height: calc(var(--input-height) - 12px);
-    font-size: 13px; /* Smaller placeholder text */
+    font-size: 13px;
+    /* Smaller placeholder text */
 }
 
 /* Improve active filters display */
@@ -542,10 +567,10 @@
 /* Enhance dropdown menu height and scrolling */
 .select2-container--bootstrap4 .select2-results {
     max-height: 200px;
-    overflow-y: auto;
+    overflow-y: hidden;
 }
 
 .select2-container--bootstrap4 .select2-results__options {
     max-height: 200px;
     overflow-y: auto;
-} 
+}

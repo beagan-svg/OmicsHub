@@ -156,37 +156,8 @@ function extractColumnConfiguration() {
         toggle.addEventListener('change', event => handleColumnToggleChange(event, columnClass));
     });
 
-    // Status columns
-    columnConfig.mappings['column-ingest_status'] = {
-        label: 'Ingest Status',
-        category: 'status',
-        visible: true
-    };
-    columnConfig.mappings['column-ingest_fid'] = {
-        label: 'Ingest FID',
-        category: 'status_fid',
-        visible: false
-    };
-    columnConfig.mappings['column-alignment_status'] = {
-        label: 'Alignment Status',
-        category: 'status',
-        visible: true
-    };
-    columnConfig.mappings['column-alignment_fid'] = {
-        label: 'Alignment FID',
-        category: 'status_fid',
-        visible: false
-    };
-    columnConfig.mappings['column-postqc_status'] = {
-        label: 'PostQC Status',
-        category: 'status',
-        visible: true
-    };
-    columnConfig.mappings['column-postqc_fid'] = {
-        label: 'PostQC FID',
-        category: 'status_fid',
-        visible: false
-    };
+    // We don't need this section anymore since all toggles are properly handled above
+    // with the data-column attributes added to the HTML
 }
 
 /**
@@ -301,6 +272,7 @@ function handleColumnToggleChange(event, columnClass) {
  */
 function handleToggleAllChange(event) {
     const newState = event.target.checked;
+    console.log(`Toggle All changed to: ${newState}`);
 
     if (newState) {
         // Switching to "Show All" mode - save current state first
@@ -309,18 +281,18 @@ function handleToggleAllChange(event) {
 
         // Show all columns
         Object.keys(columnConfig.mappings).forEach(columnClass => {
-            // Update toggle state
+            // Update toggle state - only if the toggle exists
             const toggle = columnConfig.mappings[columnClass].toggle;
             if (toggle) {
                 toggle.checked = true;
+
+                // Apply visibility
+                applyColumnVisibility(columnClass, true, true);
+
+                // Save to localStorage
+                const storageKey = `show${snakeToCamelCase(columnClass)}`;
+                localStorage.setItem(storageKey, true);
             }
-
-            // Apply visibility
-            applyColumnVisibility(columnClass, true, true);
-
-            // Save to localStorage
-            const storageKey = `show${snakeToCamelCase(columnClass)}`;
-            localStorage.setItem(storageKey, true);
         });
 
         // Show feedback
@@ -349,11 +321,13 @@ function handleToggleAllChange(event) {
  */
 function saveCurrentState() {
     columnConfig.previousState = {};
+    console.log('Saving current column state');
 
     Object.keys(columnConfig.mappings).forEach(columnClass => {
         const toggle = columnConfig.mappings[columnClass].toggle;
         if (toggle) {
             columnConfig.previousState[columnClass] = toggle.checked;
+            console.log(`Saved state for ${columnClass}: ${toggle.checked}`);
         }
     });
 }
@@ -362,9 +336,12 @@ function saveCurrentState() {
  * Restore previous column visibility state
  */
 function restorePreviousState() {
+    console.log('Restoring previous column state');
+
     // Check if we have a previous state to restore
     if (Object.keys(columnConfig.previousState).length === 0) {
         // If no previous state, just use defaults
+        console.log('No previous state found, using defaults');
         handleResetClick({ isTrusted: false });
         return;
     }
@@ -375,18 +352,20 @@ function restorePreviousState() {
             ? columnConfig.previousState[columnClass]
             : columnConfig.defaults[columnClass];
 
-        // Update toggle state
+        console.log(`Restoring ${columnClass} to ${previousState}`);
+
+        // Update toggle state - only if toggle exists
         const toggle = columnConfig.mappings[columnClass].toggle;
         if (toggle) {
             toggle.checked = previousState;
+
+            // Apply visibility
+            applyColumnVisibility(columnClass, previousState, true);
+
+            // Save to localStorage
+            const storageKey = `show${snakeToCamelCase(columnClass)}`;
+            localStorage.setItem(storageKey, previousState);
         }
-
-        // Apply visibility
-        applyColumnVisibility(columnClass, previousState, true);
-
-        // Save to localStorage
-        const storageKey = `show${snakeToCamelCase(columnClass)}`;
-        localStorage.setItem(storageKey, previousState);
     });
 }
 
@@ -447,41 +426,55 @@ function applyColumnVisibility(columnClass, isVisible, animate = false) {
     // Check if this is a FID column
     const isFidColumn = columnClass.includes('fid');
 
+    // Check if this is a status column
+    const isStatusColumn = columnClass.includes('status') && !isTimeColumn && !isFidColumn;
+
     // Get the field class pattern (column-xxx becomes field-xxx)
     let fieldClass = `field-${columnClass.replace('column-', '')}`;
 
-    // For status FID columns, also try the class directly since they have custom styling
-    const fidClasses = ['ingest-fid', 'alignment-fid', 'postqc-fid'];
+    // For status columns, they might use a different class scheme
+    const statusTypes = ['ingest', 'alignment', 'postqc'];
+    let specificStatusClass = '';
+
+    if (isStatusColumn || isFidColumn) {
+        // Extract the status type (ingest, alignment, postqc)
+        for (const type of statusTypes) {
+            if (columnClass.includes(type)) {
+                specificStatusClass = `${type}-${isFidColumn ? 'fid' : 'status'}`;
+                break;
+            }
+        }
+    }
 
     if (isTimeColumn) {
         console.log(`Found time column: ${columnClass} -> field class: ${fieldClass}`);
     }
 
     if (isFidColumn) {
-        console.log(`Found FID column: ${columnClass} -> field class: ${fieldClass}`);
+        console.log(`Found FID column: ${columnClass} -> field class: ${fieldClass}, specific class: ${specificStatusClass}`);
+    }
+
+    if (isStatusColumn) {
+        console.log(`Found status column: ${columnClass} -> field class: ${fieldClass}, specific class: ${specificStatusClass}`);
     }
 
     // Find all cells with this field class
     let cells = document.querySelectorAll(`td.${fieldClass}`);
     let headers = document.querySelectorAll(`th.${columnClass}`);
 
-    // If it's a FID column, also search by the fid-column class
-    if (isFidColumn) {
-        // Get the specific FID type (ingest, alignment, postqc)
-        const fidType = columnClass.replace('column-', '').replace('_fid', '');
-        const specificFidClass = `${fidType}-fid`;
+    // If it's a status or FID column, also search by the specific class
+    if ((isStatusColumn || isFidColumn) && specificStatusClass) {
+        const specificCells = document.querySelectorAll(`td.status-column.${specificStatusClass}, td.fid-column.${specificStatusClass}`);
+        const specificHeaders = document.querySelectorAll(`th.status-column.${specificStatusClass}, th.fid-column.${specificStatusClass}`);
 
-        const fidCells = document.querySelectorAll(`td.fid-column.${specificFidClass}`);
-        const fidHeaders = document.querySelectorAll(`th.fid-column.${specificFidClass}`);
-
-        if (fidCells.length > 0) {
-            cells = fidCells;
-            console.log(`Found ${fidCells.length} FID cells using class ${specificFidClass}`);
+        if (specificCells.length > 0) {
+            cells = specificCells;
+            console.log(`Found ${specificCells.length} cells using specific class ${specificStatusClass}`);
         }
 
-        if (fidHeaders.length > 0) {
-            headers = fidHeaders;
-            console.log(`Found ${fidHeaders.length} FID headers using class ${specificFidClass}`);
+        if (specificHeaders.length > 0) {
+            headers = specificHeaders;
+            console.log(`Found ${specificHeaders.length} headers using specific class ${specificStatusClass}`);
         }
     }
 
@@ -537,18 +530,24 @@ function updateAllColumnsState() {
     let visibleCount = 0;
     let totalColumns = 0;
 
-    // Count visible columns
+    // Count visible columns - only count columns that have toggles
     Object.keys(columnConfig.mappings).forEach(columnClass => {
-        totalColumns++;
         const toggle = columnConfig.mappings[columnClass].toggle;
-
-        if (toggle && toggle.checked) {
-            visibleCount++;
+        if (toggle) {
+            totalColumns++;
+            if (toggle.checked) {
+                visibleCount++;
+            }
         }
     });
 
-    // Update state
-    columnConfig.allVisible = (visibleCount === totalColumns && totalColumns > 0);
+    console.log(`Visible columns: ${visibleCount}/${totalColumns}`);
+
+    // Update state - only if we have columns to track
+    if (totalColumns > 0) {
+        columnConfig.allVisible = (visibleCount === totalColumns);
+        console.log(`All columns visible: ${columnConfig.allVisible}`);
+    }
 
     // Update Toggle All state
     updateToggleAllState();

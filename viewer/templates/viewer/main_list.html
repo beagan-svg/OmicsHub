@@ -9,6 +9,7 @@
 <link rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@x.x.x/dist/select2-bootstrap4.min.css" />
 <link rel="stylesheet" href="{% static 'viewer/css/multiselect-filters.css' %}" />
+<link rel="stylesheet" href="{% static 'viewer/css/fix_scrollbars.css' %}" />
 {% endblock %}
 
 {% block content %}
@@ -274,7 +275,8 @@
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
                                                         <input type="checkbox" id="toggleIngestStatus"
-                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                            class="column-toggle-checkbox" data-default-visible="true"
+                                                            data-column="column-ingest_status">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleIngestStatus">
@@ -285,7 +287,8 @@
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
                                                         <input type="checkbox" id="toggleAlignmentStatus"
-                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                            class="column-toggle-checkbox" data-default-visible="true"
+                                                            data-column="column-alignment_status">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="toggleAlignmentStatus">
@@ -296,7 +299,8 @@
                                                 <div class="form-check form-switch">
                                                     <label class="toggle-switch">
                                                         <input type="checkbox" id="togglePostqcStatus"
-                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                            class="column-toggle-checkbox" data-default-visible="true"
+                                                            data-column="column-postqc_status">
                                                         <span class="toggle-slider"></span>
                                                     </label>
                                                     <label class="form-check-label" for="togglePostqcStatus">
@@ -739,13 +743,47 @@
     }
 
     .select2-container--bootstrap4 .select2-selection--multiple {
-        overflow: hidden;
+        min-height: 38px;
+        max-height: 100px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden;
     }
 
     .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__rendered {
-        overflow-x: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
+        display: block !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice {
+        float: left;
+        margin: 2px;
+    }
+
+    /* Scrollbar styling for the selection box */
+    .select2-container--bootstrap4 .select2-selection--multiple::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Firefox scrollbar */
+    .select2-container--bootstrap4 .select2-selection--multiple {
+        scrollbar-width: thin;
+        scrollbar-color: #888 #f1f1f1;
     }
 
     /* Column Settings Dropdown Styling */
@@ -1645,6 +1683,138 @@
         color: #9e9e9e;
         text-align: center;
         font-style: italic;
+    }
+
+    /* Add styles for filter boxes with scrolling */
+    .filter-card {
+        max-height: 300px;
+        overflow-y: auto;
+        padding-right: 10px;
+        margin-right: -10px;
+    }
+
+    .filter-card::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .filter-card::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .filter-card::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .filter-card::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Ensure the filter cards have proper spacing */
+    .filter-card {
+        margin-bottom: 20px;
+        padding: 15px;
+        border-radius: 8px;
+        background-color: #fff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Adjust the select2 dropdown height */
+    .select2-container--bootstrap4 .select2-selection--multiple {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__rendered {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    /* Advanced Filters Container */
+    #advancedFilters {
+        max-height: 600px;
+        overflow-y: auto;
+        padding-right: 10px;
+        margin-right: -10px;
+    }
+
+    #advancedFilters::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #advancedFilters::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    #advancedFilters::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    #advancedFilters::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Filter Cards */
+    .filter-card {
+        max-height: none;
+        overflow-y: visible;
+        padding-right: 10px;
+        margin-right: -10px;
+    }
+
+    /* Select2 Dropdowns */
+    .select2-container--bootstrap4 .select2-selection--multiple {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__rendered {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    /* Select2 Dropdown Scrolling */
+    .select2-container--bootstrap4 .select2-results__options {
+        max-height: 200px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+
+    .select2-container--bootstrap4 .select2-results__options::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .select2-container--bootstrap4 .select2-results__options::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .select2-container--bootstrap4 .select2-results__options::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .select2-container--bootstrap4 .select2-results__options::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Ensure dropdown options are visible */
+    .select2-results__option {
+        padding: 6px 12px;
+        font-size: 0.875rem;
+    }
+
+    .select2-container--bootstrap4 .select2-dropdown {
+        border-color: #ced4da;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Ensure the dropdown is positioned correctly */
+    .select2-container--bootstrap4 .select2-dropdown--below {
+        margin-top: 2px;
     }
 </style>
 

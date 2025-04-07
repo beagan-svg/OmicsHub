@@ -1,24 +1,24 @@
 // Modern filters script with enhanced UI/UX for card-based layout
 console.log('Loading enhanced filter script with card animations...');
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log('DOM loaded, initializing filters');
-    
+
     // Toggle advanced filters
     initAdvancedFiltersToggle();
-    
+
     // Initialize Select2 with enhanced settings
     initEnhancedSelect2();
-    
+
     // Initialize filter tag removers
     initFilterTagRemovers();
-    
+
     // Initialize reset filters button
     initResetFiltersButton();
-    
+
     // Initialize active filters display
     updateActiveFiltersDisplay();
-    
+
     // Initialize card hover animations
     initCardAnimations();
 });
@@ -27,33 +27,33 @@ document.addEventListener('DOMContentLoaded', function() {
 function initAdvancedFiltersToggle() {
     const toggleButton = document.getElementById('toggleAdvancedFilters');
     const filtersPanel = document.getElementById('advancedFilters');
-    
+
     if (!toggleButton || !filtersPanel) {
         console.error('Toggle button or filters panel not found');
         return;
     }
-    
+
     // Click event for the toggle button
-    toggleButton.addEventListener('click', function() {
+    toggleButton.addEventListener('click', function () {
         if (filtersPanel.style.display === 'none' || !filtersPanel.style.display) {
             // Show with smooth animation
             filtersPanel.style.display = 'block';
             filtersPanel.style.opacity = '0';
             filtersPanel.style.transform = 'translateY(-20px)';
-            
+
             // Animate filter cards sequentially
             const filterCards = filtersPanel.querySelectorAll('.filter-card');
-            
+
             setTimeout(() => {
                 filtersPanel.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
                 filtersPanel.style.opacity = '1';
                 filtersPanel.style.transform = 'translateY(0)';
-                
+
                 // Animate each card with a slight delay
                 filterCards.forEach((card, index) => {
                     card.style.opacity = '0';
                     card.style.transform = 'translateY(20px)';
-                    
+
                     setTimeout(() => {
                         card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
                         card.style.opacity = '1';
@@ -61,29 +61,29 @@ function initAdvancedFiltersToggle() {
                     }, 100 + (index * 70));
                 });
             }, 10);
-            
+
             toggleButton.innerHTML = '<i class="bi bi-sliders"></i> <span>Hide Filters</span>';
             localStorage.setItem('showAdvancedFilters', 'true');
         } else {
             // Hide with smooth animation
             filtersPanel.style.opacity = '0';
             filtersPanel.style.transform = 'translateY(-20px)';
-            
+
             setTimeout(() => {
                 filtersPanel.style.display = 'none';
                 filtersPanel.style.transition = '';
             }, 300);
-            
+
             toggleButton.innerHTML = '<i class="bi bi-sliders"></i> <span>Advanced Filters</span>';
             localStorage.setItem('showAdvancedFilters', 'false');
         }
     });
-    
+
     // Initialize from localStorage or data attribute
-    const shouldShowFilters = 
-        localStorage.getItem('showAdvancedFilters') === 'true' || 
+    const shouldShowFilters =
+        localStorage.getItem('showAdvancedFilters') === 'true' ||
         (filtersPanel.dataset && filtersPanel.dataset.hasActiveFilters === 'true');
-    
+
     if (shouldShowFilters) {
         filtersPanel.style.display = 'block';
         toggleButton.innerHTML = '<i class="bi bi-sliders"></i> <span>Hide Filters</span>';
@@ -94,7 +94,7 @@ function initAdvancedFiltersToggle() {
 function initEnhancedSelect2() {
     if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
         console.log('Initializing enhanced Select2');
-        
+
         // Stylish configuration for Select2
         jQuery('.filter-select').select2({
             theme: 'bootstrap4',
@@ -109,26 +109,26 @@ function initEnhancedSelect2() {
             minimumResultsForSearch: 5,
             containerCssClass: 'select2-fixed-height'
         });
-        
+
         // Fix placeholder appearance
-        jQuery('.filter-select').on('select2:open', function() {
+        jQuery('.filter-select').on('select2:open', function () {
             document.querySelector('.select2-search__field').placeholder = 'Search...';
         });
-        
+
         // Handle on-change events for dynamic interface updates
-        jQuery('.filter-select').on('change', function() {
+        jQuery('.filter-select').on('change', function () {
             // Update highlighting
             updateFilterHighlighting(this);
-            
+
             // Update active filters display
             updateActiveFiltersDisplay();
-            
+
             // Fix height if needed after selection
             fixSelectHeight(this);
         });
-        
+
         // Initialize filter highlighting
-        jQuery('.filter-select').each(function() {
+        jQuery('.filter-select').each(function () {
             updateFilterHighlighting(this);
             fixSelectHeight(this);
         });
@@ -142,14 +142,16 @@ function fixSelectHeight(selectElement) {
     const $select = jQuery(selectElement);
     const $container = $select.next('.select2-container');
     const $selection = $container.find('.select2-selection');
-    
+
     // Force correct height
     $selection.css('height', '38px');
-    
+
     // For multiple select, check if we need to scroll
     if ($selection.hasClass('select2-selection--multiple')) {
         const $choices = $selection.find('.select2-selection__rendered');
         if ($choices.children().length > 2) {
+            // Don't set multiple scrollable containers
+            $selection.css('overflow-y', 'hidden');
             $choices.css('overflow-y', 'auto');
             $choices.css('max-height', '68px'); // Allow showing 2-3 rows of tags
         }
@@ -159,21 +161,21 @@ function fixSelectHeight(selectElement) {
 // Initialize animations for filter cards
 function initCardAnimations() {
     const filterCards = document.querySelectorAll('.filter-card');
-    
+
     filterCards.forEach(card => {
         // Add subtle animation on hover
-        card.addEventListener('mouseenter', function() {
+        card.addEventListener('mouseenter', function () {
             this.style.transition = 'transform 0.3s ease, box-shadow 0.3s ease';
         });
-        
+
         // Add focus effect when clicking on any input inside the card
         const inputs = card.querySelectorAll('input, select');
         inputs.forEach(input => {
-            input.addEventListener('focus', function() {
+            input.addEventListener('focus', function () {
                 card.classList.add('filter-card-focus');
             });
-            
-            input.addEventListener('blur', function() {
+
+            input.addEventListener('blur', function () {
                 card.classList.remove('filter-card-focus');
             });
         });
@@ -185,15 +187,15 @@ function formatSelectOption(option) {
     if (!option.id) {
         return option.text;
     }
-    
+
     let $option = jQuery(option.element);
     let optionText = option.text;
     let fieldName = $option.closest('select').attr('id');
-    
+
     // If this is a status field, add color indicators
     if (fieldName && (fieldName.includes('status'))) {
         let statusClass = '';
-        
+
         if (optionText.toUpperCase() === 'COMPLETED') {
             statusClass = 'status-option-completed';
         } else if (optionText.toUpperCase() === 'NOT COMPLETED') {
@@ -201,12 +203,12 @@ function formatSelectOption(option) {
         } else if (optionText.toUpperCase() === 'FAILED') {
             statusClass = 'status-option-failed';
         }
-        
+
         if (statusClass) {
             return jQuery('<span class="status-filter-option ' + statusClass + '">' + optionText + '</span>');
         }
     }
-    
+
     return optionText;
 }
 
@@ -215,11 +217,11 @@ function updateFilterHighlighting(selectElement) {
     const $select = jQuery(selectElement);
     const $container = $select.closest('.col-md-4, .col-md-6');
     const $label = $container.find('label');
-    
+
     if ($select.val() && $select.val().length > 0) {
         $label.addClass('text-primary font-weight-bold');
         $container.addClass('has-active-filter');
-        
+
         // Also highlight the parent card
         const $card = $container.closest('.filter-card');
         if ($card.length) {
@@ -228,7 +230,7 @@ function updateFilterHighlighting(selectElement) {
     } else {
         $label.removeClass('text-primary font-weight-bold');
         $container.removeClass('has-active-filter');
-        
+
         // Check if any other filters in the card are active
         const $card = $container.closest('.filter-card');
         if ($card.length) {
@@ -243,12 +245,12 @@ function updateFilterHighlighting(selectElement) {
 // Initialize filter tag removal functionality
 function initFilterTagRemovers() {
     const filterTags = document.querySelectorAll('.tag-remove');
-    
-    filterTags.forEach(function(tag) {
-        tag.addEventListener('click', function() {
+
+    filterTags.forEach(function (tag) {
+        tag.addEventListener('click', function () {
             const filter = this.dataset.filter;
             const value = this.dataset.value;
-            
+
             if (value) {
                 // For multi-select filters, remove just this value
                 const select = document.getElementById(filter);
@@ -267,13 +269,13 @@ function initFilterTagRemovers() {
                     input.value = '';
                 }
             }
-            
+
             // Show the removal effect before submitting
             const tagElement = this.closest('.filter-tag');
             tagElement.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
             tagElement.style.transform = 'translateX(-10px)';
             tagElement.style.opacity = '0';
-            
+
             setTimeout(() => {
                 // Submit the form
                 document.getElementById('filter-form').submit();
@@ -286,13 +288,13 @@ function initFilterTagRemovers() {
 function updateActiveFiltersDisplay() {
     const container = document.querySelector('.active-filters-container');
     if (!container) return;
-    
+
     // Clear existing content
     container.innerHTML = '';
-    
+
     // Create title if filters are active
     let hasActiveFilters = false;
-    
+
     // Process text filters
     document.querySelectorAll('input[type="text"][name]').forEach(input => {
         if (input.value) {
@@ -300,7 +302,7 @@ function updateActiveFiltersDisplay() {
             createFilterTag(container, input.name, null, input.value);
         }
     });
-    
+
     // Process select filters
     document.querySelectorAll('select.filter-select').forEach(select => {
         const values = jQuery(select).val();
@@ -314,7 +316,7 @@ function updateActiveFiltersDisplay() {
             });
         }
     });
-    
+
     // Show or hide the container
     if (hasActiveFilters) {
         container.style.display = 'flex';
@@ -334,63 +336,27 @@ function updateActiveFiltersDisplay() {
 function createFilterTag(container, filter, value, displayText) {
     const tag = document.createElement('div');
     tag.className = 'filter-tag';
-    
+
     // Get friendly name for the filter
     const filterLabel = document.querySelector(`label[for="${filter}"]`);
     const filterName = filterLabel ? filterLabel.textContent : formatLabelFromName(filter);
-    
+
     tag.innerHTML = `
         <span class="tag-name">${filterName}:</span>
         <span class="tag-value">${displayText}</span>
-        <span class="tag-remove" data-filter="${filter}" data-value="${value || ''}">
-            <i class="bi bi-x-circle"></i>
-        </span>
     `;
-    
+
     container.appendChild(tag);
-    
+
     // Add appearance animation
     tag.style.opacity = '0';
     tag.style.transform = 'translateY(10px)';
-    
+
     setTimeout(() => {
         tag.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
         tag.style.opacity = '1';
         tag.style.transform = 'translateY(0)';
     }, 10);
-    
-    // Add click handler
-    tag.querySelector('.tag-remove').addEventListener('click', function() {
-        const filterField = this.dataset.filter;
-        const filterValue = this.dataset.value;
-        
-        if (filterValue) {
-            // For multi-select filters, remove just this value
-            const select = document.getElementById(filterField);
-            if (select && typeof jQuery !== 'undefined') {
-                let currentValues = jQuery(select).val() || [];
-                currentValues = currentValues.filter(item => item !== filterValue);
-                jQuery(select).val(currentValues).trigger('change');
-            }
-        } else {
-            // For text inputs, clear the field
-            const input = document.querySelector(`[name="${filterField}"]`);
-            if (input) {
-                input.value = '';
-            }
-        }
-        
-        // Add removal animation
-        const tagElement = this.closest('.filter-tag');
-        tagElement.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
-        tagElement.style.transform = 'translateX(-10px)';
-        tagElement.style.opacity = '0';
-        
-        setTimeout(() => {
-            // Submit the form
-            document.getElementById('filter-form').submit();
-        }, 200);
-    });
 }
 
 // Format a field name into a friendly label
@@ -403,31 +369,31 @@ function formatLabelFromName(name) {
 // Initialize the reset filters button with enhanced feedback
 function initResetFiltersButton() {
     const resetButton = document.getElementById('resetFilters');
-    
+
     if (resetButton) {
-        resetButton.addEventListener('click', function(e) {
+        resetButton.addEventListener('click', function (e) {
             e.preventDefault();
-            
+
             // Add button press effect
             this.classList.add('btn-press-effect');
-            
+
             // Clear all selects
             if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
                 jQuery('.filter-select').val(null).trigger('change');
             } else {
-                document.querySelectorAll('.filter-select').forEach(function(select) {
+                document.querySelectorAll('.filter-select').forEach(function (select) {
                     select.selectedIndex = -1;
                 });
             }
-            
+
             // Reset text inputs
-            document.querySelectorAll('input[type="text"]').forEach(function(input) {
+            document.querySelectorAll('input[type="text"]').forEach(function (input) {
                 input.value = '';
             });
-            
+
             // Show feedback message
             showFeedbackMessage('Filters cleared', 'success');
-            
+
             // Animate filter cards reset
             const filterCards = document.querySelectorAll('.filter-card');
             filterCards.forEach((card, index) => {
@@ -438,11 +404,11 @@ function initResetFiltersButton() {
                     }, 300);
                 }, index * 50);
             });
-            
+
             setTimeout(() => {
                 // Remove button effect
                 resetButton.classList.remove('btn-press-effect');
-                
+
                 // Submit the form
                 document.getElementById('filter-form').submit();
             }, 300);
@@ -454,21 +420,21 @@ function initResetFiltersButton() {
 function showFeedbackMessage(message, type = 'info') {
     // Create or get the message container
     let messageContainer = document.getElementById('filter-feedback-message');
-    
+
     if (!messageContainer) {
         messageContainer = document.createElement('div');
         messageContainer.id = 'filter-feedback-message';
         messageContainer.className = 'filter-message';
         document.body.appendChild(messageContainer);
     }
-    
+
     // Set message content and style
     messageContainer.textContent = message;
     messageContainer.className = `filter-message ${type}`;
-    
+
     // Show and then hide after delay
     messageContainer.classList.add('show');
-    
+
     setTimeout(() => {
         messageContainer.classList.remove('show');
     }, 3000);
