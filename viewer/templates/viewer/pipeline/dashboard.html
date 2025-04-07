@@ -299,10 +299,158 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Check if there are selected samples from the main page
+        const selectedSamples = JSON.parse(localStorage.getItem('selectedSamplesForPipeline') || '[]');
+        const samplesTable = document.getElementById('samples-table');
+        const samplesTbody = samplesTable.querySelector('tbody');
+        const submitSelectedBtn = document.getElementById('submit-selected');
+
+        // Update the table with selected samples
+        if (selectedSamples.length > 0) {
+            try {
+                // Clear demo data
+                samplesTbody.innerHTML = '';
+
+                // Add selected samples to the table
+                selectedSamples.forEach(sample => {
+                    if (!sample || !sample.name) {
+                        console.warn('Skipping invalid sample data:', sample);
+                        return;
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.setAttribute('data-fastq', sample.name);
+
+                    // Create checkbox cell
+                    const tdCheckbox = document.createElement('td');
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'sample-select';
+                    checkbox.checked = true; // Pre-select transferred samples
+                    tdCheckbox.appendChild(checkbox);
+
+                    // Create other cells
+                    const tdFastq = document.createElement('td');
+                    tdFastq.textContent = sample.name;
+
+                    const tdBatch = document.createElement('td');
+                    tdBatch.textContent = sample.batchName || '-';
+
+                    const tdOrganism = document.createElement('td');
+                    tdOrganism.textContent = sample.organism || '-';
+
+                    const tdLibrary = document.createElement('td');
+                    tdLibrary.textContent = sample.libraryPrep || '-';
+
+                    // Ingest status cell
+                    const tdIngest = document.createElement('td');
+                    const ingestStatus = sample.ingestStatus || 'Unknown';
+                    const ingestBadge = document.createElement('span');
+                    ingestBadge.className = 'badge ' +
+                        (ingestStatus.toLowerCase() === 'completed' ? 'bg-success' :
+                            ingestStatus.toLowerCase() === 'in progress' ? 'bg-warning' : 'bg-secondary');
+                    ingestBadge.textContent = ingestStatus || 'Unknown';
+                    tdIngest.appendChild(ingestBadge);
+
+                    // Alignment and PostQC cells (always not started for new samples)
+                    const tdAlignment = document.createElement('td');
+                    const alignmentBadge = document.createElement('span');
+                    alignmentBadge.className = 'badge bg-secondary';
+                    alignmentBadge.textContent = 'Not Started';
+                    tdAlignment.appendChild(alignmentBadge);
+
+                    const tdPostQC = document.createElement('td');
+                    const postQCBadge = document.createElement('span');
+                    postQCBadge.className = 'badge bg-secondary';
+                    postQCBadge.textContent = 'Not Started';
+                    tdPostQC.appendChild(postQCBadge);
+
+                    // Add all cells to the row
+                    tr.appendChild(tdCheckbox);
+                    tr.appendChild(tdFastq);
+                    tr.appendChild(tdBatch);
+                    tr.appendChild(tdOrganism);
+                    tr.appendChild(tdLibrary);
+                    tr.appendChild(tdIngest);
+                    tr.appendChild(tdAlignment);
+                    tr.appendChild(tdPostQC);
+
+                    // Add row to table
+                    samplesTbody.appendChild(tr);
+                });
+
+                // Clear the storage to avoid duplicate imports
+                localStorage.removeItem('selectedSamplesForPipeline');
+
+                // Show success message
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                alertDiv.setAttribute('role', 'alert');
+                alertDiv.innerHTML = `
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    Successfully imported ${selectedSamples.length} samples from the Samples page.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+
+                // Insert alert before the first card
+                const firstCard = document.querySelector('.card');
+                if (firstCard && firstCard.parentNode) {
+                    firstCard.parentNode.insertBefore(alertDiv, firstCard);
+
+                    // Auto-dismiss after 5 seconds
+                    setTimeout(() => {
+                        try {
+                            const bsAlert = new bootstrap.Alert(alertDiv);
+                            bsAlert.close();
+                        } catch (err) {
+                            console.error('Error closing alert:', err);
+                            // Fallback if bootstrap Alert API fails
+                            if (alertDiv.parentNode) {
+                                alertDiv.parentNode.removeChild(alertDiv);
+                            }
+                        }
+                    }, 5000);
+                }
+
+                // Update submit button
+                if (submitSelectedBtn) {
+                    submitSelectedBtn.disabled = false;
+                }
+            } catch (err) {
+                console.error('Error processing imported samples:', err);
+                // Show error message
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-danger alert-dismissible fade show';
+                errorDiv.setAttribute('role', 'alert');
+                errorDiv.innerHTML = `
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    Error processing imported samples. Please try again or contact support.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+
+                // Insert error alert
+                const container = document.querySelector('.container-fluid');
+                if (container) {
+                    container.insertBefore(errorDiv, container.firstChild);
+
+                    // Auto-dismiss after 8 seconds
+                    setTimeout(() => {
+                        try {
+                            const bsAlert = new bootstrap.Alert(errorDiv);
+                            bsAlert.close();
+                        } catch (err) {
+                            if (errorDiv.parentNode) {
+                                errorDiv.parentNode.removeChild(errorDiv);
+                            }
+                        }
+                    }, 8000);
+                }
+            }
+        }
+
         // Handle select all checkbox
         const selectAllCheckbox = document.getElementById('select-all');
         const sampleCheckboxes = document.querySelectorAll('.sample-select');
-        const submitSelectedBtn = document.getElementById('submit-selected');
 
         selectAllCheckbox.addEventListener('change', function () {
             sampleCheckboxes.forEach(checkbox => {
@@ -377,8 +525,91 @@
             submitModal.hide();
 
             // You could replace this with a proper notification system
-            alert(`Submitted ${fastqNames.length} samples for ${workflow} processing`);
+            showProcessingSubmittedAlert(fastqNames, workflow);
         });
+
+        function showProcessingSubmittedAlert(fastqNames, workflow) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-primary alert-dismissible fade show';
+            alertDiv.setAttribute('role', 'alert');
+            alertDiv.innerHTML = `
+                <i class="bi bi-play-circle-fill me-2"></i>
+                Submitted ${fastqNames.length} samples for ${workflow} processing.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+
+            // Insert alert at the top of the page
+            const container = document.querySelector('.container-fluid');
+            container.insertBefore(alertDiv, container.firstChild);
+
+            // Auto-dismiss after 8 seconds
+            setTimeout(() => {
+                const bsAlert = new bootstrap.Alert(alertDiv);
+                bsAlert.close();
+            }, 8000);
+
+            // Update the active alignments section to show the new submissions
+            updateActiveAlignments(fastqNames, workflow);
+        }
+
+        function updateActiveAlignments(fastqNames, workflow) {
+            const activeAlignmentsDiv = document.querySelector('.active-alignments');
+            const noAlignmentsAlert = activeAlignmentsDiv.querySelector('.alert-info');
+
+            if (noAlignmentsAlert) {
+                // Remove the "no alignments" alert if present
+                noAlignmentsAlert.remove();
+
+                // Create a new table if it doesn't exist
+                let alignmentTable = activeAlignmentsDiv.querySelector('table');
+                if (!alignmentTable) {
+                    const tableResponsive = document.createElement('div');
+                    tableResponsive.className = 'table-responsive';
+
+                    alignmentTable = document.createElement('table');
+                    alignmentTable.className = 'table table-sm';
+
+                    const thead = document.createElement('thead');
+                    thead.innerHTML = `
+                        <tr>
+                            <th>FASTQ Name</th>
+                            <th>Demand ID</th>
+                            <th>Status</th>
+                        </tr>
+                    `;
+
+                    const tbody = document.createElement('tbody');
+                    alignmentTable.appendChild(thead);
+                    alignmentTable.appendChild(tbody);
+                    tableResponsive.appendChild(alignmentTable);
+                    activeAlignmentsDiv.appendChild(tableResponsive);
+                }
+
+                // Add new submissions to the table
+                const tbody = alignmentTable.querySelector('tbody');
+                fastqNames.forEach(fastqName => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${fastqName}</td>
+                        <td>Pending...</td>
+                        <td><span class="badge bg-info">Submitting</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                // Table already exists, add new rows
+                const tbody = activeAlignmentsDiv.querySelector('tbody');
+                fastqNames.forEach(fastqName => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${fastqName}</td>
+                        <td>Pending...</td>
+                        <td><span class="badge bg-info">Submitting</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
     });
 </script>
 {% endblock %}
