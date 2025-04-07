@@ -1,0 +1,384 @@
+{% extends "viewer/base.html" %}
+{% load static %}
+
+{% block title %}RNA-Seq Pipeline Dashboard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'viewer/css/pipeline.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">RNA-Seq Pipeline Dashboard</h4>
+                </div>
+                <div class="card-body">
+                    <p class="lead">
+                        This dashboard allows you to manage and monitor the RNA sequencing pipeline process.
+                        Select samples from the table below to submit them for processing.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6 mb-4 mb-md-0">
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Pipeline Steps</h5>
+                </div>
+                <div class="card-body">
+                    <div class="pipeline-steps">
+                        <div class="step">
+                            <div class="step-icon">
+                                <i class="bi bi-1-circle-fill"></i>
+                            </div>
+                            <div class="step-content">
+                                <h6>Data Ingestion Check</h6>
+                                <p>Verify data ingest is complete before proceeding</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <div class="step-icon">
+                                <i class="bi bi-2-circle-fill"></i>
+                            </div>
+                            <div class="step-content">
+                                <h6>Alignment Submission</h6>
+                                <p>Submit data for alignment based on organism and workflow</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <div class="step-icon">
+                                <i class="bi bi-3-circle-fill"></i>
+                            </div>
+                            <div class="step-content">
+                                <h6>Alignment Monitoring</h6>
+                                <p>Track alignment progress and status</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <div class="step-icon">
+                                <i class="bi bi-4-circle-fill"></i>
+                            </div>
+                            <div class="step-content">
+                                <h6>Post-Alignment Processing</h6>
+                                <p>Process data after alignment is complete</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Current Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="active-alignments">
+                        <h6>Running Alignments</h6>
+                        {% if running_alignments %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>FASTQ Name</th>
+                                        <th>Demand ID</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for fastq_name, details in running_alignments.items %}
+                                    <tr>
+                                        <td>{{ fastq_name }}</td>
+                                        <td>{{ details.demand_id }}</td>
+                                        <td>
+                                            {% if details.Status %}
+                                            {{ details.Status }}
+                                            {% else %}
+                                            <span class="badge bg-info">Running</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            No alignments are currently running.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Select Samples for Processing</h5>
+                    <div class="btn-group">
+                        <button id="submit-selected" class="btn btn-primary" disabled>
+                            <i class="bi bi-play-fill"></i> Submit Selected
+                        </button>
+                        <button class="btn btn-outline-secondary" id="show-workflow-config">
+                            <i class="bi bi-gear-fill"></i> Configure
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped" id="samples-table">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <input type="checkbox" id="select-all">
+                                    </th>
+                                    <th>Fastq Name</th>
+                                    <th>Batch Name</th>
+                                    <th>Organism</th>
+                                    <th>Library Prep</th>
+                                    <th>Ingest Status</th>
+                                    <th>Alignment Status</th>
+                                    <th>PostQC Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Sample data for demonstration -->
+                                <tr data-fastq="MX102931">
+                                    <td><input type="checkbox" class="sample-select"></td>
+                                    <td>MX102931</td>
+                                    <td>MTX-22030</td>
+                                    <td>human</td>
+                                    <td>10xV3.1D</td>
+                                    <td><span class="badge bg-success">Completed</span></td>
+                                    <td><span class="badge bg-secondary">Not Started</span></td>
+                                    <td><span class="badge bg-secondary">Not Started</span></td>
+                                </tr>
+                                <tr data-fastq="MX102932">
+                                    <td><input type="checkbox" class="sample-select"></td>
+                                    <td>MX102932</td>
+                                    <td>MTX-22030</td>
+                                    <td>human</td>
+                                    <td>10xV3.1D</td>
+                                    <td><span class="badge bg-success">Completed</span></td>
+                                    <td><span class="badge bg-secondary">Not Started</span></td>
+                                    <td><span class="badge bg-secondary">Not Started</span></td>
+                                </tr>
+                                <tr data-fastq="MX102933">
+                                    <td><input type="checkbox" class="sample-select"></td>
+                                    <td>MX102933</td>
+                                    <td>RTX-22045</td>
+                                    <td>mouse</td>
+                                    <td>10xV4</td>
+                                    <td><span class="badge bg-warning">In Progress</span></td>
+                                    <td><span class="badge bg-secondary">Not Started</span></td>
+                                    <td><span class="badge bg-secondary">Not Started</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Workflow Configuration Modal -->
+<div class="modal fade" id="workflow-config-modal" tabindex="-1" aria-labelledby="workflow-config-modal-label"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="workflow-config-modal-label">Pipeline Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" id="config-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="references-tab" data-bs-toggle="tab"
+                            data-bs-target="#references" type="button" role="tab" aria-controls="references"
+                            aria-selected="true">References</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="chemistries-tab" data-bs-toggle="tab" data-bs-target="#chemistries"
+                            type="button" role="tab" aria-controls="chemistries"
+                            aria-selected="false">Chemistries</button>
+                    </li>
+                </ul>
+                <div class="tab-content pt-3" id="config-tab-content">
+                    <div class="tab-pane fade show active" id="references" role="tabpanel"
+                        aria-labelledby="references-tab">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Organism</th>
+                                        <th>Reference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for organism, reference in references.items %}
+                                    <tr>
+                                        <td>{{ organism }}</td>
+                                        <td>{{ reference }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="chemistries" role="tabpanel" aria-labelledby="chemistries-tab">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Library Prep</th>
+                                        <th>Chemistry</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for prep, chemistry in chemistries.items %}
+                                    <tr>
+                                        <td>{{ prep }}</td>
+                                        <td>{{ chemistry }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Submit Modal -->
+<div class="modal fade" id="submit-modal" tabindex="-1" aria-labelledby="submit-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="submit-modal-label">Submit Samples for Processing</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>You are about to submit the following samples for processing:</p>
+                <ul id="submit-sample-list"></ul>
+                <div class="mb-3">
+                    <label for="workflow-type" class="form-label">Workflow Type</label>
+                    <select class="form-select" id="workflow-type">
+                        <option value="mtx">MTX (MultipleX)</option>
+                        <option value="rtx">RTX (RNA-Seq)</option>
+                    </select>
+                </div>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    The workflow will check ingest status, submit for alignment, and monitor progress.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirm-submit">Submit for Processing</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Handle select all checkbox
+        const selectAllCheckbox = document.getElementById('select-all');
+        const sampleCheckboxes = document.querySelectorAll('.sample-select');
+        const submitSelectedBtn = document.getElementById('submit-selected');
+
+        selectAllCheckbox.addEventListener('change', function () {
+            sampleCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            updateSubmitButton();
+        });
+
+        sampleCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateSubmitButton);
+        });
+
+        function updateSubmitButton() {
+            const checkedCount = document.querySelectorAll('.sample-select:checked').length;
+            submitSelectedBtn.disabled = checkedCount === 0;
+        }
+
+        // Show configuration modal
+        document.getElementById('show-workflow-config').addEventListener('click', function () {
+            const configModal = new bootstrap.Modal(document.getElementById('workflow-config-modal'));
+            configModal.show();
+        });
+
+        // Show submit modal
+        submitSelectedBtn.addEventListener('click', function () {
+            const selectedRows = document.querySelectorAll('.sample-select:checked');
+            const sampleList = document.getElementById('submit-sample-list');
+
+            // Clear previous list
+            sampleList.innerHTML = '';
+
+            // Add selected samples to the list
+            selectedRows.forEach(checkbox => {
+                const row = checkbox.closest('tr');
+                const fastqName = row.querySelector('td:nth-child(2)').textContent;
+                const batchName = row.querySelector('td:nth-child(3)').textContent;
+
+                const li = document.createElement('li');
+                li.innerHTML = `<strong>${fastqName}</strong> (${batchName})`;
+                sampleList.appendChild(li);
+            });
+
+            const submitModal = new bootstrap.Modal(document.getElementById('submit-modal'));
+            submitModal.show();
+        });
+
+        // Handle submit confirmation
+        document.getElementById('confirm-submit').addEventListener('click', function () {
+            const selectedRows = document.querySelectorAll('.sample-select:checked');
+            const workflow = document.getElementById('workflow-type').value;
+
+            // Collect selected fastq names and batch names
+            const fastqNames = [];
+            let batchLine = '';
+
+            selectedRows.forEach(checkbox => {
+                const row = checkbox.closest('tr');
+                const fastqName = row.querySelector('td:nth-child(2)').textContent;
+                const batchName = row.querySelector('td:nth-child(3)').textContent;
+
+                fastqNames.push(fastqName);
+                if (!batchLine) {
+                    batchLine = batchName;
+                }
+            });
+
+            // Here you would send the data to the backend
+            console.log('Submitting for processing:', { fastqNames, workflow, batchLine });
+
+            // Show success notification
+            const submitModal = bootstrap.Modal.getInstance(document.getElementById('submit-modal'));
+            submitModal.hide();
+
+            // You could replace this with a proper notification system
+            alert(`Submitted ${fastqNames.length} samples for ${workflow} processing`);
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,151 @@
+/* Pipeline Dashboard Styles */
+.pipeline-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.step {
+    display: flex;
+    gap: 1rem;
+}
+
+.step-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    font-size: 1.5rem;
+    color: #1976D2;
+}
+
+.step-content {
+    flex-grow: 1;
+}
+
+.step-content h6 {
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+.step-content p {
+    margin-bottom: 0;
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+/* Active alignment styles */
+.active-alignments h6 {
+    margin-bottom: 1rem;
+    font-weight: 500;
+}
+
+/* Status badge styling */
+.badge {
+    padding: 0.4rem 0.65rem;
+    font-weight: 500;
+    border-radius: 4px;
+}
+
+/* Sample table styling */
+#samples-table .badge {
+    display: inline-flex;
+    align-items: center;
+}
+
+#samples-table .badge::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.badge.bg-success::before {
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+.badge.bg-warning::before {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.badge.bg-secondary::before {
+    background-color: rgba(255, 255, 255, 0.6);
+}
+
+.badge.bg-info::before {
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Modal styling */
+.modal-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-footer {
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+/* Config display */
+.tab-content {
+    padding: 1rem 0;
+}
+
+/* Progress visualization */
+.progress-bar {
+    transition: width 0.5s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .pipeline-steps {
+        gap: 1rem;
+    }
+
+    .step-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 1.25rem;
+    }
+}
+
+/* Highlight selected rows */
+#samples-table tr.selected {
+    background-color: rgba(25, 118, 210, 0.1);
+}
+
+/* Button styling */
+.btn-group .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Icon styling */
+.bi {
+    line-height: 1;
+}
+
+/* Animation for running processes */
+@keyframes pulse {
+    0% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0.6;
+    }
+}
+
+.badge.bg-info {
+    animation: pulse 2s infinite ease-in-out;
+}
