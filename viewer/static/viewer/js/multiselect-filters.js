@@ -626,9 +626,9 @@ function initSelectionPanel() {
     const selectionPanel = document.getElementById('selection-actions');
     if (!selectionPanel) return;
 
-    const selectionCount = selectionPanel.querySelector('.selection-count');
-    const clearSelectionBtn = selectionPanel.querySelector('.clear-selection');
-    const sendToPipelineBtn = selectionPanel.querySelector('.send-to-pipeline');
+    const selectionCount = document.getElementById('selected-count');
+    const clearSelectionBtn = document.getElementById('clear-selection-btn');
+    const sendToPipelineBtn = document.getElementById('send-to-pipeline-btn');
 
     // Initialize panel state
     selectionPanel.style.display = 'none';
@@ -638,11 +638,11 @@ function initSelectionPanel() {
     if (clearSelectionBtn) {
         clearSelectionBtn.addEventListener('click', function () {
             // Uncheck all checkboxes
-            document.querySelectorAll('.sample-select').forEach(checkbox => {
+            document.querySelectorAll('.sample-checkbox.row-selector').forEach(checkbox => {
                 checkbox.checked = false;
             });
 
-            // Clear "Select All" checkbox if present
+            // Clear "Select All" checkbox
             const selectAllCheckbox = document.getElementById('select-all-samples');
             if (selectAllCheckbox) {
                 selectAllCheckbox.checked = false;
@@ -671,7 +671,7 @@ function initSelectionPanel() {
     }
 
     // Initialize sample checkboxes
-    document.querySelectorAll('.sample-select').forEach(checkbox => {
+    document.querySelectorAll('.sample-checkbox.row-selector').forEach(checkbox => {
         checkbox.addEventListener('change', function () {
             const row = this.closest('tr');
             const data = getSampleDataFromRow(row);
@@ -694,7 +694,7 @@ function initSelectionPanel() {
     const selectAllCheckbox = document.getElementById('select-all-samples');
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function () {
-            document.querySelectorAll('.sample-select').forEach(checkbox => {
+            document.querySelectorAll('.sample-checkbox.row-selector').forEach(checkbox => {
                 checkbox.checked = this.checked;
 
                 const row = checkbox.closest('tr');
@@ -716,7 +716,7 @@ function initSelectionPanel() {
     // Helper function to extract sample data from a row
     function getSampleDataFromRow(row) {
         return {
-            id: row.dataset.fastqId || row.dataset.id || '',
+            id: row.dataset.fastqId || '',
             name: row.dataset.fastqName || '',
             batchName: row.dataset.batchName || '',
             organism: row.dataset.organism || '',
