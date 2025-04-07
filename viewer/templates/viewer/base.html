@@ -39,13 +39,15 @@
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == '/' %}active{% endif %}"
                             href="{% url 'viewer:main_list' %}">
-                            <i class="bi bi-table me-1"></i> Samples
+                            <i class="bi bi-table"></i>
+                            <span>Samples</span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if '/pipeline/' in request.path %}active{% endif %}"
                             href="{% url 'viewer:pipeline_dashboard' %}">
-                            <i class="bi bi-diagram-3 me-1"></i> Pipeline
+                            <i class="bi bi-diagram-3"></i>
+                            <span>Pipeline</span>
                         </a>
                     </li>
                 </ul>
@@ -90,25 +92,21 @@
                 document.querySelector('a[href="{% url "viewer:pipeline_dashboard" %}"]').classList.add('active');
             }
 
-            // Add click handler for better user feedback
+            // Add subtle animation on hover
             navLinks.forEach(link => {
-                link.addEventListener('click', function (e) {
-                    // Add ripple effect for better user feedback
-                    const ripple = document.createElement('span');
-                    ripple.classList.add('nav-ripple');
+                const icon = link.querySelector('i');
 
-                    const rect = this.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
+                link.addEventListener('mouseenter', function () {
+                    if (icon) {
+                        icon.style.transition = 'transform 0.2s ease';
+                        icon.style.transform = 'translateY(-2px)';
+                    }
+                });
 
-                    ripple.style.left = x + 'px';
-                    ripple.style.top = y + 'px';
-
-                    this.appendChild(ripple);
-
-                    setTimeout(() => {
-                        ripple.remove();
-                    }, 600);
+                link.addEventListener('mouseleave', function () {
+                    if (icon && !link.classList.contains('active')) {
+                        icon.style.transform = 'translateY(0)';
+                    }
                 });
             });
         });
