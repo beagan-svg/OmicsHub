@@ -80,34 +80,36 @@
             // Get navigation links
             const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
 
-            // Reset all links (in case template logic doesn't capture all cases)
+            // Clean approach: first remove active class from all links
             navLinks.forEach(link => {
                 link.classList.remove('active');
             });
 
-            // Set active class based on current path
-            if (path === '/' || (path !== '/' && !path.includes('/pipeline/'))) {
-                document.querySelector('a[href="{% url "viewer:main_list" %}"]').classList.add('active');
-            } else if (path.includes('/pipeline/')) {
-                document.querySelector('a[href="{% url "viewer:pipeline_dashboard" %}"]').classList.add('active');
+            // Then apply active class based on current path
+            if (path.includes('/pipeline/')) {
+                // Pipeline page - Find link to pipeline dashboard
+                const pipelineLink = document.querySelector('a[href="{% url "viewer:pipeline_dashboard" %}"]');
+                if (pipelineLink) pipelineLink.classList.add('active');
+            } else {
+                // Default to Samples page for any non-pipeline path
+                const samplesLink = document.querySelector('a[href="{% url "viewer:main_list" %}"]');
+                if (samplesLink) samplesLink.classList.add('active');
             }
 
-            // Add subtle animation on hover
+            // Add hover animation for icons
             navLinks.forEach(link => {
                 const icon = link.querySelector('i');
 
-                link.addEventListener('mouseenter', function () {
-                    if (icon) {
-                        icon.style.transition = 'transform 0.2s ease';
+                // Only set up hover animation for non-active links
+                if (!link.classList.contains('active') && icon) {
+                    link.addEventListener('mouseenter', function () {
                         icon.style.transform = 'translateY(-2px)';
-                    }
-                });
+                    });
 
-                link.addEventListener('mouseleave', function () {
-                    if (icon && !link.classList.contains('active')) {
-                        icon.style.transform = 'translateY(0)';
-                    }
-                });
+                    link.addEventListener('mouseleave', function () {
+                        icon.style.transform = '';
+                    });
+                }
             });
         });
     </script>

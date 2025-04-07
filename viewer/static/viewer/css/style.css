@@ -972,7 +972,7 @@ td[class*="postqc_end_time"] {
     border-left: 2px solid rgba(52, 168, 83, 0.3);
 }
 
-/* Navbar styling */
+/* Navbar styling - updated for better active state indicator */
 .navbar-dark .navbar-nav .nav-link {
     color: rgba(255, 255, 255, 0.85);
     transition: all 0.2s ease-in-out;
@@ -980,60 +980,54 @@ td[class*="postqc_end_time"] {
     position: relative;
     font-weight: 400;
     margin: 0 0.15rem;
+    display: flex;
+    align-items: center;
 }
 
 .navbar-dark .navbar-nav .nav-link:hover {
     color: #ffffff;
 }
 
-/* Active indicator using a dot and subtle glow */
-.navbar-dark .navbar-nav .nav-link.active {
-    color: #ffffff;
-    font-weight: 500;
+.navbar-dark .navbar-nav .nav-link i {
+    margin-right: 0.4rem;
+    transition: transform 0.2s ease;
 }
 
-.navbar-dark .navbar-nav .nav-link.active::before {
+/* Enhanced active state with absolute positioning for the dot */
+.navbar-dark .navbar-nav .nav-link.active {
+    color: #ffffff !important;
+    font-weight: 500;
+    position: relative;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+/* Always visible dot indicator for active items */
+.navbar-dark .navbar-nav .nav-link.active::after {
     content: '';
     position: absolute;
-    bottom: 0.25rem;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 5px;
-    height: 5px;
-    background-color: #ffffff;
+    width: 6px;
+    height: 6px;
+    background-color: #fff;
     border-radius: 50%;
-    box-shadow: 0 0 5px 1px rgba(255, 255, 255, 0.5);
-    opacity: 1;
-    transition: opacity 0.2s ease;
+    bottom: 6px;
+    left: 50%;
+    margin-left: -3px;
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.7);
 }
 
-/* Ensure active icon always has transform applied */
+/* Override previous .active::before style */
+.navbar-dark .navbar-nav .nav-link.active::before {
+    display: none;
+}
+
+/* Icon animation - separate from the dot indicator */
 .navbar-dark .navbar-nav .nav-link.active i {
-    transform: translateY(-2px) !important;
-}
-
-/* Navbar link hover effect */
-.navbar-dark .navbar-nav .nav-link span {
-    position: relative;
-    z-index: 1;
-}
-
-.navbar-dark .navbar-nav .nav-link i {
-    transition: transform 0.2s ease;
+    transform: translateY(-2px);
 }
 
 .navbar-dark .navbar-nav .nav-link:hover i {
     transform: translateY(-2px);
-}
-
-/* Ensure icons and text are properly aligned */
-.navbar-dark .navbar-nav .nav-link {
-    display: flex;
-    align-items: center;
-}
-
-.navbar-dark .navbar-nav .nav-link i {
-    margin-right: 0.4rem;
 }
 
 /* Remove any previous styling that might conflict */
