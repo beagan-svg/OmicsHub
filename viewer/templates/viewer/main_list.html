@@ -22,6 +22,11 @@
         cursor: pointer;
     }
 
+    /* Custom margin for Sample Information card */
+    .filter-card-info {
+        margin: 0px -20px 20px 0px !important;
+    }
+
     #selection-actions {
         position: fixed;
         bottom: 20px;
@@ -698,7 +703,7 @@
                                 <thead>
                                     <tr>
                                         <th class="selection-column">
-                                            <input type="checkbox" id="select-all-samples" class="sample-checkbox">
+                                            <input type="checkbox" id="select-all-samples" class="sample-select">
                                         </th>
                                         {% for column in table.columns %}
                                         <th {{ column.attrs.th.as_html }}>{{ column.header }}</th>
@@ -714,7 +719,7 @@
                                         data-library-prep="{{ row.library_prep_method_name }}"
                                         data-ingest-status="{{ row.ingest_status }}" {% endif %}>
                                         <td class="selection-column">
-                                            <input type="checkbox" class="sample-checkbox row-selector">
+                                            <input type="checkbox" class="sample-select">
                                         </td>
                                         {% for column, cell in row.items %}
                                         <td {{ column.attrs.td.as_html }}>{{ cell }}</td>
@@ -838,7 +843,7 @@
 <!-- Selection Actions Floating Panel -->
 <div id="selection-actions">
     <div class="action-count">
-        <span id="selected-count">0</span> samples selected
+        <span id="selected-count">0</span>&nbsp;samples selected
     </div>
     <div class="action-buttons">
         <button type="button" class="send-to-pipeline" id="send-to-pipeline-btn">
@@ -2225,8 +2230,17 @@
         $('#send-to-pipeline-btn').on('click', function () {
             if (selectedSamples.length === 0) return;
 
+            // Debug: log what we're about to store
+            console.log('Send to Pipeline clicked');
+            console.log('Selected samples:', selectedSamples);
+
             // Store selected samples in localStorage to retrieve in the pipeline page
             localStorage.setItem('selectedSamplesForPipeline', JSON.stringify(selectedSamples));
+
+            // Debug: verify what was stored
+            const storedJson = localStorage.getItem('selectedSamplesForPipeline');
+            console.log('Stored in localStorage:', storedJson);
+            console.log('Parsed from localStorage:', JSON.parse(storedJson));
 
             // Show feedback message
             showFeedbackMessage('success', `Sent ${selectedSamples.length} samples to Pipeline`);
