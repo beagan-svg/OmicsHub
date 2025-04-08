@@ -350,9 +350,35 @@ class PipelineLocalData {
 
         // Check if we have stored samples
         if (!this.selectedSamples || this.selectedSamples.length === 0) {
-            // If no samples, show a message or fetch from server
+            // Show empty state message
             console.log('No samples to display in the table');
-            this.fetchSamplesFromServer();
+
+            // Add a message row to indicate empty table
+            const emptyRow = document.createElement('tr');
+            emptyRow.className = 'text-center text-muted';
+            emptyRow.innerHTML = `
+                <td colspan="8" class="py-4">
+                    <i class="bi bi-inbox-fill me-2" style="font-size: 1.5rem;"></i>
+                    <p>No samples selected. Use the Sample Browser to select samples.</p>
+                    <a href="/" class="btn btn-sm btn-outline-primary mt-2">
+                        <i class="bi bi-table me-1"></i>Go to Sample Browser
+                    </a>
+                </td>
+            `;
+            tableBody.appendChild(emptyRow);
+
+            // Disable the submit button
+            const submitBtn = document.getElementById('submit-selected');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+            }
+
+            // Update the selected count display
+            const selectedCount = document.getElementById('selected-count');
+            if (selectedCount) {
+                selectedCount.textContent = '0 samples selected';
+            }
+
             return;
         }
 
@@ -510,11 +536,22 @@ class PipelineLocalData {
             // Get the sample table body
             const tableBody = document.querySelector('#samples-table tbody');
             if (tableBody) {
-                // Keep the original sample rows but uncheck all checkboxes
-                const checkboxes = tableBody.querySelectorAll('.sample-select');
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = false;
-                });
+                // Clear all rows from the table
+                tableBody.innerHTML = '';
+
+                // Add a message row to indicate empty table
+                const emptyRow = document.createElement('tr');
+                emptyRow.className = 'text-center text-muted';
+                emptyRow.innerHTML = `
+                    <td colspan="8" class="py-4">
+                        <i class="bi bi-inbox-fill me-2" style="font-size: 1.5rem;"></i>
+                        <p>No samples selected. Use the Sample Browser to select samples.</p>
+                        <a href="/" class="btn btn-sm btn-outline-primary mt-2">
+                            <i class="bi bi-table me-1"></i>Go to Sample Browser
+                        </a>
+                    </td>
+                `;
+                tableBody.appendChild(emptyRow);
 
                 // Uncheck the "select all" checkbox
                 const selectAllCheckbox = document.getElementById('select-all-samples');
@@ -533,6 +570,9 @@ class PipelineLocalData {
                 if (selectedCount) {
                     selectedCount.textContent = '0 samples selected';
                 }
+
+                // Show a feedback message
+                this.showClearConfirmation();
             } else {
                 console.error('Table body not found when trying to clear selection');
             }
@@ -561,6 +601,39 @@ class PipelineLocalData {
         } catch (error) {
             console.error('Error clearing stored data:', error);
             return false;
+        }
+    }
+
+    // Show a confirmation message after clearing
+    showClearConfirmation() {
+        // Create the alert element
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success alert-dismissible fade show';
+        alertDiv.setAttribute('role', 'alert');
+        alertDiv.innerHTML = `
+            <i class="bi bi-check-circle-fill me-2"></i>
+            All samples have been cleared.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+
+        // Find a container to insert the alert
+        const container = document.querySelector('.container-fluid');
+        if (container) {
+            // Insert at the top of the container
+            container.insertBefore(alertDiv, container.firstChild);
+
+            // Auto-dismiss after 3 seconds
+            setTimeout(() => {
+                try {
+                    const bsAlert = new bootstrap.Alert(alertDiv);
+                    bsAlert.close();
+                } catch (err) {
+                    // Fallback if bootstrap Alert API fails
+                    if (alertDiv.parentNode) {
+                        alertDiv.parentNode.removeChild(alertDiv);
+                    }
+                }
+            }, 3000);
         }
     }
 
