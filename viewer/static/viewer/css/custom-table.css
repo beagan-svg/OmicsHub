@@ -1,0 +1,64 @@
+/* Remove vertical lines from tables */
+.table {
+    border-collapse: collapse;
+    border: none;
+}
+
+.table th,
+.table td {
+    border-left: none !important;
+    border-right: none !important;
+}
+
+/* Optional: Add horizontal lines only */
+.table thead th {
+    border-bottom: 2px solid #dee2e6;
+    border-top: none;
+}
+
+.table tbody td {
+    border-top: 1px solid #dee2e6;
+    border-bottom: none;
+}
+
+/* Ensure proper cell padding */
+.table th,
+.table td {
+    padding: 0.75rem;
+}
+
+/* Hover effect for rows */
+.table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Specific styling for sample browser table */
+#sample-table,
+#samples-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#sample-table th,
+#sample-table td,
+#samples-table th,
+#samples-table td {
+    border-left: 0 !important;
+    border-right: 0 !important;
+}
+
+/* Remove any potential grid or cell borders */
+.table-bordered {
+    border: none;
+}
+
+.table-bordered th,
+.table-bordered td {
+    border: none;
+    border-top: 1px solid #dee2e6;
+}
+
+.table-bordered thead th {
+    border-bottom: 2px solid #dee2e6;
+    border-top: none;
+}
