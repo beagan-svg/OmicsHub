@@ -131,6 +131,9 @@
                         <button class="btn btn-outline-secondary" id="show-workflow-config">
                             <i class="bi bi-gear-fill"></i> Configure
                         </button>
+                        <button class="btn btn-outline-danger" id="clear-selection">
+                            <i class="bi bi-x-circle"></i> Clear Selection
+                        </button>
                     </div>
                 </div>
                 <div class="card-body">
@@ -139,7 +142,7 @@
                             <thead>
                                 <tr>
                                     <th>
-                                        <input type="checkbox" id="select-all">
+                                        <input type="checkbox" id="select-all-samples">
                                     </th>
                                     <th>Fastq Name</th>
                                     <th>Batch Name</th>
@@ -151,7 +154,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <!-- Sample data for demonstration -->
+                                <!-- Sample data will be dynamically populated by JavaScript -->
                                 <tr data-fastq="MX102931">
                                     <td><input type="checkbox" class="sample-select"></td>
                                     <td>MX102931</td>
@@ -186,6 +189,14 @@
                         </table>
                     </div>
                 </div>
+                <div class="card-footer bg-light">
+                    <div class="d-flex justify-content-between">
+                        <span id="selected-count">0 samples selected</span>
+                        <button id="load-more-samples" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-arrow-clockwise"></i> Load More Samples
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -201,64 +212,62 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <ul class="nav nav-tabs" id="config-tabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="references-tab" data-bs-toggle="tab"
-                            data-bs-target="#references" type="button" role="tab" aria-controls="references"
-                            aria-selected="true">References</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="chemistries-tab" data-bs-toggle="tab" data-bs-target="#chemistries"
-                            type="button" role="tab" aria-controls="chemistries"
-                            aria-selected="false">Chemistries</button>
-                    </li>
-                </ul>
-                <div class="tab-content pt-3" id="config-tab-content">
-                    <div class="tab-pane fade show active" id="references" role="tabpanel"
-                        aria-labelledby="references-tab">
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Organism</th>
-                                        <th>Reference</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for organism, reference in references.items %}
-                                    <tr>
-                                        <td>{{ organism }}</td>
-                                        <td>{{ reference }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                <div class="mb-3">
+                    <label for="workflow-type" class="form-label">Workflow Type</label>
+                    <select class="form-select" id="workflow-type">
+                        <option value="standard_10x">Standard 10x</option>
+                        <option value="nuclei_10x">Nuclei 10x</option>
+                        <option value="custom">Custom Workflow</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="reference-genome" class="form-label">Reference Genome</label>
+                    <select class="form-select" id="reference-genome">
+                        {% for id, name in references.items %}
+                        <option value="{{ id }}">{{ name }}</option>
+                        {% empty %}
+                        <option value="human">human_10x_grch38_genome_star2.7.1a</option>
+                        <option value="mouse">mouse_10x_mm10_genome_star2.7.1a</option>
+                        <option value="armadillo">african-green-monkey_ncbi_vero-who-p1-0_genomefixed_star2.7.1a
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="chemistry-version" class="form-label">Chemistry Version</label>
+                    <select class="form-select" id="chemistry-version">
+                        {% for id, name in chemistries.items %}
+                        <option value="{{ id }}">{{ name }}</option>
+                        {% empty %}
+                        <option value="10xV3.1D">SC3Pv3</option>
+                        <option value="10xV4">SC3Pv4</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="param-file" class="form-label">Parameter File (Optional)</label>
+                    <input type="text" class="form-control" id="param-file" placeholder="Enter parameter file path">
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="override-defaults">
+                    <label class="form-check-label" for="override-defaults">
+                        Override Default Parameters
+                    </label>
+                </div>
+                <div id="advanced-params" class="d-none">
+                    <div class="mb-3">
+                        <label for="cpus" class="form-label">CPUs</label>
+                        <input type="number" class="form-control" id="cpus" value="8">
                     </div>
-                    <div class="tab-pane fade" id="chemistries" role="tabpanel" aria-labelledby="chemistries-tab">
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Library Prep</th>
-                                        <th>Chemistry</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for prep, chemistry in chemistries.items %}
-                                    <tr>
-                                        <td>{{ prep }}</td>
-                                        <td>{{ chemistry }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                    <div class="mb-3">
+                        <label for="memory" class="form-label">Memory (GB)</label>
+                        <input type="number" class="form-control" id="memory" value="64">
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="save-config">Save Configuration</button>
             </div>
         </div>
     </div>
@@ -274,121 +283,156 @@
             </div>
             <div class="modal-body">
                 <p>You are about to submit the following samples for processing:</p>
-                <ul id="submit-sample-list"></ul>
-                <div class="mb-3">
-                    <label for="workflow-type" class="form-label">Workflow Type</label>
-                    <select class="form-select" id="workflow-type">
-                        <option value="mtx">MTX (MultipleX)</option>
-                        <option value="rtx">RTX (RNA-Seq)</option>
-                    </select>
-                </div>
+                <ul id="submit-sample-list" class="mb-3">
+                    <!-- Will be populated by JavaScript -->
+                </ul>
                 <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i>
-                    The workflow will check ingest status, submit for alignment, and monitor progress.
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    Make sure all samples have completed the data ingestion step before proceeding.
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="confirm-submit">Submit for Processing</button>
+                <button type="button" class="btn btn-primary" id="confirm-submit">Submit</button>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
+<script src="{% static 'viewer/js/pipeline-local-data.js' %}"></script>
 <script>
+    // Debug: Check localStorage on page load
     document.addEventListener('DOMContentLoaded', function () {
-        // Check if there are selected samples from the main page
-        const selectedSamples = JSON.parse(localStorage.getItem('selectedSamplesForPipeline') || '[]');
-        const samplesTable = document.getElementById('samples-table');
-        const samplesTbody = samplesTable.querySelector('tbody');
-        const submitSelectedBtn = document.getElementById('submit-selected');
+        console.log('Dashboard page loaded - checking localStorage');
+        const legacyStorageData = localStorage.getItem('selectedSamplesForPipeline');
+        const primaryStorageData = localStorage.getItem('pipelineSelectedSamples');
 
-        // Update the table with selected samples
-        if (selectedSamples.length > 0) {
-            try {
-                // Clear demo data
-                samplesTbody.innerHTML = '';
+        console.log('selectedSamplesForPipeline:', legacyStorageData);
+        console.log('pipelineSelectedSamples:', primaryStorageData);
 
-                // Add selected samples to the table
-                selectedSamples.forEach(sample => {
-                    if (!sample || !sample.name) {
-                        console.warn('Skipping invalid sample data:', sample);
-                        return;
+        // Access PipelineLocalData object
+        if (window.pipelineLocalData) {
+            console.log('PipelineLocalData object:', window.pipelineLocalData);
+            console.log('Selected samples:', window.pipelineLocalData.selectedSamples);
+
+            // Wait a moment for everything to load, then manually call reinitialize
+            setTimeout(function () {
+                console.log('Manually calling reinitialize');
+                const initResult = window.pipelineLocalData.reinitialize();
+
+                // If reinitialize didn't work and we have legacy data, try direct approach
+                if (!initResult && legacyStorageData) {
+                    console.log('Reinitialize did not find samples, trying direct approach');
+                    try {
+                        const data = JSON.parse(legacyStorageData);
+                        if (data && data.samples && Array.isArray(data.samples)) {
+                            console.log('Manual loading of samples from legacy data');
+
+                            // Create sample table
+                            populateTableManually(data.samples);
+                        }
+                    } catch (e) {
+                        console.error('Error processing data manually:', e);
                     }
+                }
+            }, 500);
+        } else {
+            console.error('PipelineLocalData object not available!');
+        }
 
-                    const tr = document.createElement('tr');
-                    tr.setAttribute('data-fastq', sample.name);
+        // Function to manually populate the table
+        function populateTableManually(samples) {
+            if (!samples || !samples.length) return;
 
-                    // Create checkbox cell
-                    const tdCheckbox = document.createElement('td');
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.className = 'sample-select';
-                    checkbox.checked = true; // Pre-select transferred samples
-                    tdCheckbox.appendChild(checkbox);
+            console.log('Raw samples data to display:', samples);
 
-                    // Create other cells
-                    const tdFastq = document.createElement('td');
-                    tdFastq.textContent = sample.name;
+            const tableBody = document.querySelector('#samples-table tbody');
+            if (!tableBody) {
+                console.error('Table body not found');
+                return;
+            }
 
-                    const tdBatch = document.createElement('td');
-                    tdBatch.textContent = sample.batchName || '-';
+            // Clear existing rows
+            tableBody.innerHTML = '';
 
-                    const tdOrganism = document.createElement('td');
-                    tdOrganism.textContent = sample.organism || '-';
+            // Add the samples
+            samples.forEach(sample => {
+                const row = document.createElement('tr');
 
-                    const tdLibrary = document.createElement('td');
-                    tdLibrary.textContent = sample.libraryPrep || '-';
+                // Use the sample ID/name for the data-fastq attribute
+                row.dataset.fastq = sample.name || sample.id;
 
-                    // Ingest status cell
-                    const tdIngest = document.createElement('td');
-                    const ingestStatus = sample.ingestStatus || 'Unknown';
-                    const ingestBadge = document.createElement('span');
-                    ingestBadge.className = 'badge ' +
-                        (ingestStatus.toLowerCase() === 'completed' ? 'bg-success' :
-                            ingestStatus.toLowerCase() === 'in progress' ? 'bg-warning' : 'bg-secondary');
-                    ingestBadge.textContent = ingestStatus || 'Unknown';
-                    tdIngest.appendChild(ingestBadge);
+                // Field mapping - the ingestStatus field actually contains human-readable organism info
+                // and the organism field contains the sample ID
+                const sampleName = sample.name || sample.id || '';
+                const batchName = sample.batchName || '';
 
-                    // Alignment and PostQC cells (always not started for new samples)
-                    const tdAlignment = document.createElement('td');
-                    const alignmentBadge = document.createElement('span');
-                    alignmentBadge.className = 'badge bg-secondary';
-                    alignmentBadge.textContent = 'Not Started';
-                    tdAlignment.appendChild(alignmentBadge);
+                // Fix for misplaced fields - the data from sample browser has organism/ingestStatus swapped
+                const organism = sample.ingestStatus || 'Unknown'; // Organism is in ingestStatus field!
+                const libraryPrep = sample.libraryPrep || 'Unknown';
+                const ingestStatus = 'Completed'; // Default to Completed for samples sent from browser
 
-                    const tdPostQC = document.createElement('td');
-                    const postQCBadge = document.createElement('span');
-                    postQCBadge.className = 'badge bg-secondary';
-                    postQCBadge.textContent = 'Not Started';
-                    tdPostQC.appendChild(postQCBadge);
+                // Create the HTML content with corrected field mapping
+                row.innerHTML = `
+                    <td><input type="checkbox" class="sample-select" checked></td>
+                    <td>${sampleName}</td>
+                    <td>${batchName}</td>
+                    <td>${organism}</td>
+                    <td>${libraryPrep}</td>
+                    <td><span class="badge bg-success">${ingestStatus}</span></td>
+                    <td><span class="badge bg-secondary">Not Started</span></td>
+                    <td><span class="badge bg-secondary">Not Started</span></td>
+                `;
 
-                    // Add all cells to the row
-                    tr.appendChild(tdCheckbox);
-                    tr.appendChild(tdFastq);
-                    tr.appendChild(tdBatch);
-                    tr.appendChild(tdOrganism);
-                    tr.appendChild(tdLibrary);
-                    tr.appendChild(tdIngest);
-                    tr.appendChild(tdAlignment);
-                    tr.appendChild(tdPostQC);
+                tableBody.appendChild(row);
+            });
 
-                    // Add row to table
-                    samplesTbody.appendChild(tr);
-                });
+            // Enable submit button
+            const submitBtn = document.getElementById('submit-selected');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
 
-                // Clear the storage to avoid duplicate imports
-                localStorage.removeItem('selectedSamplesForPipeline');
+            // Update selected count
+            const selectedCount = document.getElementById('selected-count');
+            if (selectedCount) {
+                selectedCount.textContent = `${samples.length} sample${samples.length !== 1 ? 's' : ''} selected`;
+            }
 
-                // Show success message
+            console.log('Manual population completed, added', samples.length, 'samples');
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Show/hide advanced parameters based on override checkbox
+        const overrideCheckbox = document.getElementById('override-defaults');
+        const advancedParams = document.getElementById('advanced-params');
+
+        if (overrideCheckbox && advancedParams) {
+            overrideCheckbox.addEventListener('change', function () {
+                if (this.checked) {
+                    advancedParams.classList.remove('d-none');
+                } else {
+                    advancedParams.classList.add('d-none');
+                }
+            });
+        }
+
+        // Save configuration
+        const saveConfigBtn = document.getElementById('save-config');
+        if (saveConfigBtn) {
+            saveConfigBtn.addEventListener('click', function () {
+                const configModal = bootstrap.Modal.getInstance(document.getElementById('workflow-config-modal'));
+                configModal.hide();
+
                 const alertDiv = document.createElement('div');
                 alertDiv.className = 'alert alert-success alert-dismissible fade show';
                 alertDiv.setAttribute('role', 'alert');
                 alertDiv.innerHTML = `
                     <i class="bi bi-check-circle-fill me-2"></i>
-                    Successfully imported ${selectedSamples.length} samples from the Samples page.
+                    Pipeline configuration saved successfully.
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 `;
 
@@ -397,75 +441,58 @@
                 if (firstCard && firstCard.parentNode) {
                     firstCard.parentNode.insertBefore(alertDiv, firstCard);
 
-                    // Auto-dismiss after 5 seconds
+                    // Auto-dismiss after 3 seconds
                     setTimeout(() => {
                         try {
                             const bsAlert = new bootstrap.Alert(alertDiv);
                             bsAlert.close();
                         } catch (err) {
-                            console.error('Error closing alert:', err);
-                            // Fallback if bootstrap Alert API fails
+                            // Fallback
                             if (alertDiv.parentNode) {
                                 alertDiv.parentNode.removeChild(alertDiv);
                             }
                         }
-                    }, 5000);
+                    }, 3000);
                 }
+            });
+        }
 
-                // Update submit button
-                if (submitSelectedBtn) {
-                    submitSelectedBtn.disabled = false;
-                }
-            } catch (err) {
-                console.error('Error processing imported samples:', err);
-                // Show error message
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'alert alert-danger alert-dismissible fade show';
-                errorDiv.setAttribute('role', 'alert');
-                errorDiv.innerHTML = `
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    Error processing imported samples. Please try again or contact support.
+        // Clear selection button - Fixed implementation
+        const clearSelectionBtn = document.getElementById('clear-selection');
+        if (clearSelectionBtn) {
+            console.log('Dashboard setup: Clear selection button found');
+            // Note: The event listener is now attached directly in pipeline-local-data.js
+            // No need to add another event listener here
+        } else {
+            console.error('Clear selection button not found');
+        }
+
+        // Load more samples button
+        const loadMoreBtn = document.getElementById('load-more-samples');
+        if (loadMoreBtn) {
+            loadMoreBtn.addEventListener('click', function () {
+                // In a real implementation, this would make an AJAX call to load more samples
+                // For demo purposes, we'll just add a notification
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-info alert-dismissible fade show';
+                alertDiv.setAttribute('role', 'alert');
+                alertDiv.innerHTML = `
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    Loading more samples...
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 `;
 
-                // Insert error alert
+                // Insert alert
                 const container = document.querySelector('.container-fluid');
                 if (container) {
-                    container.insertBefore(errorDiv, container.firstChild);
+                    container.insertBefore(alertDiv, container.firstChild);
 
-                    // Auto-dismiss after 8 seconds
+                    // Auto-dismiss after 2 seconds
                     setTimeout(() => {
-                        try {
-                            const bsAlert = new bootstrap.Alert(errorDiv);
-                            bsAlert.close();
-                        } catch (err) {
-                            if (errorDiv.parentNode) {
-                                errorDiv.parentNode.removeChild(errorDiv);
-                            }
-                        }
-                    }, 8000);
+                        alertDiv.remove();
+                    }, 2000);
                 }
-            }
-        }
-
-        // Handle select all checkbox
-        const selectAllCheckbox = document.getElementById('select-all');
-        const sampleCheckboxes = document.querySelectorAll('.sample-select');
-
-        selectAllCheckbox.addEventListener('change', function () {
-            sampleCheckboxes.forEach(checkbox => {
-                checkbox.checked = selectAllCheckbox.checked;
             });
-            updateSubmitButton();
-        });
-
-        sampleCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', updateSubmitButton);
-        });
-
-        function updateSubmitButton() {
-            const checkedCount = document.querySelectorAll('.sample-select:checked').length;
-            submitSelectedBtn.disabled = checkedCount === 0;
         }
 
         // Show configuration modal
@@ -475,140 +502,52 @@
         });
 
         // Show submit modal
-        submitSelectedBtn.addEventListener('click', function () {
-            const selectedRows = document.querySelectorAll('.sample-select:checked');
-            const sampleList = document.getElementById('submit-sample-list');
+        const submitSelectedBtn = document.getElementById('submit-selected');
+        if (submitSelectedBtn) {
+            submitSelectedBtn.addEventListener('click', function () {
+                const selectedRows = document.querySelectorAll('.sample-select:checked');
+                const sampleList = document.getElementById('submit-sample-list');
 
-            // Clear previous list
-            sampleList.innerHTML = '';
+                // Clear previous list
+                sampleList.innerHTML = '';
 
-            // Add selected samples to the list
-            selectedRows.forEach(checkbox => {
-                const row = checkbox.closest('tr');
-                const fastqName = row.querySelector('td:nth-child(2)').textContent;
-                const batchName = row.querySelector('td:nth-child(3)').textContent;
+                // Add selected samples to the list
+                selectedRows.forEach(checkbox => {
+                    const row = checkbox.closest('tr');
+                    const fastqName = row.querySelector('td:nth-child(2)').textContent;
+                    const batchName = row.querySelector('td:nth-child(3)').textContent;
 
-                const li = document.createElement('li');
-                li.innerHTML = `<strong>${fastqName}</strong> (${batchName})`;
-                sampleList.appendChild(li);
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>${fastqName}</strong> (${batchName})`;
+                    sampleList.appendChild(li);
+                });
+
+                const submitModal = new bootstrap.Modal(document.getElementById('submit-modal'));
+                submitModal.show();
             });
-
-            const submitModal = new bootstrap.Modal(document.getElementById('submit-modal'));
-            submitModal.show();
-        });
-
-        // Handle submit confirmation
-        document.getElementById('confirm-submit').addEventListener('click', function () {
-            const selectedRows = document.querySelectorAll('.sample-select:checked');
-            const workflow = document.getElementById('workflow-type').value;
-
-            // Collect selected fastq names and batch names
-            const fastqNames = [];
-            let batchLine = '';
-
-            selectedRows.forEach(checkbox => {
-                const row = checkbox.closest('tr');
-                const fastqName = row.querySelector('td:nth-child(2)').textContent;
-                const batchName = row.querySelector('td:nth-child(3)').textContent;
-
-                fastqNames.push(fastqName);
-                if (!batchLine) {
-                    batchLine = batchName;
-                }
-            });
-
-            // Here you would send the data to the backend
-            console.log('Submitting for processing:', { fastqNames, workflow, batchLine });
-
-            // Show success notification
-            const submitModal = bootstrap.Modal.getInstance(document.getElementById('submit-modal'));
-            submitModal.hide();
-
-            // You could replace this with a proper notification system
-            showProcessingSubmittedAlert(fastqNames, workflow);
-        });
-
-        function showProcessingSubmittedAlert(fastqNames, workflow) {
-            const alertDiv = document.createElement('div');
-            alertDiv.className = 'alert alert-primary alert-dismissible fade show';
-            alertDiv.setAttribute('role', 'alert');
-            alertDiv.innerHTML = `
-                <i class="bi bi-play-circle-fill me-2"></i>
-                Submitted ${fastqNames.length} samples for ${workflow} processing.
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            `;
-
-            // Insert alert at the top of the page
-            const container = document.querySelector('.container-fluid');
-            container.insertBefore(alertDiv, container.firstChild);
-
-            // Auto-dismiss after 8 seconds
-            setTimeout(() => {
-                const bsAlert = new bootstrap.Alert(alertDiv);
-                bsAlert.close();
-            }, 8000);
-
-            // Update the active alignments section to show the new submissions
-            updateActiveAlignments(fastqNames, workflow);
         }
 
-        function updateActiveAlignments(fastqNames, workflow) {
-            const activeAlignmentsDiv = document.querySelector('.active-alignments');
-            const noAlignmentsAlert = activeAlignmentsDiv.querySelector('.alert-info');
-
-            if (noAlignmentsAlert) {
-                // Remove the "no alignments" alert if present
-                noAlignmentsAlert.remove();
-
-                // Create a new table if it doesn't exist
-                let alignmentTable = activeAlignmentsDiv.querySelector('table');
-                if (!alignmentTable) {
-                    const tableResponsive = document.createElement('div');
-                    tableResponsive.className = 'table-responsive';
-
-                    alignmentTable = document.createElement('table');
-                    alignmentTable.className = 'table table-sm';
-
-                    const thead = document.createElement('thead');
-                    thead.innerHTML = `
-                        <tr>
-                            <th>FASTQ Name</th>
-                            <th>Demand ID</th>
-                            <th>Status</th>
-                        </tr>
-                    `;
-
-                    const tbody = document.createElement('tbody');
-                    alignmentTable.appendChild(thead);
-                    alignmentTable.appendChild(tbody);
-                    tableResponsive.appendChild(alignmentTable);
-                    activeAlignmentsDiv.appendChild(tableResponsive);
-                }
-
-                // Add new submissions to the table
-                const tbody = alignmentTable.querySelector('tbody');
-                fastqNames.forEach(fastqName => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${fastqName}</td>
-                        <td>Pending...</td>
-                        <td><span class="badge bg-info">Submitting</span></td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } else {
-                // Table already exists, add new rows
-                const tbody = activeAlignmentsDiv.querySelector('tbody');
-                fastqNames.forEach(fastqName => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${fastqName}</td>
-                        <td>Pending...</td>
-                        <td><span class="badge bg-info">Submitting</span></td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+        // Update selected count
+        function updateSelectedCount() {
+            const selectedCount = document.getElementById('selected-count');
+            if (selectedCount) {
+                const count = document.querySelectorAll('.sample-select:checked').length;
+                selectedCount.textContent = `${count} sample${count !== 1 ? 's' : ''} selected`;
             }
+        }
+
+        // Initialize selected count
+        updateSelectedCount();
+
+        // Add event listeners to checkboxes for count update
+        document.querySelectorAll('.sample-select').forEach(checkbox => {
+            checkbox.addEventListener('change', updateSelectedCount);
+        });
+
+        // Add event listener to select all checkbox for count update
+        const selectAllCheckbox = document.getElementById('select-all-samples');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', updateSelectedCount);
         }
     });
 </script>
