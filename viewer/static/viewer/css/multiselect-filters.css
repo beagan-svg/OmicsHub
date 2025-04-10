@@ -70,6 +70,7 @@
 /* Category specific styling */
 .filter-card-info {
     border-left-color: var(--primary-color);
+    margin: 0px -10px 10px 0px;
 }
 
 .filter-card-characteristics {

@@ -623,23 +623,62 @@ function initApplyFiltersButton() {
  * Initializes the floating selection action panel
  */
 function initSelectionPanel() {
+    console.log('initSelectionPanel called');
+
     const selectionPanel = document.getElementById('selection-actions');
+    console.log('Selection panel element:', selectionPanel);
+
     if (!selectionPanel) return;
 
+    // Check if we're on the main sample page by looking for sample checkboxes
+    const checkboxes = document.querySelectorAll('.sample-select');
+    console.log('Found sample checkboxes:', checkboxes.length);
+
+    const hasSampleCheckboxes = checkboxes.length > 0;
+    if (!hasSampleCheckboxes) {
+        console.log('No sample checkboxes found, exiting');
+        return;
+    }
+
     const selectionCount = document.getElementById('selected-count');
+    console.log('Selection count element:', selectionCount);
+
     const clearSelectionBtn = document.getElementById('clear-selection-btn');
+    console.log('Clear selection button:', clearSelectionBtn);
+
     const sendToPipelineBtn = document.getElementById('send-to-pipeline-btn');
+    console.log('Send to pipeline button:', sendToPipelineBtn);
 
     // Initialize panel state
     selectionPanel.style.display = 'none';
     let selectedSamples = [];
 
+    // Initialize from current checkbox state
+    document.querySelectorAll('.sample-select').forEach(checkbox => {
+        if (checkbox.id === 'select-all-samples') return;
+
+        if (checkbox.checked) {
+            const row = checkbox.closest('tr');
+            if (row) {
+                const data = getSampleDataFromRow(row);
+                if (data && data.id && !selectedSamples.some(s => s.id === data.id)) {
+                    selectedSamples.push(data);
+                }
+            }
+        }
+    });
+
+    // Initial update of panel
+    updateSelectionPanel();
+
     // Handle clear selection button
     if (clearSelectionBtn) {
         clearSelectionBtn.addEventListener('click', function () {
             // Uncheck all checkboxes
-            document.querySelectorAll('.sample-checkbox.row-selector').forEach(checkbox => {
-                checkbox.checked = false;
+            document.querySelectorAll('.sample-select').forEach(checkbox => {
+                if (checkbox.id !== 'select-all-samples') { // Skip the select all checkbox
+                    checkbox.checked = false;
+                }
             });
 
             // Clear "Select All" checkbox
@@ -659,33 +698,160 @@ function initSelectionPanel() {
         sendToPipelineBtn.addEventListener('click', function () {
             if (selectedSamples.length === 0) return;
 
-            // Store selected samples in localStorage
-            localStorage.setItem('selectedSamplesForPipeline', JSON.stringify(selectedSamples));
+            // Debug: Log the samples being sent and the cleaned mapping
+            console.log('Sending samples to pipeline:', selectedSamples);
+
+            // Debug: Log the first sample's complete structure
+            if (selectedSamples.length > 0) {
+                console.log('SAMPLE STRUCTURE DIAGNOSTIC:');
+                console.log('Complete sample object:', selectedSamples[0]);
+                console.log('Available fields:', Object.keys(selectedSamples[0]));
+                console.log('Field values:');
+                for (const [key, value] of Object.entries(selectedSamples[0])) {
+                    console.log(`  ${key}: ${value}`);
+                }
+            }
+
+            // Ensure we're sending valid data
+            const cleanedSamples = selectedSamples.map(sample => ({
+                // Map to the exact field names expected by the pipeline
+                fastq_name: sample.fastqName || '',
+                study_set: sample.studySet || '',
+                load_name: sample.loadName || '',
+                organism_common_name: sample.organismCommon || '',
+                library_prep: sample.libraryPrepMethod || '',
+                ingest_status: sample.ingestStatus || '',
+                alignment_status: sample.alignmentStatus || '',
+                postqc_status: sample.postqcStatus || ''
+            }));
+
+            // Debug: Log the pipeline-formatted data
+            if (cleanedSamples.length > 0) {
+                console.log('PIPELINE DATA MAPPING:');
+                console.log('First mapped sample:', cleanedSamples[0]);
+                console.log('Pipeline fields:', Object.keys(cleanedSamples[0]));
+                console.log('Pipeline field values:');
+                for (const [key, value] of Object.entries(cleanedSamples[0])) {
+                    console.log(`  ${key}: ${value}`);
+                }
+            }
+
+            // Store cleaned samples in localStorage with a timestamp to ensure it's a new entry
+            const storageItem = {
+                timestamp: new Date().getTime(),
+                samples: cleanedSamples
+            };
+
+            // Add to existing samples in pipeline
+
+            // Stringify and store the data
+            const jsonData = JSON.stringify(storageItem);
+            localStorage.setItem('selectedSamplesForPipeline', jsonData);
+
+            // Debug: Verify localStorage was set correctly
+            console.log('Stored in localStorage:', localStorage.getItem('selectedSamplesForPipeline'));
+
+            // ENHANCED DEBUGGING: Additional debug logs to verify data storage
+            console.log('========== ENHANCED DEBUG LOGGING ==========');
+            console.log('Data storage verification:');
+            console.log('1. Selected samples count:', selectedSamples.length);
+            console.log('2. Cleaned samples count:', cleanedSamples.length);
+
+            // Verify key existence in localStorage
+            const keys = Object.keys(localStorage);
+            console.log('3. All localStorage keys:', keys);
+            console.log('4. Selected samples key exists:', keys.includes('selectedSamplesForPipeline'));
+
+            // Parse the stored data to verify structure
+            try {
+                const storedData = JSON.parse(localStorage.getItem('selectedSamplesForPipeline'));
+                console.log('5. Successfully parsed stored data');
+                console.log('6. Storage timestamp:', new Date(storedData.timestamp).toISOString());
+                console.log('7. Storage samples count:', storedData.samples ? storedData.samples.length : 0);
+
+                // Verify first sample data
+                if (storedData.samples && storedData.samples.length > 0) {
+                    console.log('8. First sample data:', storedData.samples[0]);
+                } else {
+                    console.warn('8. No samples found in stored data!');
+                }
+            } catch (e) {
+                console.error('Storage parsing error:', e);
+            }
+
+            // Check storage limit issues
+            try {
+                const storageUsed = new Blob([JSON.stringify(localStorage)]).size;
+                console.log('9. Approximate localStorage usage (bytes):', storageUsed);
+                console.log('10. Close to 5MB limit?', storageUsed > 4000000 ? 'YES - POTENTIAL ISSUE' : 'No');
+            } catch (e) {
+                console.warn('Storage size calculation error:', e);
+            }
+            console.log('========== END ENHANCED DEBUG LOGGING ==========');
 
             // Show feedback message
-            showFeedbackMessage('success', `${selectedSamples.length} samples sent to Pipeline Dashboard`);
+            showFeedbackMessage(`${selectedSamples.length} samples sent to Pipeline Dashboard`, 'success');
 
-            // Redirect to pipeline dashboard
-            window.location.href = '/viewer/pipeline/';
+            // Add a longer delay before redirecting to ensure localStorage is fully set
+            setTimeout(() => {
+                // ADDITIONAL VERIFICATION BEFORE REDIRECT
+                console.log('Just before redirect - final localStorage check:');
+                try {
+                    const finalCheck = localStorage.getItem('selectedSamplesForPipeline');
+                    console.log('Final storage check - data exists:', !!finalCheck);
+                    const finalData = JSON.parse(finalCheck);
+                    console.log('Final sample count:', finalData.samples ? finalData.samples.length : 0);
+                    console.log('Redirecting to pipeline...');
+                } catch (e) {
+                    console.error('CRITICAL: Final storage check failed:', e);
+                }
+
+                // Redirect to pipeline dashboard
+                window.location.href = '/pipeline/';
+            }, 800); // Increased delay to ensure localStorage is properly set
         });
     }
 
     // Initialize sample checkboxes
-    document.querySelectorAll('.sample-checkbox.row-selector').forEach(checkbox => {
+    document.querySelectorAll('.sample-select').forEach(checkbox => {
+        // Skip the select all checkbox
+        if (checkbox.id === 'select-all-samples') return;
+
         checkbox.addEventListener('change', function () {
+            console.log('Checkbox change detected', this.checked);
+
             const row = this.closest('tr');
+            console.log('Found row element:', row);
+
+            if (!row) {
+                console.error('No parent row found for checkbox');
+                return;
+            }
+
             const data = getSampleDataFromRow(row);
+            console.log('Extracted sample data:', data);
+
+            if (!data || !data.id) {
+                console.error('Invalid sample data extracted from row');
+                return;
+            }
 
             if (this.checked) {
                 // Add to selected samples if not already there
                 if (!selectedSamples.some(s => s.id === data.id)) {
+                    console.log('Adding sample to selection:', data);
                     selectedSamples.push(data);
+                } else {
+                    console.log('Sample already in selection, skipping');
                 }
             } else {
                 // Remove from selected samples
+                console.log('Removing sample from selection:', data);
                 selectedSamples = selectedSamples.filter(s => s.id !== data.id);
             }
 
+            console.log('Updated selectedSamples:', selectedSamples);
+            console.log('New count:', selectedSamples.length);
             updateSelectionPanel();
         });
     });
@@ -694,45 +860,208 @@ function initSelectionPanel() {
     const selectAllCheckbox = document.getElementById('select-all-samples');
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function () {
-            document.querySelectorAll('.sample-checkbox.row-selector').forEach(checkbox => {
+            selectedSamples = []; // Reset the selected samples array
+
+            document.querySelectorAll('.sample-select').forEach(checkbox => {
+                // Skip the select all checkbox itself
+                if (checkbox.id === 'select-all-samples') return;
+
                 checkbox.checked = this.checked;
 
-                const row = checkbox.closest('tr');
-                const data = getSampleDataFromRow(row);
-
-                if (this.checked && !selectedSamples.some(s => s.id === data.id)) {
-                    selectedSamples.push(data);
+                if (this.checked) {
+                    const row = checkbox.closest('tr');
+                    if (row) {
+                        const data = getSampleDataFromRow(row);
+                        if (data && data.id) {
+                            selectedSamples.push(data);
+                        }
+                    }
                 }
             });
 
-            if (!this.checked) {
-                selectedSamples = [];
-            }
-
+            console.log('Select all changed, selectedSamples count:', selectedSamples.length);
             updateSelectionPanel();
         });
     }
 
     // Helper function to extract sample data from a row
     function getSampleDataFromRow(row) {
-        return {
-            id: row.dataset.fastqId || '',
-            name: row.dataset.fastqName || '',
-            batchName: row.dataset.batchName || '',
-            organism: row.dataset.organism || '',
-            libraryPrep: row.dataset.libraryPrep || '',
-            ingestStatus: row.dataset.ingestStatus || ''
+        if (!row) {
+            console.error('No row provided to getSampleDataFromRow');
+            return null;
+        }
+
+        // Debug: Log the row
+        console.log('Row element:', row);
+
+        let data = {
+            fastqName: null,
+            studySet: null,
+            loadName: null,
+            libraryPrepMethod: null,
+            organismCommon: null,
+            ingestStatus: null,
+            alignmentStatus: null,
+            postqcStatus: null
         };
+
+        // First try to get data from data attributes
+        // Try multiple attribute formats
+        const attributeMappings = {
+            fastqName: ['data-fastq-name'],
+            studySet: ['data-study-set'],
+            loadName: ['data-load-name'],
+            libraryPrepMethod: ['data-library-prep'],
+            organismCommon: ['data-organism-common'],
+            ingestStatus: ['data-ingest-status'],
+            alignmentStatus: ['data-alignment-status'],
+            postqcStatus: ['data-postqc-status']
+        };
+
+        // Try each possible attribute for each data field
+        for (const [field, attributes] of Object.entries(attributeMappings)) {
+            for (const attr of attributes) {
+                const value = row.getAttribute(attr);
+                if (value) {
+                    data[field] = value;
+                    break; // Stop checking other attributes for this field if found
+                }
+            }
+        }
+
+        // Special case: If we have data-fastq but not id or name, use it for both
+        if (!data.id && !data.name && row.getAttribute('data-fastq')) {
+            const fastqValue = row.getAttribute('data-fastq');
+            data.id = fastqValue;
+            data.name = fastqValue;
+        }
+
+        // If data attributes are not available or incomplete, extract from table cells
+        if (!data.id || !data.fastqName || !data.studySet) {
+            console.log('Data attributes not found or incomplete, extracting from cells');
+
+            // Get all cells in the row
+            const cells = row.querySelectorAll('td');
+            if (cells.length < 2) {
+                console.error('Not enough cells in row');
+                return null;
+            }
+
+            // Find the table this row belongs to
+            const table = row.closest('table');
+            if (!table) {
+                console.error('Could not find parent table');
+                return null;
+            }
+
+            // Get header cells to dynamically determine column positions
+            const headerRow = table.querySelector('thead tr');
+            if (!headerRow) {
+                console.error('Could not find table header row');
+                return null;
+            }
+
+            const headerCells = headerRow.querySelectorAll('th');
+            console.log('Found header cells:', headerCells.length);
+
+            // Debug header texts
+            const headerTexts = Array.from(headerCells).map(cell => cell.textContent.trim());
+            console.log('Header texts:', headerTexts);
+
+            const columnMap = {};
+
+            // Map column indices to their names
+            headerCells.forEach((cell, index) => {
+                let headerText = cell.textContent.trim().toLowerCase();
+                console.log(`Header ${index}: "${headerText}"`);
+
+                // Map header texts to our field names
+                if (headerText.includes('fastq name')) {
+                    columnMap.fastqName = index;
+                    console.log(`  ✓ Mapped fastqName to column ${index}`);
+                }
+                else if (headerText.includes('study set')) {
+                    columnMap.studySet = index;
+                    console.log(`  ✓ Mapped studySet to column ${index}`);
+                }
+                else if (headerText.includes('load name')) {
+                    columnMap.loadName = index;
+                    console.log(`  ✓ Mapped loadName to column ${index}`);
+                }
+                else if (headerText.includes('library prep method') && !headerText.includes('id')) {
+                    columnMap.libraryPrepMethod = index;
+                    console.log(`  ✓ Mapped libraryPrepMethod to column ${index}`);
+                }
+                else if (headerText.match(/\bingestion status\b|\bingest status\b|organism\b/) && !headerText.includes('common')) {
+                    columnMap.ingestStatus = index;
+                    console.log(`  ✓ Mapped ingestStatus to column ${index}`);
+                }
+                else if (headerText.includes('organism common name')) {
+                    columnMap.organismCommon = index;
+                    console.log(`  ✓ Mapped organismCommon to column ${index}`);
+                }
+                else if (headerText.match(/\balignment status\b/)) {
+                    columnMap.alignmentStatus = index;
+                    console.log(`  ✓ Mapped alignmentStatus to column ${index}`);
+                }
+                else if (headerText.match(/\bpostqc status\b/)) {
+                    columnMap.postqcStatus = index;
+                    console.log(`  ✓ Mapped postqcStatus to column ${index}`);
+                }
+            });
+
+            console.log('Dynamic column mapping from headers:', columnMap);
+
+            // Generate a unique ID if none exists - use fastq name column if available
+            if (!data.id) {
+                const fastqNameIndex = columnMap.fastqName;
+                data.id = row.getAttribute('data-fastq') ||
+                    (fastqNameIndex !== undefined && cells[fastqNameIndex] ? cells[fastqNameIndex].textContent.trim() : null) ||
+                    `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            }
+
+            // Extract data from cells based on the dynamic mapping
+            for (const [field, index] of Object.entries(columnMap)) {
+                if (!data[field] && cells[index]) {
+                    // Get text content, removing any HTML tags
+                    const cellText = cells[index].textContent.trim();
+                    data[field] = cellText;
+                }
+            }
+
+            // Make sure we have an ID - if FASTQ name is available, use it as ID
+            if (!data.id && data.fastqName) {
+                data.id = data.fastqName;
+            }
+        }
+
+        // Ensure all properties are strings even if null
+        for (const key in data) {
+            data[key] = data[key] || '';
+        }
+
+        console.log('Extracted and cleaned data:', data);
+        return data;
     }
 
     // Helper function to update the selection panel UI
     function updateSelectionPanel() {
+        console.log('updateSelectionPanel called with', selectedSamples.length, 'samples');
+        console.log('Selected samples data:', selectedSamples);
+
+        // Filter out any invalid entries (missing id)
+        selectedSamples = selectedSamples.filter(sample => sample && sample.id);
+
         if (selectedSamples.length > 0) {
             selectionPanel.style.display = 'flex';
             if (selectionCount) {
+                console.log('Setting selection count to', selectedSamples.length);
                 selectionCount.textContent = selectedSamples.length;
+            } else {
+                console.log('Selection count element not found');
             }
         } else {
+            console.log('No samples selected, hiding panel');
             selectionPanel.style.display = 'none';
         }
     }

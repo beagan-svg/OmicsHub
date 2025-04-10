@@ -16,6 +16,51 @@ class PipelineLocalData {
         console.log('PipelineLocalData constructor complete');
     }
 
+    // Create a reusable function to show bottom toast notifications
+    showToastNotification(message, type = 'success', duration = 1500) {
+        // Create toast container if it doesn't exist
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            toastContainer.className = 'position-fixed bottom-0 start-50 translate-middle-x p-3';
+            toastContainer.style.zIndex = '11'; // Above most content
+            document.body.appendChild(toastContainer);
+        }
+
+        // Create the toast element
+        const toastDiv = document.createElement('div');
+        toastDiv.className = `toast align-items-center text-white bg-${type} border-0`;
+        toastDiv.setAttribute('role', 'alert');
+        toastDiv.setAttribute('aria-live', 'assertive');
+        toastDiv.setAttribute('aria-atomic', 'true');
+
+        // Set inner HTML for toast
+        toastDiv.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        `;
+
+        // Add to container
+        toastContainer.appendChild(toastDiv);
+
+        // Initialize and show toast
+        const bsToast = new bootstrap.Toast(toastDiv, { delay: duration });
+        bsToast.show();
+
+        // Remove after hiding
+        toastDiv.addEventListener('hidden.bs.toast', () => {
+            if (toastDiv.parentNode) {
+                toastDiv.parentNode.removeChild(toastDiv);
+            }
+        });
+    }
+
     init() {
         // Initialize the selected samples from local storage
         this.selectedSamples = this.getStoredSamples();
@@ -58,34 +103,6 @@ class PipelineLocalData {
             clearBtn.addEventListener('click', () => {
                 console.log('Clear button clicked directly on PipelineLocalData');
                 this.clearStoredData();
-
-                // Show success notification
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-success alert-dismissible fade show';
-                alertDiv.setAttribute('role', 'alert');
-                alertDiv.innerHTML = `
-                    <i class="bi bi-check-circle-fill me-2"></i>
-                    Selection cleared successfully.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
-
-                // Insert alert
-                const container = document.querySelector('.container-fluid');
-                if (container) {
-                    container.insertBefore(alertDiv, container.firstChild);
-
-                    // Auto-dismiss after 3 seconds
-                    setTimeout(() => {
-                        try {
-                            const bsAlert = new bootstrap.Alert(alertDiv);
-                            bsAlert.close();
-                        } catch (err) {
-                            if (alertDiv.parentNode) {
-                                alertDiv.parentNode.removeChild(alertDiv);
-                            }
-                        }
-                    }, 3000);
-                }
             });
         } else {
             console.log('Clear button not found!');
@@ -126,12 +143,13 @@ class PipelineLocalData {
             if (row) {
                 samples.push({
                     fastq_name: row.querySelector('td:nth-child(2)').textContent.trim(),
-                    batch_name: row.querySelector('td:nth-child(3)').textContent.trim(),
-                    organism: row.querySelector('td:nth-child(4)').textContent.trim(),
-                    library_prep: row.querySelector('td:nth-child(5)').textContent.trim(),
-                    ingest_status: row.querySelector('td:nth-child(6)').textContent.trim(),
-                    alignment_status: row.querySelector('td:nth-child(7)').textContent.trim(),
-                    postqc_status: row.querySelector('td:nth-child(8)').textContent.trim()
+                    study_set: row.querySelector('td:nth-child(3)').textContent.trim(),
+                    load_name: row.querySelector('td:nth-child(4)').textContent.trim(),
+                    organism_common_name: row.querySelector('td:nth-child(5)').textContent.trim(),
+                    library_prep: row.querySelector('td:nth-child(6)').textContent.trim(),
+                    ingest_status: row.querySelector('td:nth-child(7)').textContent.trim(),
+                    alignment_status: row.querySelector('td:nth-child(8)').textContent.trim(),
+                    postqc_status: row.querySelector('td:nth-child(9)').textContent.trim()
                 });
             }
         });
@@ -140,19 +158,86 @@ class PipelineLocalData {
         this.storeSamples();
     }
 
+    // Utility method to merge samples with duplicate detection
+    mergeSamplesWithDuplicateDetection(existingSamples, newSamples) {
+        if (!newSamples || newSamples.length === 0) {
+            return {
+                combinedSamples: existingSamples,
+                added: 0,
+                duplicates: 0
+            };
+        }
+
+        // Create a map of existing samples by ID for quick lookup during deduplication
+        const existingSampleMap = new Map();
+        existingSamples.forEach(sample => {
+            const key = (sample.id || sample.fastq_name || sample.name || '').toLowerCase();
+            if (key) existingSampleMap.set(key, sample);
+        });
+
+        // Add new samples, avoiding duplicates
+        let duplicateCount = 0;
+        let addedCount = 0;
+        const combinedSamples = [...existingSamples]; // Create a new array with existing samples
+
+        newSamples.forEach(newSample => {
+            // Generate possible ID keys for duplicate detection
+            const idKeys = [
+                (newSample.id || '').toLowerCase(),
+                (newSample.fastq_name || '').toLowerCase(),
+                (newSample.name || '').toLowerCase()
+            ].filter(key => key); // Remove empty keys
+
+            // Check if this sample is a duplicate
+            let isDuplicate = false;
+            for (const key of idKeys) {
+                if (existingSampleMap.has(key)) {
+                    isDuplicate = true;
+                    duplicateCount++;
+                    console.log(`Skipping duplicate sample: ${key}`);
+                    break;
+                }
+            }
+
+            // If not a duplicate, add to the combined list
+            if (!isDuplicate) {
+                combinedSamples.push(newSample);
+                // Also add to the map to detect duplicates within the new samples
+                idKeys.forEach(key => existingSampleMap.set(key, newSample));
+                addedCount++;
+            }
+        });
+
+        return {
+            combinedSamples,
+            added: addedCount,
+            duplicates: duplicateCount
+        };
+    }
+
     getStoredSamples() {
         try {
             console.log('getStoredSamples called');
+            let allSamples = [];
 
             // First try with our primary key
             const storedData = localStorage.getItem(this.storageKey);
             if (storedData) {
                 console.log(`Found data using primary key: ${this.storageKey}`);
+
+                // Log the raw data before parsing
+                console.log('RAW PRIMARY STORAGE DATA:', storedData);
+
                 const parsedData = JSON.parse(storedData);
-                return this.normalizeStoredSamples(parsedData);
+
+                // Log the parsed data structure
+                console.log('PARSED PRIMARY STORAGE DATA:', parsedData);
+
+                allSamples = this.normalizeStoredSamples(parsedData);
+                console.log(`Loaded ${allSamples.length} samples from primary storage`);
             }
 
-            // If not found, try with the legacy key from main_list.html
+            // Check the legacy key from main_list.html
             const legacyStoredData = localStorage.getItem(this.legacyStorageKey);
             if (legacyStoredData) {
                 console.log(`Found data using legacy key: ${this.legacyStorageKey}`);
@@ -163,7 +248,7 @@ class PipelineLocalData {
                     console.log('Parsed legacy data:', parsedData);
 
                     // Check various possible formats
-                    let samplesToNormalize;
+                    let samplesToNormalize = [];
 
                     // Format 1: {timestamp, samples} from multiselect-filters.js
                     if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData) &&
@@ -186,22 +271,40 @@ class PipelineLocalData {
                         samplesToNormalize = [];
                     }
 
-                    // Normalize the samples
+                    // Normalize the legacy samples
                     if (samplesToNormalize && samplesToNormalize.length > 0) {
-                        console.log(`Normalizing ${samplesToNormalize.length} samples`);
-                        const normalizedSamples = this.normalizeStoredSamples(samplesToNormalize);
+                        console.log(`Normalizing ${samplesToNormalize.length} legacy samples`);
+                        const normalizedLegacySamples = this.normalizeStoredSamples(samplesToNormalize);
 
-                        // Store normalized samples with our primary key for future use
-                        localStorage.setItem(this.storageKey, JSON.stringify(normalizedSamples));
-                        return normalizedSamples;
+                        // Merge the samples with duplicate detection
+                        if (allSamples.length > 0) {
+                            const mergeResult = this.mergeSamplesWithDuplicateDetection(allSamples, normalizedLegacySamples);
+                            allSamples = mergeResult.combinedSamples;
+
+                            console.log(`Combined initial samples: ${allSamples.length} total (${mergeResult.added} added, ${mergeResult.duplicates} duplicates skipped)`);
+                        } else {
+                            // No existing samples, just use the legacy ones
+                            allSamples = normalizedLegacySamples;
+                            console.log(`Using ${allSamples.length} legacy samples as initial set`);
+                        }
+
+                        // Store the combined samples with our primary key for future use
+                        localStorage.setItem(this.storageKey, JSON.stringify(allSamples));
+                        console.log(`Saved ${allSamples.length} initial combined samples to primary key`);
+
+                        // Clear the legacy storage after successfully transferring data to primary storage
+                        localStorage.removeItem(this.legacyStorageKey);
+                        console.log(`Cleared legacy storage key ${this.legacyStorageKey} after successful processing`);
                     }
                 } catch (parseError) {
                     console.error('Error parsing legacy data:', parseError);
                 }
             }
 
-            console.log('No local data found in either storage key');
-            return [];
+            if (allSamples.length === 0) {
+                console.log('No local data found in either storage key');
+            }
+            return allSamples;
         } catch (error) {
             console.error('Error retrieving stored samples:', error);
             return [];
@@ -217,49 +320,58 @@ class PipelineLocalData {
             return [];
         }
 
-        return samples.map(sample => {
-            const normalizedSample = {};
-
-            console.log('Processing sample:', sample);
-
-            // Handle different property names between formats
-            // Special handling for fastq_name which could come from different fields
-            if (sample.fastq_name) {
-                normalizedSample.fastq_name = sample.fastq_name;
-            } else if (sample.name) {
-                normalizedSample.fastq_name = sample.name;
-                console.log('Using name property for fastq_name:', sample.name);
-            } else if (sample.id) {
-                normalizedSample.fastq_name = sample.id;
-                console.log('Using id property for fastq_name:', sample.id);
-            } else {
-                normalizedSample.fastq_name = 'Unknown Sample';
-                console.warn('No identifier found for sample');
-            }
-
-            // Handle batch name variations
-            normalizedSample.batch_name = sample.batch_name || sample.batchName || '';
-
-            // Other standard fields
-            normalizedSample.organism = sample.organism || '';
-            normalizedSample.library_prep = sample.library_prep || sample.libraryPrep || '';
-            normalizedSample.ingest_status = sample.ingest_status || sample.ingestStatus || 'Unknown';
-            normalizedSample.alignment_status = sample.alignment_status || 'Not Started';
-            normalizedSample.postqc_status = sample.postqc_status || 'Not Started';
-
-            // Keep original status if it exists
-            if (sample.status) {
-                normalizedSample.status = sample.status;
-            }
-
-            // Copy any other properties that might be useful
-            Object.keys(sample).forEach(key => {
-                if (!normalizedSample.hasOwnProperty(key) && sample[key] !== undefined) {
-                    normalizedSample[key] = sample[key];
-                }
+        // Debug: Log original sample fields before normalization
+        if (samples.length > 0) {
+            console.log('DEBUG - Original sample field structure:', {
+                sample: samples[0],
+                fields: Object.keys(samples[0])
             });
+        }
 
-            console.log('Normalized sample:', normalizedSample);
+        return samples.map(sample => {
+            // Create a new normalized sample object with exactly the fields we want
+            const normalizedSample = {
+                fastq_name: '',
+                study_set: '',
+                load_name: '',
+                organism_common_name: '',
+                library_prep: '',
+                ingest_status: '',
+                alignment_status: '',
+                postqc_status: ''
+            };
+
+            // Map fields exactly according to specified mappings
+            // Fastq Name - only map from fastq_name
+            if (sample.fastq_name) normalizedSample.fastq_name = sample.fastq_name;
+
+            // Study Set - map from study_set or studySet
+            if (sample.study_set) normalizedSample.study_set = sample.study_set;
+            else if (sample.studySet) normalizedSample.study_set = sample.studySet;
+
+            // Load Name - map from load_name or loadName
+            if (sample.load_name) normalizedSample.load_name = sample.load_name;
+            else if (sample.loadName) normalizedSample.load_name = sample.loadName;
+
+            // Organism Common Name - only map from organism_common_name
+            if (sample.organism_common_name) normalizedSample.organism_common_name = sample.organism_common_name;
+
+            // Library Prep Method - map from library_prep or libraryPrep
+            if (sample.library_prep) normalizedSample.library_prep = sample.library_prep;
+            else if (sample.libraryPrep) normalizedSample.library_prep = sample.libraryPrep;
+
+            // Ingest Status - map from ingest_status or ingestStatus
+            if (sample.ingest_status) normalizedSample.ingest_status = sample.ingest_status;
+            else if (sample.ingestStatus) normalizedSample.ingest_status = sample.ingestStatus;
+
+            // Alignment Status - map from alignment_status or alignmentStatus
+            if (sample.alignment_status) normalizedSample.alignment_status = sample.alignment_status;
+            else if (sample.alignmentStatus) normalizedSample.alignment_status = sample.alignmentStatus;
+
+            // PostQC Status - map from postqc_status or postqcStatus
+            if (sample.postqc_status) normalizedSample.postqc_status = sample.postqc_status;
+            else if (sample.postqcStatus) normalizedSample.postqc_status = sample.postqcStatus;
+
             return normalizedSample;
         });
     }
@@ -345,6 +457,22 @@ class PipelineLocalData {
             return;
         }
 
+        // Update the table headers to match exactly the required fields
+        const tableHeaders = document.querySelector('#samples-table thead tr');
+        if (tableHeaders) {
+            tableHeaders.innerHTML = `
+                <th><input type="checkbox" id="select-all-samples"></th>
+                <th>Fastq Name</th>
+                <th>Study Set</th>
+                <th>Load Name</th>
+                <th>Organism Common Name</th>
+                <th>Library Prep Method</th>
+                <th>Ingest Status</th>
+                <th>Alignment Status</th>
+                <th>PostQC Status</th>
+            `;
+        }
+
         // Clear existing rows
         tableBody.innerHTML = '';
 
@@ -357,7 +485,7 @@ class PipelineLocalData {
             const emptyRow = document.createElement('tr');
             emptyRow.className = 'text-center text-muted';
             emptyRow.innerHTML = `
-                <td colspan="8" class="py-4">
+                <td colspan="9" class="py-4">
                     <i class="bi bi-inbox-fill me-2" style="font-size: 1.5rem;"></i>
                     <p>No samples selected. Use the Sample Browser to select samples.</p>
                     <a href="/" class="btn btn-sm btn-outline-primary mt-2">
@@ -384,29 +512,21 @@ class PipelineLocalData {
 
         console.log(`Rebuilding table with ${this.selectedSamples.length} samples`, this.selectedSamples);
 
-        // Rebuild table with stored samples
+        // Rebuild table with stored samples - exact fields only, no defaults
         this.selectedSamples.forEach((sample, index) => {
             const row = document.createElement('tr');
-            const sampleName = sample.fastq_name || `Unknown Sample ${index + 1}`;
-            row.dataset.fastq = sampleName;
-
-            // Ensure every field has a fallback to prevent empty cells
-            const batchName = sample.batch_name || 'Unknown';
-            const organism = sample.organism || 'Unknown';
-            const libraryPrep = sample.library_prep || 'Unknown';
-            const ingestStatus = sample.ingest_status || 'Unknown';
-            const alignmentStatus = sample.alignment_status || 'Not Started';
-            const postqcStatus = sample.postqc_status || 'Not Started';
+            row.dataset.fastq = sample.fastq_name || '';
 
             row.innerHTML = `
                 <td><input type="checkbox" class="sample-select" checked></td>
-                <td>${sampleName}</td>
-                <td>${batchName}</td>
-                <td>${organism}</td>
-                <td>${libraryPrep}</td>
-                <td>${this.formatStatus(ingestStatus)}</td>
-                <td>${this.formatStatus(alignmentStatus)}</td>
-                <td>${this.formatStatus(postqcStatus)}</td>
+                <td>${sample.fastq_name || ''}</td>
+                <td>${sample.study_set || ''}</td>
+                <td>${sample.load_name || ''}</td>
+                <td>${sample.organism_common_name || ''}</td>
+                <td>${sample.library_prep || ''}</td>
+                <td>${this.formatStatus(sample.ingest_status || '')}</td>
+                <td>${this.formatStatus(sample.alignment_status || '')}</td>
+                <td>${this.formatStatus(sample.postqc_status || '')}</td>
             `;
 
             tableBody.appendChild(row);
@@ -433,20 +553,25 @@ class PipelineLocalData {
 
     formatStatus(status) {
         // Format status with appropriate badge
-        if (!status) return '<span class="badge bg-secondary">Unknown</span>';
+        if (!status) return '<span class="badge bg-secondary">—</span>';
 
-        if (status.toLowerCase().includes('completed')) {
-            return '<span class="badge bg-success">Completed</span>';
-        } else if (status.toLowerCase().includes('progress') || status.toLowerCase().includes('running')) {
-            return '<span class="badge bg-warning">In Progress</span>';
-        } else if (status.toLowerCase().includes('submitted')) {
-            return '<span class="badge bg-info">Submitted</span>';
-        } else if (status.toLowerCase().includes('failed')) {
-            return '<span class="badge bg-danger">Failed</span>';
-        } else if (status.toLowerCase().includes('not started')) {
+        // Convert status to lowercase for case-insensitive matching
+        const statusLower = status.toLowerCase();
+
+        // Check more specific conditions first
+        if (statusLower.includes('not completed') || statusLower.includes('not started')) {
             return '<span class="badge bg-secondary">Not Started</span>';
+        } else if (statusLower.includes('completed')) {
+            return '<span class="badge bg-success">Completed</span>';
+        } else if (statusLower.includes('progress') || statusLower.includes('running')) {
+            return '<span class="badge bg-warning">In Progress</span>';
+        } else if (statusLower.includes('submitted')) {
+            return '<span class="badge bg-info">Submitted</span>';
+        } else if (statusLower.includes('failed')) {
+            return '<span class="badge bg-danger">Failed</span>';
         }
 
+        // Just show the actual value for unrecognized statuses
         return `<span class="badge bg-secondary">${status}</span>`;
     }
 
@@ -543,7 +668,7 @@ class PipelineLocalData {
                 const emptyRow = document.createElement('tr');
                 emptyRow.className = 'text-center text-muted';
                 emptyRow.innerHTML = `
-                    <td colspan="8" class="py-4">
+                    <td colspan="9" class="py-4">
                         <i class="bi bi-inbox-fill me-2" style="font-size: 1.5rem;"></i>
                         <p>No samples selected. Use the Sample Browser to select samples.</p>
                         <a href="/" class="btn btn-sm btn-outline-primary mt-2">
@@ -606,98 +731,93 @@ class PipelineLocalData {
 
     // Show a confirmation message after clearing
     showClearConfirmation() {
-        // Create the alert element
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'alert alert-success alert-dismissible fade show';
-        alertDiv.setAttribute('role', 'alert');
-        alertDiv.innerHTML = `
-            <i class="bi bi-check-circle-fill me-2"></i>
-            All samples have been cleared.
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        `;
-
-        // Find a container to insert the alert
-        const container = document.querySelector('.container-fluid');
-        if (container) {
-            // Insert at the top of the container
-            container.insertBefore(alertDiv, container.firstChild);
-
-            // Auto-dismiss after 3 seconds
-            setTimeout(() => {
-                try {
-                    const bsAlert = new bootstrap.Alert(alertDiv);
-                    bsAlert.close();
-                } catch (err) {
-                    // Fallback if bootstrap Alert API fails
-                    if (alertDiv.parentNode) {
-                        alertDiv.parentNode.removeChild(alertDiv);
-                    }
-                }
-            }, 3000);
-        }
+        // Show a toast notification at the bottom of the screen with blue background
+        this.showToastNotification('All samples have been cleared.', 'primary', 1500);
     }
 
     // Reinitialize to make sure we get the latest data from localStorage
     reinitialize() {
         console.log('Reinitializing PipelineLocalData to check for updated localStorage data');
-        // Explicitly check localStorage again
-        const legacyData = localStorage.getItem(this.legacyStorageKey);
 
-        if (legacyData) {
-            console.log('Found legacy data during reinitialization:', legacyData);
+        // Get existing samples from primary storage
+        let existingSamples = [];
+        const existingData = localStorage.getItem(this.storageKey);
+        if (existingData) {
             try {
-                // Parse the JSON data
-                const parsedData = JSON.parse(legacyData);
-                console.log('Parsed legacy data in reinitialize:', parsedData);
-
-                // Check if it's wrapped with timestamp and samples
-                if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData) && parsedData.samples) {
-                    console.log('Found samples object with timestamp, extracting samples array');
-
-                    // Get the samples array
-                    const samplesArray = parsedData.samples;
-                    console.log('Sample array from legacy data:', samplesArray);
-
-                    if (samplesArray && Array.isArray(samplesArray) && samplesArray.length > 0) {
-                        // This will hold our processed samples
-                        const processedSamples = samplesArray.map(sample => {
-                            // Fix field mapping issues:
-                            // In data from sample browser:
-                            // - ingestStatus contains the organism name
-                            // - organism contains the sample ID number
-                            return {
-                                fastq_name: sample.name || sample.id || '',
-                                batch_name: sample.batchName || '',
-                                // Fix field mixup - ingestStatus contains organism
-                                organism: sample.ingestStatus || 'Unknown',
-                                library_prep: sample.libraryPrep || '',
-                                // Always set to 'Completed' for samples from browser
-                                ingest_status: 'Completed',
-                                alignment_status: 'Not Started',
-                                postqc_status: 'Not Started'
-                            };
-                        });
-
-                        console.log('Processed samples with fixed field mapping:', processedSamples);
-
-                        // Update the selected samples
-                        this.selectedSamples = processedSamples;
-
-                        // Store with primary key
-                        localStorage.setItem(this.storageKey, JSON.stringify(this.selectedSamples));
-                        console.log('Saved normalized samples to primary key');
-
-                        // Rebuild the table with the new data
-                        this.rebuildSamplesTable();
-
-                        return true;  // Successfully processed samples
-                    }
-                }
+                existingSamples = JSON.parse(existingData);
+                console.log(`Found ${existingSamples.length} existing samples in primary storage`);
             } catch (e) {
-                console.error('Error processing legacy data in reinitialize:', e);
+                console.error('Error parsing existing data:', e);
+                existingSamples = [];
             }
-        } else {
+        }
+
+        // Check for new samples in legacy storage
+        const legacyData = localStorage.getItem(this.legacyStorageKey);
+        if (!legacyData) {
             console.log('No legacy data found during reinitialization');
+            return false;  // No processing occurred
+        }
+
+        console.log('Found legacy data during reinitialization:', legacyData);
+        try {
+            // Parse the JSON data
+            const parsedData = JSON.parse(legacyData);
+            console.log('Parsed legacy data in reinitialize:', parsedData);
+
+            // Extract samples array from various possible formats
+            let newSamples = [];
+
+            // Format 1: {timestamp, samples} from multiselect-filters.js
+            if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData) && parsedData.samples) {
+                console.log('Found samples object with timestamp, extracting samples array');
+                newSamples = parsedData.samples;
+            }
+            // Format 2: Direct array of samples
+            else if (Array.isArray(parsedData)) {
+                console.log('Found data as direct array of samples');
+                newSamples = parsedData;
+            }
+            // Format 3: Single sample object
+            else if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
+                console.log('Found data as single sample object, wrapping in array');
+                newSamples = [parsedData];
+            }
+
+            if (!newSamples || newSamples.length === 0) {
+                console.log('No valid samples found in legacy data');
+                // Clear legacy data even if there are no samples to prevent repeated processing
+                localStorage.removeItem(this.legacyStorageKey);
+                console.log(`Cleared empty legacy storage key ${this.legacyStorageKey}`);
+                return false;
+            }
+
+            console.log(`Found ${newSamples.length} new samples in legacy data:`, newSamples);
+
+            // Use the normalizeStoredSamples method for consistent field mapping
+            const processedNewSamples = this.normalizeStoredSamples(newSamples);
+            console.log('Processed new samples with fixed field mapping:', processedNewSamples);
+
+            // Merge the samples with duplicate detection
+            const mergeResult = this.mergeSamplesWithDuplicateDetection(existingSamples, processedNewSamples);
+            this.selectedSamples = mergeResult.combinedSamples;
+
+            console.log(`Combined samples: ${this.selectedSamples.length} total (${mergeResult.added} added, ${mergeResult.duplicates} duplicates skipped)`);
+
+            // Store the combined set in primary key
+            localStorage.setItem(this.storageKey, JSON.stringify(this.selectedSamples));
+            console.log(`Saved accumulated samples to primary key: ${this.selectedSamples.length} samples`);
+
+            // Clear the legacy storage after successfully transferring data to primary storage
+            localStorage.removeItem(this.legacyStorageKey);
+            console.log(`Cleared legacy storage key ${this.legacyStorageKey} after successful processing`);
+
+            // Rebuild the table with the combined data
+            this.rebuildSamplesTable();
+
+            return true;  // Successfully processed samples
+        } catch (e) {
+            console.error('Error processing legacy data in reinitialize:', e);
         }
 
         return false;  // No processing occurred

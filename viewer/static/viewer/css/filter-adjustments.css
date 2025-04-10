@@ -1,0 +1,35 @@
+/* Adjust filter cards positioning */
+.filter-card {
+    margin-left: -15px;
+    /* Move cards slightly to the left */
+    margin-right: 15px;
+    /* Add margin to the right to maintain spacing */
+}
+
+/* Adjust overall container for filter cards */
+.advanced-filters-container {
+    padding-left: 15px;
+    /* Add padding to the left of the container */
+}
+
+/* Make filter cards more compact */
+.filter-card {
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+/* Ensure the filter section headings are properly aligned */
+.filter-section-heading {
+    margin-bottom: 12px;
+}
+
+/* Add a subtle transition effect when showing/hiding */
+.advanced-filters-container {
+    transition: all 0.3s ease;
+}
+
+/* Make sure the active filters display is aligned with the filters */
+.active-filters-container {
+    margin-left: -15px;
+    padding-left: 15px;
+}
