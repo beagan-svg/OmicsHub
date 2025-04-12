@@ -22,10 +22,4 @@ DATABASES = {
             'sslmode': 'disable'  # Disable SSL for local connections
         }
     }
-}
-
-# Debug toolbar settings
-INTERNAL_IPS = [
-    '127.0.0.1',
-    'localhost',
-] 
+} 

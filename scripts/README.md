@@ -10,6 +10,7 @@ scripts/
 ├── data_verification/    # Data verification scripts
 ├── debug_tools/          # Debugging utilities
 ├── management/           # Django management commands
+├── pipeline/             # Pipeline processing scripts
 ├── shell/                # Shell scripts
 └── utilities/            # Utility modules
 ```
@@ -34,6 +35,16 @@ Scripts for verifying data integrity and status.
 |--------|-------------|-------|
 | `verify_and_fix_status.py` | Verify and fix status discrepancies | `python scripts/data_verification/verify_and_fix_status.py [--json-path PATH] [--auto-fix] [--dry-run] [--debug]` |
 | `compare_timestamps.py` | Compare timestamps between sources | `python scripts/data_verification/compare_timestamps.py [--source SOURCE]` |
+
+## Pipeline Scripts
+
+Scripts for processing samples through the RNA-Seq pipeline.
+
+| Script | Description | Usage |
+|--------|-------------|-------|
+| `alignment.py` | Submit samples for alignment | `python scripts/pipeline/alignment.py <batch_line> <workflow> <config_file> [fastq_name]` |
+| `postqc.py` | Process post-alignment QC | `python scripts/pipeline/postqc.py <batch_line> <config_file> [fastq_name]` |
+| `check_alignment.py` | Check alignment status | `python scripts/pipeline/check_alignment.py <demand_id> [--all]` |
 
 ## Shell Scripts
 
@@ -82,6 +93,22 @@ python scripts/data_import/load_study_data.py --no-clear
 python scripts/data_import/load_study_data.py --file /path/to/custom.json
 ```
 
+### Pipeline Processing
+
+```bash
+# Submit a batch for alignment using the MTX workflow
+python scripts/pipeline/alignment.py "MTX-22019_ATX-26019" mtx config/pipeline_config.yaml
+
+# Submit a specific sample for alignment
+python scripts/pipeline/alignment.py "MTX-22019_ATX-26019" mtx config/pipeline_config.yaml FASTQ_NAME
+
+# Process post-alignment QC for a batch
+python scripts/pipeline/postqc.py "MTX-22019_ATX-26019" config/pipeline_config.yaml
+
+# Check alignment status for a demand ID
+python scripts/pipeline/check_alignment.py ABC123XYZ
+```
+
 ### Data Verification
 
 ```bash
@@ -119,6 +146,10 @@ Example:
 ```bash
 # Activate your virtual environment if using one
 source venv/bin/activate
+
+# Set environment variables
+export PYTHONPATH=$PYTHONPATH:$(pwd)
+export DJANGO_SETTINGS_MODULE=config.settings.development
 
 # Run a script
 python scripts/data_import/load_study_data.py

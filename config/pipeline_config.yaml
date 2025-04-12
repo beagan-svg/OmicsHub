@@ -2,8 +2,8 @@
 
 # References for different organisms
 references:
-  armadillo: "african-green-monkey_ncbi_vero-who-p1-0_genomefixed_star2.7.1a"
-  african_green_monkey: "armadillo_ncbi_mdasnov1-hap2_genome_star2-7-1a"
+  armadillo: "armadillo_ncbi_mdasnov1-hap2_genome_star2-7-1a"
+  african_green_monkey: "african-green-monkey_ncbi_vero-who-p1-0_genomefixed_star2.7.1a"
   arctic_ground_squirrel: "arctic-ground-squirrel_ncbi_asm342692v1_genome_star2.7.1a"
   baboon: "baboon_ncbi_panubis1-0_genome_star2.7.1a"
   capuchin: "capuchin_ncbi_gsc-monkey-1-0_genome_star2.7.1a"
@@ -13,9 +13,17 @@ references:
   ferret: "ferret_ncbi_asm1176430v1.1_genome_star2.7.1a"
   gray_mouse_lemur: "gray-mouse-lemur_ncbi_mmur-3-0_genome_star2.7.1a"
   human: "human_10x_grch38_genome_star2.7.1a"
+  macaque_nemestrina: "macaque_ncbi_mmul10_genome_star2.7.1a"
   macaque: "macaque_ncbi_mmul10_genome_star2.7.1a"
   mouse: "mouse_10x_mm10_genome_star2.7.1a"
   naked_mole_rat: "naked-mole-rat_ncbi_hetgla-female-1-0_genome_star2.7.1a"
+  opossum: "opossum_ncbi_ommondom1_genome.fixed_star2.7.1a"
+  owl_monkey: "owl-monkey_ncbi_aotnan2.0_genome_star2.7.1a"
+  pig: "pig_ncbi_sscrofa11.1_genome_star2.7.1a"
+  rat: "rat_ncbi_mratbn7.2_genome_star2.7.1a"
+  squirrel-monkey: "squirrel-monkey_ncbi_bcm.sbol.2.1_genome_star2.7.1a"
+  treeshrew: "treeshrew_ncbi_kiz.ts.3.0_genome.fixed_star2.7.1a"
+
 
 # Chemistries
 chemistries:
@@ -23,6 +31,7 @@ chemistries:
   10xRseq_Mult_noATAC: "ARC-v1"
   10xV3.1_HT: "SC3Pv3HT"
   10xV4: "SC3Pv4"
+  "10Xv2": "SC3Pv2"
 
 # Pipeline settings
 settings:

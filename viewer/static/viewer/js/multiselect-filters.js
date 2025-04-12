@@ -433,18 +433,7 @@ function showFeedbackMessage(message, type = 'info') {
     }
 
     // Set message content with enhanced icons
-    let icon = '';
-    switch (type) {
-        case 'success':
-            icon = '<i class="bi bi-check2-circle"></i>';  // Changed to nicer checkmark
-            break;
-        case 'info':
-            icon = '<i class="bi bi-stars"></i>';  // Changed to stars icon
-            break;
-        case 'warning':
-            icon = '<i class="bi bi-exclamation-circle"></i>';
-            break;
-    }
+    let icon = '<i class="bi bi-stars"></i>';  // Always use stars icon for filter operations
 
     messageContainer.innerHTML = `${icon} ${message}`;
     messageContainer.className = `toast-message ${type} show`;
@@ -558,7 +547,7 @@ function initResetFiltersButton() {
             });
 
             // Show feedback message with success style
-            showFeedbackMessage('Filters cleared', 'success');
+            showFeedbackMessage('Clearing filters...', 'success');
 
             // Animate filter cards reset
             const filterCards = document.querySelectorAll('.filter-card');
@@ -718,6 +707,7 @@ function initSelectionPanel() {
                 fastq_name: sample.fastqName || '',
                 study_set: sample.studySet || '',
                 load_name: sample.loadName || '',
+                batch_name_from_vendor: sample.batchNameFromVendor || '',
                 organism_common_name: sample.organismCommon || '',
                 library_prep: sample.libraryPrepMethod || '',
                 ingest_status: sample.ingestStatus || '',
@@ -898,6 +888,7 @@ function initSelectionPanel() {
             fastqName: null,
             studySet: null,
             loadName: null,
+            batchNameFromVendor: null,
             libraryPrepMethod: null,
             organismCommon: null,
             ingestStatus: null,
@@ -1007,6 +998,10 @@ function initSelectionPanel() {
                 else if (headerText.match(/\bpostqc status\b/)) {
                     columnMap.postqcStatus = index;
                     console.log(`  ✓ Mapped postqcStatus to column ${index}`);
+                }
+                else if (headerText.includes('batch name from vendor')) {
+                    columnMap.batchNameFromVendor = index;
+                    console.log(`  ✓ Mapped batchNameFromVendor to column ${index}`);
                 }
             });
 

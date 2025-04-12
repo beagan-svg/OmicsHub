@@ -1,0 +1,174 @@
+/* ==========================================================================
+   OCS Database - Table Components
+   
+   Core styles for table elements throughout the application
+   ========================================================================== */
+
+/* Original styles from custom-table.css - migrated directly */
+
+/* Data table styling */
+.table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.table th {
+    background-color: var(--table-header-bg);
+    color: var(--google-gray);
+    font-weight: 500;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--table-border-color);
+}
+
+.table td {
+    padding: 8px 16px;
+    border-top: none;
+    border-bottom: 1px solid var(--table-border-color);
+    vertical-align: middle;
+}
+
+.table tr:hover {
+    background-color: var(--table-hover-bg);
+}
+
+/* Status badges */
+.status-badge {
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.status-completed {
+    background-color: rgba(52, 168, 83, 0.1);
+    color: #2E7D32;
+}
+
+.status-not-completed {
+    background-color: rgba(95, 99, 104, 0.1);
+    color: #37474F;
+}
+
+.status-in-progress {
+    background-color: rgba(66, 133, 244, 0.1);
+    color: #1565C0;
+}
+
+.status-pending {
+    background-color: rgba(251, 188, 5, 0.1);
+    color: #F57C00;
+}
+
+.status-error {
+    background-color: rgba(234, 67, 53, 0.1);
+    color: #C62828;
+}
+
+/* Additional table styling that builds on the imported styles */
+
+/* Table container */
+.table-container {
+    overflow-x: auto;
+    margin-bottom: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Enhanced table styling */
+.table {
+    font-size: var(--font-size-sm);
+    width: 100%;
+    margin-bottom: 0;
+    /* Remove bootstrap margin */
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Table headers */
+.table thead th {
+    background-color: var(--table-header-bg);
+    color: var(--google-gray);
+    font-weight: 500;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--table-border-color);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* First and last header cells */
+.table thead th:first-child {
+    border-top-left-radius: var(--radius-md);
+}
+
+.table thead th:last-child {
+    border-top-right-radius: var(--radius-md);
+}
+
+/* Table rows */
+.table tbody tr {
+    transition: background-color var(--transition-speed);
+}
+
+.table tbody tr:hover {
+    background-color: var(--table-hover-bg);
+}
+
+/* Striped rows */
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: var(--table-stripe-bg);
+}
+
+/* Table cells */
+.table td {
+    padding: 10px 16px;
+    border-top: none;
+    border-bottom: 1px solid var(--table-border-color);
+    vertical-align: middle;
+}
+
+/* Cell variations */
+.table .numeric {
+    text-align: right;
+}
+
+.table .actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+/* Status badges in tables */
+.table .status-badge {
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    display: inline-block;
+}
+
+.table .status-completed {
+    background-color: rgba(52, 168, 83, 0.1);
+    color: #2E7D32;
+}
+
+.table .status-pending {
+    background-color: rgba(251, 188, 5, 0.1);
+    color: #F57C00;
+}
+
+.table .status-in-progress {
+    background-color: rgba(66, 133, 244, 0.1);
+    color: #1565C0;
+}
+
+.table .status-error {
+    background-color: rgba(234, 67, 53, 0.1);
+    color: #C62828;
+}
+
+.table .status-not-completed {
+    background-color: rgba(95, 99, 104, 0.1);
+    color: #37474F;
+}

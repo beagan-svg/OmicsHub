@@ -1,0 +1,155 @@
+/* ==========================================================================
+   OCS Database - Button Components
+   
+   Styles for buttons throughout the application
+   ========================================================================== */
+
+/* Primary buttons */
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-speed);
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-dark);
+    border-color: var(--primary-dark);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+/* Secondary buttons */
+.btn-secondary {
+    background-color: var(--neutral-color);
+    border-color: var(--neutral-color);
+    color: white;
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-speed);
+}
+
+.btn-secondary:hover {
+    background-color: #37474F;
+    border-color: #37474F;
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+/* Outline buttons */
+.btn-outline-primary {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+    transition: all var(--transition-speed);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--primary-color);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-outline-secondary {
+    color: var(--neutral-color);
+    border-color: var(--neutral-color);
+    transition: all var(--transition-speed);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--neutral-color);
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* Success buttons */
+.btn-success {
+    background-color: var(--success-color);
+    border-color: var(--success-color);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-speed);
+}
+
+.btn-success:hover {
+    background-color: #1B5E20;
+    border-color: #1B5E20;
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+/* Danger buttons */
+.btn-danger {
+    background-color: var(--danger-color);
+    border-color: var(--danger-color);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-speed);
+}
+
+.btn-danger:hover {
+    background-color: #B71C1C;
+    border-color: #B71C1C;
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+/* Warning buttons */
+.btn-warning {
+    background-color: var(--warning-color);
+    border-color: var(--warning-color);
+    color: white;
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-speed);
+}
+
+.btn-warning:hover {
+    background-color: #E65100;
+    border-color: #E65100;
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+/* Icon buttons */
+.btn-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon i {
+    font-size: 18px;
+}
+
+/* Button group */
+.btn-group {
+    box-shadow: var(--shadow-sm);
+    border-radius: var(--radius-md);
+}
+
+/* Disabled state */
+.btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+/* Loading state */
+.btn-loading {
+    position: relative;
+    color: transparent;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}

@@ -1,97 +1,363 @@
 # OCS Database Viewer
 
-A Django web application for viewing and managing OCS database records.
+A Django web application for viewing and managing RNA-Seq sample data in the OCS (Open Commercialized Sequencing) database.
+
+## Table of Contents
+- [Project Overview](#project-overview)
+- [Project Structure](#project-structure)
+- [Setup and Installation](#setup-and-installation)
+- [Running the Application](#running-the-application)
+- [Features](#features)
+- [Scripts](#scripts)
+  - [Data Import Scripts](#data-import-scripts)
+  - [Data Verification Scripts](#data-verification-scripts)
+  - [Pipeline Scripts](#pipeline-scripts)
+  - [Shell Scripts](#shell-scripts)
+  - [Utility Scripts](#utility-scripts)
+- [Development](#development)
+  - [CSS Organization](#css-organization)
+  - [Static Files](#static-files)
+  - [Version Management](#version-management)
+  - [Database Management](#database-management)
+- [Deployment](#deployment)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+
+## Project Overview
+
+The OCS Database Viewer is a web application for accessing, viewing, and managing RNA-Seq sample data. It provides an intuitive interface for filtering, searching, and displaying sample information from various studies. The application supports tracking of alignment, post-QC, and ingest processing statuses for samples.
 
 ## Project Structure
 
 ```
 database_ocs/
-├── config/                    # All configuration files
-│   ├── settings/             # Django settings
+├── config/                    # Django configuration
+│   ├── settings/             # Environment-specific settings
 │   ├── urls.py               # URL configuration
 │   ├── wsgi.py               # WSGI configuration
 │   └── asgi.py               # ASGI configuration
 ├── viewer/                    # Main Django app
-├── scripts/                   # All scripts
-│   ├── shell/                # Shell scripts (*.sh)
-│   ├── management/           # Django management commands
+│   ├── views/                # View functions
+│   ├── templates/            # HTML templates
+│   ├── static/               # App-specific static files
+│   │   └── viewer/           # Namespaced static files
+│   │       ├── css/          # Organized CSS structure
+│   │       │   ├── base/    # Base styles and variables
+│   │       │   ├── components/ # Component-specific styles
+│   │       │   ├── pages/   # Page-specific styles
+│   │       │   └── utils/   # Utility styles
+│   │       └── js/           # JavaScript files
+│   ├── models.py             # Database models
+│   ├── urls.py               # App URL configuration
+│   └── tables.py             # Table definitions
+├── scripts/                   # Utility scripts
 │   ├── data_import/          # Data import scripts
 │   ├── data_verification/    # Data verification scripts
-│   └── debug_tools/          # Debugging utilities
-├── static/                    # Static files
-├── staticfiles/              # Collected static files
+│   ├── pipeline/             # Pipeline processing scripts
+│   ├── shell/                # Shell scripts
+│   └── utilities/            # Utility functions
+├── static/                    # Global static files (placeholder)
+├── staticfiles/              # Collected static files (production)
 ├── media/                    # Media files
-├── data/                     # Data files
+├── data/                     # Data storage
 │   ├── csv/                  # CSV files
 │   └── raw/                  # Raw data files
-├── tests/                    # Test files
-├── logs/                     # Log files
-├── sql/                      # SQL files
+├── backup_files/             # Database backups organized by version
 ├── docs/                     # Documentation
-│   └── database_schema.md
+├── logs/                     # Log files
+│   ├── django/              # Django application logs
+│   ├── pipeline/            # Pipeline processing logs
+│   └── import/              # Data import logs
+├── sql/                      # SQL files and database scripts
 ├── requirements.txt          # Python dependencies
 ├── environment.yml           # Conda environment
+├── version.txt               # Application version
 ├── Makefile                  # Build commands
 ├── manage.py                 # Django management script
 └── README.md                 # Project documentation
 ```
 
-## Setup
+## Setup and Installation
 
-1. Create and activate virtual environment:
+### Prerequisites
+- Python 3.8+
+- pip or conda package manager
+- Git
+
+### Installation Steps
+
+1. Clone the repository:
    ```bash
-   python -m venv venv
-   source venv/bin/activate
+   git clone <repository-url>
+   cd database_ocs
    ```
 
-2. Install dependencies:
+2. Create and activate a virtual environment:
+   ```bash
+   # Using venv
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   
+   # Or using conda
+   conda env create -f environment.yml
+   conda activate ocs-database
+   ```
+
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Run migrations:
+4. Set up the database:
    ```bash
    python manage.py migrate
    ```
 
-4. Start development server:
+5. Create a superuser (optional):
    ```bash
-   python manage.py runserver 0.0.0.0:8090
+   python manage.py createsuperuser
    ```
+
+## Running the Application
+
+### Development Server
+
+To run the development server:
+
+```bash
+python manage.py runserver 0.0.0.0:8085
+```
+
+This will start the server on port 8085, accessible at http://localhost:8085 or from any network interface.
+
+### Using Makefile
+
+The project includes a Makefile with common commands:
+
+```bash
+# Run development server
+make runserver
+
+# Apply migrations
+make migrate
+
+# Create migrations
+make migrations
+
+# Collect static files
+make collectstatic
+
+# Run tests
+make test
+
+# Clean up generated files
+make clean
+
+# Create database backup
+make backup-db
+```
+
+### Environment Variables
+
+For advanced configurations, you can set the following environment variables:
+
+```bash
+export DJANGO_SETTINGS_MODULE=config.settings.development  # or production
+export PYTHONPATH=$PYTHONPATH:$(pwd)
+```
 
 ## Features
 
-- View and filter database records
-- Search by fastq name and load name
-- Filter by study set, organism, and status
-- Sortable table columns
-- Responsive design
-- Column visibility toggle controls
-- User preference persistence
+- **Sample Browser**: View and filter RNA-Seq samples
+- **Advanced Filtering**: Filter by study set, organism, library prep method, and processing status
+- **Search Functionality**: Search by fastq name and load name
+- **Column Management**: Toggle column visibility to customize the view
+- **Responsive Design**: Works on desktop and mobile devices
+- **User Preference Persistence**: Remembers column visibility settings
+- **Pipeline Dashboard**: Monitor and manage sample processing pipelines
+- **Data Import**: Import data from various sources including vendor data
+
+## Scripts
+
+The application includes various scripts for data management, verification, and pipeline processing.
+
+### Data Import Scripts
+
+#### 1. Load Study Data
+Imports study data from a JSON file into the database.
+
+```bash
+python scripts/data_import/load_study_data.py [options]
+```
+Options:
+- `--no-clear`: Don't clear existing data before import
+- `--file PATH`: Import from a specific JSON file
+- `--dry-run`: Simulate import without making changes
+- `--debug`: Enable debug logging
+
+#### 2. Import Vendor Data
+Imports vendor data from CSV files.
+
+```bash
+python scripts/data_import/import_vendor_data.py --source SOURCE [options]
+```
+Options:
+- `--source SOURCE`: Data source (isilon, nwgc, nygc, all)
+- `--no-clear`: Don't clear existing data
+- `--debug`: Enable debug logging
+
+#### 3. Run Vendor Data Collection
+Shell script to collect and import vendor data.
+
+```bash
+./scripts/shell/run_vendor_data_collection.sh [options]
+```
+Options:
+- `--collect SOURCE`: Collect data from source (isilon, nwgc, nygc, all)
+- `--import SOURCE`: Import data from source
+- `--all`: Collect and import from all sources
+- `--debug`: Enable debug mode
+
+### Data Verification Scripts
+
+#### 1. Verify and Fix Status
+Verifies and fixes status discrepancies in the database.
+
+```bash
+python scripts/data_verification/verify_and_fix_status.py [options]
+```
+Options:
+- `--auto-fix`: Automatically fix discrepancies
+- `--dry-run`: Test without making changes
+- `--debug`: Enable debug logging
+
+#### 2. Compare Timestamps
+Compares timestamps across different status records.
+
+```bash
+python scripts/data_verification/compare_timestamps.py [options]
+```
+
+### Pipeline Scripts
+
+#### 1. Alignment Script
+Submits fastq files for alignment.
+
+```bash
+python scripts/pipeline/alignment.py <batch_line> <workflow> <config_file> [fastq_name]
+```
+Example:
+```bash
+python scripts/pipeline/alignment.py "MTX-22019_ATX-26019" mtx config/pipeline_config.yaml
+```
+
+#### 2. Post-QC Script
+Processes samples after alignment.
+
+```bash
+python scripts/pipeline/postqc.py <batch_line> <config_file> [fastq_name]
+```
+
+#### 3. Process Batch
+Processes a batch of samples.
+
+```bash
+./process_batch.sh <load_name> <organism> <library_prep_method>
+```
+
+### Shell Scripts
+
+#### 1. Run Vendor Data Collection
+Automates collection and import of vendor data.
+
+```bash
+./scripts/shell/run_vendor_data_collection.sh --all
+```
+
+#### 2. Vendor-specific Scripts
+Collect data from specific vendors:
+
+```bash
+./scripts/shell/isilon.sh
+./scripts/shell/nwgc.sh
+./scripts/shell/nygc.sh
+```
+
+### Utility Scripts
+
+Various utility functions used by other scripts:
+
+- `scripts/utilities/db_utils.py`: Database operations
+- `scripts/utilities/file_utils.py`: File handling operations
+- `scripts/utilities/schema_utils.py`: Schema management
 
 ## Development
 
-### Running Tests
-```bash
-python manage.py test viewer
-```
+### CSS Organization
 
-### Code Style
-This project follows PEP 8 guidelines. To check code style:
-```bash
-flake8 viewer/
-```
+The CSS is organized into a modular structure:
 
-### Database Migrations
-To create a new migration:
+- `viewer/static/viewer/css/base/`: Base styles and variables
+  - `variables.css`: CSS variables for colors, spacing, etc.
+  
+- `viewer/static/viewer/css/components/`: Component-specific styles
+  - `buttons.css`: Button styles
+  - `cards.css`: Card component styles
+  - `filters.css`: Filter component styles
+  - `tables.css`: Table styles
+  
+- `viewer/static/viewer/css/pages/`: Page-specific styles
+  - `main-list.css`: Styles for the main list page
+  - `pipeline.css`: Styles for the pipeline dashboard
+  
+- `viewer/static/viewer/css/utils/`: Utility styles
+  - `animations.css`: Animation definitions
+  - `responsive.css`: Media queries and responsive utilities
+
+All CSS files are imported in `viewer/static/viewer/css/main.css`, which is included in the base template.
+
+### Static Files
+
+The application follows Django's recommended approach for static files:
+
+1. **App-specific static files**: Each Django app (in this case, the `viewer` app) has its own static files in a subdirectory matching the app name (`viewer/static/viewer/`).
+
+2. **Static files collection**: Django's `collectstatic` command gathers all static files from all apps and places them in the `staticfiles/` directory for production use.
+
+To work with static files:
+
+- During development, place your static files in the app's static directory (`viewer/static/viewer/`).
+- When deploying to production, run `python manage.py collectstatic` to collect all static files to the `staticfiles/` directory.
+- In templates, reference static files using the `{% static %}` template tag:
+  ```html
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'viewer/css/main.css' %}">
+  ```
+
+### Version Management
+
+The application uses semantic versioning (MAJOR.MINOR.PATCH) tracked in `version.txt`.
+
+- Database backups are organized by version number in the `backup_files/` directory
+- Each version folder contains backups related to that specific version
+- See `backup_files/README.md` for more information on backup procedures
+
+### Database Management
+
+#### Running Migrations
+To create and apply migrations:
 ```bash
 python manage.py makemigrations
-```
-
-To apply migrations:
-```bash
 python manage.py migrate
 ```
+
+#### Creating Backups
+To create a database backup:
+```bash
+make backup-db
+```
+
+This will create a backup in the `backup_files/vX.Y.Z/` directory where X.Y.Z is the current version.
 
 ## Deployment
 
@@ -105,10 +371,34 @@ python manage.py migrate
    python manage.py collectstatic
    ```
 
-3. Run with production server:
+3. Run with a production server:
    ```bash
    gunicorn config.wsgi:application
    ```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Database Connection Issues**
+   - Check database settings in `config/settings/`
+   - Verify database server is running
+
+2. **Import Script Errors**
+   - Verify file paths and permissions
+   - Check data format consistency
+   - Use `--debug` flag for detailed logging
+
+3. **Missing Dependencies**
+   - Ensure virtual environment is active
+   - Run `pip install -r requirements.txt`
+
+### Logs
+
+Check the following log files for troubleshooting:
+- `logs/django/django.log`: Django application logs
+- `logs/import/vendor_data_*.log`: Vendor data import logs
+- `logs/pipeline/pipeline_*.log`: Pipeline processing logs
 
 ## Contributing
 
@@ -117,200 +407,4 @@ python manage.py migrate
 3. Run tests
 4. Submit a pull request
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-# Study Data Import Guide
-
-This guide provides instructions for importing study data into the Django database.
-
-## Project Structure
-
-```
-database_ocs/                  # Root project directory
-├── config/                    # All configuration files
-│   ├── settings/             # Django settings
-│   ├── urls.py               # URL configuration
-│   ├── wsgi.py               # WSGI configuration
-│   └── asgi.py               # ASGI configuration
-├── viewer/                    # Main Django app
-├── scripts/                   # All scripts
-│   ├── shell/                # Shell scripts (*.sh)
-│   ├── management/           # Django management commands
-│   ├── data_import/          # Data import scripts
-│   ├── data_verification/    # Data verification scripts
-│   └── debug_tools/          # Debugging utilities
-├── static/                    # Static files
-├── staticfiles/              # Collected static files
-├── media/                    # Media files
-├── data/                     # Data files
-│   ├── csv/                  # CSV files
-│   └── raw/                  # Raw data files
-├── tests/                    # Test files
-├── logs/                     # Log files
-├── sql/                      # SQL files
-├── docs/                     # Documentation
-│   └── database_schema.md
-├── requirements.txt          # Python dependencies
-├── environment.yml           # Conda environment
-├── Makefile                  # Build commands
-├── manage.py                 # Django management script
-└── README.md                 # Project documentation
-```
-
-## Prerequisites
-
-1. Access to the Django project at:
-   ```
-   /allen/programs/celltypes/workgroups/rnaseqanalysis/bnguy/Projects/database_ocs
-   ```
-
-2. Access to the study.json file at:
-   ```
-   /allen/programs/celltypes/workgroups/rnaseqanalysis/bnguy/Projects/ocs/batch_csv/study.json
-   ```
-
-3. Virtual environment setup:
-   ```bash
-   cd /allen/programs/celltypes/workgroups/rnaseqanalysis/bnguy/Projects/database_ocs
-   source venv/bin/activate
-   ```
-
-## Data Import Quick Guide
-
-For importing study data:
-
-```bash
-# Set environment variables
-export PYTHONPATH=$PYTHONPATH:$(pwd)
-export DJANGO_SETTINGS_MODULE=config.settings.development
-
-# Run the import script
-python scripts/data_import/load_study_data.py
-
-# Advanced options available:
-python scripts/data_import/load_study_data.py --dry-run  # Test without making changes
-python scripts/data_import/load_study_data.py --no-clear  # Don't clear existing data
-python scripts/data_import/load_study_data.py --file /path/to/custom.json  # Use custom file
-```
-
-## Data Import Process
-
-The import process handles the following data types:
-
-1. **Metadata Records**
-   - Fastq name
-   - Organism common name
-   - Library prep method
-   - Study set
-
-2. **Main Records**
-   - Study set
-   - Organism
-   - Library prep method
-   - Alignment status
-   - Post-QC status
-   - Ingest status
-
-3. **Load Association Records**
-   - Fastq name
-   - Load name
-
-4. **Alignment Records**
-   - Status ID
-   - Start time
-   - End time
-   - FID
-
-5. **Post-QC Records**
-   - Status ID
-   - Start time
-   - End time
-   - FID
-
-6. **Ingest Records**
-   - Status ID
-   - Start time
-   - End time
-   - FID
-
-## Expected Results
-
-After successful import, you should see:
-- Metadata records: ~11,800
-- Main records: ~11,800
-- Load association records: ~11,500
-- Alignment records: ~11,700
-- Post-QC records: ~11,700
-- Ingest records: ~11,700
-
-## Recent Updates
-
-- Added support for updating existing records without clearing data
-- Improved error handling for duplicate records
-- Added dry-run mode for testing imports
-- Enhanced data validation during import
-- Added support for custom JSON file paths
-
-## Troubleshooting
-
-1. **Duplicate Key Errors**
-   - Use `--no-clear` flag to update existing records
-   - Check for data consistency in the JSON file
-
-2. **Missing Data**
-   - Verify JSON file path and format
-   - Check field mappings in the import script
-
-3. **Type Conversion Errors**
-   - Ensure date formats are correct
-   - Check for invalid status values
-
-For detailed instructions, see [Importing Study Data](docs/importing_study_data.md).
-
-## Verification Script
-
-The verification script (`verify_import.py`) checks:
-- Total record counts for each model
-- Sample record details including:
-  - FASTQ Name
-  - Studies
-  - Organism Name
-
-## Notes
-
-- The import process clears existing data before importing new records
-- The studies field is stored as a plain string, not a list
-- All timestamps are properly formatted during import 
-
-## Vendor Data Import
-
-To collect data from vendor sources (isilon, NWGC, NYGC) and import it into the database:
-
-```bash
-# Set environment variables
-export PYTHONPATH=$PYTHONPATH:$(pwd)
-export DJANGO_SETTINGS_MODULE=config.settings.development
-
-# Run the automated collection and import script
-./scripts/shell/run_vendor_data_collection.sh --all
-
-# Or collect from a specific source
-./scripts/shell/run_vendor_data_collection.sh --collect isilon
-
-# Or import existing CSV files
-./scripts/shell/run_vendor_data_collection.sh --import nwgc
-```
-
-For testing purposes, you can use the sample data generator:
-
-```bash
-# Generate a sample CSV file with test data
-python scripts/data_import/create_sample_csv.py
-
-# Import the sample data
-python scripts/data_import/import_vendor_data.py --source sample
-```
-
-For detailed instructions, see [Vendor Data Import Guide](docs/vendor_data_import.md). 
+For more detailed information on specific features, refer to the documentation in the `docs/` directory. 

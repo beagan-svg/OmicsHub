@@ -1,0 +1,423 @@
+/* ==========================================================================
+   OCS Database - Filter Components
+   
+   Styles for filter components throughout the application
+   ========================================================================== */
+
+/* Original styles from multiselect-filters.css - migrated directly */
+
+/* Multiselect container */
+.multiselect-filter {
+    position: relative;
+    width: 100%;
+}
+
+/* Selected tags display */
+.selected-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    min-height: var(--input-height);
+}
+
+.tag {
+    background-color: var(--table-header-bg);
+    padding: 2px 8px;
+    border-radius: var(--border-radius);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tag-remove {
+    cursor: pointer;
+    color: var(--google-gray);
+    font-size: 12px;
+}
+
+.tag-remove:hover {
+    color: var(--google-red);
+}
+
+/* Input field styling */
+.multiselect-filter input {
+    height: var(--input-height) !important;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--input-border-color);
+    padding: 0.375rem 0.75rem;
+    width: 100%;
+    transition: border-color var(--transition-speed);
+}
+
+.multiselect-filter input:focus {
+    border-color: var(--input-focus-color);
+    box-shadow: var(--input-focus-shadow);
+    outline: none;
+}
+
+/* Dropdown styling */
+.multiselect-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid var(--input-border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.multiselect-option {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color var(--transition-speed);
+}
+
+.multiselect-option:hover {
+    background-color: var(--table-hover-bg);
+}
+
+.multiselect-option.selected {
+    background-color: var(--table-header-bg);
+    font-weight: 500;
+}
+
+/* Select2 Enhancements */
+/* Skip this part for brevity as it's quite long, directly from multiselect-filters.css */
+
+/* ==========================================================================
+   Advanced Filters Container
+   ========================================================================== */
+
+.advanced-filters-container {
+    background: var(--light-bg);
+    border-radius: var(--radius-md);
+    padding: 24px 20px 16px 20px;
+    margin-bottom: 24px;
+    border: none;
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-normal);
+    width: 100%;
+}
+
+.advanced-filters-container:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+/* ==========================================================================
+   Filter Cards
+   ========================================================================== */
+
+.filter-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 16px 20px 16px 16px;
+    box-shadow: var(--shadow-sm);
+    border-left: 4px solid var(--primary-color);
+    transition: all var(--transition-fast);
+    margin: 0px 10px 16px 0px !important;
+}
+
+.filter-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Category-specific styles */
+.filter-card-info {
+    border-left-color: var(--primary-color);
+}
+
+.filter-card-characteristics {
+    border-left-color: var(--secondary-color);
+}
+
+.filter-card-status {
+    border-left-color: var(--success-color);
+}
+
+/* Card state variations */
+.filter-card-focus,
+.filter-card.has-active-filters {
+    border-left-width: 6px;
+    box-shadow: var(--shadow-md);
+    background-color: rgba(255, 255, 255, 0.95);
+}
+
+/* ==========================================================================
+   Filter Section Headings
+   ========================================================================== */
+
+.filter-section-heading {
+    font-size: 15px;
+    color: var(--google-gray);
+    font-weight: 600;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    border: none;
+    padding: 0;
+}
+
+.filter-section-heading i {
+    margin-right: 8px;
+    color: var(--primary-color);
+    font-size: 18px;
+}
+
+.filter-card-characteristics .filter-section-heading i {
+    color: var(--secondary-color);
+}
+
+.filter-card-status .filter-section-heading i {
+    color: var(--success-color);
+}
+
+/* ==========================================================================
+   Status Filter Options
+   ========================================================================== */
+
+.status-filter-option {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+.status-filter-option::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    background-color: var(--google-light-gray);
+}
+
+.status-option-completed::before {
+    background-color: var(--success-color);
+}
+
+.status-option-not-completed::before {
+    background-color: var(--warning-color);
+}
+
+.status-option-failed::before {
+    background-color: var(--danger-color);
+}
+
+/* ==========================================================================
+   Active Filters Display
+   ========================================================================== */
+
+.active-filters-container {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+    border-left: 4px solid var(--primary-color);
+    transition: all var(--transition-fast);
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.filter-heading {
+    font-size: 15px;
+    color: var(--google-gray);
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.filter-heading i {
+    margin-right: 8px;
+    color: var(--primary-color);
+    font-size: 18px;
+}
+
+/* Filter tag styling */
+.filter-tag {
+    background-color: var(--primary-light);
+    border-radius: var(--radius-md);
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-sm);
+    max-width: 100%;
+}
+
+.filter-tag:hover {
+    box-shadow: var(--shadow-md);
+    background-color: rgba(25, 118, 210, 0.15);
+}
+
+.filter-tag .tag-name {
+    font-weight: 500;
+    color: var(--primary-dark);
+    font-size: 13px;
+}
+
+.filter-tag .tag-value {
+    font-size: 13px;
+    color: var(--neutral-color);
+}
+
+.filter-tag .tag-remove {
+    cursor: pointer;
+    color: var(--neutral-color);
+    font-size: 14px;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+}
+
+.filter-tag .tag-remove:hover {
+    color: var(--danger-color);
+    transform: scale(1.2);
+}
+
+.filter-badge {
+    padding: 2px 8px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+}
+
+/* ==========================================================================
+   Filter Actions
+   ========================================================================== */
+
+.filter-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding-right: 10px;
+    /* Align with filter card container */
+}
+
+.filter-actions .btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-sm);
+}
+
+.filter-actions .btn-primary:hover {
+    background-color: var(--primary-dark);
+    border-color: var(--primary-dark);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.filter-actions .clear-filters,
+.filter-actions .btn-outline-secondary {
+    background-color: transparent;
+    border: 1px solid var(--google-light-gray);
+    color: var(--google-gray);
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+    margin-right: 0;
+}
+
+.filter-actions .clear-filters:hover,
+.filter-actions .btn-outline-secondary:hover {
+    background-color: var(--light-bg);
+    border-color: var(--google-gray);
+    color: var(--dark-bg);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ==========================================================================
+   Filter Messages
+   ========================================================================== */
+
+.filter-message {
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border-radius: var(--radius-md);
+    background-color: var(--light-bg);
+    color: var(--neutral-color);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-sm);
+}
+
+.filter-message.info {
+    background-color: var(--primary-light);
+}
+
+.filter-message.success {
+    background-color: rgba(46, 125, 50, 0.1);
+}
+
+.filter-message.warning {
+    background-color: rgba(255, 152, 0, 0.1);
+}
+
+.filter-message.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.filter-message::before {
+    font-family: "Material Icons";
+    margin-right: 8px;
+    font-size: 18px;
+}
+
+.filter-message.success::before {
+    content: "check_circle";
+    color: var(--success-color);
+}
+
+.filter-message.info::before {
+    content: "info";
+    color: var(--primary-color);
+}

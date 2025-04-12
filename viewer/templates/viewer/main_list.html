@@ -9,7 +9,6 @@
 <link rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@x.x.x/dist/select2-bootstrap4.min.css" />
 <link rel="stylesheet" href="{% static 'viewer/css/multiselect-filters.css' %}" />
-<link rel="stylesheet" href="{% static 'viewer/css/fix_scrollbars.css' %}" />
 <style>
     .selection-column {
         width: 40px;
@@ -20,11 +19,6 @@
         width: 18px;
         height: 18px;
         cursor: pointer;
-    }
-
-    /* Custom margin for Sample Information card */
-    .filter-card-info {
-        margin: 0px -20px 20px 0px !important;
     }
 
     #selection-actions {
@@ -1942,10 +1936,8 @@
 
 {% block extrascripts %}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="{% static 'viewer/js/table-column-classes.js' %}"></script>
-<script src="{% static 'viewer/js/column-settings-rebuild.js' %}"></script>
+<script src="{% static 'viewer/js/column-manager.js' %}"></script>
 <script src="{% static 'viewer/js/multiselect-filters.js' %}"></script>
-<script src="{% static 'viewer/js/status-time-debug.js' %}"></script>
 <script>
     // Additional initialization for animations and UI effects
     document.addEventListener('DOMContentLoaded', function () {
@@ -2134,160 +2126,8 @@
     });
 </script>
 
-<!-- Ensure all script references are valid -->
-<script src="{% static 'viewer/js/column-settings-rebuild.js' %}"></script>
-<script src="{% static 'viewer/js/status-time-debug.js' %}"></script>
 
-<script>
-    // Add this to your existing JavaScript
-    $(document).ready(function () {
-        // Sample selection functionality
-        const selectionActions = $('#selection-actions');
-        const selectedCountEl = $('#selected-count');
-        const selectAllCheckbox = $('#select-all-samples');
-        const rowCheckboxes = $('.row-selector');
 
-        // Keep track of selected samples
-        let selectedSamples = [];
-
-        function updateSelectionUI() {
-            const count = selectedSamples.length;
-            selectedCountEl.text(count);
-
-            if (count > 0) {
-                selectionActions.addClass('show');
-            } else {
-                selectionActions.removeClass('show');
-            }
-
-            // Update select all checkbox state
-            if (count === rowCheckboxes.length && count > 0) {
-                selectAllCheckbox.prop('checked', true);
-                selectAllCheckbox.prop('indeterminate', false);
-            } else if (count > 0) {
-                selectAllCheckbox.prop('indeterminate', true);
-            } else {
-                selectAllCheckbox.prop('checked', false);
-                selectAllCheckbox.prop('indeterminate', false);
-            }
-        }
-
-        // Select all checkbox
-        selectAllCheckbox.on('change', function () {
-            const isChecked = $(this).prop('checked');
-            rowCheckboxes.prop('checked', isChecked);
-
-            selectedSamples = [];
-            if (isChecked) {
-                // Add all visible rows to selection
-                $('.row-selector:checked').each(function () {
-                    const row = $(this).closest('tr');
-                    if (row.data('fastq-id')) {
-                        selectedSamples.push({
-                            id: row.data('fastq-id'),
-                            name: row.data('fastq-name'),
-                            batchName: row.data('batch-name'),
-                            organism: row.data('organism'),
-                            libraryPrep: row.data('library-prep'),
-                            ingestStatus: row.data('ingest-status')
-                        });
-                    }
-                });
-            }
-
-            updateSelectionUI();
-        });
-
-        // Individual row selection
-        rowCheckboxes.on('change', function () {
-            const row = $(this).closest('tr');
-            const fastqId = row.data('fastq-id');
-
-            if (this.checked && fastqId) {
-                selectedSamples.push({
-                    id: fastqId,
-                    name: row.data('fastq-name'),
-                    batchName: row.data('batch-name'),
-                    organism: row.data('organism'),
-                    libraryPrep: row.data('library-prep'),
-                    ingestStatus: row.data('ingest-status')
-                });
-            } else {
-                selectedSamples = selectedSamples.filter(s => s.id !== fastqId);
-            }
-
-            updateSelectionUI();
-        });
-
-        // Clear selection button
-        $('#clear-selection-btn').on('click', function () {
-            rowCheckboxes.prop('checked', false);
-            selectedSamples = [];
-            updateSelectionUI();
-        });
-
-        // Send to pipeline button
-        $('#send-to-pipeline-btn').on('click', function () {
-            if (selectedSamples.length === 0) return;
-
-            // Debug: log what we're about to store
-            console.log('Send to Pipeline clicked');
-            console.log('Selected samples:', selectedSamples);
-
-            // Store selected samples in localStorage to retrieve in the pipeline page
-            localStorage.setItem('selectedSamplesForPipeline', JSON.stringify(selectedSamples));
-
-            // Debug: verify what was stored
-            const storedJson = localStorage.getItem('selectedSamplesForPipeline');
-            console.log('Stored in localStorage:', storedJson);
-            console.log('Parsed from localStorage:', JSON.parse(storedJson));
-
-            // Show feedback message
-            showFeedbackMessage('success', `Sent ${selectedSamples.length} samples to Pipeline`);
-
-            // Navigate to pipeline page
-            window.location.href = '{% url "viewer:pipeline_dashboard" %}';
-        });
-
-        // Feedback message function (reuse from your existing code or add if not present)
-        function showFeedbackMessage(type, message) {
-            const messageContainer = document.createElement('div');
-            messageContainer.className = 'feedback-message';
-            messageContainer.style.position = 'fixed';
-            messageContainer.style.bottom = '20px';
-            messageContainer.style.left = '50%';
-            messageContainer.style.transform = 'translateX(-50%) translateY(100px)';
-            messageContainer.style.backgroundColor = type === 'success' ? '#1976D2' : '#757575';
-            messageContainer.style.color = 'white';
-            messageContainer.style.padding = '10px 20px';
-            messageContainer.style.borderRadius = '4px';
-            messageContainer.style.boxShadow = '0 3px 5px rgba(0,0,0,0.2)';
-            messageContainer.style.zIndex = '9999';
-            messageContainer.style.transition = 'all 0.3s ease';
-
-            const icon = document.createElement('i');
-            icon.className = type === 'success' ? 'bi bi-check2-circle' : 'bi bi-info-circle';
-            icon.style.marginRight = '8px';
-
-            messageContainer.appendChild(icon);
-            messageContainer.appendChild(document.createTextNode(message));
-            document.body.appendChild(messageContainer);
-
-            setTimeout(() => {
-                messageContainer.style.transform = 'translateX(-50%) translateY(0)';
-            }, 10);
-
-            setTimeout(() => {
-                messageContainer.style.transform = 'translateX(-50%) translateY(100px)';
-                setTimeout(() => {
-                    document.body.removeChild(messageContainer);
-                }, 300);
-            }, 3000);
-        }
-    });
 </script>
-
 </body>
-
-</html>
 {% endblock %}

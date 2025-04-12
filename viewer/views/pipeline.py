@@ -5,12 +5,54 @@ import os
 import yaml
 import json
 from pathlib import Path
+from django.core.paginator import Paginator
 
 class PipelineDashboardView(TemplateView):
     template_name = 'viewer/pipeline/dashboard.html'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        
+        # Create a list of actual sample data
+        samples = [
+            {
+                'fastq': 'MX102931',
+                'batch': 'MTX-22030',
+                'organism': 'human',
+                'library_prep': '10xV3.1D',
+                'ingest_status': 'Completed',
+                'alignment_status': 'Not Started',
+                'postqc_status': 'Not Started'
+            },
+            {
+                'fastq': 'MX102932',
+                'batch': 'MTX-22030',
+                'organism': 'human',
+                'library_prep': '10xV3.1D',
+                'ingest_status': 'Completed',
+                'alignment_status': 'Not Started',
+                'postqc_status': 'Not Started'
+            }
+        ]
+        
+        # Set up pagination with actual samples
+        paginator = Paginator(samples, self.get_paginate_by())
+        page = self.request.GET.get('page', 1)
+        try:
+            page_obj = paginator.get_page(page)
+            print(f"DEBUG - Pagination Info:")
+            print(f"- Current page: {page_obj.number}")
+            print(f"- Items per page: {paginator.per_page}")
+            print(f"- Total pages: {paginator.num_pages}")
+            print(f"- Start index: {page_obj.start_index()}")
+            print(f"- End index: {page_obj.end_index()}")
+            print(f"- Total items: {paginator.count}")
+        except Exception as e:
+            print(f"DEBUG - Pagination Error: {str(e)}")
+            page_obj = paginator.get_page(1)
+        
+        context['page_obj'] = page_obj
+        context['current_per_page'] = self.get_paginate_by()
         
         # Get pipeline configuration
         config_path = Path(os.path.join('config', 'pipeline_config.yaml'))
@@ -50,6 +92,10 @@ class PipelineDashboardView(TemplateView):
                     pass
         
         return context
+    
+    def get_paginate_by(self):
+        """Get the number of items to display per page."""
+        return int(self.request.GET.get('per_page', 25))
 
 class PipelineApiView:
     @staticmethod

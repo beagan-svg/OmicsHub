@@ -8,18 +8,14 @@ def get_item(dictionary, key):
     return dictionary.get(key, '')
 
 @register.filter(name='split')
-def split(value, key):
+def split(value, delimiter=','):
     """
-    Split a string into a list based on a delimiter.
+    Split a string into a list.
     
     Usage:
-       {{ value|split:'delimiter' }}
-    
-    Example:
-       {{ "a,b,c"|split:',' }}
-       Returns ['a', 'b', 'c']
+       {{ value|split:',' }}
     """
-    return value.split(key)
+    return value.split(delimiter)
 
 @register.filter(name='is_selected')
 def is_selected(value, options_list):

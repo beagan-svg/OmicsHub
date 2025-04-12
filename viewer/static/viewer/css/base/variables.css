@@ -1,0 +1,71 @@
+/* ==========================================================================
+   OCS Database - CSS Variables
+   ========================================================================== */
+
+:root {
+    /* Colors */
+    --primary-color: #1976D2;
+    --primary-light: #E3F2FD;
+    --primary-dark: #0D47A1;
+    --secondary-color: #9C27B0;
+    --success-color: #2E7D32;
+    --warning-color: #FF9800;
+    --danger-color: #D32F2F;
+    --neutral-color: #455A64;
+
+    /* Background Colors */
+    --light-bg: #F5F7FA;
+    --dark-bg: #263238;
+    --border-color: #E0E0E0;
+    --card-bg: #FFFFFF;
+
+    /* Google Colors */
+    --google-blue: #4285F4;
+    --google-red: #EA4335;
+    --google-yellow: #FBBC05;
+    --google-green: #34A853;
+    --google-gray: #5F6368;
+    --google-light-gray: #E0E0E0;
+
+    /* Table Variables */
+    --table-header-bg: #F1F3F4;
+    --table-border-color: #DADCE0;
+    --table-hover-bg: #F5F7FA;
+    --table-stripe-bg: #FAFBFC;
+
+    /* Form Variables */
+    --input-height: 38px;
+    --input-border-color: #DADCE0;
+    --input-focus-color: #4285F4;
+    --input-focus-shadow: 0 0 0 3px rgba(66, 133, 244, 0.15);
+
+    /* Border Radius */
+    --border-radius: 4px;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 16px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.1);
+
+    /* Transitions */
+    --transition-speed: 0.25s;
+    --transition-fast: 0.2s ease;
+    --transition-normal: 0.3s ease;
+
+    /* Spacing */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+
+    /* Font Sizes */
+    --font-size-xs: 12px;
+    --font-size-sm: 14px;
+    --font-size-md: 16px;
+    --font-size-lg: 18px;
+    --font-size-xl: 24px;
+}

@@ -85,14 +85,65 @@ class MainTable(tables.Table):
     def render_study_set(self, value):
         if value:
             return value
-        return ''
+        return '—'
 
     def render_load_name(self, record):
         try:
             load_assoc = record.fastq_name.loadassociation_set.first()
-            return load_assoc.load_name if load_assoc else ''
+            return load_assoc.load_name if load_assoc else '—'
         except Exception:
-            return ''
+            return '—'
+
+    def render_library_prep_method(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_organism(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_organism_common_name(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_batch_name(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_batch_name_from_vendor(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_cell_capture(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_sample_id(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_amplification_name(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_amplification_id(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_cell_prep_type(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_sequencing_vendor(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_alignment_method(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_library_prep_method_id(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_library_prep_name(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_ingest_fid(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_alignment_fid(self, value):
+        return value if value and value != 'NA' else '—'
+
+    def render_postqc_fid(self, value):
+        return value if value and value != 'NA' else '—'
 
     def render_ingest_status(self, value):
         if value:
