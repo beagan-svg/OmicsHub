@@ -66,9 +66,15 @@ class PipelineLocalData {
         // Initialize the selected samples from local storage
         this.selectedSamples = this.getStoredSamples();
 
-        // Track pagination state
-        this.currentPage = 1;
-        this.itemsPerPage = 25;
+        // Initialize pagination state from server values
+        const dropdownBtn = document.getElementById('rowsPerPageDropdown');
+        const currentPageSpan = document.querySelector('.current-page');
+
+        // Get initial items per page from the dropdown button
+        this.itemsPerPage = dropdownBtn ? parseInt(dropdownBtn.textContent.trim()) : 25;
+
+        // Get initial current page from the span
+        this.currentPage = currentPageSpan ? parseInt(currentPageSpan.textContent.trim()) : 1;
 
         // Initialize event listeners once DOM is loaded
         if (document.readyState === 'loading') {
@@ -88,7 +94,10 @@ class PipelineLocalData {
             setTimeout(() => this.reinitialize(), 300);
         }
 
-        console.log('PipelineLocalData initialized');
+        console.log('PipelineLocalData initialized with:', {
+            itemsPerPage: this.itemsPerPage,
+            currentPage: this.currentPage
+        });
     }
 
     setupEventListeners() {
@@ -111,6 +120,68 @@ class PipelineLocalData {
             });
         } else {
             console.log('Clear button not found!');
+        }
+
+        // Setup pagination navigation buttons
+        const paginationNav = document.querySelector('.pagination-navigation');
+        if (paginationNav) {
+            // Get current rows per page value
+            const getCurrentPerPage = () => {
+                const dropdownBtn = document.getElementById('rowsPerPageDropdown');
+                return dropdownBtn ? parseInt(dropdownBtn.textContent.trim()) : 25;
+            };
+
+            // Helper function to construct URL with parameters
+            const constructPageUrl = (pageNum) => {
+                const url = new URL('http://127.0.0.1:8083/pipeline/');
+                url.searchParams.set('page', pageNum);
+                url.searchParams.set('per_page', getCurrentPerPage());
+                return url.toString();
+            };
+
+            // First page button
+            const firstPageBtn = paginationNav.querySelector('a[title="First page"]');
+            if (firstPageBtn) {
+                firstPageBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.location.href = constructPageUrl(1);
+                });
+            }
+
+            // Previous page button
+            const prevPageBtn = paginationNav.querySelector('a[title="Previous page"]');
+            if (prevPageBtn) {
+                prevPageBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const currentPage = parseInt(document.querySelector('.current-page').textContent);
+                    if (currentPage > 1) {
+                        window.location.href = constructPageUrl(currentPage - 1);
+                    }
+                });
+            }
+
+            // Next page button
+            const nextPageBtn = paginationNav.querySelector('a[title="Next page"]');
+            if (nextPageBtn) {
+                nextPageBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const currentPage = parseInt(document.querySelector('.current-page').textContent);
+                    const totalPages = parseInt(document.querySelector('.total-pages').textContent);
+                    if (currentPage < totalPages) {
+                        window.location.href = constructPageUrl(currentPage + 1);
+                    }
+                });
+            }
+
+            // Last page button
+            const lastPageBtn = paginationNav.querySelector('a[title="Last page"]');
+            if (lastPageBtn) {
+                lastPageBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const totalPages = parseInt(document.querySelector('.total-pages').textContent);
+                    window.location.href = constructPageUrl(totalPages);
+                });
+            }
         }
 
         // Setup pagination go-to form handler
@@ -137,30 +208,6 @@ class PipelineLocalData {
                 }
             });
         }
-
-        // Setup pagination navigation buttons
-        const pageNavLinks = document.querySelectorAll('.pagination-navigation a, .pagination-navigation button:not(.disabled)');
-        pageNavLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                if (link.classList.contains('disabled')) return;
-
-                let targetPage = 1;
-                if (link.getAttribute('href')) {
-                    // Extract page number from href
-                    const href = link.getAttribute('href');
-                    const pageMatch = href.match(/[?&]page=(\d+)/);
-                    if (pageMatch && pageMatch[1]) {
-                        targetPage = parseInt(pageMatch[1], 10);
-                    }
-                } else if (link.getAttribute('data-page')) {
-                    // Get page from data attribute
-                    targetPage = parseInt(link.getAttribute('data-page'), 10);
-                }
-
-                this.goToPage(targetPage);
-            });
-        });
 
         // Setup rows per page dropdown
         const rowsPerPageLinks = document.querySelectorAll('.pagination-dropdown .dropdown-item');
@@ -1060,18 +1107,12 @@ class PipelineLocalData {
 
         // Validate page number
         pageNumber = Math.min(Math.max(1, pageNumber), totalPages);
-        this.currentPage = pageNumber;
 
-        // Update pagination UI
-        this.updatePaginationUI();
-
-        // Rebuild table with current page
-        this.rebuildSamplesTable();
-
-        // Update URL without reloading page
+        // Update the URL and navigate to it
         const url = new URL(window.location);
         url.searchParams.set('page', pageNumber);
-        window.history.pushState({}, '', url);
+        url.searchParams.set('per_page', this.itemsPerPage);
+        window.location.href = url.toString();
     }
 
     // Change number of rows per page
@@ -1079,28 +1120,11 @@ class PipelineLocalData {
         // Verify perPage is a number and reasonable
         if (isNaN(perPage) || perPage < 1) perPage = 25;
 
-        this.itemsPerPage = perPage;
-        this.currentPage = 1; // Reset to first page
-
-        // Update dropdown button text
-        const dropdownBtn = document.getElementById('rowsPerPageDropdown');
-        if (dropdownBtn) {
-            dropdownBtn.textContent = perPage;
-        }
-
-        // Update the active class in dropdown
-        const perPageLinks = document.querySelectorAll('.pagination-dropdown .dropdown-item');
-        perPageLinks.forEach(link => {
-            if (parseInt(link.textContent.trim(), 10) === perPage) {
-                link.classList.add('active');
-            } else {
-                link.classList.remove('active');
-            }
-        });
-
-        // Update pagination UI and table
-        this.updatePaginationUI();
-        this.rebuildSamplesTable();
+        // Update the URL and navigate to it
+        const url = new URL(window.location);
+        url.searchParams.set('per_page', perPage);
+        url.searchParams.set('page', '1'); // Reset to first page
+        window.location.href = url.toString();
     }
 
     // Update pagination UI elements

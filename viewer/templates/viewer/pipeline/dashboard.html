@@ -209,25 +209,23 @@
                 </div>
                 <div class="card-footer bg-light">
                     <div class="d-flex justify-content-between align-items-center">
+                        <!-- Pagination navigation -->
                         <div class="pagination-navigation">
                             {% if page_obj.has_previous %}
-                            <a href="#" data-page="1" class="btn btn-sm btn-outline-secondary page-nav"
-                                title="First page">
+                            <a href="#" class="btn btn-sm btn-outline-secondary page-nav" title="First page">
                                 <i class="bi bi-chevron-double-left"></i>
                             </a>
-                            <a href="#" data-page="{{ page_obj.previous_page_number }}"
-                                class="btn btn-sm btn-outline-secondary page-nav ms-1" title="Previous page">
+                            <a href="#" class="btn btn-sm btn-outline-secondary page-nav ms-1" title="Previous page">
                                 <i class="bi bi-chevron-left"></i>
                             </a>
                             {% else %}
-                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
-                                title="First page">
+                            <a href="#" class="btn btn-sm btn-outline-secondary page-nav disabled" title="First page">
                                 <i class="bi bi-chevron-double-left"></i>
-                            </button>
-                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled ms-1"
+                            </a>
+                            <a href="#" class="btn btn-sm btn-outline-secondary page-nav ms-1 disabled"
                                 title="Previous page">
                                 <i class="bi bi-chevron-left"></i>
-                            </button>
+                            </a>
                             {% endif %}
 
                             <span class="page-indicator mx-2">
@@ -237,23 +235,20 @@
                             </span>
 
                             {% if page_obj.has_next %}
-                            <a href="#" data-page="{{ page_obj.next_page_number }}"
-                                class="btn btn-sm btn-outline-secondary page-nav me-1" title="Next page">
+                            <a href="#" class="btn btn-sm btn-outline-secondary page-nav me-1" title="Next page">
                                 <i class="bi bi-chevron-right"></i>
                             </a>
-                            <a href="#" data-page="{{ page_obj.paginator.num_pages }}"
-                                class="btn btn-sm btn-outline-secondary page-nav" title="Last page">
+                            <a href="#" class="btn btn-sm btn-outline-secondary page-nav" title="Last page">
                                 <i class="bi bi-chevron-double-right"></i>
                             </a>
                             {% else %}
-                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled me-1"
+                            <a href="#" class="btn btn-sm btn-outline-secondary page-nav me-1 disabled"
                                 title="Next page">
                                 <i class="bi bi-chevron-right"></i>
-                            </button>
-                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
-                                title="Last page">
+                            </a>
+                            <a href="#" class="btn btn-sm btn-outline-secondary page-nav disabled" title="Last page">
                                 <i class="bi bi-chevron-double-right"></i>
-                            </button>
+                            </a>
                             {% endif %}
                         </div>
 

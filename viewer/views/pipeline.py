@@ -6,6 +6,7 @@ import yaml
 import json
 from pathlib import Path
 from django.core.paginator import Paginator
+from viewer.models import Main, Metadata, LoadAssociation
 
 class PipelineDashboardView(TemplateView):
     template_name = 'viewer/pipeline/dashboard.html'
@@ -13,33 +14,33 @@ class PipelineDashboardView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Create a list of actual sample data
-        samples = [
-            {
-                'fastq': 'MX102931',
-                'batch': 'MTX-22030',
-                'organism': 'human',
-                'library_prep': '10xV3.1D',
-                'ingest_status': 'Completed',
-                'alignment_status': 'Not Started',
-                'postqc_status': 'Not Started'
-            },
-            {
-                'fastq': 'MX102932',
-                'batch': 'MTX-22030',
-                'organism': 'human',
-                'library_prep': '10xV3.1D',
-                'ingest_status': 'Completed',
-                'alignment_status': 'Not Started',
-                'postqc_status': 'Not Started'
-            }
-        ]
+        # Get all samples from the database
+        samples = Main.objects.select_related('fastq_name').all()
+        
+        # Convert queryset to list of dictionaries for the template
+        samples_data = []
+        for sample in samples:
+            samples_data.append({
+                'fastq': sample.fastq_name.fastq_name,
+                'batch': sample.fastq_name.batch_name_from_vendor,
+                'organism': sample.fastq_name.organism_common_name,
+                'library_prep': sample.library_prep_method,
+                'ingest_status': sample.ingest_status or 'Not Started',
+                'alignment_status': sample.alignment_status or 'Not Started',
+                'postqc_status': sample.postqc_status or 'Not Started'
+            })
+        
+        # Get pagination parameters from request
+        per_page = self.get_paginate_by()
+        page_number = self.request.GET.get('page', '1')
         
         # Set up pagination with actual samples
-        paginator = Paginator(samples, self.get_paginate_by())
-        page = self.request.GET.get('page', 1)
+        paginator = Paginator(samples_data, per_page)
         try:
-            page_obj = paginator.get_page(page)
+            # Convert page_number to int for proper pagination
+            page_number = int(page_number)
+            # Get the requested page
+            page_obj = paginator.page(page_number)
             print(f"DEBUG - Pagination Info:")
             print(f"- Current page: {page_obj.number}")
             print(f"- Items per page: {paginator.per_page}")
@@ -49,10 +50,10 @@ class PipelineDashboardView(TemplateView):
             print(f"- Total items: {paginator.count}")
         except Exception as e:
             print(f"DEBUG - Pagination Error: {str(e)}")
-            page_obj = paginator.get_page(1)
+            page_obj = paginator.page(1)
         
         context['page_obj'] = page_obj
-        context['current_per_page'] = self.get_paginate_by()
+        context['current_per_page'] = per_page
         
         # Get pipeline configuration
         config_path = Path(os.path.join('config', 'pipeline_config.yaml'))
@@ -95,7 +96,14 @@ class PipelineDashboardView(TemplateView):
     
     def get_paginate_by(self):
         """Get the number of items to display per page."""
-        return int(self.request.GET.get('per_page', 25))
+        per_page = self.request.GET.get('per_page', '25')
+        try:
+            per_page = int(per_page)
+            if per_page in [10, 25, 50, 100]:
+                return per_page
+        except (TypeError, ValueError):
+            pass
+        return 25
 
 class PipelineApiView:
     @staticmethod

@@ -228,21 +228,7 @@
     box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 
-/* Pagination Controls */
-.pagination-navigation .btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-    line-height: 1.5;
-}
-
-.pagination-navigation .page-nav {
-    min-width: 32px;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
+/* Pagination controls */
 .goto-page-input {
     width: 60px;
     text-align: center;
@@ -263,4 +249,48 @@
 #rowsPerPageDropdown {
     padding: 0.25rem 0.75rem;
     font-size: 0.875rem;
+}
+
+/* Pagination navigation */
+.pagination-navigation {
+    display: flex;
+    align-items: center;
+}
+
+.pagination-navigation .page-nav {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-color: #dee2e6;
+    color: #495057;
+    transition: all 0.2s ease;
+}
+
+.pagination-navigation .page-nav:hover:not(.disabled) {
+    background-color: #e9ecef;
+    border-color: #ced4da;
+    color: #212529;
+}
+
+.pagination-navigation .page-nav.disabled {
+    color: #adb5bd;
+    cursor: not-allowed;
+}
+
+.pagination-navigation .page-indicator {
+    font-size: 0.875rem;
+    font-weight: 500;
+    min-width: 65px;
+    text-align: center;
+}
+
+.pagination-navigation .current-page {
+    color: #212529;
+}
+
+.pagination-navigation .total-pages {
+    color: #6c757d;
 }
