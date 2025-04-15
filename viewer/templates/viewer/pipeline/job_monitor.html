@@ -179,7 +179,7 @@
                             </thead>
                             <tbody>
                                 {% for job in running_jobs %}
-                                <tr data-demand-id="{{ job.demand_id }}">
+                                <tr class="running-job" data-demand-id="{{ job.demand_id }}">
                                     <td>{{ job.fastq_name }}</td>
                                     <td>
                                         <span class="text-monospace">{{ job.demand_id }}</span>

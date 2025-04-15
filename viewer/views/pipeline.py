@@ -3,6 +3,8 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.urls import reverse
 from django.views import View
+from django.db.models import Prefetch, OuterRef, Subquery, F
+from django.core.cache import cache
 import os
 import yaml
 import json
@@ -25,17 +27,24 @@ class PipelineDashboardView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Get all samples from the database
-        samples = Main.objects.select_related('fastq_name').all()
+        # Get all samples with related data in a single query
+        samples = Main.objects.select_related(
+            'fastq_name'
+        ).prefetch_related(
+            Prefetch(
+                'fastq_name__loadassociation_set',
+                queryset=LoadAssociation.objects.all(),
+                to_attr='load_associations'
+            )
+        ).all()
         
-        # Convert queryset to list of dictionaries for the template
+        # Convert queryset to list of dictionaries efficiently
         samples_data = []
         for sample in samples:
-            # Get load name from related LoadAssociation table
+            # Get load name from prefetched data
             load_name = ''
-            load_assoc = LoadAssociation.objects.filter(fastq_name=sample.fastq_name).first()
-            if load_assoc:
-                load_name = load_assoc.load_name
+            if hasattr(sample.fastq_name, 'load_associations') and sample.fastq_name.load_associations:
+                load_name = sample.fastq_name.load_associations[0].load_name
             
             samples_data.append({
                 'fastq': sample.fastq_name.fastq_name,
@@ -56,17 +65,8 @@ class PipelineDashboardView(TemplateView):
         # Set up pagination with actual samples
         paginator = Paginator(samples_data, per_page)
         try:
-            # Convert page_number to int for proper pagination
             page_number = int(page_number)
-            # Get the requested page
             page_obj = paginator.page(page_number)
-            print(f"DEBUG - Pagination Info:")
-            print(f"- Current page: {page_obj.number}")
-            print(f"- Items per page: {paginator.per_page}")
-            print(f"- Total pages: {paginator.num_pages}")
-            print(f"- Start index: {page_obj.start_index()}")
-            print(f"- End index: {page_obj.end_index()}")
-            print(f"- Total items: {paginator.count}")
         except Exception as e:
             print(f"DEBUG - Pagination Error: {str(e)}")
             page_obj = paginator.page(1)
@@ -74,39 +74,75 @@ class PipelineDashboardView(TemplateView):
         context['page_obj'] = page_obj
         context['current_per_page'] = per_page
         
-        # Get pipeline configuration
-        config = load_pipeline_config()
+        # Cache pipeline configuration
+        cache_key = 'pipeline_config'
+        config = cache.get(cache_key)
+        if config is None:
+            config = load_pipeline_config()
+            cache.set(cache_key, config, timeout=3600)  # Cache for 1 hour
         context['references'] = config.get('references', {})
         context['chemistries'] = config.get('chemistries', {})
         
-        # Get count of running jobs
-        job_counts = count_running_jobs()
+        # Get job counts from cache or compute
+        cache_key = f'job_counts_{self.request.user.id}'
+        job_counts = cache.get(cache_key)
+        if job_counts is None:
+            job_counts = count_running_jobs()
+            cache.set(cache_key, job_counts, timeout=300)  # Cache for 5 minutes
         context['job_counts'] = job_counts
         
-        # Get list of running alignments
-        running_alignments = Alignment.objects.filter(status_id__in=['SUBMITTED', 'IN_PROGRESS']).select_related('fastq_name')
+        # Get running alignments with efficient querying
+        running_alignments = Alignment.objects.filter(
+            status_id__in=['SUBMITTED', 'IN_PROGRESS']
+        ).select_related('fastq_name').values(
+            'fastq_name_id',
+            'demand_id',
+            'status_id',
+            'start_time',
+            organism=F('fastq_name__organism_common_name'),
+            batch=F('fastq_name__batch_name_from_vendor')
+        )
         
-        # Format for display
+        # Format for display using dict comprehension
         context['running_alignments'] = {
-            alignment.fastq_name_id: {
-                'demand_id': alignment.demand_id,
-                'status': alignment.status_id,
-                'start_time': alignment.start_time,
-                'organism': alignment.fastq_name.organism_common_name,
-                'batch': alignment.fastq_name.batch_name_from_vendor
-            } for alignment in running_alignments
+            aln['fastq_name_id']: {
+                'demand_id': aln['demand_id'],
+                'status': aln['status_id'],
+                'start_time': aln['start_time'],
+                'organism': aln['organism'],
+                'batch': aln['batch']
+            } for aln in running_alignments
         }
         
-        # Check if we need to update the status of running jobs
+        # Check if we need to update job status (async)
         last_update = self.request.session.get('last_job_status_update', 0)
         current_time = timezone.now().timestamp()
         
-        # Update job status every 10 minutes
         if current_time - last_update > 600:  # 10 minutes in seconds
-            update_all_running_jobs()
-            self.request.session['last_job_status_update'] = current_time
+            from django.core.cache import cache
+            cache_key = f'updating_jobs_{self.request.user.id}'
+            if not cache.get(cache_key):
+                # Set a lock to prevent multiple updates
+                cache.set(cache_key, True, timeout=60)
+                # Update job status asynchronously
+                from django.core.cache import cache
+                from concurrent.futures import ThreadPoolExecutor
+                with ThreadPoolExecutor() as executor:
+                    executor.submit(self._update_jobs_async, self.request.user.id)
+                self.request.session['last_job_status_update'] = current_time
         
         return context
+    
+    def _update_jobs_async(self, user_id):
+        """Update jobs asynchronously and update cache"""
+        try:
+            results = update_all_running_jobs()
+            # Update job counts in cache
+            job_counts = count_running_jobs()
+            cache.set(f'job_counts_{user_id}', job_counts, timeout=300)
+        finally:
+            # Release the lock
+            cache.delete(f'updating_jobs_{user_id}')
     
     def get_paginate_by(self):
         """Get the number of items to display per page."""
@@ -125,6 +161,9 @@ class JobMonitorView(TemplateView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        
+        # Update all running jobs first to ensure database is in sync
+        update_all_running_jobs()
         
         # Get all running alignment jobs
         alignments = Alignment.objects.filter(
@@ -156,10 +195,10 @@ class JobMonitorView(TemplateView):
             'organism': alignment.fastq_name.organism_common_name,
             'batch': alignment.fastq_name.batch_name_from_vendor,
             'workflow': 'MTX' if 'MTX' in alignment.fastq_name.batch_name_from_vendor else 'RTX',
-            'duration': (alignment.end_time - alignment.start_time).total_seconds() // 60 if alignment.end_time else 0  # in minutes
+            'duration': (alignment.end_time - alignment.start_time).total_seconds() // 60 if (alignment.end_time and alignment.start_time) else 0  # in minutes
         } for alignment in completed_alignments]
         
-        # Job counts
+        # Get fresh job counts
         job_counts = count_running_jobs()
         context['job_counts'] = job_counts
         

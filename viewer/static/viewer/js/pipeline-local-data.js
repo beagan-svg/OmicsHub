@@ -6,6 +6,21 @@
 // Add immediate debugging to see if script is loaded
 console.log('pipeline-local-data.js is being loaded');
 
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 class PipelineLocalData {
     constructor() {
         this.storageKey = 'pipelineSelectedSamples';
@@ -240,6 +255,137 @@ class PipelineLocalData {
                 this.updateSubmitButtonState();
             });
         }
+
+        // Setup auto-refresh toggle
+        const autoRefreshToggle = document.getElementById('autoRefreshToggle');
+        if (autoRefreshToggle) {
+            let refreshInterval;
+
+            autoRefreshToggle.addEventListener('change', function () {
+                if (this.checked) {
+                    // Start auto-refresh every 30 seconds
+                    refreshInterval = setInterval(() => {
+                        fetch('/pipeline/api/update_all_jobs/', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken'),
+                                'Content-Type': 'application/json'
+                            }
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    // Reload the page to show updated job statuses
+                                    window.location.reload();
+                                }
+                            })
+                            .catch(error => console.error('Error updating jobs:', error));
+                    }, 30000);
+                } else {
+                    // Stop auto-refresh
+                    clearInterval(refreshInterval);
+                }
+            });
+        }
+
+        // Setup manual refresh button
+        const refreshJobsBtn = document.getElementById('refreshJobsBtn');
+        if (refreshJobsBtn) {
+            refreshJobsBtn.addEventListener('click', function () {
+                fetch('/pipeline/api/update_all_jobs/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/json'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Reload the page to show updated job statuses
+                            window.location.reload();
+                        }
+                    })
+                    .catch(error => console.error('Error updating jobs:', error));
+            });
+        }
+
+        // Setup individual job status check buttons
+        const checkStatusBtns = document.querySelectorAll('.check-status-btn');
+        checkStatusBtns.forEach(btn => {
+            btn.addEventListener('click', function () {
+                const demandId = this.dataset.demandId;
+                fetch(`/pipeline/api/check_alignment_status/?demand_id=${demandId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Update the status badge
+                            const row = this.closest('tr');
+                            const statusCell = row.querySelector('.job-status');
+                            if (statusCell) {
+                                let badgeClass = 'bg-secondary';
+                                let statusText = data.job_status;
+
+                                switch (data.job_status) {
+                                    case 'SUBMITTED':
+                                        badgeClass = 'bg-info';
+                                        statusText = 'Submitted';
+                                        break;
+                                    case 'IN_PROGRESS':
+                                        badgeClass = 'bg-primary';
+                                        statusText = 'Running';
+                                        break;
+                                    case 'COMPLETED':
+                                        badgeClass = 'bg-success';
+                                        statusText = 'Completed';
+                                        break;
+                                    case 'FAILED':
+                                        badgeClass = 'bg-danger';
+                                        statusText = 'Failed';
+                                        break;
+                                    case 'ABORTED':
+                                        badgeClass = 'bg-secondary';
+                                        statusText = 'Aborted';
+                                        break;
+                                }
+
+                                statusCell.innerHTML = `<span class="badge ${badgeClass} status-badge">${statusText}</span>`;
+                            }
+                        }
+                    })
+                    .catch(error => console.error('Error checking job status:', error));
+            });
+        });
+
+        // Setup job stop buttons
+        const stopJobBtns = document.querySelectorAll('.stop-job-btn');
+        stopJobBtns.forEach(btn => {
+            btn.addEventListener('click', function () {
+                if (confirm('Are you sure you want to stop this job?')) {
+                    const demandId = this.dataset.demandId;
+                    fetch('/pipeline/api/stop_alignment/', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCookie('csrftoken'),
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ demand_id: demandId })
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                // Update the status badge
+                                const row = this.closest('tr');
+                                const statusCell = row.querySelector('.job-status');
+                                if (statusCell) {
+                                    statusCell.innerHTML = '<span class="badge bg-secondary status-badge">Aborted</span>';
+                                }
+                            }
+                        })
+                        .catch(error => console.error('Error stopping job:', error));
+                }
+            });
+        });
 
         console.log('PipelineLocalData event listeners set up');
     }
@@ -608,7 +754,7 @@ class PipelineLocalData {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': this.getCSRFToken()
+                'X-CSRFToken': getCookie('csrftoken')
             },
             body: JSON.stringify({ samples })
         })

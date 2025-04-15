@@ -86,9 +86,14 @@ def count_running_jobs():
     try:
         if 'No demands were found' not in output and output.strip():
             align_jobs = json.loads(output)
-            align_count = len(align_jobs)
+            if isinstance(align_jobs, list):
+                align_count = len(align_jobs)
+            else:
+                logger.error(f"Unexpected alignment jobs output format: {output}")
     except json.JSONDecodeError:
         logger.error(f"Failed to parse alignment jobs output: {output}")
+    except Exception as e:
+        logger.error(f"Error counting alignment jobs: {str(e)}")
     
     # Check post-alignment jobs
     script_path = create_bash_script(
@@ -100,9 +105,17 @@ def count_running_jobs():
     try:
         if 'No demands were found' not in output and output.strip():
             post_align_jobs = json.loads(output)
-            post_align_count = len(post_align_jobs)
+            if isinstance(post_align_jobs, list):
+                post_align_count = len(post_align_jobs)
+            else:
+                logger.error(f"Unexpected post-alignment jobs output format: {output}")
     except json.JSONDecodeError:
         logger.error(f"Failed to parse post-alignment jobs output: {output}")
+    except Exception as e:
+        logger.error(f"Error counting post-alignment jobs: {str(e)}")
+    
+    # Also update database to match actual running jobs
+    update_all_running_jobs()
     
     return {
         'align_count': align_count,
@@ -331,58 +344,79 @@ def stop_alignment_job(demand_id):
         }
 
 def update_all_running_jobs():
-    """Update status of all running alignment jobs"""
-    running_jobs = Alignment.objects.filter(status_id__in=['SUBMITTED', 'IN_PROGRESS'])
+    """Update status of all running jobs in the database"""
     results = []
     
-    for job in running_jobs:
-        if job.demand_id:
-            status = check_alignment_status(job.demand_id)
-            
-            if status.get('status') == 'success':
-                job_status = status.get('job_status')
-                
-                # Update job status
-                job.status_id = job_status
-                
-                # If job completed or failed, set end time
-                if job_status in ['COMPLETED', 'FAILED', 'ABORTED']:
-                    job.end_time = timezone.now()
-                
+    # Get all jobs marked as running in our database
+    running_jobs = Alignment.objects.filter(status_id__in=['SUBMITTED', 'IN_PROGRESS'])
+    
+    # Check actual running jobs from the service
+    script_path = create_bash_script(
+        'ocs core gwo demand list-demands --demand-type align --status IN_PROGRESS --format json',
+        'check_running_jobs.sh'
+    )
+    output = run_bash_script(script_path)
+    
+    try:
+        actual_running_jobs = []
+        if 'No demands were found' not in output and output.strip():
+            actual_running_jobs = json.loads(output)
+        
+        # Create a set of actually running demand_ids
+        actual_running_demand_ids = {job['demand_id'] for job in actual_running_jobs}
+        
+        # Update jobs that are no longer running
+        for job in running_jobs:
+            if job.demand_id not in actual_running_demand_ids:
+                # Job is no longer running, mark as FAILED
+                job.status_id = 'FAILED'
+                job.end_time = timezone.now()
                 job.save()
                 
-                # Update Main table
-                main = Main.objects.get(fastq_name=job.fastq_name)
-                
-                if job_status == 'COMPLETED':
-                    main.alignment_status = 'Completed'
-                elif job_status == 'FAILED':
-                    # If retry count < 1, retry automatically
-                    if job.retry_count < 1:
-                        sample_data = {
-                            'fastq_name': job.fastq_name_id,
-                            'organism_common_name': job.fastq_name.organism_common_name,
-                            'batch_name_from_vendor': job.fastq_name.batch_name_from_vendor,
-                            'library_prep': main.library_prep_method,
-                            'load_name': main.fastq_name.loadassociation_set.first().load_name if main.fastq_name.loadassociation_set.exists() else ''
-                        }
-                        
-                        # Submit for retry after a delay
-                        time.sleep(5)  # Small delay before retry
-                        submit_sample_for_alignment(sample_data)
-                    else:
-                        main.alignment_status = 'Failed'
-                elif job_status == 'ABORTED':
-                    main.alignment_status = 'Aborted'
-                else:
-                    main.alignment_status = 'In Progress'
-                
-                main.save()
+                # Update main table
+                try:
+                    main = Main.objects.get(fastq_name=job.fastq_name)
+                    main.alignment_status = 'Failed'
+                    main.save()
+                except Main.DoesNotExist:
+                    pass
                 
                 results.append({
                     'fastq_name': job.fastq_name_id,
                     'demand_id': job.demand_id,
-                    'status': job_status
+                    'old_status': 'IN_PROGRESS',
+                    'new_status': 'FAILED'
                 })
+        
+        # Update or create entries for actually running jobs
+        for running_job in actual_running_jobs:
+            demand_id = running_job['demand_id']
+            
+            # Try to find the alignment record
+            alignment = Alignment.objects.filter(demand_id=demand_id).first()
+            
+            if alignment:
+                # Update existing record if status changed
+                if alignment.status_id != 'IN_PROGRESS':
+                    alignment.status_id = 'IN_PROGRESS'
+                    alignment.save()
+                    
+                    # Update main table
+                    try:
+                        main = Main.objects.get(fastq_name=alignment.fastq_name)
+                        main.alignment_status = 'In Progress'
+                        main.save()
+                    except Main.DoesNotExist:
+                        pass
+                    
+                    results.append({
+                        'fastq_name': alignment.fastq_name_id,
+                        'demand_id': demand_id,
+                        'old_status': alignment.status_id,
+                        'new_status': 'IN_PROGRESS'
+                    })
+            
+    except json.JSONDecodeError:
+        logger.error(f"Failed to parse running jobs output: {output}")
     
     return results 
