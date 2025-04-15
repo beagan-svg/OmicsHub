@@ -29,6 +29,35 @@
     .auto-refresh-toggle {
         cursor: pointer;
     }
+
+    /* Refresh button styles */
+    #refreshJobsBtn {
+        position: relative;
+        min-width: 120px;
+    }
+
+    #refreshJobsBtn .refresh-spinner,
+    #refreshJobsBtn .refresh-icon {
+        transition: opacity 0.2s ease;
+    }
+
+    #refreshJobsBtn .refresh-spinner {
+        margin-right: 8px;
+    }
+
+    #refreshJobsBtn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    /* Progress indicator styles */
+    #updateProgress {
+        transition: all 0.3s ease;
+    }
+
+    #updateProgress.d-none {
+        display: none !important;
+    }
 </style>
 {% endblock %}
 
@@ -57,8 +86,17 @@
                                 <label class="form-check-label" for="autoRefreshToggle">Auto Refresh</label>
                             </div>
                             <button class="btn btn-outline-primary" id="refreshJobsBtn">
-                                <i class="bi bi-arrow-clockwise"></i> Refresh Now
+                                <span class="spinner-border spinner-border-sm refresh-spinner d-none" role="status"
+                                    aria-hidden="true"></span>
+                                <i class="bi bi-arrow-clockwise refresh-icon"></i> Refresh Now
                             </button>
+                        </div>
+                    </div>
+                    <!-- Progress Indicator -->
+                    <div id="updateProgress" class="alert alert-info d-none mt-3">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
+                            <span id="updateMessage">Updating job statuses...</span>
                         </div>
                     </div>
                 </div>
@@ -260,8 +298,8 @@
                                         <span class="text-monospace">{{ job.demand_id }}</span>
                                     </td>
                                     <td>{{ job.workflow }}</td>
-                                    <td>{{ job.start_time|date:"Y-m-d H:i:s" }}</td>
-                                    <td>{{ job.end_time|date:"Y-m-d H:i:s" }}</td>
+                                    <td>{{ job.start_time }}</td>
+                                    <td>{{ job.end_time }}</td>
                                     <td>{{ job.duration }}</td>
                                     <td class="job-status">
                                         {% if job.status == 'COMPLETED' %}
@@ -282,7 +320,8 @@
                     {% else %}
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle-fill me-2"></i>
-                        No jobs have been completed recently.
+                        No jobs have been submitted and processed through this application yet. Once you submit jobs,
+                        they will appear here after completion.
                     </div>
                     {% endif %}
                 </div>
@@ -340,29 +379,28 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        console.log('DOM Content Loaded event fired'); // Debug log
+
         // Auto refresh feature
         const autoRefreshToggle = document.getElementById('autoRefreshToggle');
         let autoRefreshInterval;
 
-        autoRefreshToggle.addEventListener('change', function () {
-            if (this.checked) {
-                // Refresh every 60 seconds
-                autoRefreshInterval = setInterval(refreshJobStatus, 60000);
-                showToast('Auto refresh enabled - updating every minute', 'info');
-            } else {
-                clearInterval(autoRefreshInterval);
-                showToast('Auto refresh disabled', 'info');
-            }
-        });
-
         // Refresh button
         const refreshBtn = document.getElementById('refreshJobsBtn');
-        refreshBtn.addEventListener('click', function () {
-            refreshJobStatus();
-        });
+        console.log('Refresh button element:', refreshBtn); // Debug log
+
+        if (!refreshBtn) {
+            console.error('Refresh button not found!'); // Debug log
+        } else {
+            console.log('Adding click event listener to refresh button'); // Debug log
+            refreshBtn.addEventListener('click', function (e) {
+                console.log('Refresh button clicked!', e); // Debug log
+                refreshJobStatus();
+            });
+        }
 
         // Update all jobs button
         const updateAllJobsBtn = document.getElementById('updateAllJobsBtn');
@@ -370,40 +408,46 @@
             updateAllJobs();
         });
 
-        // Check status buttons
-        const checkStatusBtns = document.querySelectorAll('.check-status-btn');
-        checkStatusBtns.forEach(btn => {
-            btn.addEventListener('click', function () {
-                const demandId = this.getAttribute('data-demand-id');
-                checkJobStatus(demandId);
+        // Initial attachment of event listeners
+        attachEventListeners();
+
+        // Function to attach event listeners to dynamic elements
+        function attachEventListeners() {
+            // Check status buttons
+            const checkStatusBtns = document.querySelectorAll('.check-status-btn');
+            checkStatusBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const demandId = this.getAttribute('data-demand-id');
+                    checkJobStatus(demandId);
+                });
             });
-        });
 
-        // Stop job buttons
-        const stopJobBtns = document.querySelectorAll('.stop-job-btn');
-        stopJobBtns.forEach(btn => {
-            btn.addEventListener('click', function () {
-                const demandId = this.getAttribute('data-demand-id');
-                const row = this.closest('tr');
-                const fastqName = row.querySelector('td:first-child').textContent.trim();
+            // Stop job buttons
+            const stopJobBtns = document.querySelectorAll('.stop-job-btn');
+            stopJobBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const demandId = this.getAttribute('data-demand-id');
+                    const row = this.closest('tr');
+                    const fastqName = row.querySelector('td:first-child').textContent.trim();
 
-                // Populate confirm modal
-                const jobInfo = document.querySelector('#confirmStopModal .job-info');
-                jobInfo.innerHTML = `
+                    // Populate confirm modal
+                    const jobInfo = document.querySelector('#confirmStopModal .job-info');
+                    jobInfo.innerHTML = `
                     <div class="alert alert-info">
                         <strong>FASTQ Name:</strong> ${fastqName}<br>
                         <strong>Demand ID:</strong> ${demandId}
                     </div>
                 `;
 
-                // Set demand ID on confirm button
-                document.getElementById('confirmStopBtn').setAttribute('data-demand-id', demandId);
+                    // Set demand ID on confirm button
+                    document.getElementById('confirmStopBtn').setAttribute('data-demand-id', demandId);
 
-                // Show modal
-                const modal = new bootstrap.Modal(document.getElementById('confirmStopModal'));
-                modal.show();
+                    // Show modal
+                    const modal = new bootstrap.Modal(document.getElementById('confirmStopModal'));
+                    modal.show();
+                });
             });
-        });
+        }
 
         // Confirm stop button
         const confirmStopBtn = document.getElementById('confirmStopBtn');
@@ -417,8 +461,277 @@
         });
 
         // Function to refresh job status
-        function refreshJobStatus() {
-            window.location.reload();
+        async function refreshJobStatus() {
+            console.log('refreshJobStatus function called'); // Debug log
+            const refreshBtn = document.getElementById('refreshJobsBtn');
+            const refreshSpinner = refreshBtn.querySelector('.refresh-spinner');
+            const refreshIcon = refreshBtn.querySelector('.refresh-icon');
+            const progressDiv = document.getElementById('updateProgress');
+            const updateMessage = document.getElementById('updateMessage');
+
+            console.log('Button elements:', { refreshBtn, refreshSpinner, refreshIcon, progressDiv, updateMessage }); // Debug log
+
+            // Disable button and show loading state
+            refreshBtn.disabled = true;
+            refreshSpinner.classList.remove('d-none');
+            refreshIcon.classList.add('d-none');
+            progressDiv.classList.remove('d-none');
+            updateMessage.textContent = 'Updating job statuses...';
+
+            try {
+                console.log('Starting job refresh...'); // Debug log
+
+                // First update all jobs
+                const updateResponse = await fetch('/api/pipeline/update-all-jobs/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                });
+                const updateData = await updateResponse.json();
+                console.log('Update response:', updateData); // Debug log
+
+                if (updateData.status !== 'success') {
+                    throw new Error(updateData.message || 'Failed to update jobs');
+                }
+
+                // Then get the updated job data
+                updateMessage.textContent = 'Retrieving latest job data...';
+                const dataResponse = await fetch('/api/pipeline/get-job-data/');
+                const data = await dataResponse.json();
+                console.log('Data response:', data); // Debug log
+
+                if (data.status === 'success') {
+                    // Update the job statistics
+                    updateJobStatistics(data.job_counts);
+
+                    // Update the running jobs table - find the specific running jobs section by icon
+                    const runningJobsSection = document.querySelector('.card-header h5 .bi-hourglass-split')?.closest('.col-12');
+                    if (runningJobsSection) {
+                        updateRunningJobs(data.running_jobs, runningJobsSection);
+                    } else {
+                        console.error('Could not find running jobs section by icon');
+                    }
+
+                    // Update the completed jobs table - find the specific completed jobs section by icon
+                    const completedJobsSection = document.querySelector('.card-header h5 .bi-check2-circle')?.closest('.col-12');
+                    if (completedJobsSection) {
+                        updateCompletedJobs(data.completed_jobs, completedJobsSection);
+                    } else {
+                        console.error('Could not find completed jobs section by icon');
+                    }
+
+                    showToast(`Updated ${data.running_jobs.length + data.completed_jobs.length} jobs successfully`, 'success');
+                } else {
+                    throw new Error(data.message || 'Failed to retrieve job data');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Error updating jobs: ' + error.message, 'danger');
+            } finally {
+                // Always re-enable button and hide progress indicator
+                refreshBtn.disabled = false;
+                refreshSpinner.classList.add('d-none');
+                refreshIcon.classList.remove('d-none');
+                progressDiv.classList.add('d-none');
+                updateMessage.textContent = 'Updating job statuses...'; // Reset message for next time
+            }
+        }
+
+        // Function to update job statistics
+        function updateJobStatistics(jobCounts) {
+            // Update alignment jobs count
+            const alignCountElement = document.querySelector('.col-md-4 .col-6:first-child h2');
+            if (alignCountElement) {
+                alignCountElement.textContent = jobCounts.align_count;
+            }
+
+            // Update post-QC jobs count
+            const postAlignCountElement = document.querySelector('.col-md-4 .col-6:last-child h2');
+            if (postAlignCountElement) {
+                postAlignCountElement.textContent = jobCounts.post_align_count;
+            }
+
+            // Update total jobs count and progress bar
+            const totalCountElement = document.querySelector('.col-md-4 .col-12 h3');
+            const progressBar = document.querySelector('.col-md-4 .progress-bar');
+            if (totalCountElement && progressBar) {
+                totalCountElement.textContent = jobCounts.total;
+                progressBar.style.width = `${jobCounts.total}%`;
+                progressBar.setAttribute('aria-valuenow', jobCounts.total);
+                progressBar.textContent = `${jobCounts.total}%`;
+            }
+        }
+
+        // Function to update running jobs table
+        function updateRunningJobs(runningJobs, runningJobsSection) {
+            if (!runningJobsSection) {
+                console.error('Running jobs section not provided');
+                return;
+            }
+
+            // Find the card body within this specific section
+            const runningJobsContainer = runningJobsSection.querySelector('.card-body');
+            if (!runningJobsContainer) {
+                console.error('Could not find running jobs container');
+                return;
+            }
+
+            if (runningJobs.length === 0) {
+                // No running jobs, show the alert
+                runningJobsContainer.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        No jobs are currently running.
+                    </div>
+                `;
+                return;
+            }
+
+            // We have running jobs, create or update the table
+            if (!runningJobsSection.querySelector('#running-jobs-table')) {
+                // Create the table if it doesn't exist
+                runningJobsContainer.innerHTML = `
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped" id="running-jobs-table">
+                            <thead>
+                                <tr>
+                                    <th>FASTQ Name</th>
+                                    <th>Demand ID</th>
+                                    <th>Workflow</th>
+                                    <th>Organism</th>
+                                    <th>Batch</th>
+                                    <th>Start Time</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            // Now we're sure the table exists, update it
+            const tbody = runningJobsSection.querySelector('#running-jobs-table tbody');
+            if (tbody) {
+                tbody.innerHTML = runningJobs.map(job => `
+                    <tr class="running-job" data-demand-id="${job.demand_id}">
+                        <td>${job.fastq_name}</td>
+                        <td><span class="text-monospace">${job.demand_id}</span></td>
+                        <td>${job.workflow}</td>
+                        <td>${job.organism}</td>
+                        <td>${job.batch}</td>
+                        <td>${job.start_time}</td>
+                        <td class="job-status">
+                            ${getStatusBadge(job.status)}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary check-status-btn" data-demand-id="${job.demand_id}">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger stop-job-btn" data-demand-id="${job.demand_id}">
+                                <i class="bi bi-stop-fill"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            // Update the badge count for running jobs
+            const runningBadge = runningJobsSection.querySelector('.card-header .badge');
+            if (runningBadge) {
+                runningBadge.textContent = runningJobs.length;
+            }
+
+            // Re-add event listeners to the new buttons
+            attachEventListeners();
+        }
+
+        // Function to update completed jobs table
+        function updateCompletedJobs(completedJobs, completedJobsSection) {
+            if (!completedJobsSection) {
+                console.error('Completed jobs section not provided');
+                return;
+            }
+
+            // Find the card body within this specific section
+            const completedJobsContainer = completedJobsSection.querySelector('.card-body');
+            if (!completedJobsContainer) {
+                console.error('Could not find completed jobs container');
+                return;
+            }
+
+            if (completedJobs.length === 0) {
+                // No completed jobs, show the alert
+                completedJobsContainer.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        No jobs have been submitted and processed through this application yet. Once you submit jobs, they will appear here after completion.
+                    </div>
+                `;
+                return;
+            }
+
+            // We have completed jobs, create or update the table
+            if (!completedJobsSection.querySelector('#completed-jobs-table')) {
+                // Create the table if it doesn't exist
+                completedJobsContainer.innerHTML = `
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="completed-jobs-table">
+                            <thead>
+                                <tr>
+                                    <th>FASTQ Name</th>
+                                    <th>Demand ID</th>
+                                    <th>Workflow</th>
+                                    <th>Start Time</th>
+                                    <th>End Time</th>
+                                    <th>Duration (min)</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            // Now we're sure the table exists, update it
+            const tbody = completedJobsSection.querySelector('#completed-jobs-table tbody');
+            if (tbody) {
+                tbody.innerHTML = completedJobs.map(job => `
+                    <tr data-demand-id="${job.demand_id}" class="${job.status === 'FAILED' ? 'table-danger' : job.status === 'ABORTED' ? 'table-secondary' : ''}">
+                        <td>${job.fastq_name}</td>
+                        <td><span class="text-monospace">${job.demand_id}</span></td>
+                        <td>${job.workflow}</td>
+                        <td>${job.start_time}</td>
+                        <td>${job.end_time}</td>
+                        <td>${job.duration}</td>
+                        <td class="job-status">
+                            ${getStatusBadge(job.status)}
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            // Update the badge count for completed jobs
+            const completedBadge = completedJobsSection.querySelector('.card-header .badge');
+            if (completedBadge) {
+                completedBadge.textContent = completedJobs.length;
+            }
+        }
+
+        // Helper function to get status badge HTML
+        function getStatusBadge(status) {
+            const badges = {
+                'SUBMITTED': '<span class="badge bg-info status-badge">Submitted</span>',
+                'IN_PROGRESS': '<span class="badge bg-primary status-badge">Running</span>',
+                'COMPLETED': '<span class="badge bg-success status-badge">Completed</span>',
+                'FAILED': '<span class="badge bg-danger status-badge">Failed</span>',
+                'ABORTED': '<span class="badge bg-secondary status-badge">Aborted</span>'
+            };
+            return badges[status] || `<span class="badge bg-secondary status-badge">${status}</span>`;
         }
 
         // Function to check job status
