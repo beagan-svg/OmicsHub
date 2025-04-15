@@ -1,0 +1,595 @@
+{% extends "viewer/base.html" %}
+{% load static %}
+{% load viewer_filters %}
+
+{% block title %}Pipeline Job Monitor{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'viewer/css/pipeline.css' %}">
+<style>
+    .job-card {
+        transition: all 0.2s ease;
+    }
+
+    .job-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .job-status {
+        width: 100px;
+    }
+
+    .status-badge {
+        width: 100%;
+        display: inline-block;
+        text-align: center;
+    }
+
+    .auto-refresh-toggle {
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Pipeline Job Monitor</h4>
+                    <div>
+                        <a href="{% url 'viewer:pipeline_dashboard' %}" class="btn btn-light">
+                            <i class="bi bi-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <p class="lead mb-0">
+                            Monitor and manage running alignment jobs
+                        </p>
+                        <div class="d-flex align-items-center">
+                            <div class="form-check form-switch me-3">
+                                <input class="form-check-input auto-refresh-toggle" type="checkbox"
+                                    id="autoRefreshToggle">
+                                <label class="form-check-label" for="autoRefreshToggle">Auto Refresh</label>
+                            </div>
+                            <button class="btn btn-outline-primary" id="refreshJobsBtn">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4 mb-4 mb-md-0">
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Job Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="text-center mb-3">
+                                <h2 class="mb-0">{{ job_counts.align_count }}</h2>
+                                <small class="text-muted">Alignment Jobs</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center mb-3">
+                                <h2 class="mb-0">{{ job_counts.post_align_count }}</h2>
+                                <small class="text-muted">Post-QC Jobs</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="text-center mb-3">
+                                <h3 class="mb-0">{{ job_counts.total }}</h3>
+                                <small class="text-muted">Total Running Jobs</small>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar bg-primary" role="progressbar"
+                                    style="width: {{ job_counts.total }}%;" aria-valuenow="{{ job_counts.total }}"
+                                    aria-valuemin="0" aria-valuemax="100">{{ job_counts.total }}%</div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1">
+                                <small class="text-muted">0</small>
+                                <small class="text-muted">100 (Max)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="card job-card">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-arrow-clockwise text-primary" style="font-size: 2rem;"></i>
+                                    <h5 class="card-title mt-2">Update All Jobs</h5>
+                                    <p class="card-text text-muted">Get the latest status of all running jobs</p>
+                                    <button class="btn btn-sm btn-primary" id="updateAllJobsBtn">Update Now</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card job-card">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-exclamation-triangle text-warning" style="font-size: 2rem;"></i>
+                                    <h5 class="card-title mt-2">View Failed Jobs</h5>
+                                    <p class="card-text text-muted">Check jobs that need attention</p>
+                                    <a href="{% url 'viewer:failed_jobs' %}" class="btn btn-sm btn-warning">View
+                                        Failed</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card job-card">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-plus-circle text-success" style="font-size: 2rem;"></i>
+                                    <h5 class="card-title mt-2">New Submission</h5>
+                                    <p class="card-text text-muted">Submit new samples for processing</p>
+                                    <a href="{% url 'viewer:pipeline_dashboard' %}" class="btn btn-sm btn-success">Go to
+                                        Dashboard</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="bi bi-hourglass-split text-primary me-2"></i> Running Jobs
+                        <span class="badge bg-primary ms-2">{{ running_jobs|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if running_jobs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped" id="running-jobs-table">
+                            <thead>
+                                <tr>
+                                    <th>FASTQ Name</th>
+                                    <th>Demand ID</th>
+                                    <th>Workflow</th>
+                                    <th>Organism</th>
+                                    <th>Batch</th>
+                                    <th>Start Time</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for job in running_jobs %}
+                                <tr data-demand-id="{{ job.demand_id }}">
+                                    <td>{{ job.fastq_name }}</td>
+                                    <td>
+                                        <span class="text-monospace">{{ job.demand_id }}</span>
+                                    </td>
+                                    <td>{{ job.workflow }}</td>
+                                    <td>{{ job.organism }}</td>
+                                    <td>{{ job.batch }}</td>
+                                    <td>{{ job.start_time|date:"Y-m-d H:i:s" }}</td>
+                                    <td class="job-status">
+                                        {% if job.status == 'SUBMITTED' %}
+                                        <span class="badge bg-info status-badge">Submitted</span>
+                                        {% elif job.status == 'IN_PROGRESS' %}
+                                        <span class="badge bg-primary status-badge">Running</span>
+                                        {% elif job.status == 'COMPLETED' %}
+                                        <span class="badge bg-success status-badge">Completed</span>
+                                        {% elif job.status == 'FAILED' %}
+                                        <span class="badge bg-danger status-badge">Failed</span>
+                                        {% elif job.status == 'ABORTED' %}
+                                        <span class="badge bg-secondary status-badge">Aborted</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary status-badge">{{ job.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary check-status-btn"
+                                            data-demand-id="{{ job.demand_id }}">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger stop-job-btn"
+                                            data-demand-id="{{ job.demand_id }}">
+                                            <i class="bi bi-stop-fill"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        No jobs are currently running.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="bi bi-check2-circle text-success me-2"></i> Recently Completed Jobs
+                        <span class="badge bg-success ms-2">{{ completed_jobs|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if completed_jobs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="completed-jobs-table">
+                            <thead>
+                                <tr>
+                                    <th>FASTQ Name</th>
+                                    <th>Demand ID</th>
+                                    <th>Workflow</th>
+                                    <th>Start Time</th>
+                                    <th>End Time</th>
+                                    <th>Duration (min)</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for job in completed_jobs %}
+                                <tr data-demand-id="{{ job.demand_id }}"
+                                    class="{% if job.status == 'FAILED' %}table-danger{% elif job.status == 'ABORTED' %}table-secondary{% endif %}">
+                                    <td>{{ job.fastq_name }}</td>
+                                    <td>
+                                        <span class="text-monospace">{{ job.demand_id }}</span>
+                                    </td>
+                                    <td>{{ job.workflow }}</td>
+                                    <td>{{ job.start_time|date:"Y-m-d H:i:s" }}</td>
+                                    <td>{{ job.end_time|date:"Y-m-d H:i:s" }}</td>
+                                    <td>{{ job.duration }}</td>
+                                    <td class="job-status">
+                                        {% if job.status == 'COMPLETED' %}
+                                        <span class="badge bg-success status-badge">Completed</span>
+                                        {% elif job.status == 'FAILED' %}
+                                        <span class="badge bg-danger status-badge">Failed</span>
+                                        {% elif job.status == 'ABORTED' %}
+                                        <span class="badge bg-secondary status-badge">Aborted</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary status-badge">{{ job.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        No jobs have been completed recently.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Update Modal -->
+<div class="modal fade" id="statusUpdateModal" tabindex="-1" aria-labelledby="statusUpdateModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statusUpdateModalLabel">Job Status Update</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="job-status-details">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Stop Job Modal -->
+<div class="modal fade" id="confirmStopModal" tabindex="-1" aria-labelledby="confirmStopModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmStopModalLabel">Confirm Stop Job</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to stop this job?</p>
+                <p class="text-danger">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <strong>Warning:</strong> Stopping a job will abort the current alignment process and cannot be
+                    undone.
+                </p>
+                <div class="job-info mb-3">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmStopBtn">Stop Job</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Auto refresh feature
+        const autoRefreshToggle = document.getElementById('autoRefreshToggle');
+        let autoRefreshInterval;
+
+        autoRefreshToggle.addEventListener('change', function () {
+            if (this.checked) {
+                // Refresh every 60 seconds
+                autoRefreshInterval = setInterval(refreshJobStatus, 60000);
+                showToast('Auto refresh enabled - updating every minute', 'info');
+            } else {
+                clearInterval(autoRefreshInterval);
+                showToast('Auto refresh disabled', 'info');
+            }
+        });
+
+        // Refresh button
+        const refreshBtn = document.getElementById('refreshJobsBtn');
+        refreshBtn.addEventListener('click', function () {
+            refreshJobStatus();
+        });
+
+        // Update all jobs button
+        const updateAllJobsBtn = document.getElementById('updateAllJobsBtn');
+        updateAllJobsBtn.addEventListener('click', function () {
+            updateAllJobs();
+        });
+
+        // Check status buttons
+        const checkStatusBtns = document.querySelectorAll('.check-status-btn');
+        checkStatusBtns.forEach(btn => {
+            btn.addEventListener('click', function () {
+                const demandId = this.getAttribute('data-demand-id');
+                checkJobStatus(demandId);
+            });
+        });
+
+        // Stop job buttons
+        const stopJobBtns = document.querySelectorAll('.stop-job-btn');
+        stopJobBtns.forEach(btn => {
+            btn.addEventListener('click', function () {
+                const demandId = this.getAttribute('data-demand-id');
+                const row = this.closest('tr');
+                const fastqName = row.querySelector('td:first-child').textContent.trim();
+
+                // Populate confirm modal
+                const jobInfo = document.querySelector('#confirmStopModal .job-info');
+                jobInfo.innerHTML = `
+                    <div class="alert alert-info">
+                        <strong>FASTQ Name:</strong> ${fastqName}<br>
+                        <strong>Demand ID:</strong> ${demandId}
+                    </div>
+                `;
+
+                // Set demand ID on confirm button
+                document.getElementById('confirmStopBtn').setAttribute('data-demand-id', demandId);
+
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById('confirmStopModal'));
+                modal.show();
+            });
+        });
+
+        // Confirm stop button
+        const confirmStopBtn = document.getElementById('confirmStopBtn');
+        confirmStopBtn.addEventListener('click', function () {
+            const demandId = this.getAttribute('data-demand-id');
+            stopJob(demandId);
+
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('confirmStopModal'));
+            modal.hide();
+        });
+
+        // Function to refresh job status
+        function refreshJobStatus() {
+            window.location.reload();
+        }
+
+        // Function to check job status
+        function checkJobStatus(demandId) {
+            fetch(`/api/pipeline/check-status/?demand_id=${demandId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Update the status in the table
+                        const row = document.querySelector(`tr[data-demand-id="${demandId}"]`);
+                        if (row) {
+                            const statusCell = row.querySelector('.job-status');
+                            let statusHTML = '';
+
+                            switch (data.job_status) {
+                                case 'SUBMITTED':
+                                    statusHTML = '<span class="badge bg-info status-badge">Submitted</span>';
+                                    break;
+                                case 'IN_PROGRESS':
+                                    statusHTML = '<span class="badge bg-primary status-badge">Running</span>';
+                                    break;
+                                case 'COMPLETED':
+                                    statusHTML = '<span class="badge bg-success status-badge">Completed</span>';
+                                    break;
+                                case 'FAILED':
+                                    statusHTML = '<span class="badge bg-danger status-badge">Failed</span>';
+                                    break;
+                                case 'ABORTED':
+                                    statusHTML = '<span class="badge bg-secondary status-badge">Aborted</span>';
+                                    break;
+                                default:
+                                    statusHTML = `<span class="badge bg-secondary status-badge">${data.job_status}</span>`;
+                            }
+
+                            statusCell.innerHTML = statusHTML;
+                        }
+
+                        // Show status details in modal
+                        const statusDetails = document.querySelector('#statusUpdateModal .job-status-details');
+                        statusDetails.innerHTML = `
+                            <div class="alert alert-info">
+                                <strong>Demand ID:</strong> ${data.demand_id}<br>
+                                <strong>Status:</strong> ${data.job_status}<br>
+                                <strong>Start Time:</strong> ${data.start_time || 'N/A'}<br>
+                            </div>
+                        `;
+
+                        // Show modal
+                        const modal = new bootstrap.Modal(document.getElementById('statusUpdateModal'));
+                        modal.show();
+
+                        showToast('Status updated successfully', 'success');
+                    } else {
+                        showToast(`Error: ${data.message}`, 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('Error checking status', 'danger');
+                });
+        }
+
+        // Function to stop a job
+        function stopJob(demandId) {
+            fetch('/api/pipeline/stop-alignment/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ demand_id: demandId })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showToast('Job stopped successfully', 'success');
+
+                        // Update status in table
+                        const row = document.querySelector(`tr[data-demand-id="${demandId}"]`);
+                        if (row) {
+                            const statusCell = row.querySelector('.job-status');
+                            statusCell.innerHTML = '<span class="badge bg-secondary status-badge">Aborted</span>';
+                        }
+
+                        // Refresh the page after a short delay
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+                    } else {
+                        showToast(`Error: ${data.message}`, 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('Error stopping job', 'danger');
+                });
+        }
+
+        // Function to update all jobs
+        function updateAllJobs() {
+            fetch('/api/pipeline/update-all-jobs/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({})
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showToast(`Updated ${data.results.length} jobs successfully`, 'success');
+
+                        // Refresh the page after a short delay
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(`Error: ${data.message}`, 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('Error updating jobs', 'danger');
+                });
+        }
+
+        // Helper function to get CSRF token
+        function getCSRFToken() {
+            const cookieValue = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrftoken='))
+                ?.split('=')[1];
+            return cookieValue;
+        }
+
+        // Toast notification function
+        function showToast(message, type = 'success') {
+            // Create toast container if it doesn't exist
+            let toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toast-container';
+                toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+                toastContainer.style.zIndex = '5';
+                document.body.appendChild(toastContainer);
+            }
+
+            // Create the toast element
+            const toastId = 'toast-' + Date.now();
+            const toastHTML = `
+                <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+
+            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+
+            // Initialize and show the toast
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+            toast.show();
+
+            // Remove the toast element after it's hidden
+            toastElement.addEventListener('hidden.bs.toast', function () {
+                toastElement.remove();
+            });
+        }
+    });
+</script>
+{% endblock %}

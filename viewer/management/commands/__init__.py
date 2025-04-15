@@ -1,1 +1,1 @@
-# Management commands package
+# viewer.management.commands package

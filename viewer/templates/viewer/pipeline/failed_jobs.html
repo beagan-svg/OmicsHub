@@ -1,0 +1,391 @@
+{% extends "viewer/base.html" %}
+{% load static %}
+{% load viewer_filters %}
+
+{% block title %}Failed Pipeline Jobs{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'viewer/css/pipeline.css' %}">
+<style>
+    .job-card {
+        transition: all 0.2s ease;
+    }
+
+    .job-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .job-status {
+        width: 100px;
+    }
+
+    .status-badge {
+        width: 100%;
+        display: inline-block;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Failed Pipeline Jobs</h4>
+                    <div>
+                        <a href="{% url 'viewer:job_monitor' %}" class="btn btn-light me-2">
+                            <i class="bi bi-arrow-left"></i> Back to Job Monitor
+                        </a>
+                        <a href="{% url 'viewer:pipeline_dashboard' %}" class="btn btn-light">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <p class="lead mb-0">
+                            Jobs that have failed and need attention.
+                        </p>
+                        <button class="btn btn-outline-primary" id="refreshBtn">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="bi bi-exclamation-triangle text-danger me-2"></i> Failed Jobs
+                        <span class="badge bg-danger ms-2">{{ failed_jobs|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if failed_jobs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="failed-jobs-table">
+                            <thead>
+                                <tr>
+                                    <th>FASTQ Name</th>
+                                    <th>Demand ID</th>
+                                    <th>Organism</th>
+                                    <th>Batch</th>
+                                    <th>Start Time</th>
+                                    <th>End Time</th>
+                                    <th>Retry Count</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for job in failed_jobs %}
+                                <tr data-fastq="{{ job.fastq_name }}" data-demand-id="{{ job.demand_id }}">
+                                    <td>{{ job.fastq_name }}</td>
+                                    <td>
+                                        <span class="text-monospace">{{ job.demand_id }}</span>
+                                    </td>
+                                    <td>{{ job.organism }}</td>
+                                    <td>{{ job.batch }}</td>
+                                    <td>{{ job.start_time|date:"Y-m-d H:i:s" }}</td>
+                                    <td>{{ job.end_time|date:"Y-m-d H:i:s" }}</td>
+                                    <td>
+                                        <span class="badge bg-warning">{{ job.retry_count }}</span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-success retry-btn"
+                                            data-fastq="{{ job.fastq_name }}">
+                                            <i class="bi bi-arrow-repeat"></i> Retry
+                                        </button>
+                                        <button class="btn btn-sm btn-danger cancel-btn"
+                                            data-fastq="{{ job.fastq_name }}">
+                                            <i class="bi bi-x-circle"></i> Cancel
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        No failed jobs found. All jobs are running smoothly!
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Retry Modal -->
+<div class="modal fade" id="confirmRetryModal" tabindex="-1" aria-labelledby="confirmRetryModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmRetryModalLabel">Confirm Retry</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to retry this job?</p>
+                <div class="job-info mb-3">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmRetryBtn">Retry Job</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Cancel Modal -->
+<div class="modal fade" id="confirmCancelModal" tabindex="-1" aria-labelledby="confirmCancelModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmCancelModalLabel">Confirm Cancel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to cancel this failed job?</p>
+                <p class="text-danger">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <strong>Warning:</strong> Cancelling will mark this job as permanently failed and it will be removed
+                    from the retry queue.
+                </p>
+                <div class="job-info mb-3">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Go Back</button>
+                <button type="button" class="btn btn-danger" id="confirmCancelBtn">Cancel Job</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Refresh button
+        const refreshBtn = document.getElementById('refreshBtn');
+        refreshBtn.addEventListener('click', function () {
+            window.location.reload();
+        });
+
+        // Retry buttons
+        const retryBtns = document.querySelectorAll('.retry-btn');
+        retryBtns.forEach(btn => {
+            btn.addEventListener('click', function () {
+                const fastqName = this.getAttribute('data-fastq');
+                const row = this.closest('tr');
+
+                // Populate confirm modal
+                const jobInfo = document.querySelector('#confirmRetryModal .job-info');
+                jobInfo.innerHTML = `
+                    <div class="alert alert-info">
+                        <strong>FASTQ Name:</strong> ${fastqName}
+                    </div>
+                `;
+
+                // Set fastq name on confirm button
+                document.getElementById('confirmRetryBtn').setAttribute('data-fastq', fastqName);
+
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById('confirmRetryModal'));
+                modal.show();
+            });
+        });
+
+        // Cancel buttons
+        const cancelBtns = document.querySelectorAll('.cancel-btn');
+        cancelBtns.forEach(btn => {
+            btn.addEventListener('click', function () {
+                const fastqName = this.getAttribute('data-fastq');
+                const row = this.closest('tr');
+
+                // Populate confirm modal
+                const jobInfo = document.querySelector('#confirmCancelModal .job-info');
+                jobInfo.innerHTML = `
+                    <div class="alert alert-info">
+                        <strong>FASTQ Name:</strong> ${fastqName}
+                    </div>
+                `;
+
+                // Set fastq name on confirm button
+                document.getElementById('confirmCancelBtn').setAttribute('data-fastq', fastqName);
+
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById('confirmCancelModal'));
+                modal.show();
+            });
+        });
+
+        // Confirm retry button
+        const confirmRetryBtn = document.getElementById('confirmRetryBtn');
+        confirmRetryBtn.addEventListener('click', function () {
+            const fastqName = this.getAttribute('data-fastq');
+            retryJob(fastqName);
+
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('confirmRetryModal'));
+            modal.hide();
+        });
+
+        // Confirm cancel button
+        const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+        confirmCancelBtn.addEventListener('click', function () {
+            const fastqName = this.getAttribute('data-fastq');
+            cancelJob(fastqName);
+
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('confirmCancelModal'));
+            modal.hide();
+        });
+
+        // Function to retry a job
+        function retryJob(fastqName) {
+            fetch('/api/pipeline/retry-job/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ fastq_name: fastqName })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showToast('Job submitted for retry', 'success');
+
+                        // Remove from the failed jobs table
+                        const row = document.querySelector(`tr[data-fastq="${fastqName}"]`);
+                        if (row) {
+                            row.classList.add('table-success');
+
+                            // Fade out and remove after animation
+                            setTimeout(() => {
+                                row.style.transition = 'opacity 0.5s';
+                                row.style.opacity = '0';
+
+                                setTimeout(() => {
+                                    row.remove();
+
+                                    // Check if table is empty
+                                    const tbody = document.querySelector('#failed-jobs-table tbody');
+                                    if (tbody && tbody.children.length === 0) {
+                                        const tableContainer = document.querySelector('.table-responsive');
+                                        tableContainer.innerHTML = `
+                                        <div class="alert alert-success">
+                                            <i class="bi bi-check-circle-fill me-2"></i>
+                                            No failed jobs found. All jobs are running smoothly!
+                                        </div>
+                                    `;
+                                    }
+                                }, 500);
+                            }, 1000);
+                        }
+                    } else {
+                        showToast(`Error: ${data.message}`, 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('Error retrying job', 'danger');
+                });
+        }
+
+        // Function to cancel a job
+        function cancelJob(fastqName) {
+            // Here we would typically call an API to mark the job as permanently failed
+            // For now, we'll just remove it from the UI
+
+            const row = document.querySelector(`tr[data-fastq="${fastqName}"]`);
+            if (row) {
+                row.classList.add('table-secondary');
+
+                // Fade out and remove after animation
+                setTimeout(() => {
+                    row.style.transition = 'opacity 0.5s';
+                    row.style.opacity = '0';
+
+                    setTimeout(() => {
+                        row.remove();
+
+                        // Check if table is empty
+                        const tbody = document.querySelector('#failed-jobs-table tbody');
+                        if (tbody && tbody.children.length === 0) {
+                            const tableContainer = document.querySelector('.table-responsive');
+                            tableContainer.innerHTML = `
+                                <div class="alert alert-success">
+                                    <i class="bi bi-check-circle-fill me-2"></i>
+                                    No failed jobs found. All jobs are running smoothly!
+                                </div>
+                            `;
+                        }
+
+                        showToast('Job cancelled successfully', 'info');
+                    }, 500);
+                }, 1000);
+            }
+        }
+
+        // Helper function to get CSRF token
+        function getCSRFToken() {
+            const cookieValue = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrftoken='))
+                ?.split('=')[1];
+            return cookieValue;
+        }
+
+        // Toast notification function
+        function showToast(message, type = 'success') {
+            // Create toast container if it doesn't exist
+            let toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toast-container';
+                toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+                toastContainer.style.zIndex = '5';
+                document.body.appendChild(toastContainer);
+            }
+
+            // Create the toast element
+            const toastId = 'toast-' + Date.now();
+            const toastHTML = `
+                <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+
+            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+
+            // Initialize and show the toast
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+            toast.show();
+
+            // Remove the toast element after it's hidden
+            toastElement.addEventListener('hidden.bs.toast', function () {
+                toastElement.remove();
+            });
+        }
+    });
+</script>
+{% endblock %}

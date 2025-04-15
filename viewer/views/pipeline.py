@@ -1,12 +1,23 @@
 from django.views.generic import TemplateView
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
+from django.urls import reverse
+from django.views import View
 import os
 import yaml
 import json
 from pathlib import Path
 from django.core.paginator import Paginator
-from viewer.models import Main, Metadata, LoadAssociation
+from django.utils import timezone
+from viewer.models import Main, Metadata, LoadAssociation, Alignment, PostQC
+from viewer.utils.pipeline_utils import (
+    load_pipeline_config, 
+    count_running_jobs, 
+    submit_sample_for_alignment, 
+    check_alignment_status as check_job_status,
+    stop_alignment_job,
+    update_all_running_jobs
+)
 
 class PipelineDashboardView(TemplateView):
     template_name = 'viewer/pipeline/dashboard.html'
@@ -20,8 +31,16 @@ class PipelineDashboardView(TemplateView):
         # Convert queryset to list of dictionaries for the template
         samples_data = []
         for sample in samples:
+            # Get load name from related LoadAssociation table
+            load_name = ''
+            load_assoc = LoadAssociation.objects.filter(fastq_name=sample.fastq_name).first()
+            if load_assoc:
+                load_name = load_assoc.load_name
+            
             samples_data.append({
                 'fastq': sample.fastq_name.fastq_name,
+                'study_set': sample.study_set,
+                'load_name': load_name,
                 'batch': sample.fastq_name.batch_name_from_vendor,
                 'organism': sample.fastq_name.organism_common_name,
                 'library_prep': sample.library_prep_method,
@@ -56,41 +75,36 @@ class PipelineDashboardView(TemplateView):
         context['current_per_page'] = per_page
         
         # Get pipeline configuration
-        config_path = Path(os.path.join('config', 'pipeline_config.yaml'))
-        if config_path.exists():
-            with open(config_path, 'r') as f:
-                try:
-                    config = yaml.safe_load(f)
-                    context['references'] = config.get('references', {})
-                    context['chemistries'] = config.get('chemistries', {})
-                except Exception as e:
-                    context['config_error'] = str(e)
-        else:
-            # Use default config for development
-            context['references'] = {
-                "armadillo": "african-green-monkey_ncbi_vero-who-p1-0_genomefixed_star2.7.1a",
-                "human": "human_10x_grch38_genome_star2.7.1a",
-                "mouse": "mouse_10x_mm10_genome_star2.7.1a",
-                # Add more references as needed
-            }
-            context['chemistries'] = {
-                "10xV3.1D": "SC3Pv3",
-                "10xV4": "SC3Pv4",
-                # Add more chemistries as needed
-            }
+        config = load_pipeline_config()
+        context['references'] = config.get('references', {})
+        context['chemistries'] = config.get('chemistries', {})
         
-        # Get running alignments if available
-        results_dir = Path('results')
-        context['running_alignments'] = {}
+        # Get count of running jobs
+        job_counts = count_running_jobs()
+        context['job_counts'] = job_counts
         
-        if results_dir.exists():
-            for file in results_dir.glob('running_submitted_*.json'):
-                try:
-                    with open(file, 'r') as f:
-                        alignments = json.load(f)
-                        context['running_alignments'].update(alignments)
-                except Exception:
-                    pass
+        # Get list of running alignments
+        running_alignments = Alignment.objects.filter(status_id__in=['SUBMITTED', 'IN_PROGRESS']).select_related('fastq_name')
+        
+        # Format for display
+        context['running_alignments'] = {
+            alignment.fastq_name_id: {
+                'demand_id': alignment.demand_id,
+                'status': alignment.status_id,
+                'start_time': alignment.start_time,
+                'organism': alignment.fastq_name.organism_common_name,
+                'batch': alignment.fastq_name.batch_name_from_vendor
+            } for alignment in running_alignments
+        }
+        
+        # Check if we need to update the status of running jobs
+        last_update = self.request.session.get('last_job_status_update', 0)
+        current_time = timezone.now().timestamp()
+        
+        # Update job status every 10 minutes
+        if current_time - last_update > 600:  # 10 minutes in seconds
+            update_all_running_jobs()
+            self.request.session['last_job_status_update'] = current_time
         
         return context
     
@@ -105,6 +119,78 @@ class PipelineDashboardView(TemplateView):
             pass
         return 25
 
+class JobMonitorView(TemplateView):
+    """View for monitoring running jobs"""
+    template_name = 'viewer/pipeline/job_monitor.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Get all running alignment jobs
+        alignments = Alignment.objects.filter(
+            status_id__in=['SUBMITTED', 'IN_PROGRESS']
+        ).select_related('fastq_name')
+        
+        # Get all completed/failed alignment jobs (last 50)
+        completed_alignments = Alignment.objects.filter(
+            status_id__in=['COMPLETED', 'FAILED', 'ABORTED']
+        ).order_by('-end_time')[:50].select_related('fastq_name')
+        
+        # Format for display
+        context['running_jobs'] = [{
+            'fastq_name': alignment.fastq_name_id,
+            'demand_id': alignment.demand_id,
+            'status': alignment.status_id,
+            'start_time': alignment.start_time,
+            'organism': alignment.fastq_name.organism_common_name,
+            'batch': alignment.fastq_name.batch_name_from_vendor,
+            'workflow': 'MTX' if 'MTX' in alignment.fastq_name.batch_name_from_vendor else 'RTX'
+        } for alignment in alignments]
+        
+        context['completed_jobs'] = [{
+            'fastq_name': alignment.fastq_name_id,
+            'demand_id': alignment.demand_id,
+            'status': alignment.status_id,
+            'start_time': alignment.start_time,
+            'end_time': alignment.end_time,
+            'organism': alignment.fastq_name.organism_common_name,
+            'batch': alignment.fastq_name.batch_name_from_vendor,
+            'workflow': 'MTX' if 'MTX' in alignment.fastq_name.batch_name_from_vendor else 'RTX',
+            'duration': (alignment.end_time - alignment.start_time).total_seconds() // 60 if alignment.end_time else 0  # in minutes
+        } for alignment in completed_alignments]
+        
+        # Job counts
+        job_counts = count_running_jobs()
+        context['job_counts'] = job_counts
+        
+        return context
+
+class FailedJobsView(TemplateView):
+    """View for failed jobs that need attention"""
+    template_name = 'viewer/pipeline/failed_jobs.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Get all failed jobs
+        failed_jobs = Alignment.objects.filter(
+            status_id='FAILED', 
+            retry_count__gte=1
+        ).select_related('fastq_name')
+        
+        # Format for display
+        context['failed_jobs'] = [{
+            'fastq_name': job.fastq_name_id,
+            'demand_id': job.demand_id,
+            'start_time': job.start_time,
+            'end_time': job.end_time,
+            'retry_count': job.retry_count,
+            'organism': job.fastq_name.organism_common_name,
+            'batch': job.fastq_name.batch_name_from_vendor
+        } for job in failed_jobs]
+        
+        return context
+
 class PipelineApiView:
     @staticmethod
     def submit_alignment(request):
@@ -112,17 +198,61 @@ class PipelineApiView:
         if request.method == 'POST':
             try:
                 data = json.loads(request.body)
-                fastq_names = data.get('fastq_names', [])
-                workflow = data.get('workflow', '')
-                batch_line = data.get('batch_line', '')
+                samples = data.get('samples', [])
                 
-                # Here you would call your alignment script
-                # For now, just return a success response
+                # Check if we have capacity to submit more jobs
+                job_counts = count_running_jobs()
+                
+                if job_counts['total'] >= 100:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': f'Cannot submit more jobs. {job_counts["total"]} jobs already running. Maximum is 100.'
+                    }, status=400)
+                
+                # Check how many new jobs we can submit
+                available_slots = 100 - job_counts['total']
+                
+                if len(samples) > available_slots:
+                    return JsonResponse({
+                        'status': 'warning',
+                        'message': f'Can only submit {available_slots} out of {len(samples)} samples due to capacity limits.'
+                    }, status=200)
+                
+                # Process samples
+                results = []
+                successful = 0
+                failed = 0
+                
+                for sample in samples:
+                    # Check if ingest is complete
+                    if sample.get('ingest_status') != 'Completed':
+                        results.append({
+                            'fastq_name': sample.get('fastq_name'),
+                            'status': 'error',
+                            'message': 'Ingest not completed'
+                        })
+                        failed += 1
+                        continue
+                    
+                    # Submit for alignment
+                    result = submit_sample_for_alignment(sample)
+                    
+                    if result.get('status') == 'success':
+                        successful += 1
+                    else:
+                        failed += 1
+                        
+                    results.append(result)
+                    
+                    # Add delay between submissions
+                    if len(samples) > 1:
+                        import time
+                        time.sleep(300)  # 5 minutes
+                
                 return JsonResponse({
                     'status': 'success',
-                    'message': f'Submitted {len(fastq_names)} fastq files for {workflow} alignment',
-                    'fastq_names': fastq_names,
-                    'batch_line': batch_line
+                    'message': f'Processed {len(samples)} samples. {successful} successful, {failed} failed.',
+                    'results': results
                 })
             except Exception as e:
                 return JsonResponse({
@@ -139,15 +269,221 @@ class PipelineApiView:
     def check_alignment_status(request):
         """API endpoint to check alignment status"""
         if request.method == 'GET':
+            demand_id = request.GET.get('demand_id', '')
             fastq_name = request.GET.get('fastq_name', '')
             
-            # Here you would check the status using your script
-            # For now, just return a sample response
-            return JsonResponse({
-                'status': 'running',
-                'fastq_name': fastq_name,
-                'progress': '50%'
-            })
+            if not demand_id and not fastq_name:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Either demand_id or fastq_name must be provided'
+                }, status=400)
+            
+            if demand_id:
+                # Check status by demand_id
+                result = check_job_status(demand_id)
+                
+                if result.get('status') == 'success':
+                    # Also update the database with this status
+                    try:
+                        alignment = Alignment.objects.get(demand_id=demand_id)
+                        alignment.status_id = result.get('job_status')
+                        
+                        if result.get('job_status') in ['COMPLETED', 'FAILED', 'ABORTED']:
+                            alignment.end_time = timezone.now()
+                            
+                        alignment.save()
+                        
+                        # Also update the main table
+                        main = Main.objects.get(fastq_name=alignment.fastq_name)
+                        
+                        if result.get('job_status') == 'COMPLETED':
+                            main.alignment_status = 'Completed'
+                        elif result.get('job_status') == 'FAILED':
+                            main.alignment_status = 'Failed'
+                        elif result.get('job_status') == 'ABORTED':
+                            main.alignment_status = 'Aborted'
+                        else:
+                            main.alignment_status = 'In Progress'
+                            
+                        main.save()
+                    except Alignment.DoesNotExist:
+                        pass  # No alignment record found, that's okay
+                    
+                return JsonResponse(result)
+                
+            else:
+                # Check status by fastq_name
+                try:
+                    alignment = Alignment.objects.get(fastq_name=fastq_name)
+                    
+                    if alignment.demand_id:
+                        # Check status from the service
+                        result = check_job_status(alignment.demand_id)
+                        
+                        if result.get('status') == 'success':
+                            # Update the database
+                            alignment.status_id = result.get('job_status')
+                            
+                            if result.get('job_status') in ['COMPLETED', 'FAILED', 'ABORTED']:
+                                alignment.end_time = timezone.now()
+                                
+                            alignment.save()
+                            
+                            # Also update the main table
+                            main = Main.objects.get(fastq_name=fastq_name)
+                            
+                            if result.get('job_status') == 'COMPLETED':
+                                main.alignment_status = 'Completed'
+                            elif result.get('job_status') == 'FAILED':
+                                main.alignment_status = 'Failed'
+                            elif result.get('job_status') == 'ABORTED':
+                                main.alignment_status = 'Aborted'
+                            else:
+                                main.alignment_status = 'In Progress'
+                                
+                            main.save()
+                        
+                        return JsonResponse({
+                            'status': 'success',
+                            'demand_id': alignment.demand_id,
+                            'job_status': alignment.status_id,
+                            'start_time': alignment.start_time,
+                            'end_time': alignment.end_time
+                        })
+                    else:
+                        return JsonResponse({
+                            'status': 'error',
+                            'message': f'No demand_id found for {fastq_name}'
+                        })
+                        
+                except Alignment.DoesNotExist:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': f'No alignment record found for {fastq_name}'
+                    })
+        
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Invalid request method'
+        }, status=405)
+    
+    @staticmethod
+    def stop_alignment(request):
+        """API endpoint to stop a running alignment job"""
+        if request.method == 'POST':
+            try:
+                data = json.loads(request.body)
+                demand_id = data.get('demand_id', '')
+                
+                if not demand_id:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': 'demand_id must be provided'
+                    }, status=400)
+                
+                # Try to stop the job
+                result = stop_alignment_job(demand_id)
+                
+                if result.get('status') == 'success':
+                    # Update the database
+                    try:
+                        alignment = Alignment.objects.get(demand_id=demand_id)
+                        alignment.status_id = 'ABORTED'
+                        alignment.end_time = timezone.now()
+                        alignment.save()
+                        
+                        # Update main table
+                        main = Main.objects.get(fastq_name=alignment.fastq_name)
+                        main.alignment_status = 'Aborted'
+                        main.save()
+                    except Alignment.DoesNotExist:
+                        pass  # No alignment record found, that's okay
+                
+                return JsonResponse(result)
+                
+            except Exception as e:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': str(e)
+                }, status=400)
+        
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Invalid request method'
+        }, status=405)
+    
+    @staticmethod
+    def retry_failed_job(request):
+        """API endpoint to retry a failed alignment job"""
+        if request.method == 'POST':
+            try:
+                data = json.loads(request.body)
+                fastq_name = data.get('fastq_name', '')
+                
+                if not fastq_name:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': 'fastq_name must be provided'
+                    }, status=400)
+                
+                try:
+                    # Get the necessary sample data
+                    main = Main.objects.select_related('fastq_name').get(fastq_name=fastq_name)
+                    
+                    # Get load name from related LoadAssociation table
+                    load_name = ''
+                    load_assoc = LoadAssociation.objects.filter(fastq_name=main.fastq_name).first()
+                    if load_assoc:
+                        load_name = load_assoc.load_name
+                    
+                    sample_data = {
+                        'fastq_name': fastq_name,
+                        'organism_common_name': main.fastq_name.organism_common_name,
+                        'batch_name_from_vendor': main.fastq_name.batch_name_from_vendor,
+                        'library_prep': main.library_prep_method,
+                        'load_name': load_name
+                    }
+                    
+                    # Submit for alignment
+                    result = submit_sample_for_alignment(sample_data)
+                    
+                    return JsonResponse(result)
+                    
+                except Main.DoesNotExist:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': f'No record found for {fastq_name}'
+                    })
+                    
+            except Exception as e:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': str(e)
+                }, status=400)
+        
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Invalid request method'
+        }, status=405)
+    
+    @staticmethod
+    def update_all_jobs(request):
+        """API endpoint to update status of all running jobs"""
+        if request.method == 'POST':
+            try:
+                results = update_all_running_jobs()
+                
+                return JsonResponse({
+                    'status': 'success',
+                    'message': f'Updated {len(results)} jobs',
+                    'results': results
+                })
+                
+            except Exception as e:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': str(e)
+                }, status=400)
         
         return JsonResponse({
             'status': 'error',

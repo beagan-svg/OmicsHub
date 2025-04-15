@@ -32,6 +32,8 @@ class Alignment(models.Model):
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
     fid = models.CharField(max_length=255, null=True, blank=True)
+    demand_id = models.CharField(max_length=255, null=True, blank=True)
+    retry_count = models.IntegerField(default=0)
 
     class Meta:
         db_table = 'alignment'
@@ -45,6 +47,8 @@ class PostQC(models.Model):
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
     fid = models.CharField(max_length=255, null=True, blank=True)
+    demand_id = models.CharField(max_length=255, null=True, blank=True)
+    retry_count = models.IntegerField(default=0)
 
     class Meta:
         db_table = 'postqc'

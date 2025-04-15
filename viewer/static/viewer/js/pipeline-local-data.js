@@ -535,67 +535,116 @@ class PipelineLocalData {
     }
 
     handleSampleSubmission(event) {
-        // Update selected samples before submission
-        this.updateSelectedSamples();
+        event.preventDefault();
+        console.log('handleSampleSubmission called');
 
-        // Get workflow information
-        const workflow = document.getElementById('workflow-type').value;
-        const reference = document.getElementById('reference-genome').value;
-        const chemistry = document.getElementById('chemistry-version').value;
+        // Get selected samples
+        const samples = this.getStoredSamples();
 
-        // Add workflow info to the stored samples
-        this.selectedSamples.forEach(sample => {
-            sample.workflow = workflow;
-            sample.reference = reference;
-            sample.chemistry = chemistry;
-            sample.submission_time = new Date().toISOString();
-            sample.status = 'Submitted';
-        });
-
-        // Store updated samples
-        this.storeSamples();
-
-        // Rebuild the table with updated data
-        this.rebuildSamplesTable();
-
-        // Close the modal if it's open
-        const submitModal = bootstrap.Modal.getInstance(document.getElementById('submit-modal'));
-        if (submitModal) {
-            submitModal.hide();
+        if (!samples || samples.length === 0) {
+            this.showToastNotification('No samples selected for submission', 'danger');
+            return;
         }
 
-        // Show success notification
-        this.showSubmissionAlert(this.selectedSamples.length, workflow);
+        // Check if all samples have completed ingest
+        const pendingIngest = samples.filter(sample => sample.ingest_status !== 'Completed');
+
+        if (pendingIngest.length > 0) {
+            // Show warning about samples with pending ingest
+            this.showToastNotification(`${pendingIngest.length} samples have not completed ingest and will be skipped`, 'warning');
+        }
+
+        // Populate the submit modal with sample information
+        const sampleList = document.getElementById('submit-sample-list');
+        if (sampleList) {
+            sampleList.innerHTML = '';
+
+            samples.forEach(sample => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <strong>${sample.fastq_name}</strong>
+                    <span class="ms-2 badge ${sample.ingest_status === 'Completed' ? 'bg-success' : 'bg-warning'}">
+                        ${sample.ingest_status}
+                    </span>
+                `;
+                sampleList.appendChild(li);
+            });
+        }
+
+        // Update the submit button state
+        const confirmSubmitBtn = document.getElementById('confirm-submit');
+        if (confirmSubmitBtn) {
+            confirmSubmitBtn.disabled = samples.length === 0;
+
+            // Add submit handler
+            confirmSubmitBtn.onclick = () => {
+                this.submitSamplesToAlignment(samples);
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('submit-modal'));
+                if (modal) {
+                    modal.hide();
+                }
+            };
+        }
+
+        // Show the submit modal
+        const modal = new bootstrap.Modal(document.getElementById('submit-modal'));
+        modal.show();
     }
 
-    showSubmissionAlert(count, workflow) {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'alert alert-primary alert-dismissible fade show';
-        alertDiv.setAttribute('role', 'alert');
-        alertDiv.innerHTML = `
-            <i class="bi bi-play-circle-fill me-2"></i>
-            Submitted ${count} samples for ${workflow} processing.
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        `;
+    /**
+     * Submit selected samples for alignment
+     * @param {Array} samples - Array of sample objects
+     */
+    submitSamplesToAlignment(samples) {
+        console.log('Submitting samples to alignment:', samples);
 
-        // Insert alert at the top of the page
-        const container = document.querySelector('.container-fluid');
-        if (container) {
-            container.insertBefore(alertDiv, container.firstChild);
+        // Show loading
+        this.showToastNotification('Submitting samples for processing...', 'info', 3000);
 
-            // Auto-dismiss after 8 seconds
-            setTimeout(() => {
-                try {
-                    const bsAlert = new bootstrap.Alert(alertDiv);
-                    bsAlert.close();
-                } catch (err) {
-                    // Fallback if bootstrap Alert API fails
-                    if (alertDiv.parentNode) {
-                        alertDiv.parentNode.removeChild(alertDiv);
-                    }
+        // Submit to the server
+        fetch('/api/pipeline/submit-alignment/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken()
+            },
+            body: JSON.stringify({ samples })
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Submission response:', data);
+
+                if (data.status === 'success' || data.status === 'warning') {
+                    // Show success message
+                    this.showToastNotification(data.message, data.status === 'warning' ? 'warning' : 'success', 5000);
+
+                    // Redirect to job monitor after a delay
+                    setTimeout(() => {
+                        window.location.href = '/pipeline/jobs/';
+                    }, 2000);
+                } else {
+                    // Show error message
+                    this.showToastNotification(`Error: ${data.message}`, 'danger', 5000);
                 }
-            }, 8000);
-        }
+            })
+            .catch(error => {
+                console.error('Error submitting samples:', error);
+                this.showToastNotification('Error submitting samples for alignment', 'danger', 5000);
+            });
+    }
+
+    /**
+     * Get CSRF token from cookies
+     * @returns {string} CSRF token
+     */
+    getCSRFToken() {
+        const cookieValue = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('csrftoken='))
+            ?.split('=')[1];
+        return cookieValue;
     }
 
     formatStatus(status) {
