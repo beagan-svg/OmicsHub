@@ -674,12 +674,19 @@ class PipelineLocalData {
         console.log('Rebuilding table with samples:', samples);
 
         if (!samples || samples.length === 0) {
-            // Add a "no samples" message row
+            // Add a "no samples" message row with the same styling as the initial state
             const messageRow = document.createElement('tr');
             messageRow.innerHTML = `
-                <td colspan="9" class="text-center text-muted py-4">
-                    <i class="bi bi-info-circle me-2"></i>
-                    No samples selected. Select samples from the main page to view them here.
+                <td colspan="10" class="text-center py-5">
+                    <div class="d-flex flex-column align-items-center">
+                        <div class="mb-3">
+                            <i class="bi bi-x-circle" style="font-size: 2rem;"></i>
+                        </div>
+                        <p class="text-muted mb-4">No samples selected. Use the Sample Browser to select samples.</p>
+                        <a href="/" class="btn btn-primary">
+                            <i class="bi bi-table me-2"></i>GO TO SAMPLE BROWSER
+                        </a>
+                    </div>
                 </td>
             `;
             tableBody.appendChild(messageRow);
@@ -687,14 +694,33 @@ class PipelineLocalData {
             // Update pagination info to show 0 results
             const paginationInfo = document.querySelector('.pagination-info');
             if (paginationInfo) {
-                paginationInfo.textContent = `Results 0-0 of 0`;
+                paginationInfo.textContent = 'Results 0-0 of 0';
             }
 
-            // Update goto page input max value
+            // Update current page and total pages display for empty state
+            const currentPageSpan = document.querySelector('.current-page');
+            if (currentPageSpan) {
+                currentPageSpan.textContent = '0';
+            }
+
+            const totalPagesSpan = document.querySelector('.total-pages');
+            if (totalPagesSpan) {
+                totalPagesSpan.textContent = '0';
+            }
+
+            // Disable all pagination buttons
+            const paginationButtons = document.querySelectorAll('.pagination-navigation a');
+            paginationButtons.forEach(btn => {
+                btn.classList.add('disabled');
+                btn.setAttribute('aria-disabled', 'true');
+            });
+
+            // Update goto page input
             const gotoPageInput = document.getElementById('gotoPage');
             if (gotoPageInput) {
-                gotoPageInput.max = 1;
-                gotoPageInput.value = 1;
+                gotoPageInput.max = 0;
+                gotoPageInput.value = 0;
+                gotoPageInput.disabled = true;
             }
 
             return;
@@ -843,16 +869,19 @@ class PipelineLocalData {
                 // Clear all rows from the table
                 tableBody.innerHTML = '';
 
-                // Add a message row to indicate empty table
+                // Add the empty state message row with exact same HTML as template
                 const emptyRow = document.createElement('tr');
-                emptyRow.className = 'text-center text-muted';
                 emptyRow.innerHTML = `
-                    <td colspan="9" class="py-4">
-                        <i class="bi bi-x-circle me-2" style="font-size: 1.5rem;"></i>
-                        <p>No samples selected. Use the Sample Browser to select samples.</p>
-                        <a href="/" class="btn btn-sm btn-outline-primary mt-2">
-                            <i class="bi bi-table me-1"></i>Go to Sample Browser
-                        </a>
+                    <td colspan="10" class="text-center py-5">
+                        <div class="d-flex flex-column align-items-center">
+                            <div class="mb-3">
+                                <i class="bi bi-x-circle" style="font-size: 2rem;"></i>
+                            </div>
+                            <p class="text-muted mb-4">No samples selected. Use the Sample Browser to select samples.</p>
+                            <a href="/" class="btn btn-primary">
+                                <i class="bi bi-table me-2"></i>GO TO SAMPLE BROWSER
+                            </a>
+                        </div>
                     </td>
                 `;
                 tableBody.appendChild(emptyRow);
@@ -874,9 +903,6 @@ class PipelineLocalData {
                 if (selectedCount) {
                     selectedCount.textContent = '0 samples selected';
                 }
-
-                // Show a feedback message
-                this.showClearConfirmation();
             } else {
                 console.error('Table body not found when trying to clear selection');
             }
@@ -906,12 +932,6 @@ class PipelineLocalData {
             console.error('Error clearing stored data:', error);
             return false;
         }
-    }
-
-    // Show a confirmation message after clearing
-    showClearConfirmation() {
-        // Show a toast notification at the bottom of the screen with blue background
-        this.showToastNotification('Clearing filters...', 'primary', 1500);
     }
 
     // Reinitialize to make sure we get the latest data from localStorage

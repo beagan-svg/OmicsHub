@@ -172,37 +172,43 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <!-- Sample data will be dynamically populated by JavaScript -->
-                                <tr data-fastq="MX102931">
+                                {% if page_obj.object_list %}
+                                {% for sample in page_obj.object_list %}
+                                <tr data-fastq="{{ sample.fastq }}">
                                     <td><input type="checkbox" class="sample-select"></td>
-                                    <td>MX102931</td>
-                                    <td>MTX-22030</td>
-                                    <td>human</td>
-                                    <td>10xV3.1D</td>
-                                    <td><span class="badge bg-success">Completed</span></td>
-                                    <td><span class="badge bg-secondary">Not Started</span></td>
-                                    <td><span class="badge bg-secondary">Not Started</span></td>
+                                    <td>{{ sample.fastq }}</td>
+                                    <td>{{ sample.study_set }}</td>
+                                    <td>{{ sample.load_name }}</td>
+                                    <td>{{ sample.batch }}</td>
+                                    <td>{{ sample.organism }}</td>
+                                    <td>{{ sample.library_prep }}</td>
+                                    <td><span
+                                            class="badge {% if sample.ingest_status == 'Completed' %}bg-success{% elif sample.ingest_status == 'In Progress' %}bg-warning{% else %}bg-secondary{% endif %}">{{
+                                            sample.ingest_status }}</span></td>
+                                    <td><span
+                                            class="badge {% if sample.alignment_status == 'Completed' %}bg-success{% elif sample.alignment_status == 'In Progress' %}bg-warning{% else %}bg-secondary{% endif %}">{{
+                                            sample.alignment_status }}</span></td>
+                                    <td><span
+                                            class="badge {% if sample.postqc_status == 'Completed' %}bg-success{% elif sample.postqc_status == 'In Progress' %}bg-warning{% else %}bg-secondary{% endif %}">{{
+                                            sample.postqc_status }}</span></td>
                                 </tr>
-                                <tr data-fastq="MX102932">
-                                    <td><input type="checkbox" class="sample-select"></td>
-                                    <td>MX102932</td>
-                                    <td>MTX-22030</td>
-                                    <td>human</td>
-                                    <td>10xV3.1D</td>
-                                    <td><span class="badge bg-success">Completed</span></td>
-                                    <td><span class="badge bg-secondary">Not Started</span></td>
-                                    <td><span class="badge bg-secondary">Not Started</span></td>
+                                {% endfor %}
+                                {% else %}
+                                <tr>
+                                    <td colspan="10" class="text-center py-5">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <div class="mb-3">
+                                                <i class="bi bi-x-circle" style="font-size: 2rem;"></i>
+                                            </div>
+                                            <p class="text-muted mb-4">No samples selected. Use the Sample Browser to
+                                                select samples.</p>
+                                            <a href="{% url 'viewer:main_list' %}" class="btn btn-primary">
+                                                <i class="bi bi-table me-2"></i>GO TO SAMPLE BROWSER
+                                            </a>
+                                        </div>
+                                    </td>
                                 </tr>
-                                <tr data-fastq="MX102933">
-                                    <td><input type="checkbox" class="sample-select"></td>
-                                    <td>MX102933</td>
-                                    <td>RTX-22045</td>
-                                    <td>mouse</td>
-                                    <td>10xV4</td>
-                                    <td><span class="badge bg-warning">In Progress</span></td>
-                                    <td><span class="badge bg-secondary">Not Started</span></td>
-                                    <td><span class="badge bg-secondary">Not Started</span></td>
-                                </tr>
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
