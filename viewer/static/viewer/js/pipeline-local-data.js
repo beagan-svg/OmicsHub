@@ -132,6 +132,16 @@ class PipelineLocalData {
             clearBtn.addEventListener('click', () => {
                 console.log('Clear button clicked directly on PipelineLocalData');
                 this.clearStoredData();
+
+                // Force an update of the selected samples immediately
+                this.updateSelectedSamples();
+
+                // Emit a custom event that the page was cleared
+                const clearEvent = new CustomEvent('selections-cleared');
+                document.dispatchEvent(clearEvent);
+
+                // Update the submit button state
+                this.updateSubmitButtonState();
             });
         } else {
             console.log('Clear button not found!');
@@ -414,6 +424,8 @@ class PipelineLocalData {
         const samples = [];
         const selectedRows = document.querySelectorAll('.sample-select:checked');
 
+        console.log(`updateSelectedSamples: found ${selectedRows.length} checked checkboxes`);
+
         selectedRows.forEach(checkbox => {
             const row = checkbox.closest('tr');
             if (row) {
@@ -428,11 +440,27 @@ class PipelineLocalData {
                     alignment_status: row.querySelector('td:nth-child(9)').textContent.trim(),
                     postqc_status: row.querySelector('td:nth-child(10)').textContent.trim()
                 });
+
+                // Add visual feedback - highlight the selected rows
+                row.classList.add('table-active');
+            }
+        });
+
+        // Remove highlight from unselected rows
+        document.querySelectorAll('.sample-select:not(:checked)').forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            if (row) {
+                row.classList.remove('table-active');
             }
         });
 
         this.selectedSamples = samples;
         this.storeSamples();
+
+        // Update the submit button state
+        this.updateSubmitButtonState();
+
+        console.log(`Updated selected samples: ${samples.length} samples in selection`);
     }
 
     // Utility method to merge samples with duplicate detection
@@ -1089,6 +1117,22 @@ class PipelineLocalData {
                 if (selectedCount) {
                     selectedCount.textContent = '0 samples selected';
                 }
+
+                // Add debug logs to track what's happening
+                console.log('Selection cleared: checkboxes unchecked, localStorage cleared');
+                console.log('Current selected samples array:', this.selectedSamples);
+
+                // Force a redraw of the table to reflect the changes
+                // This is needed because even though we unchecked boxes, the visual state might not update
+                setTimeout(() => {
+                    // Force browser to recalculate layout
+                    tableBody.style.display = 'none';
+                    // This triggers a reflow
+                    void tableBody.offsetHeight;
+                    tableBody.style.display = '';
+
+                    console.log('Table redraw triggered');
+                }, 50);
             } else {
                 console.error('Table body not found when trying to clear selection');
             }
