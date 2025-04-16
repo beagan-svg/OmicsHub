@@ -161,18 +161,65 @@
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <div id="samples-table-header"
+                    class="card-header bg-light d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Select Samples for Processing</h5>
-                    <div class="btn-group">
-                        <button id="submit-selected" class="btn btn-primary" disabled>
-                            <i class="bi bi-play-fill"></i> Submit Selected
-                        </button>
-                        <button class="btn btn-outline-secondary" id="show-workflow-config">
-                            <i class="bi bi-gear-fill"></i> Configure
-                        </button>
-                        <button class="btn btn-outline-danger" id="clear-selection">
-                            <i class="bi bi-x-circle"></i> Clear Selection
-                        </button>
+                    <div class="action-toggle-container">
+                        <!-- Submit Button (styled to match other toggles) -->
+                        <div class="action-button-toggle">
+                            <button id="submit-action-btn" class="btn btn-primary btn-sm w-100" disabled>
+                                <i class="bi bi-play-fill me-2"></i>SUBMIT SELECTED
+                            </button>
+                        </div>
+
+                        <!-- Configure Toggle -->
+                        <div class="action-button-toggle">
+                            <label class="toggle-switch toggle-switch-lg" for="configure-toggle">
+                                <input type="checkbox" id="configure-toggle" class="action-toggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <label class="toggle-label" for="configure-toggle">
+                                Configure
+                            </label>
+                        </div>
+
+                        <!-- Clear Selection Toggle -->
+                        <div class="action-button-toggle">
+                            <label class="toggle-switch toggle-switch-lg toggle-switch-action" for="clear-toggle">
+                                <input type="checkbox" id="clear-toggle" class="action-toggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <label class="toggle-label" for="clear-toggle">
+                                Clear Selection
+                            </label>
+                        </div>
+
+                        <!-- Clear ATAC Toggle -->
+                        <div class="action-button-toggle">
+                            <label class="toggle-switch toggle-switch-lg toggle-switch-atac" for="clear-atac-toggle">
+                                <input type="checkbox" id="clear-atac-toggle" class="action-toggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <label class="toggle-label" for="clear-atac-toggle">
+                                Clear ATAC
+                            </label>
+                        </div>
+
+                        <!-- Keep the original buttons in a hidden div for functionality -->
+                        <div style="display: none;">
+                            <button id="submit-selected" class="btn btn-primary" disabled>
+                                <i class="bi bi-play-fill"></i> Submit Selected
+                            </button>
+                            <button class="btn btn-outline-secondary" id="show-workflow-config">
+                                <i class="bi bi-gear-fill"></i> Configure
+                            </button>
+                            <button class="btn btn-outline-danger" id="clear-selection">
+                                <i class="bi bi-x-circle"></i> Clear Selection
+                            </button>
+                            <button id="clear-atac" class="btn btn-outline-danger">
+                                <i class="bi bi-x-circle"></i> Clear ATAC
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
@@ -676,7 +723,354 @@
         // Add event listener to select all checkbox for count update
         const selectAllCheckbox = document.getElementById('select-all-samples');
         if (selectAllCheckbox) {
-            selectAllCheckbox.addEventListener('change', updateSelectedCount);
+            // Remove any existing event listeners to prevent duplication
+            const newSelectAllCheckbox = selectAllCheckbox.cloneNode(true);
+            selectAllCheckbox.parentNode.replaceChild(newSelectAllCheckbox, selectAllCheckbox);
+
+            // Add our single event listener
+            newSelectAllCheckbox.addEventListener('change', function () {
+                // Update count
+                updateSelectedCount();
+
+                // Call the PipelineLocalData handler for the backend logic
+                // But prevent it from showing its own notification
+                if (window.pipelineLocalData) {
+                    window.pipelineLocalData.handleSelectAllChange({ target: this });
+                }
+
+                // Show a single toast notification for select all/none
+                if (this.checked) {
+                    const count = document.querySelectorAll('.sample-select').length;
+                    showToggleToast(`Selecting all ${count} samples...`, 'bi-stars');
+                } else {
+                    showToggleToast('Clearing selections...', 'bi-stars');
+                }
+            });
+        }
+
+        // Toggle switch handlers for action buttons
+
+        // Submit Button
+        const submitActionBtn = document.getElementById('submit-action-btn');
+        if (submitActionBtn) {
+            submitActionBtn.addEventListener('click', function () {
+                // Show toast notification
+                showToggleToast('Submitting selected samples...', 'bi-stars');
+
+                // Trigger the original button click
+                document.getElementById('submit-selected').click();
+            });
+
+            // Sync the button state with the hidden button
+            function syncSubmitButtonState() {
+                const originalBtn = document.getElementById('submit-selected');
+                if (originalBtn && submitActionBtn) {
+                    submitActionBtn.disabled = originalBtn.disabled;
+                }
+            }
+
+            // Set up observer to watch for changes to the original button
+            const submitBtnObserver = new MutationObserver(syncSubmitButtonState);
+            const originalBtn = document.getElementById('submit-selected');
+            if (originalBtn) {
+                submitBtnObserver.observe(originalBtn, { attributes: true });
+                // Initial sync
+                syncSubmitButtonState();
+            }
+
+            // Also listen for changes to selected samples
+            document.addEventListener('change', function (event) {
+                if (event.target.matches('.sample-select')) {
+                    // Slight delay to let other handlers run first
+                    setTimeout(syncSubmitButtonState, 50);
+                }
+            });
+        }
+
+        // Configure Toggle
+        const configureToggle = document.getElementById('configure-toggle');
+        if (configureToggle) {
+            configureToggle.addEventListener('change', function () {
+                if (this.checked) {
+                    // Show toast notification
+                    showToggleToast('Opening configuration panel...', 'bi-stars');
+
+                    // Trigger the original button click after a short delay
+                    setTimeout(() => {
+                        document.getElementById('show-workflow-config').click();
+
+                        // Reset toggle after action completes
+                        this.checked = false;
+                    }, 500);
+                }
+            });
+        }
+
+        // Clear Selection Toggle
+        const clearToggle = document.getElementById('clear-toggle');
+        if (clearToggle) {
+            clearToggle.addEventListener('change', function () {
+                if (this.checked) {
+                    // Show toast notification
+                    showToggleToast('Clearing selections...', 'bi-stars');
+
+                    // Trigger the original button click after a short delay
+                    setTimeout(() => {
+                        document.getElementById('clear-selection').click();
+
+                        // Reset toggle after action completes
+                        this.checked = false;
+                    }, 500);
+                }
+            });
+        }
+
+        // Clear ATAC Toggle
+        const clearAtacToggle = document.getElementById('clear-atac-toggle');
+        if (clearAtacToggle) {
+            clearAtacToggle.addEventListener('change', function () {
+                if (this.checked) {
+                    // Show toast notification
+                    showToggleToast('Clearing ATAC samples...', 'bi-stars');
+
+                    // Perform ATAC clear after a short delay
+                    setTimeout(() => {
+                        clearAtacSamples();
+
+                        // Reset toggle after action completes
+                        this.checked = false;
+                    }, 500);
+                }
+            });
+        }
+
+        // Function to clear ATAC samples (batch name starting with ATX)
+        function clearAtacSamples() {
+            // Get all rows in the table for visible UI updates
+            const tableBody = document.querySelector('#samples-table tbody');
+            if (!tableBody) return;
+
+            // Track removed samples for reporting
+            let visibleRemoved = 0;
+            let totalRemoved = 0;
+
+            // First, filter all ATAC samples from PipelineLocalData
+            if (window.pipelineLocalData && window.pipelineLocalData.selectedSamples) {
+                const originalLength = window.pipelineLocalData.selectedSamples.length;
+
+                // Filter out samples with batch name starting with ATX
+                window.pipelineLocalData.selectedSamples = window.pipelineLocalData.selectedSamples.filter(sample => {
+                    const batchName = sample.batch_name_from_vendor || '';
+                    const isAtacSample = batchName.toUpperCase().startsWith('ATX');
+
+                    if (isAtacSample) {
+                        totalRemoved++;
+                    }
+
+                    return !isAtacSample;
+                });
+
+                // Calculate how many samples were removed
+                totalRemoved = originalLength - window.pipelineLocalData.selectedSamples.length;
+
+                // Save the updated samples to localStorage
+                window.pipelineLocalData.saveSamples();
+            }
+
+            // Then, update the visible UI by removing matching rows from the current page
+            const rows = tableBody.querySelectorAll('tr');
+            rows.forEach(row => {
+                // Skip empty state row
+                if (row.querySelector('td[colspan="10"]')) return;
+
+                // Check batch name column (5th column, index 4)
+                const batchNameCell = row.querySelector('td:nth-child(5)');
+                if (batchNameCell) {
+                    const batchName = batchNameCell.textContent.trim();
+                    if (batchName.toUpperCase().startsWith('ATX')) {
+                        // Remove row from visible table
+                        row.remove();
+                        visibleRemoved++;
+                    }
+                }
+            });
+
+            // Update UI state based on results
+            if (window.pipelineLocalData) {
+                // Update submit button state
+                window.pipelineLocalData.updateSubmitButtonState();
+
+                // Update selected count
+                const selectedCount = document.getElementById('selected-count');
+                if (selectedCount) {
+                    const remainingCount = window.pipelineLocalData.selectedSamples.length;
+                    selectedCount.textContent = `${remainingCount} sample${remainingCount !== 1 ? 's' : ''} selected`;
+                }
+
+                // Update the pagination info to reflect the new total count
+                const remainingCount = window.pipelineLocalData.selectedSamples.length;
+                const currentPage = parseInt(document.querySelector('.current-page')?.textContent) || 1;
+                const itemsPerPage = parseInt(document.getElementById('rowsPerPageDropdown')?.textContent) || 25;
+                const startIndex = Math.min(((currentPage - 1) * itemsPerPage) + 1, remainingCount);
+                const endIndex = Math.min(startIndex + itemsPerPage - 1, remainingCount);
+
+                // Update pagination info text
+                const paginationInfo = document.querySelector('.pagination-info');
+                if (paginationInfo) {
+                    if (remainingCount > 0) {
+                        paginationInfo.textContent = `Results ${startIndex}-${endIndex} of ${remainingCount}`;
+                    } else {
+                        paginationInfo.textContent = 'Results 0-0 of 0';
+                    }
+                }
+
+                // Update total pages
+                const totalPages = Math.ceil(remainingCount / itemsPerPage);
+                const totalPagesSpan = document.querySelector('.total-pages');
+                if (totalPagesSpan) {
+                    totalPagesSpan.textContent = totalPages || 0;
+                }
+
+                // Also update the goto page input max value
+                const gotoPageInput = document.getElementById('gotoPage');
+                if (gotoPageInput) {
+                    gotoPageInput.max = totalPages || 1;
+                    // If current page is beyond total pages, adjust it
+                    if (currentPage > totalPages) {
+                        gotoPageInput.value = totalPages || 1;
+                    }
+                }
+
+                // Check if table is now empty (all visible samples were removed)
+                if (tableBody.querySelectorAll('tr').length === 0) {
+                    // Show empty state
+                    const emptyRow = document.createElement('tr');
+                    emptyRow.innerHTML = `
+                        <td colspan="10" class="text-center py-5">
+                            <div class="d-flex flex-column align-items-center">
+                                <div class="mb-3">
+                                    <i class="bi bi-x-circle" style="font-size: 2rem;"></i>
+                                </div>
+                                <p class="text-muted mb-4">No samples selected. Use the Sample Browser to select samples.</p>
+                                <a href="/" class="btn btn-primary">
+                                    <i class="bi bi-table me-2"></i>GO TO SAMPLE BROWSER
+                                </a>
+                            </div>
+                        </td>
+                    `;
+                    tableBody.appendChild(emptyRow);
+
+                    // Disable pagination buttons
+                    const paginationButtons = document.querySelectorAll('.pagination-navigation a');
+                    paginationButtons.forEach(btn => {
+                        btn.classList.add('disabled');
+                        btn.setAttribute('aria-disabled', 'true');
+                    });
+
+                    // Reset and disable goto page input
+                    if (gotoPageInput) {
+                        gotoPageInput.value = 0;
+                        gotoPageInput.disabled = true;
+                    }
+                } else {
+                    // Update pagination buttons state based on current page and total pages
+                    const firstAndPrevButtons = document.querySelectorAll('[title="First page"], [title="Previous page"]');
+                    firstAndPrevButtons.forEach(btn => {
+                        if (currentPage <= 1) {
+                            btn.classList.add('disabled');
+                            btn.setAttribute('aria-disabled', 'true');
+                        } else {
+                            btn.classList.remove('disabled');
+                            btn.setAttribute('aria-disabled', 'false');
+                        }
+                    });
+
+                    const nextAndLastButtons = document.querySelectorAll('[title="Next page"], [title="Last page"]');
+                    nextAndLastButtons.forEach(btn => {
+                        if (currentPage >= totalPages) {
+                            btn.classList.add('disabled');
+                            btn.setAttribute('aria-disabled', 'true');
+                        } else {
+                            btn.classList.remove('disabled');
+                            btn.setAttribute('aria-disabled', 'false');
+                        }
+                    });
+                }
+
+                // Show success message with total removal count
+                if (totalRemoved > 0) {
+                    let message = `Removed ${totalRemoved} ATAC sample${totalRemoved !== 1 ? 's' : ''}`;
+                    if (visibleRemoved < totalRemoved) {
+                        message += ` (${visibleRemoved} from current page)`;
+                    }
+                    showToggleToast(message, 'bi-stars');
+                } else {
+                    // No ATAC samples found
+                    showToggleToast('No ATAC samples found to remove', 'bi-stars');
+                }
+            } else {
+                // Fallback if PipelineLocalData is not available
+                if (visibleRemoved > 0) {
+                    showToggleToast(`Removed ${visibleRemoved} ATAC samples from current page`, 'bi-stars');
+                } else {
+                    showToggleToast('No ATAC samples found to remove', 'bi-stars');
+                }
+            }
+        }
+
+        // Function to show toast notifications for toggle actions
+        function showToggleToast(message, iconClass) {
+            // Remove any existing toasts to prevent duplicates
+            const existingToasts = document.querySelectorAll('.toggle-toast, .toast');
+            existingToasts.forEach(toast => {
+                try {
+                    // If it's a Bootstrap toast, hide it properly
+                    if (toast.classList.contains('toast')) {
+                        const bsToast = bootstrap.Toast.getInstance(toast);
+                        if (bsToast) bsToast.hide();
+                    }
+                    // For other toasts or if bootstrap hide fails, remove directly
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                } catch (e) {
+                    console.error('Error removing existing toast:', e);
+                }
+            });
+
+            // Create new toast
+            const toast = document.createElement('div');
+            toast.className = 'toggle-toast';
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+
+            // Use consistent HTML structure and always use the stars icon
+            toast.innerHTML = `
+                <div class="toggle-toast-icon">
+                    <i class="bi bi-stars"></i>
+                </div>
+                <div class="toggle-toast-message">${message}</div>
+            `;
+
+            // Add to document
+            document.body.appendChild(toast);
+
+            // Remove after delay
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translate(-50%, 20px)';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }, 2000);
+
+            // Also ensure the local data's toast container is clear
+            const toastContainer = document.getElementById('toast-container');
+            if (toastContainer) {
+                toastContainer.innerHTML = '';
+            }
         }
     });
 </script>

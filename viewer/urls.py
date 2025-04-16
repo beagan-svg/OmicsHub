@@ -25,4 +25,5 @@ urlpatterns = [
     path('api/pipeline/stop-alignment/', PipelineApiView.stop_alignment, name='stop_alignment'),
     path('api/pipeline/retry-job/', PipelineApiView.retry_failed_job, name='retry_failed_job'),
     path('api/pipeline/update-all-jobs/', PipelineApiView.update_all_jobs, name='update_all_jobs'),
+    path('api/pipeline/get-job-data/', PipelineApiView.get_job_data, name='get_job_data'),
 ] 
