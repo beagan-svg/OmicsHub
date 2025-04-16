@@ -562,6 +562,57 @@
     </div>
 </div>
 
+<!-- Sample Submission Modal -->
+<div class="modal fade" id="submissionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Submit Selected Samples</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="incomplete-samples-warning" class="alert alert-warning mb-3 d-none">
+                    <h6 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>Incomplete Samples
+                        Detected</h6>
+                    <p>The following samples have not completed ingest:</p>
+                    <ul id="incomplete-samples-list" class="mb-2"></ul>
+                    <p class="mb-0">Would you like to proceed with only the valid samples?</p>
+                </div>
+                <div class="alert alert-info">
+                    <span id="selected-count" class="fw-bold">0</span> samples selected for submission
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="forceSubmitCheck">
+                    <label class="form-check-label" for="forceSubmitCheck">
+                        Force submission (override pending jobs check)
+                    </label>
+                </div>
+                <div class="overflow-auto" style="max-height: 400px;">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>FASTQ Name</th>
+                                <th>Workflow</th>
+                                <th>Ingest Status</th>
+                                <th>Command</th>
+                            </tr>
+                        </thead>
+                        <tbody id="submission-samples-list">
+                            <!-- Sample list will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="proceedWithValidBtn" style="display:none;">Proceed
+                    with Valid Samples</button>
+                <button type="button" class="btn btn-primary" id="submitSamplesBtn">Submit Samples</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Toast Container -->
 <div id="toast-container" class="position-fixed bottom-0 start-50 translate-middle-x p-3" style="z-index: 11;">
     <!-- Toasts will be added here dynamically -->

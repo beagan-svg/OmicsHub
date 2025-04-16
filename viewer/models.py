@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 class Metadata(models.Model):
     fastq_name = models.CharField(max_length=255, primary_key=True)
@@ -116,44 +117,37 @@ class UserPreferences(models.Model):
         db_table = 'user_preferences'
 
 class SampleQueue(models.Model):
-    """
-    Model for storing samples in the server-side processing queue.
-    Used to track sample status and metadata throughout the pipeline.
-    """
-    QUEUE_TYPES = (
+    """Model for storing samples in processing queue"""
+    QUEUE_TYPES = [
         ('alignment', 'Alignment Queue'),
-        ('postqc', 'Post-QC Queue'),
-    )
+        ('postqc', 'Post-QC Queue')
+    ]
     
-    STATUS_CHOICES = (
+    STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('submitted', 'Submitted'),
         ('running', 'Running'),
         ('completed', 'Completed'),
         ('failed', 'Failed'),
-        ('cancelled', 'Cancelled'),
-    )
+        ('cancelled', 'Cancelled')
+    ]
     
     fastq_name = models.CharField(max_length=255)
     queue_type = models.CharField(max_length=20, choices=QUEUE_TYPES)
-    workflow = models.CharField(max_length=20, default='RTX')
-    command = models.TextField()
-    demand_id = models.CharField(max_length=255, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    metadata = models.TextField(null=True, blank=True)  # JSON string of sample metadata
-    added_time = models.DateTimeField(auto_now_add=True)
+    workflow = models.CharField(max_length=20, null=True, blank=True)
+    command = models.TextField(blank=True)
+    demand_id = models.CharField(max_length=255, null=True, blank=True)
+    metadata = models.JSONField(null=True, blank=True)
+    added_time = models.DateTimeField(default=timezone.now)
     start_time = models.DateTimeField(null=True, blank=True)
-    end_time = models.DateTimeField(null=True, blank=True)
     
     class Meta:
-        indexes = [
-            models.Index(fields=['fastq_name']),
-            models.Index(fields=['queue_type', 'status']),
-            models.Index(fields=['demand_id']),
-        ]
-        
+        unique_together = ('fastq_name', 'queue_type')
+        ordering = ['added_time']
+    
     def __str__(self):
-        return f"{self.fastq_name} ({self.queue_type} - {self.status})"
+        return f"{self.fastq_name} ({self.queue_type})"
         
     @property
     def metadata_dict(self):

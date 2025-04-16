@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from django.core.paginator import Paginator
 from django.utils import timezone
-from viewer.models import Main, Metadata, LoadAssociation, Alignment, PostQC
+from viewer.models import Main, Metadata, LoadAssociation, Alignment, PostQC, SampleQueue
 from viewer.utils.pipeline_utils import (
     load_pipeline_config, 
     count_running_jobs, 
@@ -32,8 +32,14 @@ from viewer.utils.pipeline_utils import (
     check_alignment_status,
     stop_alignment_job,
     update_all_running_jobs,
-    get_queue_data
+    get_queue_data,
+    determine_workflow,
+    is_ingest_complete,
+    create_mtx_alignment_command,
+    create_rtx_alignment_command
 )
+from django.views.decorators.http import require_http_methods
+from django.db import transaction
 
 # Cache timeouts in seconds
 PIPELINE_CONFIG_CACHE_TIMEOUT = 3600  # 1 hour
@@ -683,4 +689,122 @@ class PipelineApiView:
                 'postqc_queue': queue_data['postqc_queue']
             })
         except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400) 
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+@require_http_methods(["POST"])
+def submit_samples(request):
+    """API endpoint to submit samples for processing"""
+    try:
+        data = json.loads(request.body)
+        sample_names = data.get('samples', [])
+        force_submit = data.get('force_submit', False)
+        
+        if not sample_names:
+            return JsonResponse({'status': 'error', 'message': 'No samples provided'})
+        
+        # Check current job count if not forcing submission
+        if not force_submit:
+            job_counts = count_running_jobs()
+            if job_counts['total'] >= 100:
+                return JsonResponse({
+                    'status': 'error', 
+                    'message': f'Too many jobs running ({job_counts["total"]}). Please try again later or use force submit.'
+                })
+        
+        submitted = []
+        skipped = []
+        
+        for sample_name in sample_names:
+            try:
+                # Get sample metadata
+                metadata = Metadata.objects.get(fastq_name=sample_name)
+                
+                # Check if ingest is complete
+                if not is_ingest_complete(sample_name) and not force_submit:
+                    skipped.append({'fastq_name': sample_name, 'reason': 'Ingest not complete'})
+                    continue
+                
+                # Determine workflow
+                workflow = determine_workflow(metadata.batch_name_from_vendor)
+                if not workflow:
+                    workflow = 'rtx'  # Default to RTX
+                
+                # Generate command
+                if workflow == 'mtx':
+                    command = create_mtx_alignment_command({
+                        'organism_common_name': metadata.organism_common_name,
+                        'load_name': metadata.load_name
+                    })
+                else:
+                    command = create_rtx_alignment_command({
+                        'organism_common_name': metadata.organism_common_name,
+                        'load_name': metadata.load_name,
+                        'library_prep': metadata.library_prep
+                    })
+                
+                # Create or update queue entry
+                with transaction.atomic():
+                    queue_entry, created = SampleQueue.objects.get_or_create(
+                        fastq_name=sample_name,
+                        queue_type='alignment',
+                        defaults={
+                            'workflow': workflow,
+                            'command': command,
+                            'status': 'pending',
+                            'metadata': {
+                                'organism': metadata.organism_common_name,
+                                'batch': metadata.batch_name_from_vendor,
+                                'load_name': metadata.load_name,
+                                'library_prep': metadata.library_prep
+                            }
+                        }
+                    )
+                    
+                    if not created:
+                        queue_entry.workflow = workflow
+                        queue_entry.command = command
+                        queue_entry.status = 'pending'
+                        queue_entry.save()
+                
+                # Submit sample for alignment
+                result = submit_sample_for_alignment({
+                    'fastq_name': sample_name,
+                    'load_name': metadata.load_name,
+                    'organism_common_name': metadata.organism_common_name,
+                    'batch_name_from_vendor': metadata.batch_name_from_vendor,
+                    'library_prep': metadata.library_prep
+                })
+                
+                if result.get('status') == 'success':
+                    # Update queue entry with demand ID and start time
+                    queue_entry.demand_id = result.get('demand_id')
+                    queue_entry.status = 'submitted'
+                    queue_entry.start_time = timezone.now()
+                    queue_entry.save()
+                    
+                    submitted.append(sample_name)
+                else:
+                    skipped.append({
+                        'fastq_name': sample_name, 
+                        'reason': result.get('message', 'Unknown error')
+                    })
+                
+                # Wait 5 minutes between submissions (unless force submit)
+                if not force_submit and sample_name != sample_names[-1]:
+                    time.sleep(300)  # 5 minutes in seconds
+            
+            except Metadata.DoesNotExist:
+                skipped.append({'fastq_name': sample_name, 'reason': 'Metadata not found'})
+            except Exception as e:
+                skipped.append({'fastq_name': sample_name, 'reason': str(e)})
+        
+        return JsonResponse({
+            'status': 'success',
+            'submitted': submitted,
+            'submitted_count': len(submitted),
+            'skipped': skipped,
+            'skipped_count': len(skipped)
+        })
+    
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}) 

@@ -795,7 +795,7 @@ class PipelineLocalData {
                         <div>
                             <strong>${sample.fastq_name}</strong>
                             <span class="ms-2 badge bg-warning">Pending Ingest</span>
-                        </div>
+                    </div>
                         <small class="text-muted">${sample.workflow || this.determineWorkflow(sample.batch_name_from_vendor)}</small>
                     `;
                     sampleList.appendChild(li);
@@ -939,7 +939,7 @@ class PipelineLocalData {
                     <div class="modal-header">
                         <h5 class="modal-title">Confirm Submission</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
+                            </div>
                     <div class="modal-body">
                         <div class="alert alert-warning">
                             <i class="bi bi-exclamation-triangle me-2"></i>

@@ -5,7 +5,8 @@ from viewer.views.pipeline import (
     PipelineDashboardView, 
     PipelineApiView, 
     JobMonitorView, 
-    FailedJobsView
+    FailedJobsView,
+    submit_samples
 )
 
 app_name = 'viewer'
@@ -27,4 +28,5 @@ urlpatterns = [
     path('api/pipeline/update_all_jobs/', PipelineApiView.update_all_jobs, name='update_all_jobs'),
     path('api/pipeline/get-job-data/', PipelineApiView.get_job_data, name='get_job_data'),
     path('api/pipeline/get-queue-data/', PipelineApiView.get_queue_data, name='api_get_queue_data'),
+    path('api/pipeline/submit-samples/', submit_samples, name='submit_samples'),
 ] 
