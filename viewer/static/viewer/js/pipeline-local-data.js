@@ -1084,69 +1084,45 @@ class PipelineLocalData {
 
     // Helper method to clear all stored data
     clearStoredData() {
-        try {
-            console.log('Clearing selected samples');
+        console.log('Clearing selected samples');
 
-            // Remove data from localStorage (both keys)
-            localStorage.removeItem(this.storageKey);
-            localStorage.removeItem(this.legacyStorageKey);
+        // Uncheck all checkboxes
+        const checkboxes = document.querySelectorAll('input[type="checkbox"].sample-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
 
-            // Reset the selectedSamples array
-            this.selectedSamples = [];
-
-            // Get the sample table body
-            const tableBody = document.querySelector('#samples-table tbody');
-            if (tableBody) {
-                // MODIFIED: Don't clear the table, just uncheck all checkboxes
-                const checkboxes = tableBody.querySelectorAll('.sample-select');
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = false;
-                });
-
-                // Uncheck the "select all" checkbox
-                const selectAllCheckbox = document.getElementById('select-all-samples');
-                if (selectAllCheckbox) {
-                    selectAllCheckbox.checked = false;
-                }
-
-                // MODIFIED: Don't disable the submit button, update its state based on selection
-                this.updateSubmitButtonState();
-
-                // Update the selected count display
-                const selectedCount = document.getElementById('selected-count');
-                if (selectedCount) {
-                    selectedCount.textContent = '0 samples selected';
-                }
-
-                // Add debug logs to track what's happening
-                console.log('Selection cleared: checkboxes unchecked, localStorage cleared');
-                console.log('Current selected samples array:', this.selectedSamples);
-
-                // Force a redraw of the table to reflect the changes
-                // This is needed because even though we unchecked boxes, the visual state might not update
-                setTimeout(() => {
-                    // Force browser to recalculate layout
-                    tableBody.style.display = 'none';
-                    // This triggers a reflow
-                    void tableBody.offsetHeight;
-                    tableBody.style.display = '';
-
-                    console.log('Table redraw triggered');
-                }, 50);
-            } else {
-                console.error('Table body not found when trying to clear selection');
-            }
-
-            console.log('Sample selections cleared successfully');
-
-            // Show a toast notification to confirm the action
-            this.showToastNotification('Sample selections cleared', 'info');
-
-            return true;
-        } catch (error) {
-            console.error('Error clearing stored data:', error);
-            return false;
+        // Clear the select all checkbox
+        const selectAllCheckbox = document.querySelector('#select-all-checkbox');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = false;
         }
+
+        // Clear the selected samples array
+        this.selectedSamples = [];
+
+        // Update storage and log the new count
+        this.storeSamples();
+        const remainingSamples = this.getSamplesFromStorage();
+        console.log(`Storage updated: ${remainingSamples.length} samples remaining in storage`);
+
+        // Update submit button state
+        this.updateSubmitButtonState();
+        console.log('Selection cleared: checkboxes unchecked, localStorage cleared');
+        console.log('Current selected samples array:', this.selectedSamples);
+
+        // Force table redraw
+        const tableBody = document.querySelector('.table tbody');
+        if (tableBody) {
+            tableBody.style.display = 'none';
+            // Force reflow
+            void tableBody.offsetHeight;
+            tableBody.style.display = '';
+        }
+        console.log('Table redraw triggered');
+
+        // Show success message
+        this.showToast('Sample selections cleared successfully', 'success');
     }
 
     // Reinitialize to make sure we get the latest data from localStorage
