@@ -131,24 +131,27 @@ def is_ingest_complete(fastq_name):
     except Main.DoesNotExist:
         return False
 
-def determine_workflow(batch_name_from_vendor):
-    """Determine workflow based on batch name from vendor"""
-    if not batch_name_from_vendor:
-        return None
+def determine_workflow(batch_name):
+    """
+    Determine workflow type (MTX/RTX) based on batch name.
     
-    # Extract prefix (e.g., MTX from MTX-22030)
-    parts = batch_name_from_vendor.split('-')
-    if not parts:
-        return None
+    Args:
+        batch_name (str): The batch name from vendor
+        
+    Returns:
+        str: 'MTX' or 'RTX' workflow type
+    """
+    if not batch_name:
+        return 'RTX'  # Default to RTX if no batch name
+        
+    batch_name_upper = batch_name.upper()
     
-    prefix = parts[0].upper()
-    
-    if prefix == 'MTX':
-        return 'mtx'
-    elif prefix == 'RTX':
-        return 'rtx'
+    if batch_name_upper.startswith('MTX') or 'ATX' in batch_name_upper:
+        return 'MTX'
+    elif batch_name_upper.startswith('RTX'):
+        return 'RTX'
     else:
-        return None
+        return 'RTX'  # Default to RTX for unrecognized patterns
 
 def get_reference_name(organism_common_name):
     """Get reference name for an organism"""
@@ -213,80 +216,223 @@ def create_rtx_alignment_command(sample):
     
     return command
 
-def submit_sample_for_alignment(sample):
-    """Submit a sample for alignment and return the result"""
-    # Check if ingest is complete
-    fastq_name = sample.get('fastq_name')
-    if not is_ingest_complete(fastq_name):
-        return {
-            'status': 'error',
-            'message': f'Ingest not complete for {fastq_name}',
-            'fastq_name': fastq_name
-        }
+def generate_alignment_command(sample_data, config=None):
+    """
+    Generate the OCS alignment command based on sample data.
     
-    # Get workflow from batch name
-    batch_name = sample.get('batch_name_from_vendor', '')
+    Args:
+        sample_data (dict): Sample metadata including organism, load_name, etc.
+        config (dict, optional): Pipeline configuration with references
+        
+    Returns:
+        dict: Command details including full_command, workflow, etc.
+    """
+    # Get basic sample info
+    organism = sample_data.get('organism_common_name', '')
+    load_name = sample_data.get('load_name', '')
+    batch_name = sample_data.get('batch_name_from_vendor', '')
+    library_prep = sample_data.get('library_prep', '')
+    
+    # Determine workflow
     workflow = determine_workflow(batch_name)
     
-    if not workflow:
+    # Get reference based on organism
+    if not config:
+        config = load_pipeline_config()
+        
+    reference_map = {
+        'mouse': 'mouse_10x_mm10_genome_star2.7.1a',
+        'human': 'human_10x_grch38_genome_star2.7.1a',
+        # Add more organism mappings as needed
+    }
+    
+    # Try to get from config first, then fallback to hardcoded defaults
+    references = config.get('references', {})
+    reference = None
+    
+    # Try exact match first
+    for ref_id, ref_info in references.items():
+        if isinstance(ref_info, dict) and ref_info.get('organism', '').lower() == organism.lower():
+            reference = ref_id
+            break
+    
+    # If no match in config, use hardcoded defaults
+    if not reference:
+        reference = reference_map.get(organism.lower(), 'human_10x_grch38_genome_star2.7.1a')
+    
+    # Set chemistry version (default to v3)
+    chemistry = sample_data.get('chemistry', 'v3')
+    
+    # Build the command based on workflow
+    if workflow == 'MTX':
+        command = (
+            f'ocs fastqs align tenx-arc '
+            f'--reference-names "{reference}" '
+            f'--asset-name cellranger-arc '
+            f'--load-names "{load_name}" '
+            f'--notify-on FAILED '
+            f'--notify beagan.nguy@alleninstitute.org'
+        )
+    else:  # RTX
+        command = (
+            f'ocs fastqs align tenx-rnaseq '
+            f'--reference-names "{reference}" '
+            f'--asset-name cellranger-rnaseq '
+            f'--load-names "{load_name}" '
+            f'--cellranger-addopts "--chemistry {chemistry} --include-introns"'
+        )
+    
+    # Wrap command in bash script
+    full_command = (
+        '#!/bin/bash\n'
+        'source /home/svc_bicore/genomics-cloud-services/gcs-cli/.venv/bin/activate\n'
+        'export AWS_PROFILE=aibs-bicore\n'
+        f'{command}'
+    )
+    
+    return {
+        'command': command,
+        'full_command': full_command,
+        'workflow': workflow,
+        'reference': reference,
+        'chemistry': chemistry
+    }
+
+def submit_sample_for_alignment(sample, config=None):
+    """
+    Submit a sample for alignment processing.
+    
+    Args:
+        sample (dict): Sample metadata
+        config (dict, optional): Pipeline configuration
+        
+    Returns:
+        dict: Result of submission including status and demand_id
+    """
+    from django.utils import timezone
+    from viewer.models import SampleQueue, Main, Alignment
+    import subprocess
+    import json
+    import time
+    import uuid
+    
+    # Check ingest status
+    if sample.get('ingest_status') != 'Completed':
         return {
+            'fastq_name': sample.get('fastq_name'),
             'status': 'error',
-            'message': f'Could not determine workflow for {fastq_name} with batch name {batch_name}',
-            'fastq_name': fastq_name
+            'message': 'Ingest not completed'
         }
     
-    # Create alignment command based on workflow
-    if workflow == 'mtx':
-        command = create_mtx_alignment_command(sample)
-    else:  # rtx
-        command = create_rtx_alignment_command(sample)
+    # Check job capacity
+    job_counts = count_running_jobs()
+    if job_counts['total'] >= 100:
+        return {
+            'fastq_name': sample.get('fastq_name'),
+            'status': 'error',
+            'message': 'Maximum job capacity reached (100 jobs)'
+        }
     
-    # Create and run bash script
-    script_path = create_bash_script(command, f'submit_{fastq_name}.sh')
-    output = run_bash_script(script_path)
-    
-    # Parse result
     try:
-        if 'demand_status' in output and 'SUBMITTED' in output:
-            # Extract demand_id from the output
-            result_json = json.loads(output)
-            demand_id = result_json.get('demand_execution', {}).get('demand_id', '')
+        # Generate command
+        command_details = generate_alignment_command(sample, config)
+        
+        # Add sample to server-side queue
+        queue_entry = SampleQueue(
+            fastq_name=sample.get('fastq_name'),
+            queue_type='alignment',
+            workflow=command_details['workflow'],
+            command=command_details['full_command'],
+            status='pending',
+            metadata=json.dumps(sample),
+            added_time=timezone.now()
+        )
+        queue_entry.save()
+        
+        # Execute the command (wrapped script)
+        temp_script = f"/tmp/pipeline_submit_{uuid.uuid4().hex}.sh"
+        with open(temp_script, 'w') as f:
+            f.write(command_details['full_command'])
+        
+        subprocess.run(['chmod', '+x', temp_script])
+        result = subprocess.run([temp_script], capture_output=True, text=True)
+        
+        # Parse output for demand_id
+        demand_id = None
+        output = result.stdout
+        
+        for line in output.splitlines():
+            if "demand_id" in line:
+                try:
+                    demand_data = json.loads(line)
+                    demand_id = demand_data.get("demand_id")
+                except json.JSONDecodeError:
+                    # Try to extract demand_id using string parsing
+                    import re
+                    match = re.search(r'"demand_id"\s*:\s*"([^"]+)"', line)
+                    if match:
+                        demand_id = match.group(1)
+        
+        # Clean up temp script
+        subprocess.run(['rm', temp_script])
+        
+        if demand_id:
+            # Update queue entry
+            queue_entry.demand_id = demand_id
+            queue_entry.status = 'submitted'
+            queue_entry.start_time = timezone.now()
+            queue_entry.save()
             
-            # If submission was successful, update database
-            if demand_id:
-                # Update or create Alignment record
-                alignment, created = Alignment.objects.update_or_create(
-                    fastq_name_id=fastq_name,
-                    defaults={
-                        'status_id': 'SUBMITTED',
-                        'start_time': timezone.now(),
-                        'demand_id': demand_id,
-                        'retry_count': 0 if created else models.F('retry_count') + 1
-                    }
-                )
-                
-                # Update Main table
-                main = Main.objects.get(fastq_name_id=fastq_name)
+            # Create or update alignment record
+            alignment, created = Alignment.objects.get_or_create(
+                fastq_name_id=sample.get('fastq_name'),
+                defaults={
+                    'demand_id': demand_id,
+                    'status_id': 'SUBMITTED',
+                    'start_time': timezone.now(),
+                    'end_time': None,
+                    'retry_count': 0
+                }
+            )
+            
+            if not created:
+                alignment.demand_id = demand_id
+                alignment.status_id = 'SUBMITTED'
+                alignment.start_time = timezone.now()
+                alignment.end_time = None
+                alignment.save()
+            
+            # Update Main record
+            try:
+                main = Main.objects.get(fastq_name=sample.get('fastq_name'))
                 main.alignment_status = 'In Progress'
                 main.save()
+            except Main.DoesNotExist:
+                pass
             
             return {
+                'fastq_name': sample.get('fastq_name'),
                 'status': 'success',
-                'message': f'Successfully submitted {fastq_name} for alignment',
-                'fastq_name': fastq_name,
-                'demand_id': demand_id
+                'demand_id': demand_id,
+                'workflow': command_details['workflow'],
+                'message': f'Submitted successfully with demand_id: {demand_id}'
             }
         else:
+            # Mark as failed in queue
+            queue_entry.status = 'failed'
+            queue_entry.save()
+            
             return {
+                'fastq_name': sample.get('fastq_name'),
                 'status': 'error',
-                'message': f'Failed to submit {fastq_name} for alignment: {output}',
-                'fastq_name': fastq_name
+                'message': f'Failed to get demand_id from submission output: {output}'
             }
+            
     except Exception as e:
         return {
+            'fastq_name': sample.get('fastq_name'),
             'status': 'error',
-            'message': f'Error processing alignment submission for {fastq_name}: {str(e)}',
-            'fastq_name': fastq_name
+            'message': str(e)
         }
 
 def check_alignment_status(demand_id):
@@ -420,3 +566,50 @@ def update_all_running_jobs():
         logger.error(f"Failed to parse running jobs output: {output}")
     
     return results 
+
+def get_queue_data():
+    """
+    Get data from the server-side alignment and post-QC queues.
+    
+    Returns:
+        dict: Queue data for alignment and post-QC
+    """
+    from viewer.models import SampleQueue
+    
+    # Get alignment queue items
+    alignment_queue = SampleQueue.objects.filter(
+        queue_type='alignment', 
+        status__in=['pending', 'submitted', 'running']
+    ).order_by('-added_time')
+    
+    # Get post-QC queue items
+    postqc_queue = SampleQueue.objects.filter(
+        queue_type='postqc', 
+        status__in=['pending', 'submitted', 'running']
+    ).order_by('-added_time')
+    
+    # Format data for frontend
+    alignment_data = [{
+        'fastq_name': item.fastq_name,
+        'workflow': item.workflow,
+        'demand_id': item.demand_id,
+        'status': item.status,
+        'added_time': item.added_time,
+        'start_time': item.start_time,
+        'metadata': item.metadata
+    } for item in alignment_queue]
+    
+    postqc_data = [{
+        'fastq_name': item.fastq_name,
+        'workflow': item.workflow,
+        'demand_id': item.demand_id,
+        'status': item.status,
+        'added_time': item.added_time,
+        'start_time': item.start_time,
+        'metadata': item.metadata
+    } for item in postqc_queue]
+    
+    return {
+        'alignment_queue': alignment_data,
+        'postqc_queue': postqc_data
+    } 

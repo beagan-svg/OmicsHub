@@ -113,4 +113,55 @@ class UserPreferences(models.Model):
     show_cell_capture = models.BooleanField(default=True)
     
     class Meta:
-        db_table = 'user_preferences' 
+        db_table = 'user_preferences'
+
+class SampleQueue(models.Model):
+    """
+    Model for storing samples in the server-side processing queue.
+    Used to track sample status and metadata throughout the pipeline.
+    """
+    QUEUE_TYPES = (
+        ('alignment', 'Alignment Queue'),
+        ('postqc', 'Post-QC Queue'),
+    )
+    
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('submitted', 'Submitted'),
+        ('running', 'Running'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
+    )
+    
+    fastq_name = models.CharField(max_length=255)
+    queue_type = models.CharField(max_length=20, choices=QUEUE_TYPES)
+    workflow = models.CharField(max_length=20, default='RTX')
+    command = models.TextField()
+    demand_id = models.CharField(max_length=255, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    metadata = models.TextField(null=True, blank=True)  # JSON string of sample metadata
+    added_time = models.DateTimeField(auto_now_add=True)
+    start_time = models.DateTimeField(null=True, blank=True)
+    end_time = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['fastq_name']),
+            models.Index(fields=['queue_type', 'status']),
+            models.Index(fields=['demand_id']),
+        ]
+        
+    def __str__(self):
+        return f"{self.fastq_name} ({self.queue_type} - {self.status})"
+        
+    @property
+    def metadata_dict(self):
+        """Return the metadata as a dictionary."""
+        if not self.metadata:
+            return {}
+        try:
+            import json
+            return json.loads(self.metadata)
+        except:
+            return {} 

@@ -21,9 +21,10 @@ urlpatterns = [
     
     # Pipeline API endpoints
     path('api/pipeline/submit-alignment/', PipelineApiView.submit_alignment, name='submit_alignment'),
-    path('api/pipeline/check-status/', PipelineApiView.check_alignment_status, name='check_alignment_status'),
+    path('api/pipeline/check-alignment-status/', PipelineApiView.check_alignment_status, name='check_alignment_status'),
     path('api/pipeline/stop-alignment/', PipelineApiView.stop_alignment, name='stop_alignment'),
-    path('api/pipeline/retry-job/', PipelineApiView.retry_failed_job, name='retry_failed_job'),
-    path('api/pipeline/update-all-jobs/', PipelineApiView.update_all_jobs, name='update_all_jobs'),
+    path('api/pipeline/retry-failed-job/', PipelineApiView.retry_failed_job, name='retry_failed_job'),
+    path('api/pipeline/update_all_jobs/', PipelineApiView.update_all_jobs, name='update_all_jobs'),
     path('api/pipeline/get-job-data/', PipelineApiView.get_job_data, name='get_job_data'),
+    path('api/pipeline/get-queue-data/', PipelineApiView.get_queue_data, name='api_get_queue_data'),
 ] 

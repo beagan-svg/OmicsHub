@@ -31,7 +31,8 @@ from viewer.utils.pipeline_utils import (
     submit_sample_for_alignment, 
     check_alignment_status,
     stop_alignment_job,
-    update_all_running_jobs
+    update_all_running_jobs,
+    get_queue_data
 )
 
 # Cache timeouts in seconds
@@ -341,29 +342,59 @@ class PipelineApiView:
         try:
             data = json.loads(request.body)
             samples = data.get('samples', [])
+            force_submit = data.get('force_submit', False)  # Flag to force submission of samples with incomplete ingest
             
             # Check job capacity
             job_counts = count_running_jobs()
-            if job_counts['total'] >= 100:
+            max_jobs = 100
+            if job_counts['total'] >= max_jobs:
                 return JsonResponse({
                     'status': 'error',
-                    'message': f'Cannot submit more jobs. {job_counts["total"]} jobs already running. Maximum is 100.'
+                    'message': f'Cannot submit more jobs. {job_counts["total"]} jobs already running. Maximum is {max_jobs}.'
                 }, status=400)
             
             # Check available slots
-            available_slots = 100 - job_counts['total']
-            if len(samples) > available_slots:
+            available_slots = max_jobs - job_counts['total']
+            
+            # Split samples into valid and invalid based on ingest status
+            valid_samples = []
+            invalid_samples = []
+            
+            for sample in samples:
+                if sample.get('ingest_status') == 'Completed' or force_submit:
+                    valid_samples.append(sample)
+                else:
+                    invalid_samples.append(sample)
+            
+            # If there are invalid samples and not forcing submission, return warning
+            if invalid_samples and not force_submit:
+                invalid_names = [s.get('fastq_name', 'Unknown') for s in invalid_samples]
                 return JsonResponse({
                     'status': 'warning',
-                    'message': f'Can only submit {available_slots} out of {len(samples)} samples due to capacity limits.'
-                }, status=200)
+                    'message': f'Some samples have not completed ingest: {", ".join(invalid_names)}',
+                    'valid_samples': len(valid_samples),
+                    'invalid_samples': invalid_names,
+                    'requires_confirmation': True
+                })
+            
+            # Check if we need to limit samples due to capacity
+            if len(valid_samples) > available_slots:
+                # Truncate the list to available slots
+                samples_to_submit = valid_samples[:available_slots]
+                overflow_count = len(valid_samples) - available_slots
+                overflow_warning = f'Can only submit {available_slots} out of {len(valid_samples)} samples due to capacity limits.'
+            else:
+                samples_to_submit = valid_samples
+                overflow_count = 0
+                overflow_warning = None
             
             # Process samples
             results = []
             successful = failed = 0
+            submitted_samples = []
             
-            for sample in samples:
-                if sample.get('ingest_status') != 'Completed':
+            for sample in samples_to_submit:
+                if sample.get('ingest_status') != 'Completed' and not force_submit:
                     results.append({
                         'fastq_name': sample.get('fastq_name'),
                         'status': 'error',
@@ -377,17 +408,29 @@ class PipelineApiView:
                 
                 if result.get('status') == 'success':
                     successful += 1
+                    submitted_samples.append(sample.get('fastq_name'))
                 else:
                     failed += 1
                 
-                # Add delay between submissions
-                if len(samples) > 1:
+                # Add delay between submissions (5 minutes)
+                if len(samples_to_submit) > 1 and samples_to_submit.index(sample) < len(samples_to_submit) - 1:
                     time.sleep(300)  # 5 minutes
             
+            # Construct response message
+            message = f'Processed {len(samples_to_submit)} samples. {successful} successful, {failed} failed.'
+            if overflow_warning:
+                message = f'{message} {overflow_warning}'
+            
+            response_status = 'warning' if failed > 0 or overflow_count > 0 else 'success'
+            
             return JsonResponse({
-                'status': 'success',
-                'message': f'Processed {len(samples)} samples. {successful} successful, {failed} failed.',
-                'results': results
+                'status': response_status,
+                'message': message,
+                'results': results,
+                'submitted_samples': submitted_samples,
+                'successful': successful,
+                'failed': failed,
+                'overflow_count': overflow_count
             })
             
         except Exception as e:
@@ -623,4 +666,21 @@ class PipelineApiView:
             return JsonResponse({
                 'status': 'error',
                 'message': str(e)
-            }, status=500) 
+            }, status=500)
+    
+    @staticmethod
+    def get_queue_data(request) -> JsonResponse:
+        """Get data from the alignment and post-QC queues."""
+        if request.method != 'GET':
+            return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+        
+        try:
+            queue_data = get_queue_data()
+            
+            return JsonResponse({
+                'status': 'success',
+                'alignment_queue': queue_data['alignment_queue'],
+                'postqc_queue': queue_data['postqc_queue']
+            })
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400) 

@@ -406,6 +406,18 @@ class PipelineLocalData {
                 }
             }.bind(this));
         }
+
+        // View Queue button (in job monitor)
+        const viewQueueBtn = document.getElementById('view-queue-btn');
+        if (viewQueueBtn) {
+            viewQueueBtn.addEventListener('click', () => this.showQueueModal());
+        }
+
+        // Refresh Queue button (in queue modal)
+        const refreshQueueBtn = document.getElementById('refresh-queue');
+        if (refreshQueueBtn) {
+            refreshQueueBtn.addEventListener('click', () => this.fetchQueueData());
+        }
     }
 
     refreshJobs() {
@@ -738,35 +750,85 @@ class PipelineLocalData {
             sample.ingest_status !== 'Completed'
         );
 
-        if (pendingIngest.length > 0) {
-            this.showToastNotification(
-                `${pendingIngest.length} samples have not completed ingest and will be skipped`,
-                'warning'
-            );
-        }
-
         // Populate modal
         const sampleList = document.getElementById('submit-sample-list');
         if (sampleList) {
             sampleList.innerHTML = '';
-            this.selectedSamples.forEach(sample => {
-                const li = document.createElement('li');
-                li.innerHTML = `
-                    <strong>${sample.fastq_name}</strong>
-                    <span class="ms-2 badge ${sample.ingest_status === 'Completed' ? 'bg-success' : 'bg-warning'}">
-                        ${sample.ingest_status}
-                    </span>
+
+            // Group samples by ingest status
+            const completedSamples = this.selectedSamples.filter(sample =>
+                sample.ingest_status === 'Completed'
+            );
+
+            // Add completed samples
+            if (completedSamples.length > 0) {
+                const completedHeader = document.createElement('h6');
+                completedHeader.className = 'mt-3 mb-2';
+                completedHeader.innerHTML = 'Ready for Submission:';
+                sampleList.appendChild(completedHeader);
+
+                completedSamples.forEach(sample => {
+                    const li = document.createElement('li');
+                    li.className = 'd-flex justify-content-between align-items-center mb-1';
+                    li.innerHTML = `
+                        <div>
+                            <strong>${sample.fastq_name}</strong>
+                            <span class="ms-2 badge bg-success">Ready</span>
+                        </div>
+                        <small class="text-muted">${sample.workflow || this.determineWorkflow(sample.batch_name_from_vendor)}</small>
+                    `;
+                    sampleList.appendChild(li);
+                });
+            }
+
+            // Add pending ingest samples
+            if (pendingIngest.length > 0) {
+                const pendingHeader = document.createElement('h6');
+                pendingHeader.className = 'mt-3 mb-2 text-warning';
+                pendingHeader.innerHTML = 'Not Ready (Ingest Incomplete):';
+                sampleList.appendChild(pendingHeader);
+
+                pendingIngest.forEach(sample => {
+                    const li = document.createElement('li');
+                    li.className = 'd-flex justify-content-between align-items-center mb-1';
+                    li.innerHTML = `
+                        <div>
+                            <strong>${sample.fastq_name}</strong>
+                            <span class="ms-2 badge bg-warning">Pending Ingest</span>
+                        </div>
+                        <small class="text-muted">${sample.workflow || this.determineWorkflow(sample.batch_name_from_vendor)}</small>
+                    `;
+                    sampleList.appendChild(li);
+                });
+
+                // Add warning about pending ingest samples
+                const warning = document.createElement('div');
+                warning.className = 'alert alert-warning mt-3';
+                warning.innerHTML = `
+                    <small>
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        ${pendingIngest.length} sample${pendingIngest.length !== 1 ? 's' : ''} have not completed ingest. 
+                        These samples will be skipped unless you force submission.
+                    </small>
                 `;
-                sampleList.appendChild(li);
-            });
+                sampleList.appendChild(warning);
+            }
         }
 
         // Setup submit handler
         const confirmSubmitBtn = document.getElementById('confirm-submit');
+        const forceSubmitCheckbox = document.getElementById('force-submit');
+
         if (confirmSubmitBtn) {
             confirmSubmitBtn.disabled = this.selectedSamples.length === 0;
             confirmSubmitBtn.onclick = () => {
-                this.submitSamplesToAlignment(this.selectedSamples);
+                // Get force submit option
+                const forceSubmit = forceSubmitCheckbox && forceSubmitCheckbox.checked;
+
+                // Submit samples
+                this.submitSamplesToAlignment(this.selectedSamples, forceSubmit);
+
+                // Close modal
                 const modal = bootstrap.Modal.getInstance(document.getElementById('submit-modal'));
                 if (modal) modal.hide();
             };
@@ -777,7 +839,23 @@ class PipelineLocalData {
         modal.show();
     }
 
-    submitSamplesToAlignment(samples) {
+    determineWorkflow(batchName) {
+        if (!batchName) {
+            return 'RTX';  // Default to RTX if no batch name
+        }
+
+        const batchNameUpper = batchName.toUpperCase();
+
+        if (batchNameUpper.startsWith('MTX') || batchNameUpper.includes('ATX')) {
+            return 'MTX';
+        } else if (batchNameUpper.startsWith('RTX')) {
+            return 'RTX';
+        } else {
+            return 'RTX';  // Default to RTX for unrecognized patterns
+        }
+    }
+
+    submitSamplesToAlignment(samples, forceSubmit = false) {
         this.showToastNotification('Submitting samples for processing...', 'info', 3000);
 
         fetch('/api/pipeline/submit-alignment/', {
@@ -786,20 +864,48 @@ class PipelineLocalData {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: JSON.stringify({ samples })
+            body: JSON.stringify({
+                samples,
+                force_submit: forceSubmit
+            })
         })
             .then(response => response.json())
             .then(data => {
+                // Check if confirmation is required for samples with incomplete ingest
+                if (data.status === 'warning' && data.requires_confirmation) {
+                    // Show confirmation dialog for samples with incomplete ingest
+                    this.showConfirmationDialog(
+                        data.message,
+                        () => {
+                            // User confirmed - resubmit with force_submit=true
+                            this.submitSamplesToAlignment(samples, true);
+                        }
+                    );
+                    return;
+                }
+
                 if (data.status === 'success' || data.status === 'warning') {
+                    // Remove successfully submitted samples
+                    if (data.submitted_samples && Array.isArray(data.submitted_samples)) {
+                        this.removeSubmittedSamples(data.submitted_samples);
+                    }
+
                     this.showToastNotification(
                         data.message,
                         data.status === 'warning' ? 'warning' : 'success',
                         5000
                     );
 
-                    setTimeout(() => {
-                        window.location.href = '/pipeline/jobs/';
-                    }, 2000);
+                    // Only redirect if there are no remaining samples
+                    if (this.selectedSamples.length === 0) {
+                        setTimeout(() => {
+                            window.location.href = '/pipeline/jobs/';
+                        }, 2000);
+                    } else {
+                        // Rebuild the table with remaining samples
+                        this.rebuildSamplesTable();
+                        this.updateSubmitButtonState();
+                    }
                 } else {
                     this.showToastNotification(`Error: ${data.message}`, 'danger', 5000);
                 }
@@ -808,6 +914,96 @@ class PipelineLocalData {
                 console.error('Error submitting samples:', error);
                 this.showToastNotification('Error submitting samples for alignment', 'danger', 5000);
             });
+    }
+
+    showConfirmationDialog(message, onConfirm) {
+        // Create confirmation modal
+        const modalId = 'confirmation-dialog';
+        let confirmModal = document.getElementById(modalId);
+
+        // Remove existing modal if present
+        if (confirmModal) {
+            document.body.removeChild(confirmModal);
+        }
+
+        // Create new modal
+        confirmModal = document.createElement('div');
+        confirmModal.id = modalId;
+        confirmModal.className = 'modal fade';
+        confirmModal.setAttribute('tabindex', '-1');
+        confirmModal.setAttribute('aria-hidden', 'true');
+
+        confirmModal.innerHTML = `
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirm Submission</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            ${message}
+                        </div>
+                        <p>Would you like to proceed with only the valid samples, or force submission of all samples?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="proceed-valid-only">
+                            Submit Valid Only
+                        </button>
+                        <button type="button" class="btn btn-warning" id="force-submit-all">
+                            Force Submit All
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(confirmModal);
+
+        // Initialize Bootstrap modal
+        const bsModal = new bootstrap.Modal(confirmModal);
+        bsModal.show();
+
+        // Add event listeners
+        document.getElementById('proceed-valid-only').addEventListener('click', () => {
+            bsModal.hide();
+            this.showToastNotification('Submitting valid samples only...', 'info');
+            // Submit only valid samples
+            const validSamples = this.selectedSamples.filter(
+                sample => sample.ingest_status === 'Completed'
+            );
+            this.submitSamplesToAlignment(validSamples, false);
+        });
+
+        document.getElementById('force-submit-all').addEventListener('click', () => {
+            bsModal.hide();
+            if (typeof onConfirm === 'function') {
+                onConfirm();
+            }
+        });
+    }
+
+    removeSubmittedSamples(submittedSamples) {
+        // Create a Set of submitted sample names for faster lookup
+        const submittedSet = new Set(submittedSamples.map(sample =>
+            typeof sample === 'string' ? sample : sample.fastq_name
+        ));
+
+        // Filter out submitted samples
+        this.selectedSamples = this.selectedSamples.filter(sample =>
+            !submittedSet.has(sample.fastq_name)
+        );
+
+        // Save updated samples to localStorage
+        this.saveSamples();
+
+        // Update UI elements
+        const selectedCount = document.getElementById('selected-count');
+        if (selectedCount) {
+            selectedCount.textContent = `${this.selectedSamples.length} samples selected`;
+        }
     }
 
     goToPage(pageNumber) {
@@ -876,6 +1072,300 @@ class PipelineLocalData {
 
         // Skip showing any notification here
         // Toast notification is exclusively handled in dashboard.html
+    }
+
+    showQueueModal() {
+        // Fetch and display queue data
+        this.fetchQueueData();
+
+        // Show the modal
+        const queueModal = new bootstrap.Modal(document.getElementById('queue-modal'));
+        queueModal.show();
+    }
+
+    fetchQueueData() {
+        // Show loading indicators
+        document.getElementById('alignment-queue-body').innerHTML = '<tr><td colspan="7" class="text-center">Loading queue data...</td></tr>';
+        document.getElementById('postqc-queue-body').innerHTML = '<tr><td colspan="7" class="text-center">Loading queue data...</td></tr>';
+
+        // Fetch data from API
+        fetch('/api/pipeline/get-queue-data/', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Update alignment queue
+                    this.displayQueueData(
+                        data.alignment_queue,
+                        'alignment-queue-body',
+                        'alignment-count'
+                    );
+
+                    // Update post-QC queue
+                    this.displayQueueData(
+                        data.postqc_queue,
+                        'postqc-queue-body',
+                        'postqc-count'
+                    );
+                } else {
+                    this.showToastNotification(`Error fetching queue data: ${data.message}`, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching queue data:', error);
+                this.showToastNotification('Error fetching queue data from server', 'danger');
+            });
+    }
+
+    displayQueueData(queueItems, tableBodyId, countId) {
+        const tableBody = document.getElementById(tableBodyId);
+        const countBadge = document.getElementById(countId);
+
+        if (!tableBody) return;
+
+        // Update count badge
+        if (countBadge) {
+            countBadge.textContent = queueItems.length;
+        }
+
+        // Clear table
+        tableBody.innerHTML = '';
+
+        if (queueItems.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No items in queue</td></tr>';
+            return;
+        }
+
+        // Add rows for each queue item
+        queueItems.forEach(item => {
+            // Parse metadata if available
+            let metadata = {};
+            if (item.metadata) {
+                try {
+                    metadata = JSON.parse(item.metadata);
+                } catch (e) {
+                    console.error('Error parsing metadata JSON:', e);
+                }
+            }
+
+            // Create badge based on status
+            let statusBadge = '';
+            switch (item.status) {
+                case 'pending':
+                    statusBadge = '<span class="badge bg-secondary">Pending</span>';
+                    break;
+                case 'submitted':
+                    statusBadge = '<span class="badge bg-info">Submitted</span>';
+                    break;
+                case 'running':
+                    statusBadge = '<span class="badge bg-warning">Running</span>';
+                    break;
+                case 'completed':
+                    statusBadge = '<span class="badge bg-success">Completed</span>';
+                    break;
+                case 'failed':
+                    statusBadge = '<span class="badge bg-danger">Failed</span>';
+                    break;
+                default:
+                    statusBadge = `<span class="badge bg-secondary">${item.status}</span>`;
+            }
+
+            // Format dates
+            const addedTime = new Date(item.added_time).toLocaleString();
+            const startTime = item.start_time ? new Date(item.start_time).toLocaleString() : '-';
+
+            // Create row
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${item.fastq_name}</td>
+                <td><span class="badge ${item.workflow === 'MTX' ? 'bg-info' : 'bg-primary'}">${item.workflow}</span></td>
+                <td>${statusBadge}</td>
+                <td>${item.demand_id || '-'}</td>
+                <td>${addedTime}</td>
+                <td>${startTime}</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-info btn-sm view-details-btn" 
+                                data-fastq="${item.fastq_name}" data-bs-toggle="tooltip" title="View Details">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm refresh-status-btn"
+                                data-fastq="${item.fastq_name}" data-bs-toggle="tooltip" title="Refresh Status">
+                            <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            tableBody.appendChild(row);
+
+            // Add event listeners for the buttons
+            const viewDetailsBtn = row.querySelector('.view-details-btn');
+            if (viewDetailsBtn) {
+                viewDetailsBtn.addEventListener('click', () => {
+                    this.showSampleDetails(item, metadata);
+                });
+            }
+
+            const refreshStatusBtn = row.querySelector('.refresh-status-btn');
+            if (refreshStatusBtn) {
+                refreshStatusBtn.addEventListener('click', () => {
+                    this.refreshSampleStatus(item.fastq_name, item.demand_id);
+                });
+            }
+        });
+
+        // Initialize tooltips
+        const tooltips = [].slice.call(tableBody.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltips.map(function (tooltipNode) {
+            return new bootstrap.Tooltip(tooltipNode);
+        });
+    }
+
+    showSampleDetails(item, metadata) {
+        // Create modal for displaying sample details
+        const modalId = 'sample-details-modal';
+        let detailsModal = document.getElementById(modalId);
+
+        // Remove existing modal if present
+        if (detailsModal) {
+            document.body.removeChild(detailsModal);
+        }
+
+        // Determine workflow from batch name
+        const workflow = item.workflow || this.determineWorkflow(metadata.batch_name_from_vendor || '');
+
+        // Format the command for display with line breaks
+        let formattedCommand = '';
+        if (item.command) {
+            formattedCommand = item.command.replace(/\n/g, '<br>');
+        }
+
+        // Create details modal
+        detailsModal = document.createElement('div');
+        detailsModal.id = modalId;
+        detailsModal.className = 'modal fade';
+        detailsModal.setAttribute('tabindex', '-1');
+        detailsModal.setAttribute('aria-hidden', 'true');
+
+        detailsModal.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Sample Details: ${item.fastq_name}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <h6>Status Information</h6>
+                                <table class="table table-sm table-bordered">
+                                    <tr>
+                                        <th>Workflow:</th>
+                                        <td><span class="badge ${workflow === 'MTX' ? 'bg-info' : 'bg-primary'}">${workflow}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Status:</th>
+                                        <td>${item.status || 'Unknown'}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Demand ID:</th>
+                                        <td>${item.demand_id || 'Not yet assigned'}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Added:</th>
+                                        <td>${new Date(item.added_time).toLocaleString()}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Started:</th>
+                                        <td>${item.start_time ? new Date(item.start_time).toLocaleString() : 'Not started'}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Sample Metadata</h6>
+                                <table class="table table-sm table-bordered">
+                                    <tr>
+                                        <th>FASTQ Name:</th>
+                                        <td>${metadata.fastq_name || item.fastq_name}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Organism:</th>
+                                        <td>${metadata.organism_common_name || 'Unknown'}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Batch:</th>
+                                        <td>${metadata.batch_name_from_vendor || 'Unknown'}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Load Name:</th>
+                                        <td>${metadata.load_name || 'Unknown'}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Library Prep:</th>
+                                        <td>${metadata.library_prep || 'Unknown'}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <h6>Command</h6>
+                        <div class="border rounded p-2 bg-light">
+                            <pre class="mb-0"><code>${formattedCommand || 'Command not available'}</code></pre>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(detailsModal);
+
+        // Initialize and show Bootstrap modal
+        const bsModal = new bootstrap.Modal(detailsModal);
+        bsModal.show();
+    }
+
+    refreshSampleStatus(fastqName, demandId) {
+        // Show toast notification
+        this.showToastNotification(`Refreshing status for ${fastqName}...`, 'info');
+
+        // Determine which endpoint to use based on available info
+        let url = '/api/pipeline/check-alignment-status/';
+        if (demandId) {
+            url += `?demand_id=${demandId}`;
+        } else {
+            url += `?fastq_name=${fastqName}`;
+        }
+
+        // Fetch updated status
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    this.showToastNotification(`Status updated: ${data.job_status || 'Unknown'}`, 'success');
+
+                    // Refresh queue data to show updated status
+                    this.fetchQueueData();
+                } else {
+                    this.showToastNotification(`Error: ${data.message}`, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing status:', error);
+                this.showToastNotification('Error refreshing sample status', 'danger');
+            });
     }
 }
 
