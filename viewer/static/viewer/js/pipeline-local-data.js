@@ -148,7 +148,7 @@ class PipelineLocalData {
 
             // Helper function to construct URL with parameters
             const constructPageUrl = (pageNum) => {
-                const url = new URL('http://127.0.0.1:8083/pipeline/');
+                const url = new URL(window.location.href);
                 url.searchParams.set('page', pageNum);
                 url.searchParams.set('per_page', getCurrentPerPage());
                 return url.toString();
@@ -847,10 +847,18 @@ class PipelineLocalData {
     }
 
     updateSubmitButtonState() {
-        const submitButton = document.getElementById('submit-selected');
-        if (submitButton) {
-            const selectedSamples = document.querySelectorAll('.sample-select:checked');
-            submitButton.disabled = selectedSamples.length === 0;
+        const submitBtn = document.getElementById('submit-selected');
+        if (submitBtn) {
+            const selectedCount = document.querySelectorAll('.sample-select:checked').length;
+            submitBtn.disabled = selectedCount === 0;
+
+            // Update the selected count display if it exists
+            const selectedCountDisplay = document.getElementById('selected-count');
+            if (selectedCountDisplay) {
+                selectedCountDisplay.textContent = `${selectedCount} sample${selectedCount !== 1 ? 's' : ''} selected`;
+            }
+
+            console.log(`Submit button state updated - ${selectedCount} samples selected`);
         }
     }
 
@@ -1049,7 +1057,7 @@ class PipelineLocalData {
     // Helper method to clear all stored data
     clearStoredData() {
         try {
-            console.log('Clearing stored data');
+            console.log('Clearing selected samples');
 
             // Remove data from localStorage (both keys)
             localStorage.removeItem(this.storageKey);
@@ -1061,25 +1069,11 @@ class PipelineLocalData {
             // Get the sample table body
             const tableBody = document.querySelector('#samples-table tbody');
             if (tableBody) {
-                // Clear all rows from the table
-                tableBody.innerHTML = '';
-
-                // Add the empty state message row with exact same HTML as template
-                const emptyRow = document.createElement('tr');
-                emptyRow.innerHTML = `
-                    <td colspan="10" class="text-center py-5">
-                        <div class="d-flex flex-column align-items-center">
-                            <div class="mb-3">
-                                <i class="bi bi-x-circle" style="font-size: 2rem;"></i>
-                            </div>
-                            <p class="text-muted mb-4">No samples selected. Use the Sample Browser to select samples.</p>
-                            <a href="/" class="btn btn-primary">
-                                <i class="bi bi-table me-2"></i>GO TO SAMPLE BROWSER
-                            </a>
-                        </div>
-                    </td>
-                `;
-                tableBody.appendChild(emptyRow);
+                // MODIFIED: Don't clear the table, just uncheck all checkboxes
+                const checkboxes = tableBody.querySelectorAll('.sample-select');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
 
                 // Uncheck the "select all" checkbox
                 const selectAllCheckbox = document.getElementById('select-all-samples');
@@ -1087,11 +1081,8 @@ class PipelineLocalData {
                     selectAllCheckbox.checked = false;
                 }
 
-                // Disable the submit button
-                const submitBtn = document.getElementById('submit-selected');
-                if (submitBtn) {
-                    submitBtn.disabled = true;
-                }
+                // MODIFIED: Don't disable the submit button, update its state based on selection
+                this.updateSubmitButtonState();
 
                 // Update the selected count display
                 const selectedCount = document.getElementById('selected-count');
@@ -1102,26 +1093,11 @@ class PipelineLocalData {
                 console.error('Table body not found when trying to clear selection');
             }
 
-            // Update active alignments to show no running alignments
-            const activeAlignmentsDiv = document.querySelector('.active-alignments');
-            if (activeAlignmentsDiv) {
-                // Clear current alignments table if it exists
-                const existingTable = activeAlignmentsDiv.querySelector('.table-responsive');
-                if (existingTable) {
-                    existingTable.remove();
-                }
+            console.log('Sample selections cleared successfully');
 
-                // Add "no alignments" message if it doesn't exist
-                const noAlignmentsAlert = activeAlignmentsDiv.querySelector('.alert-info');
-                if (!noAlignmentsAlert) {
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert alert-info';
-                    alertDiv.textContent = 'No alignments are currently running.';
-                    activeAlignmentsDiv.appendChild(alertDiv);
-                }
-            }
+            // Show a toast notification to confirm the action
+            this.showToastNotification('Sample selections cleared', 'info');
 
-            console.log('Data cleared successfully');
             return true;
         } catch (error) {
             console.error('Error clearing stored data:', error);
