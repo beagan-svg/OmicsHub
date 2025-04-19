@@ -1,0 +1,11 @@
+--- COMMAND LOG AT 2025-04-16T23:17:00.632974 ---
+Script path: /tmp/check_running_jobs.sh
+
+Script content:
+#!/bin/bash
+source /home/svc_bicore/genomics-cloud-services/gcs-cli/.venv/bin/activate
+export AWS_PROFILE=aibs-bicore
+
+ocs core gwo demand list-demands --demand-type align --status IN_PROGRESS --format json
+
+--- END OF COMMAND LOG ---

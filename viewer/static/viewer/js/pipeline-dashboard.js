@@ -1,6 +1,27 @@
 // Handle submit selected samples button click
 document.getElementById('submit-action-btn').addEventListener('click', function () {
-    const selectedSamples = pipelineLocalData.getSelectedSamples();
+    // Get only the checked samples from the table
+    const selectedRows = document.querySelectorAll('.sample-select:checked');
+    const selectedSamples = [];
+
+    selectedRows.forEach(checkbox => {
+        const row = checkbox.closest('tr');
+        if (row) {
+            const sample = {
+                fastq_name: row.querySelector('td:nth-child(2)').textContent.trim(),
+                study_set: row.querySelector('td:nth-child(3)').textContent.trim(),
+                load_name: row.querySelector('td:nth-child(4)').textContent.trim(),
+                batch_name_from_vendor: row.querySelector('td:nth-child(5)').textContent.trim(),
+                organism_common_name: row.querySelector('td:nth-child(6)').textContent.trim(),
+                library_prep: row.querySelector('td:nth-child(7)').textContent.trim(),
+                ingest_status: row.querySelector('td:nth-child(8)').textContent.trim(),
+                alignment_status: row.querySelector('td:nth-child(9)').textContent.trim(),
+                postqc_status: row.querySelector('td:nth-child(10)').textContent.trim()
+            };
+            selectedSamples.push(sample);
+        }
+    });
+
     if (selectedSamples.length === 0) {
         showToast('Please select at least one sample', 'warning');
         return;

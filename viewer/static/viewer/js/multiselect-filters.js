@@ -685,120 +685,110 @@ function initSelectionPanel() {
     // Handle send to pipeline button
     if (sendToPipelineBtn) {
         sendToPipelineBtn.addEventListener('click', function () {
-            if (selectedSamples.length === 0) return;
-
-            // Debug: Log the samples being sent and the cleaned mapping
-            console.log('Sending samples to pipeline:', selectedSamples);
-
-            // Debug: Log the first sample's complete structure
-            if (selectedSamples.length > 0) {
-                console.log('SAMPLE STRUCTURE DIAGNOSTIC:');
-                console.log('Complete sample object:', selectedSamples[0]);
-                console.log('Available fields:', Object.keys(selectedSamples[0]));
-                console.log('Field values:');
-                for (const [key, value] of Object.entries(selectedSamples[0])) {
-                    console.log(`  ${key}: ${value}`);
-                }
+            if (selectedSamples.length === 0) {
+                showFeedbackMessage('No samples selected', 'warning');
+                return;
             }
 
-            // Ensure we're sending valid data
-            const cleanedSamples = selectedSamples.map(sample => ({
-                // Map to the exact field names expected by the pipeline
-                fastq_name: sample.fastqName || '',
-                study_set: sample.studySet || '',
-                load_name: sample.loadName || '',
-                batch_name_from_vendor: sample.batchNameFromVendor || '',
-                organism_common_name: sample.organismCommon || '',
-                library_prep: sample.libraryPrepMethod || '',
-                ingest_status: sample.ingestStatus || '',
-                alignment_status: sample.alignmentStatus || '',
-                postqc_status: sample.postqcStatus || ''
-            }));
+            // Show loading state
+            sendToPipelineBtn.disabled = true;
+            sendToPipelineBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
 
-            // Debug: Log the pipeline-formatted data
-            if (cleanedSamples.length > 0) {
-                console.log('PIPELINE DATA MAPPING:');
-                console.log('First mapped sample:', cleanedSamples[0]);
-                console.log('Pipeline fields:', Object.keys(cleanedSamples[0]));
-                console.log('Pipeline field values:');
-                for (const [key, value] of Object.entries(cleanedSamples[0])) {
-                    console.log(`  ${key}: ${value}`);
+            // Convert selected samples to pipeline format more efficiently
+            const cleanedSamples = [];
+
+            // Process in batches to avoid blocking the UI
+            const batchSize = 200;
+            let currentBatch = 0;
+
+            function processBatch() {
+                const startIdx = currentBatch * batchSize;
+                const endIdx = Math.min(startIdx + batchSize, selectedSamples.length);
+
+                // Process this batch
+                for (let i = startIdx; i < endIdx; i++) {
+                    const sample = selectedSamples[i];
+                    // Map to pipeline format with essential fields only
+                    cleanedSamples.push({
+                        id: sample.id || '',
+                        name: sample.name || sample.id || '',
+                        studySet: sample.studySet || '',
+                        loadName: sample.loadName || '',
+                        batchName: sample.batchName || '',
+                        ingestStatus: sample.organism || 'Unknown', // Field-mapping correction
+                        libraryPrep: sample.libraryPrep || 'Unknown'
+                    });
                 }
-            }
 
-            // Store cleaned samples in localStorage with a timestamp to ensure it's a new entry
-            const storageItem = {
-                timestamp: new Date().getTime(),
-                samples: cleanedSamples
-            };
-
-            // Add to existing samples in pipeline
-
-            // Stringify and store the data
-            const jsonData = JSON.stringify(storageItem);
-            localStorage.setItem('selectedSamplesForPipeline', jsonData);
-
-            // Debug: Verify localStorage was set correctly
-            console.log('Stored in localStorage:', localStorage.getItem('selectedSamplesForPipeline'));
-
-            // ENHANCED DEBUGGING: Additional debug logs to verify data storage
-            console.log('========== ENHANCED DEBUG LOGGING ==========');
-            console.log('Data storage verification:');
-            console.log('1. Selected samples count:', selectedSamples.length);
-            console.log('2. Cleaned samples count:', cleanedSamples.length);
-
-            // Verify key existence in localStorage
-            const keys = Object.keys(localStorage);
-            console.log('3. All localStorage keys:', keys);
-            console.log('4. Selected samples key exists:', keys.includes('selectedSamplesForPipeline'));
-
-            // Parse the stored data to verify structure
-            try {
-                const storedData = JSON.parse(localStorage.getItem('selectedSamplesForPipeline'));
-                console.log('5. Successfully parsed stored data');
-                console.log('6. Storage timestamp:', new Date(storedData.timestamp).toISOString());
-                console.log('7. Storage samples count:', storedData.samples ? storedData.samples.length : 0);
-
-                // Verify first sample data
-                if (storedData.samples && storedData.samples.length > 0) {
-                    console.log('8. First sample data:', storedData.samples[0]);
+                // Check if we're done
+                if (endIdx >= selectedSamples.length) {
+                    finalizeSending();
                 } else {
-                    console.warn('8. No samples found in stored data!');
+                    // Move to next batch
+                    currentBatch++;
+                    setTimeout(processBatch, 0);
                 }
-            } catch (e) {
-                console.error('Storage parsing error:', e);
             }
 
-            // Check storage limit issues
-            try {
-                const storageUsed = new Blob([JSON.stringify(localStorage)]).size;
-                console.log('9. Approximate localStorage usage (bytes):', storageUsed);
-                console.log('10. Close to 5MB limit?', storageUsed > 4000000 ? 'YES - POTENTIAL ISSUE' : 'No');
-            } catch (e) {
-                console.warn('Storage size calculation error:', e);
-            }
-            console.log('========== END ENHANCED DEBUG LOGGING ==========');
+            function finalizeSending() {
+                // Store cleaned samples in localStorage efficiently
+                // Use a slimmer format to avoid size limitations
+                const storageItem = {
+                    timestamp: new Date().getTime(),
+                    samples: cleanedSamples
+                };
 
-            // Show feedback message
-            showFeedbackMessage(`${selectedSamples.length} samples sent to Pipeline Dashboard`, 'success');
-
-            // Add a longer delay before redirecting to ensure localStorage is fully set
-            setTimeout(() => {
-                // ADDITIONAL VERIFICATION BEFORE REDIRECT
-                console.log('Just before redirect - final localStorage check:');
                 try {
-                    const finalCheck = localStorage.getItem('selectedSamplesForPipeline');
-                    console.log('Final storage check - data exists:', !!finalCheck);
-                    const finalData = JSON.parse(finalCheck);
-                    console.log('Final sample count:', finalData.samples ? finalData.samples.length : 0);
-                    console.log('Redirecting to pipeline...');
-                } catch (e) {
-                    console.error('CRITICAL: Final storage check failed:', e);
-                }
+                    // Stringify and store the data
+                    localStorage.setItem('selectedSamplesForPipeline', JSON.stringify(storageItem));
 
-                // Redirect to pipeline dashboard
-                window.location.href = '/pipeline/';
-            }, 800); // Increased delay to ensure localStorage is properly set
+                    // Show feedback message
+                    showFeedbackMessage(`${selectedSamples.length} samples sent to Pipeline Dashboard`, 'success');
+
+                    // Redirect to pipeline dashboard with minimal delay
+                    setTimeout(() => {
+                        window.location.href = '/pipeline/';
+                    }, 300);
+                } catch (error) {
+                    // Handle storage errors
+                    console.error('Error storing samples:', error);
+
+                    // If storage is full, try to store only most essential data
+                    if (error.name === 'QuotaExceededError' || error.code === 22) {
+                        handleStorageFullError();
+                    } else {
+                        showFeedbackMessage('Error sending samples to pipeline', 'danger');
+                        sendToPipelineBtn.disabled = false;
+                        sendToPipelineBtn.innerHTML = 'Send to Pipeline <i class="bi bi-arrow-right"></i>';
+                    }
+                }
+            }
+
+            function handleStorageFullError() {
+                // Try with a reduced sample set (first 1000 samples only)
+                const reducedSamples = cleanedSamples.slice(0, 1000);
+                try {
+                    localStorage.setItem('selectedSamplesForPipeline', JSON.stringify({
+                        timestamp: new Date().getTime(),
+                        samples: reducedSamples
+                    }));
+
+                    showFeedbackMessage(`Storage limit reached. Only first 1000 samples will be processed.`, 'warning');
+
+                    setTimeout(() => {
+                        window.location.href = '/pipeline/';
+                    }, 1000);
+                } catch (error) {
+                    // If still failing, give up and show error
+                    console.error('Still failed with reduced set:', error);
+                    showFeedbackMessage('Storage limit exceeded. Please select fewer samples.', 'danger');
+                    sendToPipelineBtn.disabled = false;
+                    sendToPipelineBtn.innerHTML = 'Send to Pipeline <i class="bi bi-arrow-right"></i>';
+                }
+            }
+
+            // Start processing the first batch
+            processBatch();
         });
     }
 

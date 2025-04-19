@@ -561,7 +561,7 @@
                 console.log('Starting job refresh...'); // Debug log
 
                 // First update all jobs
-                const updateResponse = await fetch('/api/pipeline/update-all-jobs/', {
+                const updateResponse = await fetch('/api/pipeline/update_all_jobs/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -911,7 +911,7 @@
 
         // Function to update all jobs
         function updateAllJobs() {
-            fetch('/api/pipeline/update-all-jobs/', {
+            fetch('/api/pipeline/update_all_jobs/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

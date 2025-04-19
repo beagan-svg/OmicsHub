@@ -109,18 +109,15 @@ class PipelineLocalData {
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 this.setupEventListeners();
-                // Add a small delay to reinitialize after page is fully loaded
-                setTimeout(() => this.reinitialize(), 300);
+                this.reinitialize();
             });
         } else {
             this.setupEventListeners();
-            // Add a small delay to reinitialize after page is fully loaded
-            setTimeout(() => this.reinitialize(), 300);
+            this.reinitialize();
         }
     }
 
     loadSamples() {
-        console.log('Loading samples from storage');
         try {
             // First try with primary storage key
             const storedData = localStorage.getItem(this.storageKey);
@@ -128,13 +125,11 @@ class PipelineLocalData {
 
             if (storedData) {
                 primarySamples = JSON.parse(storedData);
-                console.log(`Found ${primarySamples.length} samples in primary storage`);
             }
 
             // Check legacy storage
             const legacyData = localStorage.getItem(this.legacyStorageKey);
             if (legacyData) {
-                console.log('Found legacy data, processing it');
                 let legacySamples = [];
 
                 try {
@@ -149,16 +144,12 @@ class PipelineLocalData {
                         legacySamples = this.normalizeSamples([parsedData]);
                     }
 
-                    console.log(`Processed ${legacySamples.length} samples from legacy storage`);
-
                     // Merge samples from both storages
                     this.selectedSamples = this.mergeSamples(primarySamples, legacySamples);
-                    console.log(`Combined total: ${this.selectedSamples.length} samples after merging`);
 
                     // Save to primary storage and clear legacy
                     this.saveSamples();
                     localStorage.removeItem(this.legacyStorageKey);
-                    console.log('Legacy data processed and cleared');
                 } catch (parseError) {
                     console.error('Error parsing legacy data:', parseError);
                     this.selectedSamples = primarySamples;
@@ -166,11 +157,7 @@ class PipelineLocalData {
             } else {
                 // Just use primary samples
                 this.selectedSamples = primarySamples;
-                console.log('No legacy data found, using only primary storage');
             }
-
-            // Add console log to show final samples count
-            console.log(`Loaded ${this.selectedSamples.length} total samples`);
         } catch (error) {
             console.error('Error loading samples:', error);
             this.selectedSamples = [];
@@ -201,8 +188,6 @@ class PipelineLocalData {
 
     // Add back reinitialize method
     reinitialize() {
-        console.log('Reinitializing PipelineLocalData to check for updated localStorage data');
-
         // Backup current samples
         const currentSamples = [...this.selectedSamples];
 
@@ -211,13 +196,11 @@ class PipelineLocalData {
 
         // Check if samples changed
         if (this.selectedSamples.length !== currentSamples.length) {
-            console.log(`Sample count changed from ${currentSamples.length} to ${this.selectedSamples.length}`);
             // Rebuild the table to reflect the updated samples
             this.rebuildSamplesTable();
             return true;
         }
 
-        console.log('No changes in samples detected during reinitialization');
         return false;
     }
 
@@ -236,7 +219,57 @@ class PipelineLocalData {
     }
 
     saveSamples() {
-        localStorage.setItem(this.storageKey, JSON.stringify(this.selectedSamples));
+        try {
+            // Check if the data has actually changed before saving
+            const currentData = localStorage.getItem(this.storageKey);
+            const newData = JSON.stringify(this.selectedSamples);
+
+            // Only save if the data has changed or doesn't exist
+            if (!currentData || currentData !== newData) {
+                localStorage.setItem(this.storageKey, newData);
+            }
+        } catch (error) {
+            console.error('Error saving samples to localStorage:', error);
+
+            // If localStorage is full, try to save only essential data
+            if (error.name === 'QuotaExceededError' || error.code === 22) {
+                this._handleStorageFullError();
+            }
+        }
+    }
+
+    // Handle localStorage quota exceeded errors
+    _handleStorageFullError() {
+        try {
+            // Attempt to clear any legacy data
+            localStorage.removeItem(this.legacyStorageKey);
+
+            // Reduce the data by keeping only essential fields
+            const minimalSamples = this.selectedSamples.map(sample => ({
+                fastq_name: sample.fastq_name,
+                study_set: sample.study_set,
+                load_name: sample.load_name,
+                batch_name_from_vendor: sample.batch_name_from_vendor,
+                ingest_status: sample.ingest_status
+            }));
+
+            // Try to save the minimal data
+            localStorage.setItem(this.storageKey, JSON.stringify(minimalSamples));
+
+            // Show warning to user
+            this.showToastNotification(
+                'Warning: Storage limit reached. Some sample data may be truncated.',
+                'warning',
+                5000
+            );
+        } catch (error) {
+            console.error('Failed to save even minimal data:', error);
+            this.showToastNotification(
+                'Error: Unable to save selected samples due to browser storage limits.',
+                'danger',
+                5000
+            );
+        }
     }
 
     initializePagination() {
@@ -559,11 +592,36 @@ class PipelineLocalData {
         // Update pagination info
         this.updatePaginationInfo(startIndex, endIndex, totalPages);
 
+        // Use document fragment for better performance
+        const fragment = document.createDocumentFragment();
+
         // Build rows for current page
         const currentPageSamples = this.selectedSamples.slice(startIndex, endIndex);
-        currentPageSamples.forEach(sample => {
+
+        // Pre-cache status badge HTML for performance
+        const statusBadgeCache = {
+            'Completed': '<span class="badge bg-success">Completed</span>',
+            'In Progress': '<span class="badge bg-warning">In Progress</span>',
+            'Not Started': '<span class="badge bg-secondary">Not Started</span>',
+            'Pending': '<span class="badge bg-info">Pending</span>',
+            'Error': '<span class="badge bg-danger">Error</span>',
+            'Failed': '<span class="badge bg-danger">Failed</span>'
+        };
+
+        // Create all rows at once for better performance
+        for (let i = 0; i < currentPageSamples.length; i++) {
+            const sample = currentPageSamples[i];
             const row = document.createElement('tr');
             row.setAttribute('data-fastq', sample.fastq_name || '');
+
+            // Format status with cached badges when possible
+            const ingestStatus = this.formatStatus(sample.ingest_status);
+            const alignmentStatus = this.formatStatus(sample.alignment_status);
+            const postqcStatus = this.formatStatus(sample.postqc_status);
+
+            const ingestBadge = statusBadgeCache[ingestStatus] || this.formatStatusWithBadge(sample.ingest_status);
+            const alignmentBadge = statusBadgeCache[alignmentStatus] || this.formatStatusWithBadge(sample.alignment_status);
+            const postqcBadge = statusBadgeCache[postqcStatus] || this.formatStatusWithBadge(sample.postqc_status);
 
             row.innerHTML = `
                 <td>
@@ -575,17 +633,22 @@ class PipelineLocalData {
                 <td>${sample.batch_name_from_vendor || ''}</td>
                 <td>${sample.organism_common_name || ''}</td>
                 <td>${sample.library_prep || ''}</td>
-                <td>${this.formatStatusWithBadge(sample.ingest_status)}</td>
-                <td>${this.formatStatusWithBadge(sample.alignment_status)}</td>
-                <td>${this.formatStatusWithBadge(sample.postqc_status)}</td>
+                <td>${ingestBadge}</td>
+                <td>${alignmentBadge}</td>
+                <td>${postqcBadge}</td>
             `;
 
-            tableBody.appendChild(row);
-        });
+            fragment.appendChild(row);
+        }
+
+        // Add fragment to DOM in one operation
+        tableBody.appendChild(fragment);
 
         // Update UI state
-        this.setupSelectionListeners();
-        this.updateSubmitButtonState();
+        setTimeout(() => {
+            this.setupSelectionListeners();
+            this.updateSubmitButtonState();
+        }, 0);
     }
 
     showEmptyState(tableBody) {
@@ -1069,9 +1132,6 @@ class PipelineLocalData {
         // Update selected samples and UI
         this.updateSelectedSamples();
         this.updateSubmitButtonState();
-
-        // Skip showing any notification here
-        // Toast notification is exclusively handled in dashboard.html
     }
 
     showQueueModal() {
@@ -1366,6 +1426,48 @@ class PipelineLocalData {
                 console.error('Error refreshing status:', error);
                 this.showToastNotification('Error refreshing sample status', 'danger');
             });
+    }
+
+    // Add the bulkAddSamples method for efficient bulk operations
+    bulkAddSamples(samples) {
+        if (!samples || !samples.length) return;
+
+        // Create a map of existing samples for faster lookups
+        const existingSamplesMap = new Map();
+        this.selectedSamples.forEach(sample => {
+            existingSamplesMap.set(sample.fastq_name, true);
+        });
+
+        // Add only non-duplicate samples
+        let newSamplesCount = 0;
+        samples.forEach(sample => {
+            if (!existingSamplesMap.has(sample.fastq_name)) {
+                this.selectedSamples.push(sample);
+                newSamplesCount++;
+            }
+        });
+
+        // Only save if we actually added new samples
+        if (newSamplesCount > 0) {
+            // Debounce the save operation for better performance
+            this._debouncedSave();
+        }
+
+        return newSamplesCount;
+    }
+
+    // Private method for debounced saving
+    _debouncedSave() {
+        // Clear any pending save operation
+        if (this._saveTimeout) {
+            clearTimeout(this._saveTimeout);
+        }
+
+        // Schedule a new save operation
+        this._saveTimeout = setTimeout(() => {
+            this.saveSamples();
+            this._saveTimeout = null;
+        }, 300); // Wait 300ms to batch multiple operations
     }
 }
 

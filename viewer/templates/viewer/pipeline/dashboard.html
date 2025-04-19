@@ -238,7 +238,7 @@
                                     <th>Library Prep Method</th>
                                     <th>Ingest Status</th>
                                     <th>Alignment Status</th>
-                                    <th>PostQC Status</th>
+                                    <th>POSTQC STATUS</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -448,7 +448,7 @@
 
 <!-- Submit Modal -->
 <div class="modal fade" id="submit-modal" tabindex="-1" aria-labelledby="submit-modal-label" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="submit-modal-label">Submit Samples</h5>
@@ -456,25 +456,90 @@
             </div>
             <div class="modal-body">
                 <p>The following samples will be submitted for processing:</p>
-                <ul id="submit-sample-list" class="list-unstyled">
-                    <!-- Sample list will be populated dynamically -->
-                </ul>
-                <div class="alert alert-info mb-3">
+                <div class="overflow-auto mb-3" style="max-height: 400px;">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>FASTQ Name</th>
+                                <th>Load Name</th>
+                                <th>Workflow</th>
+                                <th>Organism</th>
+                                <th>Library Prep Method</th>
+                                <th>Ingest Status</th>
+                                <th>Alignment Status</th>
+                                <th>POSTQC STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="submit-sample-list">
+                            <!-- Sample list will be populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Warning for incomplete samples -->
+                <div id="incomplete-samples-warning" class="alert alert-warning mb-3 d-none">
+                    <h6 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>Incomplete Samples
+                        Detected</h6>
+                    <p>The following samples have not completed ingest:</p>
+                    <ul id="incomplete-samples-list" class="mb-2"></ul>
+                    <p class="mb-0">Would you like to proceed with submission?</p>
+                </div>
+
+                <!-- Auto-proceed to Post-QC toggle -->
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="auto-proceed-toggle">
+                    <label class="form-check-label" for="auto-proceed-toggle">
+                        <strong>Automatically proceed to Post-QC after alignment completes</strong>
+                    </label>
+                </div>
+
+                <!-- Submission Commands Section -->
+                <div class="row g-3">
+                    <!-- Alignment Submissions -->
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0">Alignment Submissions</h6>
+                                <small>Samples that have completed ingest and will proceed to alignment</small>
+                            </div>
+                            <div class="card-body">
+                                <div class="list-group list-group-flush" id="alignment-commands-list">
+                                    <!-- Will be populated dynamically -->
+                                    <div class="list-group-item text-center text-muted">No samples eligible for
+                                        alignment</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Post-QC Submissions -->
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0">Post-QC Submissions</h6>
+                                <small>Samples that have completed alignment and will proceed to post-QC</small>
+                            </div>
+                            <div class="card-body">
+                                <div class="list-group list-group-flush" id="postqc-commands-list">
+                                    <!-- Will be populated dynamically -->
+                                    <div class="list-group-item text-center text-muted">No samples eligible for post-QC
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-info my-3">
                     <small>
                         <i class="bi bi-info-circle"></i>
                         Samples will be automatically removed from the dashboard after successful submission.
                     </small>
                 </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="force-submit">
-                    <label class="form-check-label" for="force-submit">
-                        Force submit all samples, even those with incomplete ingest (not recommended)
-                    </label>
-                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="confirm-submit">Submit</button>
+                <button type="button" class="btn btn-primary" id="confirm-submit">Confirm and Submit</button>
             </div>
         </div>
     </div>
@@ -562,57 +627,6 @@
     </div>
 </div>
 
-<!-- Sample Submission Modal -->
-<div class="modal fade" id="submissionModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Submit Selected Samples</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div id="incomplete-samples-warning" class="alert alert-warning mb-3 d-none">
-                    <h6 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>Incomplete Samples
-                        Detected</h6>
-                    <p>The following samples have not completed ingest:</p>
-                    <ul id="incomplete-samples-list" class="mb-2"></ul>
-                    <p class="mb-0">Would you like to proceed with only the valid samples?</p>
-                </div>
-                <div class="alert alert-info">
-                    <span id="selected-count" class="fw-bold">0</span> samples selected for submission
-                </div>
-                <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" id="forceSubmitCheck">
-                    <label class="form-check-label" for="forceSubmitCheck">
-                        Force submission (override pending jobs check)
-                    </label>
-                </div>
-                <div class="overflow-auto" style="max-height: 400px;">
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr>
-                                <th>FASTQ Name</th>
-                                <th>Workflow</th>
-                                <th>Ingest Status</th>
-                                <th>Command</th>
-                            </tr>
-                        </thead>
-                        <tbody id="submission-samples-list">
-                            <!-- Sample list will be populated here -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="proceedWithValidBtn" style="display:none;">Proceed
-                    with Valid Samples</button>
-                <button type="button" class="btn btn-primary" id="submitSamplesBtn">Submit Samples</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Toast Container -->
 <div id="toast-container" class="position-fixed bottom-0 start-50 translate-middle-x p-3" style="z-index: 11;">
     <!-- Toasts will be added here dynamically -->
@@ -621,42 +635,30 @@
 
 {% block extra_scripts %}
 <script src="{% static 'viewer/js/pipeline-local-data.js' %}"></script>
+<script src="{% static 'viewer/js/pipeline-submit-modal.js' %}"></script>
 <script>
     // Debug: Check localStorage on page load
     document.addEventListener('DOMContentLoaded', function () {
-        console.log('Dashboard page loaded - checking localStorage');
         const legacyStorageData = localStorage.getItem('selectedSamplesForPipeline');
         const primaryStorageData = localStorage.getItem('pipelineSelectedSamples');
 
-        console.log('selectedSamplesForPipeline:', legacyStorageData);
-        console.log('pipelineSelectedSamples:', primaryStorageData);
-
         // Access PipelineLocalData object
         if (window.pipelineLocalData) {
-            console.log('PipelineLocalData object:', window.pipelineLocalData);
-            console.log('Selected samples:', window.pipelineLocalData.selectedSamples);
+            // Immediately call reinitialize with no delay
+            const initResult = window.pipelineLocalData.reinitialize();
 
-            // Wait a moment for everything to load, then manually call reinitialize
-            setTimeout(function () {
-                console.log('Manually calling reinitialize');
-                const initResult = window.pipelineLocalData.reinitialize();
-
-                // If reinitialize didn't work and we have legacy data, try direct approach
-                if (!initResult && legacyStorageData) {
-                    console.log('Reinitialize did not find samples, trying direct approach');
-                    try {
-                        const data = JSON.parse(legacyStorageData);
-                        if (data && data.samples && Array.isArray(data.samples)) {
-                            console.log('Manual loading of samples from legacy data');
-
-                            // Create sample table
-                            populateTableManually(data.samples);
-                        }
-                    } catch (e) {
-                        console.error('Error processing data manually:', e);
+            // If reinitialize didn't work and we have legacy data, try direct approach
+            if (!initResult && legacyStorageData) {
+                try {
+                    const data = JSON.parse(legacyStorageData);
+                    if (data && data.samples && Array.isArray(data.samples)) {
+                        // Create sample table
+                        populateTableManually(data.samples);
                     }
+                } catch (e) {
+                    console.error('Error processing data manually:', e);
                 }
-            }, 500);
+            }
         } else {
             console.error('PipelineLocalData object not available!');
         }
@@ -665,65 +667,114 @@
         function populateTableManually(samples) {
             if (!samples || !samples.length) return;
 
-            console.log('Raw samples data to display:', samples);
-
             const tableBody = document.querySelector('#samples-table tbody');
-            if (!tableBody) {
-                console.error('Table body not found');
-                return;
-            }
+            if (!tableBody) return;
 
             // Clear existing rows
             tableBody.innerHTML = '';
 
-            // Add the samples
-            samples.forEach(sample => {
-                const row = document.createElement('tr');
+            // Use document fragment for faster DOM manipulation
+            const fragment = document.createDocumentFragment();
 
-                // Use the sample ID/name for the data-fastq attribute
-                row.dataset.fastq = sample.name || sample.id;
+            // Pre-cache badge HTML for common statuses
+            const completedBadge = '<span class="badge bg-success">Completed</span>';
+            const notStartedBadge = '<span class="badge bg-secondary">Not Started</span>';
 
-                // Field mapping - the ingestStatus field actually contains human-readable organism info
-                // and the organism field contains the sample ID
-                const sampleName = sample.name || sample.id || '';
-                const loadName = sample.loadName || '';
-                const batchName = sample.batchName || '';
+            // Process samples in batches for better performance
+            const batchSize = 100;
 
-                // Fix for misplaced fields - the data from sample browser has organism/ingestStatus swapped
-                const organism = sample.ingestStatus || 'Unknown'; // Organism is in ingestStatus field!
-                const libraryPrep = sample.libraryPrep || 'Unknown';
-                const ingestStatus = 'Completed'; // Default to Completed for samples sent from browser
+            // Function to process a batch of samples
+            function processBatch(startIdx) {
+                const endIdx = Math.min(startIdx + batchSize, samples.length);
 
-                // Create the HTML content with corrected field mapping
-                row.innerHTML = `
-                    <td><input type="checkbox" class="sample-select" checked></td>
-                    <td>${sampleName}</td>
-                    <td>${sample.studySet}</td>
-                    <td>${loadName}</td>
-                    <td>${batchName}</td>
-                    <td>${organism}</td>
-                    <td>${libraryPrep}</td>
-                    <td><span class="badge bg-success">${ingestStatus}</span></td>
-                    <td><span class="badge bg-secondary">Not Started</span></td>
-                    <td><span class="badge bg-secondary">Not Started</span></td>
-                `;
+                // Create rows for this batch
+                for (let i = startIdx; i < endIdx; i++) {
+                    const sample = samples[i];
+                    const row = document.createElement('tr');
 
-                tableBody.appendChild(row);
+                    // Field mapping - the ingestStatus field actually contains human-readable organism info
+                    // and the organism field contains the sample ID
+                    const sampleName = sample.name || sample.id || '';
+                    const loadName = sample.loadName || '';
+                    const batchName = sample.batchName || '';
+                    const organism = sample.ingestStatus || 'Unknown'; // Organism is in ingestStatus field!
+                    const libraryPrep = sample.libraryPrep || 'Unknown';
+
+                    // Use dataset instead of setAttribute for better performance
+                    row.dataset.fastq = sampleName;
+
+                    // Use innerHTML once with template literal for better performance
+                    row.innerHTML = `
+                        <td><input type="checkbox" class="sample-select" checked></td>
+                        <td>${sampleName}</td>
+                        <td>${sample.studySet || ''}</td>
+                        <td>${loadName}</td>
+                        <td>${batchName}</td>
+                        <td>${organism}</td>
+                        <td>${libraryPrep}</td>
+                        <td>${completedBadge}</td>
+                        <td>${notStartedBadge}</td>
+                        <td>${notStartedBadge}</td>
+                    `;
+
+                    fragment.appendChild(row);
+                }
+
+                // If we're done with all batches
+                if (endIdx >= samples.length) {
+                    // Commit all changes to DOM at once
+                    tableBody.appendChild(fragment);
+
+                    // Update UI elements asynchronously after DOM update
+                    setTimeout(() => {
+                        // Enable submit button
+                        const submitBtn = document.getElementById('submit-selected');
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                        }
+
+                        // Update selected count
+                        const selectedCount = document.getElementById('selected-count');
+                        if (selectedCount) {
+                            selectedCount.textContent = `${samples.length} sample${samples.length !== 1 ? 's' : ''} selected`;
+                        }
+
+                        // Store samples in pipelineLocalData efficiently
+                        if (window.pipelineLocalData) {
+                            // Format samples for storage
+                            const formattedSamples = samples.map(sample => ({
+                                fastq_name: sample.name || sample.id || '',
+                                study_set: sample.studySet || '',
+                                load_name: sample.loadName || '',
+                                batch_name_from_vendor: sample.batchName || '',
+                                organism_common_name: sample.ingestStatus || 'Unknown', // Field mapping correction
+                                library_prep: sample.libraryPrep || 'Unknown',
+                                ingest_status: 'Completed',
+                                alignment_status: 'Not Started',
+                                postqc_status: 'Not Started'
+                            }));
+
+                            // Bulk save samples
+                            window.pipelineLocalData.bulkAddSamples(formattedSamples);
+                        }
+                    }, 0);
+                } else {
+                    // Process next batch asynchronously to avoid blocking UI
+                    setTimeout(() => processBatch(endIdx), 0);
+                }
+            }
+
+            // Start processing the first batch
+            processBatch(0);
+        }
+
+        // Set up submit button click handler
+        const submitBtn = document.getElementById('submit-action-btn');
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function () {
+                const submitModal = new bootstrap.Modal(document.getElementById('submit-modal'));
+                submitModal.show();
             });
-
-            // Enable submit button
-            const submitBtn = document.getElementById('submit-selected');
-            if (submitBtn) {
-                submitBtn.disabled = false;
-            }
-
-            // Update selected count
-            const selectedCount = document.getElementById('selected-count');
-            if (selectedCount) {
-                selectedCount.textContent = `${samples.length} sample${samples.length !== 1 ? 's' : ''} selected`;
-            }
-
-            console.log('Manual population completed, added', samples.length, 'samples');
         }
     });
 
@@ -884,12 +935,10 @@
                     window.pipelineLocalData.handleSelectAllChange({ target: this });
                 }
 
-                // Show a single toast notification for select all/none
+                // Show toast notification only when selecting all
                 if (this.checked) {
                     const count = document.querySelectorAll('.sample-select').length;
-                    showToggleToast(`Selecting all ${count} samples...`, 'bi-stars');
-                } else {
-                    showToggleToast('Clearing selections...', 'bi-stars');
+                    showToggleToast(`Selecting all ${count} samples...`, 'bi-stars', 750);
                 }
             });
         }
@@ -1165,7 +1214,7 @@
         }
 
         // Function to show toast notifications for toggle actions
-        function showToggleToast(message, iconClass) {
+        function showToggleToast(message, iconClass, duration = 2000) {
             // Remove any existing toasts to prevent duplicates
             const existingToasts = document.querySelectorAll('.toggle-toast, .toast');
             existingToasts.forEach(toast => {
@@ -1210,7 +1259,7 @@
                         toast.parentNode.removeChild(toast);
                     }
                 }, 300);
-            }, 2000);
+            }, duration);
 
             // Also ensure the local data's toast container is clear
             const toastContainer = document.getElementById('toast-container');
