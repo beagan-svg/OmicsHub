@@ -93,33 +93,37 @@
                 <div class="card-body">
                     <form method="get" id="filter-form">
                         <!-- Search row -->
-                        <div class="row mb-3">
+                        <div class="row mb-4">
                             <div class="col-md-8">
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light">
-                                        <i class="bi bi-search"></i>
-                                    </span>
-                                    <input type="text" name="search" id="search-input"
-                                        class="form-control form-control-lg"
-                                        placeholder="Search batch name from vendor, load name, organism, library prep..."
-                                        value="{{ search_term }}" aria-label="Search">
-                                    <button type="submit" class="btn btn-primary">
-                                        Search
-                                    </button>
+                                <div class="search-container">
+                                    <div class="input-group input-group-lg shadow-sm">
+                                        <span class="input-group-text bg-white border-end-0">
+                                            <i class="bi bi-search text-primary"></i>
+                                        </span>
+                                        <input type="text" name="search" id="search-input"
+                                            class="form-control border-start-0"
+                                            placeholder="Search batch name, load name, organism, library prep method..."
+                                            value="{{ search_term }}" aria-label="Search">
+                                        <button type="submit" class="btn btn-primary px-4">
+                                            Search
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="col-md-4 text-end">
-                                <!-- Advanced filters toggle button with icon -->
-                                <button type="button" id="toggleAdvancedFilters" class="btn btn-outline-primary me-2">
-                                    <i class="bi bi-sliders"></i> Advanced Filters
+                            <div class="col-md-4 d-flex justify-content-end align-items-center">
+                                <!-- Advanced filters toggle button with animation -->
+                                <button type="button" id="toggleAdvancedFilters"
+                                    class="btn btn-outline-primary me-2 shadow-sm">
+                                    <i class="bi bi-sliders me-1"></i> Advanced Filters
                                 </button>
 
                                 <!-- Column Settings Dropdown -->
                                 <div class="dropdown column-settings-dropdown d-inline-block">
-                                    <button type="button" id="column-settings-toggle" class="btn btn-outline-secondary"
-                                        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-                                        <i class="bi bi-columns"></i> Columns
+                                    <button type="button" id="column-settings-toggle"
+                                        class="btn btn-outline-secondary shadow-sm" data-bs-toggle="dropdown"
+                                        data-bs-auto-close="outside" aria-expanded="false">
+                                        <i class="bi bi-columns-gap me-1"></i> Columns
                                     </button>
                                     <div class="dropdown-menu dropdown-menu-end column-settings-dropdown-menu"
                                         aria-labelledby="column-settings-toggle" id="column-settings-dropdown">
@@ -545,7 +549,7 @@
                             data-has-active-filters="{{ has_active_filters|yesno:'true,false' }}">
 
                             <!-- Sample Information Card -->
-                            <div class="filter-card filter-card-info">
+                            <div class="filter-card filter-card-info stagger-fade">
                                 <h6 class="filter-section-heading"><i class="bi bi-info-circle"></i> Sample Information
                                 </h6>
 
@@ -556,7 +560,7 @@
                                         <div class="select-container">
                                             <select name="batch_name_from_vendor" id="batch_name_from_vendor"
                                                 class="form-select filter-select" multiple="multiple"
-                                                data-placeholder="Select options">
+                                                data-placeholder="Select batch names...">
                                                 {% for batch_name in batch_names_from_vendor %}
                                                 <option value="{{ batch_name }}" {{
                                                     batch_name|is_selected:current_filters.batch_name_from_vendor_list
@@ -572,7 +576,7 @@
                                         <label for="study_set" class="form-label">Study Set</label>
                                         <div class="select-container">
                                             <select name="study_set" id="study_set" class="form-select filter-select"
-                                                multiple="multiple" data-placeholder="Select options">
+                                                multiple="multiple" data-placeholder="Select study sets...">
                                                 {% for study_set in study_sets %}
                                                 <option value="{{ study_set }}" {{
                                                     study_set|is_selected:current_filters.study_set_list }}>
@@ -586,7 +590,7 @@
                             </div>
 
                             <!-- Sample Characteristics Card -->
-                            <div class="filter-card filter-card-characteristics">
+                            <div class="filter-card filter-card-characteristics stagger-fade">
                                 <h6 class="filter-section-heading"><i class="bi bi-tag"></i> Sample Characteristics</h6>
 
                                 <div class="row g-3">
@@ -594,7 +598,7 @@
                                         <label for="organism" class="form-label">Organism Common Name</label>
                                         <div class="select-container">
                                             <select name="organism" id="organism" class="form-select filter-select"
-                                                multiple="multiple" data-placeholder="Select options">
+                                                multiple="multiple" data-placeholder="Select organisms...">
                                                 {% for organism in organisms %}
                                                 <option value="{{ organism }}" {{
                                                     organism|is_selected:current_filters.organism_list }}>
@@ -610,7 +614,7 @@
                                         <div class="select-container">
                                             <select name="library_prep_method" id="library_prep_method"
                                                 class="form-select filter-select" multiple="multiple"
-                                                data-placeholder="Select options">
+                                                data-placeholder="Select methods...">
                                                 {% for method in library_prep_methods %}
                                                 <option value="{{ method }}" {{
                                                     method|is_selected:current_filters.library_prep_method_list }}>
@@ -624,7 +628,7 @@
                             </div>
 
                             <!-- Processing Status Card -->
-                            <div class="filter-card filter-card-status">
+                            <div class="filter-card filter-card-status stagger-fade">
                                 <h6 class="filter-section-heading"><i class="bi bi-check2-circle"></i> Processing Status
                                 </h6>
 
@@ -634,7 +638,7 @@
                                         <div class="select-container">
                                             <select name="ingest_status" id="ingest_status"
                                                 class="form-select filter-select" multiple="multiple"
-                                                data-placeholder="Select options">
+                                                data-placeholder="Select statuses...">
                                                 {% for status in ingest_status_options %}
                                                 <option value="{{ status }}" {{
                                                     status|is_selected:current_filters.ingest_status_list }}>
@@ -650,7 +654,7 @@
                                         <div class="select-container">
                                             <select name="alignment_status" id="alignment_status"
                                                 class="form-select filter-select" multiple="multiple"
-                                                data-placeholder="Select options">
+                                                data-placeholder="Select statuses...">
                                                 {% for status in alignment_status_options %}
                                                 <option value="{{ status }}" {{
                                                     status|is_selected:current_filters.alignment_status_list }}>
@@ -666,7 +670,7 @@
                                         <div class="select-container">
                                             <select name="postqc_status" id="postqc_status"
                                                 class="form-select filter-select" multiple="multiple"
-                                                data-placeholder="Select options">
+                                                data-placeholder="Select statuses...">
                                                 {% for status in postqc_status_options %}
                                                 <option value="{{ status }}" {{
                                                     status|is_selected:current_filters.postqc_status_list }}>
@@ -688,149 +692,153 @@
                                 </button>
                             </div>
                         </div>
-                    </form>
 
-                    <!-- Main data table -->
-                    <div class="table-responsive">
-                        <form id="samples-selection-form">
-                            <table class="table table-hover table-bordered table-striped">
-                                <thead>
-                                    <tr>
-                                        <th class="selection-column">
-                                            <input type="checkbox" id="select-all-samples" class="sample-select">
-                                        </th>
-                                        {% for column in table.columns %}
-                                        <th {{ column.attrs.th.as_html }}>{{ column.header }}</th>
+                        <!-- Active Filters Display -->
+                        <div class="active-filters-container" style="display: none;"></div>
+
+                        <!-- Main data table -->
+                        <div class="table-responsive">
+                            <form id="samples-selection-form">
+                                <table class="table table-hover table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th class="selection-column">
+                                                <input type="checkbox" id="select-all-samples" class="sample-select">
+                                            </th>
+                                            {% for column in table.columns %}
+                                            <th {{ column.attrs.th.as_html }}>{{ column.header }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in table.page.object_list|default:table.rows %}
+                                        <tr {% if row.fastq_name %}data-fastq-id="{{ row.fastq_name }}"
+                                            data-fastq-name="{{ row.fastq_name }}"
+                                            data-batch-name-from-vendor="{{ row.batch_name_from_vendor }}"
+                                            data-organism-common-name="{{ row.organism_common_name }}"
+                                            data-library-prep-method="{{ row.library_prep_method }}"
+                                            data-study-set="{{ row.study_set }}" data-load-name="{{ row.load_name }}"
+                                            data-ingest-status="{{ row.ingest_status }}"
+                                            data-alignment-status="{{ row.alignment_status }}"
+                                            data-postqc-status="{{ row.postqc_status }}" {% endif %}>
+                                            <td class="selection-column">
+                                                <input type="checkbox" class="sample-select">
+                                            </td>
+                                            {% for column, cell in row.items %}
+                                            <td {{ column.attrs.td.as_html }}>{{ cell }}</td>
+                                            {% endfor %}
+                                        </tr>
                                         {% endfor %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in table.page.object_list|default:table.rows %}
-                                    <tr {% if row.fastq_name %}data-fastq-id="{{ row.fastq_name }}"
-                                        data-fastq-name="{{ row.fastq_name }}"
-                                        data-batch-name-from-vendor="{{ row.batch_name_from_vendor }}"
-                                        data-organism-common-name="{{ row.organism_common_name }}"
-                                        data-library-prep-method="{{ row.library_prep_method }}"
-                                        data-study-set="{{ row.study_set }}" data-load-name="{{ row.load_name }}"
-                                        data-ingest-status="{{ row.ingest_status }}"
-                                        data-alignment-status="{{ row.alignment_status }}"
-                                        data-postqc-status="{{ row.postqc_status }}" {% endif %}>
-                                        <td class="selection-column">
-                                            <input type="checkbox" class="sample-select">
-                                        </td>
-                                        {% for column, cell in row.items %}
-                                        <td {{ column.attrs.td.as_html }}>{{ cell }}</td>
-                                        {% endfor %}
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </form>
-                    </div>
-
-                    <!-- Pagination controls -->
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                        <div class="pagination-navigation">
-                            {% if page_obj.has_previous %}
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page=1"
-                                class="btn btn-sm btn-outline-secondary page-nav" title="First page">
-                                <i class="bi bi-chevron-double-left"></i>
-                            </a>
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
-                                class="btn btn-sm btn-outline-secondary page-nav ms-1" title="Previous page">
-                                <i class="bi bi-chevron-left"></i>
-                            </a>
-                            {% else %}
-                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
-                                title="First page">
-                                <i class="bi bi-chevron-double-left"></i>
-                            </button>
-                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled ms-1"
-                                title="Previous page">
-                                <i class="bi bi-chevron-left"></i>
-                            </button>
-                            {% endif %}
-
-                            <span class="page-indicator mx-2">
-                                <span class="current-page">{{ page_obj.number }}</span>
-                                <span class="text-muted">/</span>
-                                <span class="total-pages">{{ page_obj.paginator.num_pages }}</span>
-                            </span>
-
-                            {% if page_obj.has_next %}
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
-                                class="btn btn-sm btn-outline-secondary page-nav me-1" title="Next page">
-                                <i class="bi bi-chevron-right"></i>
-                            </a>
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}"
-                                class="btn btn-sm btn-outline-secondary page-nav" title="Last page">
-                                <i class="bi bi-chevron-double-right"></i>
-                            </a>
-                            {% else %}
-                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled me-1"
-                                title="Next page">
-                                <i class="bi bi-chevron-right"></i>
-                            </button>
-                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
-                                title="Last page">
-                                <i class="bi bi-chevron-double-right"></i>
-                            </button>
-                            {% endif %}
+                                    </tbody>
+                                </table>
+                            </form>
                         </div>
 
-                        <div class="d-flex align-items-center">
-                            <!-- Rows per page selector -->
-                            <div class="pagination-control d-flex align-items-center me-3">
-                                <label for="rowsPerPageDropdown" class="text-muted me-2 mb-0">Rows per page:</label>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-3" type="button"
-                                        id="rowsPerPageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                                        {{ current_per_page }}
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end pagination-dropdown"
-                                        aria-labelledby="rowsPerPageDropdown">
-                                        {% for option in '10,25,50,100'|split:',' %}
-                                        <li>
-                                            <a class="dropdown-item{% if current_per_page == option|add:0 %} active{% endif %}"
-                                                href="?{% for key, value in request.GET.items %}{% if key != 'page' and key != 'per_page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'per_page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}per_page={{ option }}&page=1">
-                                                {{ option }}
-                                            </a>
-                                        </li>
-                                        {% endfor %}
-                                    </ul>
+                        <!-- Pagination controls -->
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div class="pagination-navigation">
+                                {% if page_obj.has_previous %}
+                                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page=1"
+                                    class="btn btn-sm btn-outline-secondary page-nav" title="First page">
+                                    <i class="bi bi-chevron-double-left"></i>
+                                </a>
+                                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
+                                    class="btn btn-sm btn-outline-secondary page-nav ms-1" title="Previous page">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                                {% else %}
+                                <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
+                                    title="First page">
+                                    <i class="bi bi-chevron-double-left"></i>
+                                </button>
+                                <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled ms-1"
+                                    title="Previous page">
+                                    <i class="bi bi-chevron-left"></i>
+                                </button>
+                                {% endif %}
+
+                                <span class="page-indicator mx-2">
+                                    <span class="current-page">{{ page_obj.number }}</span>
+                                    <span class="text-muted">/</span>
+                                    <span class="total-pages">{{ page_obj.paginator.num_pages }}</span>
+                                </span>
+
+                                {% if page_obj.has_next %}
+                                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
+                                    class="btn btn-sm btn-outline-secondary page-nav me-1" title="Next page">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}"
+                                    class="btn btn-sm btn-outline-secondary page-nav" title="Last page">
+                                    <i class="bi bi-chevron-double-right"></i>
+                                </a>
+                                {% else %}
+                                <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled me-1"
+                                    title="Next page">
+                                    <i class="bi bi-chevron-right"></i>
+                                </button>
+                                <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
+                                    title="Last page">
+                                    <i class="bi bi-chevron-double-right"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+
+                            <div class="d-flex align-items-center">
+                                <!-- Rows per page selector -->
+                                <div class="pagination-control d-flex align-items-center me-3">
+                                    <label for="rowsPerPageDropdown" class="text-muted me-2 mb-0">Rows per page:</label>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-3"
+                                            type="button" id="rowsPerPageDropdown" data-bs-toggle="dropdown"
+                                            aria-expanded="false">
+                                            {{ current_per_page }}
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end pagination-dropdown"
+                                            aria-labelledby="rowsPerPageDropdown">
+                                            {% for option in '10,25,50,100'|split:',' %}
+                                            <li>
+                                                <a class="dropdown-item{% if current_per_page == option|add:0 %} active{% endif %}"
+                                                    href="?{% for key, value in request.GET.items %}{% if key != 'page' and key != 'per_page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'per_page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}per_page={{ option }}&page=1">
+                                                    {{ option }}
+                                                </a>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
                                 </div>
+
+                                <!-- Go to page input -->
+                                <div class="goto-page d-flex align-items-center me-3">
+                                    <form id="gotoPageForm" class="d-flex align-items-center">
+                                        {% for key, value in request.GET.items %}
+                                        {% if key != 'page' and value %}
+                                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                                        {% endif %}
+                                        {% endfor %}
+
+                                        {% for key, values in request.GET.lists %}
+                                        {% if key != 'page' and key != 'csrfmiddlewaretoken' %}
+                                        {% for value in values %}
+                                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                                        {% endfor %}
+                                        {% endif %}
+                                        {% endfor %}
+
+                                        <label for="gotoPage" class="text-muted me-2 mb-0">Go to:</label>
+                                        <input type="number" id="gotoPage" name="page"
+                                            class="form-control form-control-sm goto-page-input" min="1"
+                                            max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary ms-1 goto-btn">
+                                            <i class="bi bi-arrow-right"></i>
+                                        </button>
+                                    </form>
+                                </div>
+
+                                <span class="text-muted pagination-info">{% pagination_info page_obj %}</span>
                             </div>
-
-                            <!-- Go to page input -->
-                            <div class="goto-page d-flex align-items-center me-3">
-                                <form id="gotoPageForm" class="d-flex align-items-center">
-                                    {% for key, value in request.GET.items %}
-                                    {% if key != 'page' and value %}
-                                    <input type="hidden" name="{{ key }}" value="{{ value }}">
-                                    {% endif %}
-                                    {% endfor %}
-
-                                    {% for key, values in request.GET.lists %}
-                                    {% if key != 'page' and key != 'csrfmiddlewaretoken' %}
-                                    {% for value in values %}
-                                    <input type="hidden" name="{{ key }}" value="{{ value }}">
-                                    {% endfor %}
-                                    {% endif %}
-                                    {% endfor %}
-
-                                    <label for="gotoPage" class="text-muted me-2 mb-0">Go to:</label>
-                                    <input type="number" id="gotoPage" name="page"
-                                        class="form-control form-control-sm goto-page-input" min="1"
-                                        max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary ms-1 goto-btn">
-                                        <i class="bi bi-arrow-right"></i>
-                                    </button>
-                                </form>
-                            </div>
-
-                            <span class="text-muted pagination-info">{% pagination_info page_obj %}</span>
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
         </div>

@@ -1,5 +1,5 @@
 // Modern filters script with enhanced UI/UX for card-based layout
-console.log('Loading enhanced filter script with card animations...');
+console.log('Loading enhanced filter system v2.0...');
 
 /**
  * Utility function for logging with consistent format
@@ -9,9 +9,9 @@ console.log('Loading enhanced filter script with card animations...');
 function logDebug(message, data) {
     if (window.DEBUG_MODE) {
         if (data !== undefined) {
-            console.log(message, data);
+            console.log(`%c[Filters] %c${message}`, 'color: #3E67B7; font-weight: bold', 'color: inherit', data);
         } else {
-            console.log(message);
+            console.log(`%c[Filters] %c${message}`, 'color: #3E67B7; font-weight: bold', 'color: inherit');
         }
     }
 }
@@ -31,25 +31,22 @@ function getElement(selector, elementName) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    logDebug('DOM loaded, initializing filters');
+    logDebug('DOM loaded, initializing filter system');
 
-    // Toggle advanced filters
+    // Toggle advanced filters with improved animations
     initAdvancedFiltersToggle();
 
     // Initialize Select2 with enhanced settings
     initEnhancedSelect2();
 
-    // Initialize filter tag removers
-    initFilterTagRemovers();
+    // Initialize filter tag system
+    initFilterTagSystem();
 
     // Initialize reset filters button
     initResetFiltersButton();
 
     // Initialize apply filters button
     initApplyFiltersButton();
-
-    // Initialize active filters display
-    updateActiveFiltersDisplay();
 
     // Initialize card hover animations
     initCardAnimations();
@@ -59,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 /**
- * Initialize the advanced filters toggle with animation
+ * Initialize the advanced filters toggle with enhanced animation
  */
 function initAdvancedFiltersToggle() {
     const toggleButton = getElement('#toggleAdvancedFilters', 'Toggle button');
@@ -67,9 +64,11 @@ function initAdvancedFiltersToggle() {
 
     if (!toggleButton || !filtersPanel) return;
 
-    // Set up the toggle click handler
+    // Set up the toggle click handler with improved animation
     toggleButton.addEventListener('click', function () {
-        const isHidden = filtersPanel.style.display === 'none' || !filtersPanel.style.display;
+        const isHidden = filtersPanel.classList.contains('collapsed') ||
+            (!filtersPanel.classList.contains('expanded') &&
+                (filtersPanel.style.display === 'none' || !filtersPanel.style.display));
 
         if (isHidden) {
             showFiltersPanel();
@@ -83,65 +82,89 @@ function initAdvancedFiltersToggle() {
         localStorage.getItem('showAdvancedFilters') === 'true' ||
         (filtersPanel.dataset && filtersPanel.dataset.hasActiveFilters === 'true');
 
+    // Initial state setup
     if (shouldShowFilters) {
         filtersPanel.style.display = 'block';
+        filtersPanel.classList.add('expanded');
+        filtersPanel.classList.remove('collapsed');
         toggleButton.innerHTML = '<i class="bi bi-sliders"></i> <span>Hide Filters</span>';
+    } else {
+        filtersPanel.classList.add('collapsed');
+        filtersPanel.classList.remove('expanded');
+        filtersPanel.style.display = 'none';
     }
 
-    // Helper functions
-
     /**
-     * Show filters panel with animation
+     * Show filters panel with staggered animation
      */
     function showFiltersPanel() {
-        // Initial display
+        // Initial display setup
         filtersPanel.style.display = 'block';
-        filtersPanel.style.opacity = '0';
-        filtersPanel.style.transform = 'translateY(-20px)';
 
-        // Get filter cards for animation
+        // Add staggered animation class to cards
         const filterCards = filtersPanel.querySelectorAll('.filter-card');
+        filterCards.forEach(card => {
+            card.classList.add('fade-up');
+        });
 
-        // Animate panel
+        // Trigger expanded state after a tiny delay to allow DOM to update
         setTimeout(() => {
-            filtersPanel.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-            filtersPanel.style.opacity = '1';
-            filtersPanel.style.transform = 'translateY(0)';
+            filtersPanel.classList.remove('collapsed');
+            filtersPanel.classList.add('expanded');
 
-            // Animate each card with a delay
+            // Add staggered animation effect to cards
             filterCards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-
-                setTimeout(() => {
-                    card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, 100 + (index * 70));
+                card.style.animationDelay = `${0.05 + (index * 0.1)}s`;
             });
-        }, 10);
+        }, 20);
 
-        // Update button text
-        toggleButton.innerHTML = '<i class="bi bi-sliders"></i> <span>Hide Filters</span>';
+        // Update button text with animation
+        toggleButton.classList.add('btn-press-effect');
+        setTimeout(() => {
+            toggleButton.classList.remove('btn-press-effect');
+            toggleButton.innerHTML = '<i class="bi bi-sliders"></i> <span>Hide Filters</span>';
+        }, 200);
+
         localStorage.setItem('showAdvancedFilters', 'true');
     }
 
     /**
-     * Hide filters panel with animation
+     * Hide filters panel with smooth animation
      */
     function hideFiltersPanel() {
-        // Animate out
-        filtersPanel.style.opacity = '0';
-        filtersPanel.style.transform = 'translateY(-20px)';
+        // Add collapse class
+        filtersPanel.classList.add('collapsed');
+        filtersPanel.classList.remove('expanded');
+
+        // Animate hide
+        const filterCards = filtersPanel.querySelectorAll('.filter-card');
+        filterCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(-10px)';
+            card.style.transition = `opacity 0.2s ease, transform 0.2s ease`;
+            card.style.transitionDelay = `${0.05 * (filterCards.length - index - 1)}s`;
+        });
 
         // Hide after animation
         setTimeout(() => {
             filtersPanel.style.display = 'none';
-            filtersPanel.style.transition = '';
+            // Reset card styles
+            filterCards.forEach(card => {
+                card.style.opacity = '';
+                card.style.transform = '';
+                card.style.transition = '';
+                card.style.transitionDelay = '';
+                card.classList.remove('fade-up');
+            });
         }, 300);
 
-        // Update button text
-        toggleButton.innerHTML = '<i class="bi bi-sliders"></i> <span>Advanced Filters</span>';
+        // Update button text with animation
+        toggleButton.classList.add('btn-press-effect');
+        setTimeout(() => {
+            toggleButton.classList.remove('btn-press-effect');
+            toggleButton.innerHTML = '<i class="bi bi-sliders"></i> <span>Advanced Filters</span>';
+        }, 200);
+
         localStorage.setItem('showAdvancedFilters', 'false');
     }
 }
@@ -157,35 +180,7 @@ function initEnhancedSelect2() {
 
     logDebug('Initializing enhanced Select2');
 
-    // Add CSS for enhanced styling of selected options in dropdown only
-    const selectStyles = document.createElement('style');
-    selectStyles.textContent = `
-        /* Selected option in dropdown */
-        .select2-results__option--selected {
-            background-color: #e6f3ff !important;
-            position: relative;
-            padding-right: 25px !important;
-        }
-        
-        /* Checkmark icon for selected options */
-        .select2-results__option--selected:after {
-            content: "✓";
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #1976D2;
-            font-weight: bold;
-        }
-        
-        /* Highlight selected option on hover */
-        .select2-results__option--selected:hover {
-            background-color: #d4e9ff !important;
-        }
-    `;
-    document.head.appendChild(selectStyles);
-
-    // Apply Select2 to filter selects
+    // Apply Select2 to filter selects with advanced configuration
     const select2Config = {
         theme: 'bootstrap4',
         width: '100%',
@@ -202,26 +197,37 @@ function initEnhancedSelect2() {
 
     jQuery('.filter-select').select2(select2Config);
 
-    // Set up event handlers
+    // Set up enhanced event handlers
     setupSelect2EventHandlers();
 
     // Initialize current select states
     initializeCurrentStates();
 
     /**
-     * Set up event handlers for Select2 elements
+     * Set up improved event handlers for Select2 elements
      */
     function setupSelect2EventHandlers() {
-        // Fix placeholder appearance
+        // Improved placeholder appearance
         jQuery('.filter-select').on('select2:open', function () {
-            document.querySelector('.select2-search__field').placeholder = 'Search...';
+            const searchField = document.querySelector('.select2-search__field');
+            if (searchField) {
+                searchField.placeholder = 'Search options...';
+                searchField.focus();
+            }
         });
 
-        // Handle on-change events
+        // Enhanced change handling with visual feedback
         jQuery('.filter-select').on('change', function () {
             updateFilterHighlighting(this);
             updateActiveFiltersDisplay();
             fixSelectHeight(this);
+
+            // Provide visual feedback on change
+            const $container = jQuery(this).next('.select2-container');
+            $container.addClass('selection-updated');
+            setTimeout(() => {
+                $container.removeClass('selection-updated');
+            }, 500);
 
             // Keep focus on the dropdown after selection
             if (jQuery(this).data('select2').isOpen()) {
@@ -229,7 +235,7 @@ function initEnhancedSelect2() {
             }
         });
 
-        // Prevent dropdown from closing when clicking inside
+        // Improve dropdown behavior
         jQuery(document).on('click', '.select2-results__option', function (e) {
             e.stopPropagation();
         });
@@ -243,6 +249,34 @@ function initEnhancedSelect2() {
             updateFilterHighlighting(this);
             fixSelectHeight(this);
         });
+    }
+}
+
+/**
+ * Initialize filter tag system for active filter display
+ */
+function initFilterTagSystem() {
+    // Initialize tag removers
+    initFilterTagRemovers();
+
+    // Initialize active filters display
+    updateActiveFiltersDisplay();
+
+    // Add periodic check for URL parameter changes
+    setInterval(checkForFilterChanges, 500);
+
+    // Track current filter state
+    let lastFilterState = window.location.search;
+
+    /**
+     * Check if filters have changed (for back/forward navigation)
+     */
+    function checkForFilterChanges() {
+        const currentState = window.location.search;
+        if (currentState !== lastFilterState) {
+            lastFilterState = currentState;
+            updateActiveFiltersDisplay();
+        }
     }
 }
 
@@ -455,15 +489,15 @@ function createFilterTag(container, filter, value, displayText) {
 }
 
 /**
- * Initialize filter tag removal functionality
+ * Initialize filter tag removal functionality with improved animations
  */
 function initFilterTagRemovers() {
     const filterTags = document.querySelectorAll('.tag-remove');
 
     filterTags.forEach(tag => {
         tag.addEventListener('click', function () {
-            const filter = this.dataset.filter;
-            const value = this.dataset.value;
+            const filter = this.closest('.filter-tag').dataset.filter;
+            const value = this.closest('.filter-tag').dataset.value;
             const tagElement = this.closest('.filter-tag');
 
             // Handle different filter types
@@ -496,148 +530,183 @@ function initFilterTagRemovers() {
     }
 
     function animateTagRemoval(tagElement) {
-        tagElement.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
-        tagElement.style.transform = 'translateX(-10px)';
+        tagElement.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+        tagElement.style.transform = 'translateX(-15px)';
         tagElement.style.opacity = '0';
 
         setTimeout(() => {
             document.getElementById('filter-form').submit();
-        }, 200);
+        }, 300);
     }
 }
 
 /**
- * Update the active filters display
+ * Update the active filters display with improved animations
  */
 function updateActiveFiltersDisplay() {
     const container = document.querySelector('.active-filters-container');
     if (!container) return;
 
-    // Clear existing content
-    container.innerHTML = '';
+    // Clear existing content with fade-out
+    const existingTags = container.querySelectorAll('.filter-tag');
+    if (existingTags.length > 0) {
+        existingTags.forEach((tag, index) => {
+            tag.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+            tag.style.transitionDelay = `${0.03 * index}s`;
+            tag.style.opacity = '0';
+            tag.style.transform = 'translateY(10px)';
+        });
 
-    // Set to track unique filter combinations (filter:value)
-    const uniqueFilters = new Set();
-    let hasActiveFilters = false;
-
-    // Process all filter sources
-    // 1. URL parameters (for page load)
-    processUrlParameters();
-
-    // 2. Current form field values (for interactive updates)
-    processFormFields();
-
-    // Update UI state
-    updateFilterContainerVisibility();
-
-    /**
-     * Process URL parameters to find active filters
-     */
-    function processUrlParameters() {
-        const urlParams = new URLSearchParams(window.location.search);
-
-        for (const [key, value] of urlParams.entries()) {
-            if (key !== 'page' && key !== 'per_page' && value) {
-                hasActiveFilters = true;
-
-                if (key.endsWith('_list')) {
-                    processListParameter(key, value);
-                } else {
-                    processSimpleParameter(key, value);
-                }
-            }
-        }
+        setTimeout(() => {
+            container.innerHTML = '';
+            renderActiveFilters();
+        }, existingTags.length > 5 ? 200 : 100);
+    } else {
+        renderActiveFilters();
     }
 
     /**
-     * Process current form field values
+     * Render all active filters into the container
      */
-    function processFormFields() {
-        // Process text inputs
-        document.querySelectorAll('input[type="text"][name]').forEach(input => {
-            if (input.value) {
-                const filterKey = `${input.name}:${input.value}`;
-                if (!uniqueFilters.has(filterKey)) {
-                    uniqueFilters.add(filterKey);
+    function renderActiveFilters() {
+        // Set to track unique filter combinations (filter:value)
+        const uniqueFilters = new Set();
+        let hasActiveFilters = false;
+
+        // Process all filter sources
+        processUrlParameters();
+        processFormFields();
+
+        // Update UI state
+        updateFilterContainerVisibility();
+
+        /**
+         * Process URL parameters to find active filters
+         */
+        function processUrlParameters() {
+            const urlParams = new URLSearchParams(window.location.search);
+
+            for (const [key, value] of urlParams.entries()) {
+                if (key !== 'page' && key !== 'per_page' && value) {
                     hasActiveFilters = true;
-                    createFilterTag(container, input.name, null, input.value);
+
+                    if (key.endsWith('_list')) {
+                        processListParameter(key, value);
+                    } else {
+                        processSimpleParameter(key, value);
+                    }
                 }
             }
-        });
+        }
 
-        // Process select filters
-        document.querySelectorAll('select.filter-select').forEach(select => {
-            const values = jQuery(select).val();
-            if (values && values.length) {
-                hasActiveFilters = true;
-                values.forEach(value => {
-                    const filterKey = `${select.name}:${value}`;
+        /**
+         * Process current form field values
+         */
+        function processFormFields() {
+            // Process text inputs
+            document.querySelectorAll('input[type="text"][name]').forEach(input => {
+                if (input.value) {
+                    const filterKey = `${input.name}:${input.value}`;
                     if (!uniqueFilters.has(filterKey)) {
                         uniqueFilters.add(filterKey);
-                        const option = select.querySelector(`option[value="${value}"]`);
-                        const displayText = option ? option.textContent : value;
-                        createFilterTag(container, select.name, value, displayText);
+                        hasActiveFilters = true;
+                        createFilterTag(container, input.name, null, input.value);
                     }
-                });
+                }
+            });
+
+            // Process select filters
+            document.querySelectorAll('select.filter-select').forEach(select => {
+                const values = jQuery(select).val();
+                if (values && values.length) {
+                    hasActiveFilters = true;
+                    values.forEach(value => {
+                        const filterKey = `${select.name}:${value}`;
+                        if (!uniqueFilters.has(filterKey)) {
+                            uniqueFilters.add(filterKey);
+                            const option = select.querySelector(`option[value="${value}"]`);
+                            const displayText = option ? option.textContent : value;
+                            createFilterTag(container, select.name, value, displayText);
+                        }
+                    });
+                }
+            });
+        }
+
+        /**
+         * Process list parameters (comma-separated values)
+         */
+        function processListParameter(key, value) {
+            const baseKey = key.replace('_list', '');
+            const values = value.split(',');
+
+            values.forEach(val => {
+                if (val) {
+                    const filterKey = `${baseKey}:${val}`;
+                    if (!uniqueFilters.has(filterKey)) {
+                        uniqueFilters.add(filterKey);
+                        const select = document.getElementById(baseKey);
+                        const option = select ? select.querySelector(`option[value="${val}"]`) : null;
+                        const displayText = option ? option.textContent : val;
+                        createFilterTag(container, baseKey, val, displayText);
+                    }
+                }
+            });
+        }
+
+        /**
+         * Process simple parameters (non-list)
+         */
+        function processSimpleParameter(key, value) {
+            const filterKey = `${key}:${value}`;
+            if (!uniqueFilters.has(filterKey)) {
+                uniqueFilters.add(filterKey);
+                createFilterTag(container, key, null, value);
             }
-        });
-    }
+        }
 
-    /**
-     * Process list parameters (comma-separated values)
-     */
-    function processListParameter(key, value) {
-        const baseKey = key.replace('_list', '');
-        const values = value.split(',');
+        /**
+         * Update UI state based on active filters
+         */
+        function updateFilterContainerVisibility() {
+            // Show or hide the container with animation
+            if (hasActiveFilters) {
+                if (container.style.display === 'none') {
+                    container.style.display = 'flex';
+                    container.style.opacity = '0';
+                    container.style.transform = 'translateY(-10px)';
 
-        values.forEach(val => {
-            if (val) {
-                const filterKey = `${baseKey}:${val}`;
-                if (!uniqueFilters.has(filterKey)) {
-                    uniqueFilters.add(filterKey);
-                    const select = document.getElementById(baseKey);
-                    const option = select ? select.querySelector(`option[value="${val}"]`) : null;
-                    const displayText = option ? option.textContent : val;
-                    createFilterTag(container, baseKey, val, displayText);
+                    setTimeout(() => {
+                        container.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                        container.style.opacity = '1';
+                        container.style.transform = 'translateY(0)';
+                    }, 10);
+                }
+
+                // Add a title if not present
+                if (!container.querySelector('.filter-heading')) {
+                    const heading = document.createElement('div');
+                    heading.className = 'filter-heading';
+                    heading.innerHTML = '<i class="bi bi-funnel-fill me-1"></i> Active Filters';
+                    container.prepend(heading);
+                }
+            } else {
+                if (container.style.display !== 'none') {
+                    container.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                    container.style.opacity = '0';
+                    container.style.transform = 'translateY(-10px)';
+
+                    setTimeout(() => {
+                        container.style.display = 'none';
+                    }, 300);
                 }
             }
-        });
-    }
 
-    /**
-     * Process simple parameters (non-list)
-     */
-    function processSimpleParameter(key, value) {
-        const filterKey = `${key}:${value}`;
-        if (!uniqueFilters.has(filterKey)) {
-            uniqueFilters.add(filterKey);
-            createFilterTag(container, key, null, value);
-        }
-    }
-
-    /**
-     * Update UI state based on active filters
-     */
-    function updateFilterContainerVisibility() {
-        // Show or hide the container
-        if (hasActiveFilters) {
-            container.style.display = 'flex';
-
-            // Add a title if not present
-            if (!container.querySelector('.filter-heading')) {
-                const heading = document.createElement('div');
-                heading.className = 'filter-heading';
-                heading.innerHTML = '<i class="bi bi-funnel-fill me-1"></i> Active Filters:';
-                container.prepend(heading);
+            // Update data attribute on advanced filters container
+            const advancedFilters = document.getElementById('advancedFilters');
+            if (advancedFilters) {
+                advancedFilters.dataset.hasActiveFilters = hasActiveFilters.toString();
             }
-        } else {
-            container.style.display = 'none';
-        }
-
-        // Update data attribute on advanced filters container
-        const advancedFilters = document.getElementById('advancedFilters');
-        if (advancedFilters) {
-            advancedFilters.dataset.hasActiveFilters = hasActiveFilters.toString();
         }
     }
 }
@@ -649,8 +718,13 @@ function formatLabelFromName(name) {
         .replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// Show a feedback message to the user
-function showFeedbackMessage(message, type = 'info', duration = 1500) {
+/**
+ * Shows a toast message with enhanced animations
+ * @param {string} message - Message to display
+ * @param {string} type - Message type (success, info, warning)
+ * @param {number} duration - How long to show message in ms
+ */
+function showFeedbackMessage(message, type = 'info', duration = 2000) {
     // Create or reuse the message container
     let messageContainer = document.getElementById('filter-feedback-message');
     if (!messageContainer) {
@@ -660,96 +734,43 @@ function showFeedbackMessage(message, type = 'info', duration = 1500) {
         document.body.appendChild(messageContainer);
     }
 
-    // Configure the message
-    const icon = '<i class="bi bi-stars"></i>';  // Always use stars icon
+    // Configure the message with appropriate icon
+    let icon = '<i class="bi bi-info-circle"></i>';
+    if (type === 'success') {
+        icon = '<i class="bi bi-check-circle"></i>';
+    } else if (type === 'warning') {
+        icon = '<i class="bi bi-exclamation-triangle"></i>';
+    }
+
+    // Set content and class
     messageContainer.innerHTML = `${icon} ${message}`;
-    messageContainer.className = `toast-message ${type} show`;
+    messageContainer.className = `toast-message ${type}`;
 
-    // Apply styles - use CSS classes where possible
-    const styles = {
-        position: 'fixed',
-        bottom: '24px',
-        left: '50%',
-        transform: 'translate(-50%, 100%)',
-        zIndex: '9999',
-        backgroundColor: '#1976D2',
-        color: '#fff',
-        padding: '14px 24px',
-        borderRadius: '8px',
-        minWidth: '200px',
-        maxWidth: '600px',
-        boxShadow: '0 3px 5px -1px rgba(25, 118, 210, 0.2), 0 6px 10px 0 rgba(25, 118, 210, 0.14), 0 1px 18px 0 rgba(25, 118, 210, 0.12)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '12px',
-        fontSize: '15px',
-        lineHeight: '1.4',
-        fontWeight: '500',
-        textAlign: 'center',
-        transition: 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-        opacity: '0'
-    };
+    // Position fixed at the bottom center
+    messageContainer.style.opacity = '0';
+    messageContainer.style.transform = 'translate(-50%, 20px)';
 
-    // Apply all styles at once
-    Object.assign(messageContainer.style, styles);
-
-    // Show animation
+    // Show with animation
     requestAnimationFrame(() => {
+        messageContainer.classList.add('show');
         messageContainer.style.opacity = '1';
         messageContainer.style.transform = 'translate(-50%, 0)';
     });
 
     // Hide and remove after duration
-    setTimeout(() => {
+    clearTimeout(messageContainer.hideTimeout);
+    messageContainer.hideTimeout = setTimeout(() => {
         messageContainer.style.opacity = '0';
-        messageContainer.style.transform = 'translate(-50%, 100%)';
+        messageContainer.style.transform = 'translate(-50%, 20px)';
 
         // Remove from DOM after animation
         setTimeout(() => {
             if (messageContainer.parentNode) {
                 messageContainer.parentNode.removeChild(messageContainer);
             }
-        }, 150);
+        }, 300);
     }, duration);
 }
-
-// Add styles to the document
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes sparkle {
-        0%, 100% { transform: scale(1) rotate(0deg); }
-        25% { transform: scale(1.2) rotate(-5deg); }
-        50% { transform: scale(1.1) rotate(5deg); }
-        75% { transform: scale(1.2) rotate(-3deg); }
-    }
-
-    .toast-message i {
-        font-size: 1.2em;
-        margin-right: 4px;
-        animation: sparkle 2s infinite;
-        display: inline-block;
-        color: #fff;
-    }
-
-    .toast-message.success {
-        background-color: #1976D2 !important;
-    }
-
-    .toast-message.info {
-        background-color: #1976D2 !important;
-    }
-
-    .toast-message.warning {
-        background-color: #1976D2 !important;
-    }
-
-    .toast-message {
-        backdrop-filter: blur(8px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-`;
-document.head.appendChild(style);
 
 // Initialize the reset filters button with enhanced feedback
 function initResetFiltersButton() {
