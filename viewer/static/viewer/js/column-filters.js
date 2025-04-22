@@ -46,20 +46,28 @@ function addFilterButtonsToHeaders() {
             header.setAttribute('id', columnId);
         }
 
-        // Create filter button
+        // Clean up any placeholder-like text (such as {{ COLUMN.HEADER }})
+        if (columnName.includes('{{') && columnName.includes('}}')) {
+            // Extract a clean name from the placeholder
+            const cleanName = columnName.replace(/[{}]/g, '').trim().split('.').pop();
+            // Set the header text to the clean name
+            header.textContent = cleanName.charAt(0).toUpperCase() + cleanName.slice(1).toLowerCase();
+        }
+
+        // Create filter button with tooltip
         const filterBtn = document.createElement('button');
         filterBtn.className = 'column-filter-btn';
         filterBtn.innerHTML = '<i class="bi bi-funnel"></i>';
         filterBtn.setAttribute('data-column', columnId);
-        filterBtn.setAttribute('aria-label', `Filter ${columnName}`);
-        filterBtn.title = `Filter ${columnName}`;
+        filterBtn.setAttribute('aria-label', `Filter ${header.textContent.trim()}`);
+        filterBtn.setAttribute('title', `Filter ${header.textContent.trim()}`);
 
         // Create filter container
         const filterContainer = document.createElement('div');
         filterContainer.className = 'column-filter-container';
 
         // Create dropdown
-        const dropdown = createFilterDropdown(columnName, columnId);
+        const dropdown = createFilterDropdown(header.textContent.trim(), columnId);
 
         // Add to header
         filterContainer.appendChild(filterBtn);
@@ -164,6 +172,9 @@ function setupFilterDropdowns() {
             // Toggle this dropdown
             dropdown.classList.toggle('show');
 
+            // Toggle active state on button
+            this.classList.toggle('active', dropdown.classList.contains('show'));
+
             // If showing dropdown, load filter values
             if (dropdown.classList.contains('show')) {
                 loadFilterValues(columnId);
@@ -175,7 +186,13 @@ function setupFilterDropdowns() {
     document.querySelectorAll('.close-filter').forEach(btn => {
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
-            this.closest('.column-filter-dropdown').classList.remove('show');
+            const dropdown = this.closest('.column-filter-dropdown');
+            dropdown.classList.remove('show');
+
+            // Remove active state from button
+            const columnId = dropdown.id.replace('dropdown-', '');
+            const btn = document.querySelector(`.column-filter-btn[data-column="${columnId}"]`);
+            if (btn) btn.classList.remove('active');
         });
     });
 
@@ -183,7 +200,13 @@ function setupFilterDropdowns() {
     document.querySelectorAll('.cancel-filter').forEach(btn => {
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
-            this.closest('.column-filter-dropdown').classList.remove('show');
+            const dropdown = this.closest('.column-filter-dropdown');
+            dropdown.classList.remove('show');
+
+            // Remove active state from button
+            const columnId = dropdown.id.replace('dropdown-', '');
+            const btn = document.querySelector(`.column-filter-btn[data-column="${columnId}"]`);
+            if (btn) btn.classList.remove('active');
         });
     });
 
@@ -248,6 +271,11 @@ function setupClickOutsideHandler() {
             document.querySelectorAll('.column-filter-dropdown').forEach(dropdown => {
                 dropdown.classList.remove('show');
             });
+
+            // Remove active state from all buttons
+            document.querySelectorAll('.column-filter-btn.active').forEach(btn => {
+                btn.classList.remove('active');
+            });
         }
     });
 }
@@ -276,11 +304,12 @@ function loadFilterValues(columnId) {
         let optionsHTML = '';
         values.forEach(value => {
             const isChecked = !activeFilters.length || activeFilters.includes(value);
+            const valueId = value.toString().replace(/[^a-zA-Z0-9]/g, '-');
             optionsHTML += `
                 <div class="filter-option">
-                    <input type="checkbox" id="${columnId}-${value.replace(/[^a-zA-Z0-9]/g, '-')}" 
+                    <input type="checkbox" id="${columnId}-${valueId}" 
                            ${isChecked ? 'checked' : ''} value="${value}">
-                    <label for="${columnId}-${value.replace(/[^a-zA-Z0-9]/g, '-')}">${value}</label>
+                    <label for="${columnId}-${valueId}">${value}</label>
                 </div>
             `;
         });
@@ -337,6 +366,10 @@ function applyFilter(columnId, dropdown) {
         } else {
             // Just close the dropdown if no change
             dropdown.classList.remove('show');
+
+            // Remove active state from button
+            const btn = document.querySelector(`.column-filter-btn[data-column="${columnId}"]`);
+            if (btn) btn.classList.remove('active');
         }
         return;
     }

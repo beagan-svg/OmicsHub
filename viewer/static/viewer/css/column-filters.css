@@ -10,31 +10,77 @@
     --filter-header-bg: #f8f9fa;
     --filter-border-color: #e0e0e0;
     --filter-radius: 4px;
+    --header-bg-color: #f5f7fa;
+    --header-border-color: #e0e6ed;
+    --header-text-color: #4a5568;
+}
+
+/* Enhanced table header styling */
+.table thead th {
+    background-color: var(--header-bg-color);
+    border-bottom: 2px solid var(--header-border-color);
+    color: var(--header-text-color);
+    font-weight: 600;
+    padding: 12px 8px;
+    text-transform: none;
+    vertical-align: middle;
+    position: relative;
+    transition: all 0.2s ease;
+    border-top: none;
+    white-space: nowrap;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+}
+
+.table thead th:hover {
+    background-color: #ebeff5;
+}
+
+.table thead th::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: transparent;
+    transition: background-color 0.2s ease;
+}
+
+.table thead th.asc::after,
+.table thead th.desc::after {
+    background-color: var(--filter-btn-color);
 }
 
 /* Column filter toggle button */
 .column-filter-btn {
     background: transparent;
     border: none;
-    color: #6c757d;
+    color: #9aa5b1;
     padding: 2px;
     margin-left: 6px;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
-    transition: color 0.2s ease;
+    transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    border-radius: 3px;
+    width: 24px;
+    height: 24px;
 }
 
 .column-filter-btn:hover,
 .column-filter-btn.active {
     color: var(--filter-btn-color);
+    background-color: rgba(25, 118, 210, 0.08);
 }
 
 /* Column filter container */
 .column-filter-container {
     position: relative;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 /* The actual dropdown panel */
@@ -213,15 +259,19 @@
 th.has-active-filter .column-filter-btn {
     color: var(--filter-btn-color);
     font-weight: bold;
+    background-color: rgba(25, 118, 210, 0.1);
 }
 
 th.has-active-filter .column-filter-btn::after {
-    content: "•";
-    color: var(--filter-btn-color);
-    font-size: 18px;
+    content: "";
     position: absolute;
-    top: -5px;
-    right: -5px;
+    top: -6px;
+    right: -6px;
+    width: 8px;
+    height: 8px;
+    background-color: var(--filter-btn-color);
+    border-radius: 50%;
+    border: 2px solid white;
 }
 
 /* Custom scrollbar for filter dropdown */
@@ -328,4 +378,39 @@ th.has-active-filter .column-filter-btn::after {
     100% {
         transform: rotate(360deg);
     }
+}
+
+/* Table header with active sorting */
+.table thead th.sorting-active {
+    color: var(--filter-btn-color);
+    background-color: rgba(25, 118, 210, 0.05);
+}
+
+/* Add header separator lines */
+.table thead th:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    top: 25%;
+    right: 0;
+    height: 50%;
+    width: 1px;
+    background-color: #d1d5db;
+}
+
+/* Selection column styling */
+.table th.selection-column {
+    width: 40px;
+    text-align: center;
+    background-color: #f8fafc;
+}
+
+/* First column styling for better visual hierarchy */
+.table thead th:first-child {
+    border-top-left-radius: 4px;
+    border-left: none;
+}
+
+.table thead th:last-child {
+    border-top-right-radius: 4px;
+    border-right: none;
 }
