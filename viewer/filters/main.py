@@ -90,6 +90,28 @@ class MainFilter(django_filters.FilterSet):
         choices=lambda: [(x, x) for x in Main.objects.filter(ingest_status__isnull=False)
             .exclude(ingest_status='').values_list('ingest_status', flat=True).distinct()]
     )
+    
+    # Column filters - dynamic filters for any column
+    fastq_name_filter = django_filters.CharFilter(method='filter_by_column')
+    study_set_filter = django_filters.CharFilter(method='filter_by_column')
+    load_name_filter = django_filters.CharFilter(method='filter_by_column')
+    batch_name_filter = django_filters.CharFilter(method='filter_by_column')
+    batch_name_from_vendor_filter = django_filters.CharFilter(method='filter_by_column')
+    cell_capture_filter = django_filters.CharFilter(method='filter_by_column')
+    sample_id_filter = django_filters.CharFilter(method='filter_by_column')
+    amplification_name_filter = django_filters.CharFilter(method='filter_by_column')
+    amplification_id_filter = django_filters.CharFilter(method='filter_by_column')
+    cell_prep_type_filter = django_filters.CharFilter(method='filter_by_column')
+    sequencing_vendor_filter = django_filters.CharFilter(method='filter_by_column')
+    alignment_method_filter = django_filters.CharFilter(method='filter_by_column')
+    library_prep_method_filter = django_filters.CharFilter(method='filter_by_column')
+    library_prep_method_id_filter = django_filters.CharFilter(method='filter_by_column')
+    library_prep_name_filter = django_filters.CharFilter(method='filter_by_column')
+    organism_filter = django_filters.CharFilter(method='filter_by_column')
+    organism_common_name_filter = django_filters.CharFilter(method='filter_by_column')
+    ingest_status_filter = django_filters.CharFilter(method='filter_by_column')
+    alignment_status_filter = django_filters.CharFilter(method='filter_by_column')
+    postqc_status_filter = django_filters.CharFilter(method='filter_by_column')
 
     def apply_distinct(self, queryset):
         """
@@ -102,6 +124,65 @@ class MainFilter(django_filters.FilterSet):
             # For databases that don't support DISTINCT ON, 
             # we'll need to handle the distinct processing at the view level
             return queryset.distinct()
+    
+    def filter_by_column(self, queryset, name, value):
+        """
+        Dynamic column filter method that handles filtering for any column
+        based on the field name pattern column_name_filter
+        
+        Args:
+            queryset: The queryset to filter
+            name: The filter field name (e.g., 'fastq_name_filter')
+            value: Comma-separated string of values to filter by
+            
+        Returns:
+            Filtered queryset
+        """
+        if not value:
+            return queryset
+            
+        # Extract the actual field name from the filter name
+        field_name = name.replace('_filter', '')
+        
+        # Split the comma-separated values
+        values = value.split(',')
+        
+        # Create a mapping of field names to model fields
+        field_mappings = {
+            'fastq_name': 'fastq_name__fastq_name',
+            'study_set': 'study_set',
+            'load_name': 'fastq_name__loadassociation__load_name',
+            'batch_name': 'fastq_name__batch_name',
+            'batch_name_from_vendor': 'fastq_name__batch_name_from_vendor',
+            'cell_capture': 'fastq_name__cell_capture',
+            'sample_id': 'fastq_name__fastq_id',
+            'amplification_name': 'amplification_name',
+            'amplification_id': 'amplification_id',
+            'cell_prep_type': 'cell_prep_type',
+            'sequencing_vendor': 'sequencing_vendor',
+            'alignment_method': 'alignment_method',
+            'library_prep_method': 'library_prep_method',
+            'library_prep_method_id': 'library_prep_method_id',
+            'library_prep_name': 'library_prep_name',
+            'organism': 'fastq_name__organism_name',
+            'organism_common_name': 'fastq_name__organism_common_name',
+            'ingest_status': 'ingest_status',
+            'alignment_status': 'alignment_status',
+            'postqc_status': 'postqc_status'
+        }
+        
+        # Get the correct field name to filter on
+        filter_field = field_mappings.get(field_name, field_name)
+        
+        # Create Q objects for each value (OR condition)
+        q_objects = Q()
+        for val in values:
+            q_objects |= Q(**{f"{filter_field}__exact": val})
+        
+        # Apply the filter
+        filtered_qs = queryset.filter(q_objects)
+        
+        return self.apply_distinct(filtered_qs)
 
     def filter_search(self, queryset, name, value):
         """
@@ -240,5 +321,26 @@ class MainFilter(django_filters.FilterSet):
             'library_prep_method', 
             'alignment_status', 
             'postqc_status', 
-            'ingest_status'
+            'ingest_status',
+            # Column filters
+            'fastq_name_filter',
+            'study_set_filter',
+            'load_name_filter',
+            'batch_name_filter',
+            'batch_name_from_vendor_filter',
+            'cell_capture_filter',
+            'sample_id_filter',
+            'amplification_name_filter',
+            'amplification_id_filter',
+            'cell_prep_type_filter',
+            'sequencing_vendor_filter',
+            'alignment_method_filter',
+            'library_prep_method_filter',
+            'library_prep_method_id_filter',
+            'library_prep_name_filter',
+            'organism_filter',
+            'organism_common_name_filter',
+            'ingest_status_filter',
+            'alignment_status_filter',
+            'postqc_status_filter'
         ] 

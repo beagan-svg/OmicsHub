@@ -8,7 +8,6 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
 <link rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@x.x.x/dist/select2-bootstrap4.min.css" />
-<link rel="stylesheet" href="{% static 'viewer/css/multiselect-filters.css' %}" />
 <link rel="stylesheet" href="{% static 'viewer/css/column-filters.css' %}" />
 <style>
     .selection-column {
@@ -78,114 +77,6 @@
     #selection-actions button.clear-selection {
         color: #757575;
     }
-
-    /* Column header filter styles */
-    .column-filter {
-        margin-top: 8px;
-        position: relative;
-    }
-
-    .column-filter .filter-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-        height: 24px;
-        border-radius: 4px;
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        cursor: pointer;
-        color: #6c757d;
-        transition: all 0.2s ease;
-    }
-
-    .column-filter .filter-toggle:hover,
-    .column-filter .filter-toggle.active {
-        background-color: #e9ecef;
-        color: #1976D2;
-        border-color: #1976D2;
-    }
-
-    .column-filter .filter-toggle.active {
-        background-color: #e3f2fd;
-    }
-
-    .column-filter .filter-dropdown {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        z-index: 1000;
-        display: none;
-        min-width: 250px;
-        padding: 8px;
-        margin-top: 4px;
-        background-color: #fff;
-        border-radius: 4px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        border: 1px solid #dee2e6;
-    }
-
-    .column-filter .filter-dropdown.show {
-        display: block;
-    }
-
-    th {
-        position: relative;
-        min-width: 150px;
-    }
-
-    .table th .header-content {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    .active-filters-container {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 1rem;
-    }
-
-    .filter-tag {
-        display: flex;
-        align-items: center;
-        background-color: #e3f2fd;
-        color: #1976D2;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 0.875rem;
-    }
-
-    .filter-heading {
-        margin-right: 8px;
-        font-weight: 500;
-        color: #6c757d;
-    }
-
-    .tag-name {
-        font-weight: 500;
-        margin-right: 4px;
-    }
-
-    .tag-value {
-        margin-right: 4px;
-    }
-
-    .tag-remove {
-        background: none;
-        border: none;
-        color: #1976D2;
-        cursor: pointer;
-        padding: 0 4px;
-        display: flex;
-        align-items: center;
-    }
-
-    .tag-remove:hover {
-        color: #0d47a1;
-    }
 </style>
 {% endblock %}
 
@@ -203,7 +94,7 @@
                     <form method="get" id="filter-form">
                         <!-- Search row -->
                         <div class="row mb-3">
-                            <div class="col-md-9">
+                            <div class="col-md-8">
                                 <div class="input-group">
                                     <span class="input-group-text bg-light">
                                         <i class="bi bi-search"></i>
@@ -218,7 +109,7 @@
                                 </div>
                             </div>
 
-                            <div class="col-md-3 text-end">
+                            <div class="col-md-4 text-end">
                                 <!-- Column Settings Dropdown -->
                                 <div class="dropdown column-settings-dropdown d-inline-block">
                                     <button type="button" id="column-settings-toggle" class="btn btn-outline-secondary"
@@ -227,7 +118,6 @@
                                     </button>
                                     <div class="dropdown-menu dropdown-menu-end column-settings-dropdown-menu"
                                         aria-labelledby="column-settings-toggle" id="column-settings-dropdown">
-                                        <!-- Column selections content is the same as before -->
                                         <div class="column-categories-container">
                                             <!-- Sample Information Category -->
                                             <div class="column-category">
@@ -244,11 +134,361 @@
                                                     </label>
                                                 </div>
 
-                                                <!-- Rest of column toggles remain the same -->
-                                                <!-- ... -->
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleStudySet"
+                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleStudySet">
+                                                        Study Set
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleLoadName"
+                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleLoadName">
+                                                        Load Name
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleBatchName"
+                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleBatchName">
+                                                        Batch Name
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleBatchNameFromVendor"
+                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleBatchNameFromVendor">
+                                                        Batch Name From Vendor
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleCellCapture"
+                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleCellCapture">
+                                                        Cell Capture
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleSampleId"
+                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleSampleId">
+                                                        Sample ID
+                                                    </label>
+                                                </div>
                                             </div>
 
-                                            <!-- ... Other column categories ... -->
+                                            <!-- Amplification Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-layers me-2"></i>Amplification</h6>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAmplificationName"
+                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAmplificationName">
+                                                        Amplification
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAmplificationId"
+                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAmplificationId">
+                                                        Amplification ID
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Preparation Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-tools me-2"></i>Preparation</h6>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleCellPrepType"
+                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleCellPrepType">
+                                                        Cell Prep Type
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleSequencingVendor"
+                                                            class="column-toggle-checkbox" data-default-visible="false">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleSequencingVendor">
+                                                        Sequencing Vendor
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAlignmentMethod"
+                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAlignmentMethod">
+                                                        Alignment Method
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Library Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-journal me-2"></i>Library</h6>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleLibraryPrepMethod"
+                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleLibraryPrepMethod">
+                                                        Library Prep Method
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleLibraryPrepMethodId"
+                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleLibraryPrepMethodId">
+                                                        Library Prep Method ID
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleLibraryPrepName"
+                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleLibraryPrepName">
+                                                        Library Prep Name
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Organism Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-bug me-2"></i>Organism</h6>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleOrganism"
+                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleOrganism">
+                                                        Organism
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleOrganismCommonName"
+                                                            class="column-toggle-checkbox" data-default-visible="true">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleOrganismCommonName">
+                                                        Organism Common Name
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Status Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-check2-circle me-2"></i>Status</h6>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleIngestStatus"
+                                                            class="column-toggle-checkbox" data-default-visible="true"
+                                                            data-column="column-ingest_status">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleIngestStatus">
+                                                        Ingest Status
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAlignmentStatus"
+                                                            class="column-toggle-checkbox" data-default-visible="true"
+                                                            data-column="column-alignment_status">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAlignmentStatus">
+                                                        Alignment Status
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="togglePostqcStatus"
+                                                            class="column-toggle-checkbox" data-default-visible="true"
+                                                            data-column="column-postqc_status">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="togglePostqcStatus">
+                                                        PostQC Status
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Status FID Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-hash me-2"></i>Status FID</h6>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleIngestFid"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-ingest_fid">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleIngestFid">
+                                                        Ingest FID
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAlignmentFid"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-alignment_fid">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAlignmentFid">
+                                                        Alignment FID
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="togglePostqcFid"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-postqc_fid">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="togglePostqcFid">
+                                                        PostQC FID
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Status Time Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-clock-history me-2"></i>Status Time</h6>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleIngestStartTime"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-ingest_start_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleIngestStartTime">
+                                                        Ingest Start
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleIngestEndTime"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-ingest_end_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleIngestEndTime">
+                                                        Ingest End
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAlignmentStartTime"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-alignment_start_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAlignmentStartTime">
+                                                        Alignment Start
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="toggleAlignmentEndTime"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-alignment_end_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="toggleAlignmentEndTime">
+                                                        Alignment End
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="togglePostqcStartTime"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-postqc_start_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="togglePostqcStartTime">
+                                                        PostQC Start
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check form-switch">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" id="togglePostqcEndTime"
+                                                            class="column-toggle-checkbox" data-default-visible="false"
+                                                            data-column="column-postqc_end_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label" for="togglePostqcEndTime">
+                                                        PostQC End
+                                                    </label>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <!-- Action Buttons -->
@@ -271,198 +511,155 @@
                                         </div>
                                     </div>
                                 </div>
-
-                                <!-- Reset Filters Button -->
-                                <button type="button" id="resetFilters" class="btn btn-outline-danger ms-2">
-                                    <i class="bi bi-x-circle"></i> Clear Filters
-                                </button>
                             </div>
                         </div>
 
-                        <!-- Active filters display -->
-                        <div class="active-filters-container mb-3" {% if has_active_filters %}style="display: flex;" {%
-                            else %}style="display: none;" {% endif %}></div>
-
-                        <!-- Main data table -->
-                        <div class="table-responsive">
-                            <form id="samples-selection-form">
-                                <table class="table table-hover table-bordered table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th class="selection-column">
-                                                <input type="checkbox" id="select-all-samples" class="sample-select">
-                                            </th>
-                                            {% for column in table.columns %}
-                                            <th {{ column.attrs.th.as_html }}>
-                                                <div class="header-content">
-                                                    {{ column.header }}
-                                                    {% if column.name != 'selection' and column.name != 'actions' %}
-                                                    <div class="column-filter" data-field="{{ column.name }}">
-                                                        <div class="filter-toggle" title="Filter {{ column.header }}">
-                                                            <i class="bi bi-funnel"></i>
-                                                        </div>
-                                                        <div class="filter-dropdown">
-                                                            <!-- Populate with filter options based on column -->
-                                                            {% if column.name == 'fastq_name' or column.name ==
-                                                            'load_name' or column.name == 'batch_name_from_vendor' %}
-                                                            <input type="text" class="form-control mb-2 text-filter"
-                                                                data-field="{{ column.name }}"
-                                                                placeholder="Filter {{ column.header }}...">
-                                                            {% else %}
-                                                            <!-- Select dropdown for categorical fields -->
-                                                            <select class="form-select filter-select" multiple
-                                                                data-field="{{ column.name }}"
-                                                                data-placeholder="Select options">
-                                                                <!-- Options will be populated by JavaScript -->
-                                                            </select>
-                                                            {% endif %}
-                                                            <div class="d-flex justify-content-between mt-2">
-                                                                <button type="button"
-                                                                    class="btn btn-sm btn-outline-secondary clear-filter-btn">
-                                                                    Clear
-                                                                </button>
-                                                                <button type="button"
-                                                                    class="btn btn-sm btn-primary apply-filter-btn">
-                                                                    Apply
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    {% endif %}
-                                                </div>
-                                            </th>
-                                            {% endfor %}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for row in table.page.object_list|default:table.rows %}
-                                        <tr {% if row.fastq_name %}data-fastq-id="{{ row.fastq_name }}"
-                                            data-fastq-name="{{ row.fastq_name }}"
-                                            data-batch-name-from-vendor="{{ row.batch_name_from_vendor }}"
-                                            data-organism-common-name="{{ row.organism_common_name }}"
-                                            data-library-prep-method="{{ row.library_prep_method }}"
-                                            data-study-set="{{ row.study_set }}" data-load-name="{{ row.load_name }}"
-                                            data-ingest-status="{{ row.ingest_status }}"
-                                            data-alignment-status="{{ row.alignment_status }}"
-                                            data-postqc-status="{{ row.postqc_status }}" {% endif %}>
-                                            <td class="selection-column">
-                                                <input type="checkbox" class="sample-select">
-                                            </td>
-                                            {% for column, cell in row.items %}
-                                            <td {{ column.attrs.td.as_html }}>{{ cell }}</td>
-                                            {% endfor %}
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </form>
-                        </div>
-
-                        <!-- Pagination controls -->
-                        <div class="d-flex justify-content-between align-items-center mt-3">
-                            <div class="pagination-navigation">
-                                {% if page_obj.has_previous %}
-                                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page=1"
-                                    class="btn btn-sm btn-outline-secondary page-nav" title="First page">
-                                    <i class="bi bi-chevron-double-left"></i>
-                                </a>
-                                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
-                                    class="btn btn-sm btn-outline-secondary page-nav ms-1" title="Previous page">
-                                    <i class="bi bi-chevron-left"></i>
-                                </a>
-                                {% else %}
-                                <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
-                                    title="First page">
-                                    <i class="bi bi-chevron-double-left"></i>
-                                </button>
-                                <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled ms-1"
-                                    title="Previous page">
-                                    <i class="bi bi-chevron-left"></i>
-                                </button>
-                                {% endif %}
-
-                                <span class="page-indicator mx-2">
-                                    <span class="current-page">{{ page_obj.number }}</span>
-                                    <span class="text-muted">/</span>
-                                    <span class="total-pages">{{ page_obj.paginator.num_pages }}</span>
-                                </span>
-
-                                {% if page_obj.has_next %}
-                                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
-                                    class="btn btn-sm btn-outline-secondary page-nav me-1" title="Next page">
-                                    <i class="bi bi-chevron-right"></i>
-                                </a>
-                                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}"
-                                    class="btn btn-sm btn-outline-secondary page-nav" title="Last page">
-                                    <i class="bi bi-chevron-double-right"></i>
-                                </a>
-                                {% else %}
-                                <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled me-1"
-                                    title="Next page">
-                                    <i class="bi bi-chevron-right"></i>
-                                </button>
-                                <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
-                                    title="Last page">
-                                    <i class="bi bi-chevron-double-right"></i>
-                                </button>
-                                {% endif %}
-                            </div>
-
-                            <div class="d-flex align-items-center">
-                                <!-- Rows per page selector -->
-                                <div class="pagination-control d-flex align-items-center me-3">
-                                    <label for="rowsPerPageDropdown" class="text-muted me-2 mb-0">Rows per page:</label>
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-3"
-                                            type="button" id="rowsPerPageDropdown" data-bs-toggle="dropdown"
-                                            aria-expanded="false">
-                                            {{ current_per_page }}
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end pagination-dropdown"
-                                            aria-labelledby="rowsPerPageDropdown">
-                                            {% for option in '10,25,50,100'|split:',' %}
-                                            <li>
-                                                <a class="dropdown-item{% if current_per_page == option|add:0 %} active{% endif %}"
-                                                    href="?{% for key, value in request.GET.items %}{% if key != 'page' and key != 'per_page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'per_page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}per_page={{ option }}&page=1">
-                                                    {{ option }}
-                                                </a>
-                                            </li>
-                                            {% endfor %}
-                                        </ul>
-                                    </div>
-                                </div>
-
-                                <!-- Go to page input -->
-                                <div class="goto-page d-flex align-items-center me-3">
-                                    <form id="gotoPageForm" class="d-flex align-items-center">
-                                        {% for key, value in request.GET.items %}
-                                        {% if key != 'page' and value %}
-                                        <input type="hidden" name="{{ key }}" value="{{ value }}">
-                                        {% endif %}
-                                        {% endfor %}
-
-                                        {% for key, values in request.GET.lists %}
-                                        {% if key != 'page' and key != 'csrfmiddlewaretoken' %}
-                                        {% for value in values %}
-                                        <input type="hidden" name="{{ key }}" value="{{ value }}">
-                                        {% endfor %}
-                                        {% endif %}
-                                        {% endfor %}
-
-                                        <label for="gotoPage" class="text-muted me-2 mb-0">Go to:</label>
-                                        <input type="number" id="gotoPage" name="page"
-                                            class="form-control form-control-sm goto-page-input" min="1"
-                                            max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-secondary ms-1 goto-btn">
-                                            <i class="bi bi-arrow-right"></i>
-                                        </button>
-                                    </form>
-                                </div>
-
-                                <span class="text-muted pagination-info">{% pagination_info page_obj %}</span>
-                            </div>
-                        </div>
+                        <!-- Applied filters display -->
+                        <div class="applied-filters-container mb-3" style="display: none;"></div>
                     </form>
+
+                    <!-- Main data table -->
+                    <div class="table-responsive">
+                        <form id="samples-selection-form">
+                            <table class="table table-hover table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th class="selection-column">
+                                            <input type="checkbox" id="select-all-samples" class="sample-select">
+                                        </th>
+                                        {% for column in table.columns %}
+                                        <th {{ column.attrs.th.as_html }} id="col-{{ column.name|slugify }}">{{
+                                            column.header }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in table.page.object_list|default:table.rows %}
+                                    <tr {% if row.fastq_name %}data-fastq-id="{{ row.fastq_name }}"
+                                        data-fastq-name="{{ row.fastq_name }}"
+                                        data-batch-name-from-vendor="{{ row.batch_name_from_vendor }}"
+                                        data-organism-common-name="{{ row.organism_common_name }}"
+                                        data-library-prep-method="{{ row.library_prep_method }}"
+                                        data-study-set="{{ row.study_set }}" data-load-name="{{ row.load_name }}"
+                                        data-ingest-status="{{ row.ingest_status }}"
+                                        data-alignment-status="{{ row.alignment_status }}"
+                                        data-postqc-status="{{ row.postqc_status }}" {% endif %}>
+                                        <td class="selection-column">
+                                            <input type="checkbox" class="sample-select">
+                                        </td>
+                                        {% for column, cell in row.items %}
+                                        <td {{ column.attrs.td.as_html }}>{{ cell }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </form>
+                    </div>
+
+                    <!-- Pagination controls -->
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <div class="pagination-navigation">
+                            {% if page_obj.has_previous %}
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page=1"
+                                class="btn btn-sm btn-outline-secondary page-nav" title="First page">
+                                <i class="bi bi-chevron-double-left"></i>
+                            </a>
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
+                                class="btn btn-sm btn-outline-secondary page-nav ms-1" title="Previous page">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                            {% else %}
+                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
+                                title="First page">
+                                <i class="bi bi-chevron-double-left"></i>
+                            </button>
+                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled ms-1"
+                                title="Previous page">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                            {% endif %}
+
+                            <span class="page-indicator mx-2">
+                                <span class="current-page">{{ page_obj.number }}</span>
+                                <span class="text-muted">/</span>
+                                <span class="total-pages">{{ page_obj.paginator.num_pages }}</span>
+                            </span>
+
+                            {% if page_obj.has_next %}
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
+                                class="btn btn-sm btn-outline-secondary page-nav me-1" title="Next page">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}"
+                                class="btn btn-sm btn-outline-secondary page-nav" title="Last page">
+                                <i class="bi bi-chevron-double-right"></i>
+                            </a>
+                            {% else %}
+                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled me-1"
+                                title="Next page">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                            <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
+                                title="Last page">
+                                <i class="bi bi-chevron-double-right"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex align-items-center">
+                            <!-- Rows per page selector -->
+                            <div class="pagination-control d-flex align-items-center me-3">
+                                <label for="rowsPerPageDropdown" class="text-muted me-2 mb-0">Rows per page:</label>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-3" type="button"
+                                        id="rowsPerPageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                        {{ current_per_page }}
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end pagination-dropdown"
+                                        aria-labelledby="rowsPerPageDropdown">
+                                        {% for option in '10,25,50,100'|split:',' %}
+                                        <li>
+                                            <a class="dropdown-item{% if current_per_page == option|add:0 %} active{% endif %}"
+                                                href="?{% for key, value in request.GET.items %}{% if key != 'page' and key != 'per_page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'per_page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}per_page={{ option }}&page=1">
+                                                {{ option }}
+                                            </a>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Go to page input -->
+                            <div class="goto-page d-flex align-items-center me-3">
+                                <form id="gotoPageForm" class="d-flex align-items-center">
+                                    {% for key, value in request.GET.items %}
+                                    {% if key != 'page' and value %}
+                                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                                    {% endif %}
+                                    {% endfor %}
+
+                                    {% for key, values in request.GET.lists %}
+                                    {% if key != 'page' and key != 'csrfmiddlewaretoken' %}
+                                    {% for value in values %}
+                                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                                    {% endfor %}
+                                    {% endif %}
+                                    {% endfor %}
+
+                                    <label for="gotoPage" class="text-muted me-2 mb-0">Go to:</label>
+                                    <input type="number" id="gotoPage" name="page"
+                                        class="form-control form-control-sm goto-page-input" min="1"
+                                        max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary ms-1 goto-btn">
+                                        <i class="bi bi-arrow-right"></i>
+                                    </button>
+                                </form>
+                            </div>
+
+                            <span class="text-muted pagination-info">{% pagination_info page_obj %}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -483,11 +680,1098 @@
         </button>
     </div>
 </div>
+
+<!-- Additional CSS for select container and column toggles -->
+<style>
+    .select-container {
+        position: relative;
+        height: 38px;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple {
+        min-height: 38px;
+        max-height: 100px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__rendered {
+        display: block !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice {
+        float: left;
+        margin: 2px;
+    }
+
+    /* Scrollbar styling for the selection box */
+    .select2-container--bootstrap4 .select2-selection--multiple::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Firefox scrollbar */
+    .select2-container--bootstrap4 .select2-selection--multiple {
+        scrollbar-width: thin;
+        scrollbar-color: #888 #f1f1f1;
+    }
+
+    /* Column Settings Dropdown Styling */
+    .column-settings-dropdown .dropdown-menu {
+        padding: 0;
+        min-width: 300px;
+        border-radius: 8px;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+        border: none;
+        max-height: 60vh;
+        overflow: hidden;
+        /* Fix for scrolling issue */
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+    }
+
+    /* Make sure pointer events work properly inside the dropdown */
+    .column-settings-dropdown .dropdown-menu * {
+        pointer-events: auto;
+    }
+
+    /* Contains the scrollable categories */
+    .column-categories-container {
+        padding: 1rem;
+        max-height: calc(60vh - 52px);
+        /* Adjusted height without header */
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    /* Fix for category headers */
+    .column-category {
+        margin-bottom: 1.5rem;
+        position: relative;
+        padding-top: 2.5rem;
+    }
+
+    /* Last category needs less bottom margin */
+    .column-category:last-of-type {
+        margin-bottom: 0.5rem;
+    }
+
+    .column-settings-dropdown h6 {
+        color: #6c757d;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e9ecef;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        background-color: white;
+        z-index: 10;
+        margin-top: 0;
+        padding-top: 0.5rem;
+    }
+
+    /* Action buttons at the bottom */
+    .column-settings-dropdown .dropdown-menu .d-flex.justify-content-between {
+        position: sticky;
+        bottom: 0;
+        background-color: white;
+        padding: 0.75rem 1rem;
+        margin-top: 0 !important;
+        box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
+        z-index: 30;
+    }
+
+    /* Toggle switch form-check styling */
+    .column-settings-dropdown .form-check {
+        padding: 0.5rem 0.5rem;
+        margin-bottom: 0.5rem;
+        border-radius: 6px;
+        transition: background-color 0.2s ease;
+        display: flex;
+        align-items: center;
+    }
+
+    .column-settings-dropdown .form-check:hover {
+        background-color: #f8f9fa;
+    }
+
+    .column-settings-dropdown .form-check-label {
+        margin-left: 0.5rem;
+        font-weight: 500;
+        flex-grow: 1;
+        cursor: pointer;
+    }
+
+    /* Toggle All Columns section */
+    .toggle-all-columns {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        min-width: 140px;
+    }
+
+    .toggle-all-columns:hover {
+        background-color: #f8f9fa;
+    }
+
+    @media (max-width: 576px) {
+        .toggle-all-columns {
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .toggle-label {
+            margin-left: 0;
+            margin-top: 0.25rem;
+        }
+    }
+
+    /* Highlight when all columns are visible */
+    input#toggleAllColumns:checked~.toggle-label {
+        color: #007bff;
+        font-weight: 700;
+    }
+
+    .toggle-all-columns input:checked+.toggle-slider {
+        background-color: #007bff;
+    }
+
+    .toggle-label {
+        margin-left: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: #495057;
+        transition: color 0.2s ease;
+    }
+
+    /* Larger Toggle Switch for Show All - make it smaller but still distinct */
+    .toggle-switch-lg {
+        width: 42px;
+        height: 24px;
+    }
+
+    .toggle-switch-lg .toggle-slider:before {
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+    }
+
+    /* Add eye icons to the toggle slider */
+    .toggle-switch-lg .toggle-slider:after {
+        font-family: "bootstrap-icons";
+        position: absolute;
+        color: white;
+        font-size: 11px;
+        right: 6px;
+        top: 4px;
+        content: "\F341";
+        /* eye icon */
+    }
+
+    .toggle-switch-lg input:checked+.toggle-slider:after {
+        content: "\F340";
+        /* eye-slash icon */
+        left: 6px;
+        right: auto;
+    }
+
+    .toggle-switch-lg input:checked+.toggle-slider:before {
+        transform: translateX(18px);
+    }
+
+    .column-settings-dropdown .form-check:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* Modern Toggle Switch */
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 38px;
+        height: 22px;
+        margin: 0;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 22px;
+    }
+
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    input:checked+.toggle-slider {
+        background-color: #007bff;
+    }
+
+    input:focus+.toggle-slider {
+        box-shadow: 0 0 1px #007bff;
+    }
+
+    input:checked+.toggle-slider:before {
+        transform: translateX(16px);
+    }
+
+    /* Column toggle button */
+    #column-settings-toggle {
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    #column-settings-toggle:hover {
+        background-color: #e9ecef;
+    }
+
+    #column-settings-toggle i {
+        transition: transform 0.3s ease;
+    }
+
+    #column-settings-toggle[aria-expanded="true"] i {
+        transform: rotate(180deg);
+    }
+
+    /* Toggle Feedback Animation */
+    .toggle-feedback {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: rgba(40, 40, 40, 0.9);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 6px;
+        z-index: 9999;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        transform: translateY(20px);
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        font-weight: 500;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .toggle-feedback:before {
+        content: "";
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        background-color: #4CAF50;
+        border-radius: 50%;
+        animation: pulse 1.5s infinite;
+    }
+
+    .toggle-feedback.error {
+        background-color: rgba(220, 53, 69, 0.9);
+    }
+
+    .toggle-feedback.error:before {
+        background-color: #fff;
+        animation: shake 0.82s cubic-bezier(.36, .07, .19, .97) both;
+    }
+
+    .toggle-feedback.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    @keyframes pulse {
+        0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+        }
+
+        70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+        }
+
+        100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+        }
+    }
+
+    @keyframes shake {
+
+        10%,
+        90% {
+            transform: translate3d(-1px, 0, 0);
+        }
+
+        20%,
+        80% {
+            transform: translate3d(2px, 0, 0);
+        }
+
+        30%,
+        50%,
+        70% {
+            transform: translate3d(-4px, 0, 0);
+        }
+
+        40%,
+        60% {
+            transform: translate3d(4px, 0, 0);
+        }
+    }
+
+    /* Column visibility animation */
+    .animate-column-toggle {
+        transition: opacity 0.3s ease, transform 0.3s ease !important;
+    }
+
+    /* Additional fixes for the column toggle dropdown */
+    .column-category.header-hover h6 {
+        background-color: #f8f9fa;
+    }
+
+    .column-settings-dropdown .column-category:first-of-type {
+        padding-top: 0;
+    }
+
+    .column-settings-dropdown .column-category:first-of-type h6 {
+        position: relative;
+        margin-bottom: 1rem;
+    }
+
+    /* Improved spacing for toggle buttons */
+    .column-settings-dropdown .form-check {
+        margin-bottom: 0.75rem;
+        padding: 0.5rem 0.5rem;
+        border-radius: 6px;
+    }
+
+    /* Pagination styling */
+    .pagination-control {
+        font-size: 0.875rem;
+    }
+
+    .pagination-control .btn {
+        min-width: 50px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-left: 0.75rem;
+        padding-right: 0.5rem;
+        background-color: white;
+        transition: all 0.2s ease;
+    }
+
+    .pagination-control .btn:hover {
+        background-color: #f8f9fa;
+    }
+
+    .pagination-dropdown {
+        min-width: unset;
+        width: 90px;
+        border-radius: 6px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        padding: 0.25rem 0;
+    }
+
+    .pagination-dropdown .dropdown-item {
+        padding: 0.4rem 1rem;
+        text-align: center;
+        transition: all 0.15s ease;
+    }
+
+    .pagination-dropdown .dropdown-item:hover {
+        background-color: #f1f3f5;
+    }
+
+    .pagination-dropdown .dropdown-item.active {
+        background-color: #e9ecef;
+        color: #495057;
+        font-weight: 500;
+    }
+
+    .pagination-info {
+        font-size: 0.875rem;
+    }
+
+    /* Pagination navigation */
+    .pagination-navigation {
+        display: flex;
+        align-items: center;
+    }
+
+    .pagination-navigation .page-nav {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-color: #dee2e6;
+        color: #495057;
+        transition: all 0.2s ease;
+    }
+
+    .pagination-navigation .page-nav:hover:not(.disabled) {
+        background-color: #e9ecef;
+        border-color: #ced4da;
+        color: #212529;
+    }
+
+    .pagination-navigation .page-nav.disabled {
+        color: #adb5bd;
+        cursor: not-allowed;
+    }
+
+    .pagination-navigation .page-indicator {
+        font-size: 0.875rem;
+        font-weight: 500;
+        min-width: 65px;
+        text-align: center;
+    }
+
+    .pagination-navigation .current-page {
+        color: #212529;
+    }
+
+    .pagination-navigation .total-pages {
+        color: #6c757d;
+    }
+
+    /* Go to page input */
+    .goto-page {
+        font-size: 0.875rem;
+    }
+
+    .goto-page-input {
+        width: 50px;
+        text-align: center;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        border-color: #dee2e6;
+    }
+
+    .goto-page-input:focus {
+        border-color: #adb5bd;
+        box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.1);
+    }
+
+    .goto-page-input::-webkit-inner-spin-button,
+    .goto-page-input::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .goto-page-input[type=number] {
+        -moz-appearance: textfield;
+    }
+
+    .goto-btn {
+        width: 30px;
+        height: 31px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-color: #dee2e6;
+    }
+
+    .goto-btn:hover {
+        background-color: #e9ecef;
+        border-color: #ced4da;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .pagination-navigation {
+            flex-wrap: wrap;
+        }
+
+        .d-flex.justify-content-between.align-items-center.mt-3 {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 1rem;
+        }
+
+        .d-flex.align-items-center {
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .pagination-control,
+        .goto-page {
+            margin-right: 0 !important;
+        }
+
+        .pagination-info {
+            margin-top: 0.5rem;
+            width: 100%;
+        }
+    }
+
+    /* Status badge styling */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        line-height: 1.2;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 16px;
+        min-width: 90px;
+        letter-spacing: 0.02em;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .status-badge::before {
+        content: "";
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Google style color scheme */
+    .status-completed {
+        background-color: rgba(52, 168, 83, 0.12);
+        color: #1e8e3e;
+        border: 1px solid rgba(52, 168, 83, 0.2);
+        border-left: 3px solid #34A853;
+        /* Google Green */
+    }
+
+    .status-completed::before {
+        background-color: #34A853;
+        /* Google Green */
+    }
+
+    .status-not-completed {
+        background-color: rgba(234, 67, 53, 0.12);
+        color: #c5221f;
+        border: 1px solid rgba(234, 67, 53, 0.2);
+        border-left: 3px solid #EA4335;
+        /* Google Red */
+    }
+
+    .status-not-completed::before {
+        background-color: #EA4335;
+        /* Google Red */
+    }
+
+    .status-in-progress {
+        background-color: rgba(251, 188, 5, 0.12);
+        color: #e37400;
+        border: 1px solid rgba(251, 188, 5, 0.2);
+        border-left: 3px solid #FBBC05;
+        /* Google Yellow */
+    }
+
+    .status-in-progress::before {
+        background-color: #FBBC05;
+        /* Google Yellow */
+    }
+
+    .status-pending {
+        background-color: rgba(66, 133, 244, 0.12);
+        color: #1a73e8;
+        border: 1px solid rgba(66, 133, 244, 0.2);
+        border-left: 3px solid #4285F4;
+        /* Google Blue */
+    }
+
+    .status-pending::before {
+        background-color: #4285F4;
+        /* Google Blue */
+    }
+
+    .status-error {
+        background-color: rgba(95, 99, 104, 0.12);
+        color: #5f6368;
+        border: 1px solid rgba(95, 99, 104, 0.2);
+        border-left: 3px solid #5F6368;
+        /* Google Gray */
+    }
+
+    .status-error::before {
+        background-color: #5F6368;
+        /* Google Gray */
+    }
+
+    /* Special status styles for different process types */
+    .status-column.ingest-status .status-badge {
+        border-left-color: #4285F4;
+        /* Google Blue for ingest */
+    }
+
+    .status-column.alignment-status .status-badge {
+        border-left-color: #FBBC05;
+        /* Google Yellow for alignment */
+    }
+
+    .status-column.postqc-status .status-badge {
+        border-left-color: #34A853;
+        /* Google Green for postqc */
+    }
+
+    /* Hover effects */
+    .status-badge:hover {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        transform: translateY(-1px);
+    }
+
+    /* Tooltip on hover */
+    tr td .status-badge {
+        position: relative;
+    }
+
+    /* Timestamp field styling */
+    td.field-ingest_start_time,
+    td.field-ingest_end_time,
+    td.field-alignment_start_time,
+    td.field-alignment_end_time,
+    td.field-postqc_start_time,
+    td.field-postqc_end_time {
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        white-space: nowrap;
+        min-width: 150px;
+    }
+
+    /* Add a subtle background color to time cells for better readability */
+    td[class*="ingest_start_time"],
+    td[class*="ingest_end_time"] {
+        background-color: rgba(66, 133, 244, 0.05);
+        /* Google Blue for ingest */
+        border-left: 2px solid rgba(66, 133, 244, 0.3);
+    }
+
+    td[class*="alignment_start_time"],
+    td[class*="alignment_end_time"] {
+        background-color: rgba(251, 188, 5, 0.05);
+        /* Google Yellow for alignment */
+        border-left: 2px solid rgba(251, 188, 5, 0.3);
+    }
+
+    td[class*="postqc_start_time"],
+    td[class*="postqc_end_time"] {
+        background-color: rgba(52, 168, 83, 0.05);
+        /* Google Green for postqc */
+        border-left: 2px solid rgba(52, 168, 83, 0.3);
+    }
+
+    /* Highlight time pairs on hover */
+    tr:hover td[class*="_time"] {
+        background-color: #f8f9fa;
+    }
+
+    .time-column {
+        font-family: monospace;
+        white-space: nowrap;
+    }
+
+    td.time-column,
+    th.time-column {
+        text-align: center;
+        min-width: 150px;
+    }
+
+    .time-column:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* FID column styling - Google Material Design inspired */
+    .fid-column {
+        font-family: inherit;
+        font-size: 0.875rem;
+        letter-spacing: normal;
+        white-space: nowrap;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 4px;
+        padding: 0.4rem 0.75rem !important;
+        position: relative;
+    }
+
+    td.fid-column,
+    th.fid-column {
+        text-align: left;
+        min-width: 150px;
+        background-color: #f5f5f5;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Material design inspired styling for different FID types */
+    td.ingest-fid,
+    th.ingest-fid {
+        background-color: rgba(66, 133, 244, 0.05);
+    }
+
+    td.alignment-fid,
+    th.alignment-fid {
+        background-color: rgba(251, 188, 5, 0.05);
+    }
+
+    td.postqc-fid,
+    th.postqc-fid {
+        background-color: rgba(52, 168, 83, 0.05);
+    }
+
+    /* Material ripple effect on hover */
+    td.fid-column {
+        position: relative;
+        overflow: hidden;
+        transform: translate3d(0, 0, 0);
+    }
+
+    td.fid-column::after {
+        content: "";
+        display: block;
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        background-image: radial-gradient(circle, #000 10%, transparent 10.01%);
+        background-repeat: no-repeat;
+        background-position: 50%;
+        transform: scale(10, 10);
+        opacity: 0;
+        transition: transform 0.5s, opacity 0.8s;
+    }
+
+    td.fid-column:active::after {
+        transform: scale(0, 0);
+        opacity: 0.1;
+        transition: 0s;
+    }
+
+    /* Enhance hover with Material Design elevation */
+    td.fid-column:hover {
+        background-color: #fafafa;
+        box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.16), 0 2px 10px 0 rgba(0, 0, 0, 0.12);
+        z-index: 10;
+        max-width: none;
+        overflow: visible;
+        white-space: normal;
+        word-break: break-all;
+    }
+
+    /* Clean Material tooltip on hover */
+    td.fid-column:hover::before {
+        content: attr(title);
+        position: absolute;
+        top: -32px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 4px 8px;
+        background-color: rgba(97, 97, 97, 0.9);
+        color: white;
+        border-radius: 2px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        z-index: 11;
+        opacity: 1;
+        pointer-events: none;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        font-family: inherit;
+        font-weight: 400;
+    }
+
+    /* Copy indicator */
+    td.fid-column.copied {
+        background-color: rgba(52, 168, 83, 0.1) !important;
+    }
+
+    td.fid-column.copied::after {
+        content: "✓";
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 2px 5px;
+        background-color: #34A853;
+        color: white;
+        border-radius: 0 0 0 4px;
+        font-size: 0.7rem;
+        opacity: 1;
+        transform: none;
+    }
+
+    /* Empty FID styling */
+    td.fid-column:empty::before,
+    td.fid-column:contains("—")::before {
+        content: "No ID";
+        display: block;
+        color: #9e9e9e;
+        text-align: center;
+        font-style: italic;
+        font-size: 0.8rem;
+    }
+
+    /* Material Design ripple effect */
+    .ripple {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 50%;
+        transform: scale(0);
+        animation: ripple 0.6s linear;
+        pointer-events: none;
+    }
+
+    @keyframes ripple {
+        to {
+            transform: scale(4);
+            opacity: 0;
+        }
+    }
+
+    /* Material Design toast notification */
+    .material-toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background-color: #323232;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 4px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        min-width: 200px;
+        max-width: 80%;
+        opacity: 0;
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+            opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 9999;
+        font-family: inherit;
+        font-size: 14px;
+    }
+
+    .material-toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    .material-toast-icon {
+        margin-right: 12px;
+        color: #4caf50;
+        font-size: 18px;
+    }
+
+    .material-toast-message {
+        flex-grow: 1;
+    }
+
+    /* Material Design empty FID styling */
+    td.fid-column.fid-empty,
+    td.fid-column:empty {
+        color: #9e9e9e;
+        text-align: center;
+        font-style: italic;
+    }
+
+    /* Add styles for filter boxes with scrolling */
+    .filter-card {
+        max-height: 300px;
+        overflow-y: auto;
+        padding-right: 10px;
+        margin-right: -10px;
+    }
+
+    .filter-card::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .filter-card::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .filter-card::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .filter-card::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Ensure the filter cards have proper spacing */
+    .filter-card {
+        margin-bottom: 20px;
+        padding: 15px;
+        border-radius: 8px;
+        background-color: #fff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Adjust the select2 dropdown height */
+    .select2-container--bootstrap4 .select2-selection--multiple {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__rendered {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    /* Advanced Filters Container */
+    #advancedFilters {
+        max-height: 600px;
+        overflow-y: auto;
+        padding-right: 10px;
+        margin-right: -10px;
+    }
+
+    #advancedFilters::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #advancedFilters::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    #advancedFilters::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    #advancedFilters::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Filter Cards */
+    .filter-card {
+        max-height: none;
+        overflow-y: visible;
+        padding-right: 10px;
+        margin-right: -10px;
+    }
+
+    /* Select2 Dropdowns */
+    .select2-container--bootstrap4 .select2-selection--multiple {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__rendered {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    /* Select2 Dropdown Scrolling */
+    .select2-container--bootstrap4 .select2-results__options {
+        max-height: 200px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+
+    .select2-container--bootstrap4 .select2-results__options::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .select2-container--bootstrap4 .select2-results__options::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .select2-container--bootstrap4 .select2-results__options::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .select2-container--bootstrap4 .select2-results__options::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Ensure dropdown options are visible */
+    .select2-results__option {
+        padding: 6px 12px;
+        font-size: 0.875rem;
+    }
+
+    .select2-container--bootstrap4 .select2-dropdown {
+        border-color: #ced4da;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Ensure the dropdown is positioned correctly */
+    .select2-container--bootstrap4 .select2-dropdown--below {
+        margin-top: 2px;
+    }
+</style>
+
 {% endblock %}
 
-{% block extrajs %}
+{% block extrascripts %}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="{% static 'viewer/js/column-settings-rebuild.js' %}"></script>
+<script src="{% static 'viewer/js/column-manager.js' %}"></script>
 <script src="{% static 'viewer/js/multiselect-filters.js' %}"></script>
+<script src="{% static 'viewer/js/column-settings-rebuild.js' %}"></script>
 <script src="{% static 'viewer/js/column-filters.js' %}"></script>
+{% endblock %}
+</body>
 {% endblock %}

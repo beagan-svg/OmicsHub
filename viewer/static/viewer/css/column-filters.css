@@ -1,68 +1,60 @@
-/**
- * CSS for column-based filters in the sample browser
- */
+/* ==========================================================================
+   Column Filters Component
+   ========================================================================== */
+
+:root {
+    --filter-btn-color: #1976D2;
+    --filter-btn-hover: #1565C0;
+    --filter-dropdown-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+    --filter-panel-bg: #ffffff;
+    --filter-header-bg: #f8f9fa;
+    --filter-border-color: #e0e0e0;
+    --filter-radius: 4px;
+}
+
+/* Column filter toggle button */
+.column-filter-btn {
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    padding: 2px;
+    margin-left: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.column-filter-btn:hover,
+.column-filter-btn.active {
+    color: var(--filter-btn-color);
+}
 
 /* Column filter container */
-.column-filter {
-    margin-top: 8px;
+.column-filter-container {
     position: relative;
 }
 
-/* Filter toggle button */
-.column-filter .filter-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
-    cursor: pointer;
-    color: #6c757d;
-    transition: all 0.2s ease;
-}
-
-.column-filter .filter-toggle:hover {
-    background-color: #e9ecef;
-    color: #1976D2;
-    border-color: #1976D2;
-}
-
-.column-filter .filter-toggle.active {
-    background-color: #e3f2fd;
-    color: #1976D2;
-    border-color: #1976D2;
-}
-
-/* Filter dropdown */
-.column-filter .filter-dropdown {
+/* The actual dropdown panel */
+.column-filter-dropdown {
     position: absolute;
     top: 100%;
-    left: 0;
+    right: 0;
+    width: 300px;
+    background: var(--filter-panel-bg);
+    border-radius: var(--filter-radius);
+    box-shadow: var(--filter-dropdown-shadow);
+    border: 1px solid var(--filter-border-color);
     z-index: 1000;
     display: none;
-    min-width: 250px;
-    padding: 12px;
-    margin-top: 4px;
-    background-color: #fff;
-    border-radius: 4px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
-    border: 1px solid #dee2e6;
+    margin-top: 8px;
+    animation: filterDropdownFadeIn 0.2s ease;
+    overflow: hidden;
 }
 
-.column-filter .filter-dropdown.show {
-    display: block;
-    animation: fadeInDown 0.2s ease forwards;
-}
-
-/* Ensure dropdown is above other elements */
-.column-filter .filter-dropdown {
-    z-index: 1050;
-}
-
-/* Dropdown animation */
-@keyframes fadeInDown {
+@keyframes filterDropdownFadeIn {
     from {
         opacity: 0;
         transform: translateY(-10px);
@@ -74,145 +66,266 @@
     }
 }
 
-/* Column header styling */
-th {
-    position: relative;
-    min-width: 150px;
+.column-filter-dropdown.show {
+    display: block;
 }
 
-/* Header content layout */
-.table th .header-content {
+/* Filter dropdown header */
+.filter-dropdown-header {
+    background-color: var(--filter-header-bg);
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--filter-border-color);
+    font-weight: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.filter-dropdown-header .filter-title {
+    font-size: 14px;
+    color: #212529;
+}
+
+.filter-dropdown-header .close-filter {
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    justify-content: center;
 }
 
-/* Active filters container */
-.active-filters-container {
+.filter-dropdown-header .close-filter:hover {
+    color: #212529;
+}
+
+/* Filter dropdown content */
+.filter-dropdown-content {
+    padding: 15px;
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+/* Filter dropdown footer */
+.filter-dropdown-footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 15px;
+    border-top: 1px solid var(--filter-border-color);
+    background-color: var(--filter-header-bg);
+}
+
+.filter-dropdown-footer button {
+    font-size: 13px;
+    padding: 5px 10px;
+}
+
+/* Filter options */
+.filter-options-container {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    border: 1px solid var(--filter-border-color);
+    border-radius: var(--filter-radius);
+}
+
+.filter-option {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--filter-border-color);
+}
+
+.filter-option:last-child {
+    border-bottom: none;
+}
+
+.filter-option label {
+    margin-bottom: 0;
+    padding-left: 8px;
+    cursor: pointer;
+    flex-grow: 1;
+    font-weight: normal;
+    font-size: 13px;
+    user-select: none;
+}
+
+.filter-option input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* Filter search */
+.filter-search {
+    margin-bottom: 15px;
+    position: relative;
+}
+
+.filter-search input {
+    width: 100%;
+    padding: 8px 12px;
+    padding-left: 32px;
+    border: 1px solid var(--filter-border-color);
+    border-radius: var(--filter-radius);
+    font-size: 13px;
+}
+
+.filter-search input:focus {
+    outline: none;
+    border-color: var(--filter-btn-color);
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.15);
+}
+
+.filter-search i {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6c757d;
+    font-size: 14px;
+}
+
+/* Select/deselect all */
+.select-all-container {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.select-all-container button {
+    background: transparent;
+    border: none;
+    color: var(--filter-btn-color);
+    font-size: 13px;
+    padding: 0;
+    cursor: pointer;
+}
+
+.select-all-container button:hover {
+    text-decoration: underline;
+    color: var(--filter-btn-hover);
+}
+
+/* Active filter indicator */
+th.has-active-filter .column-filter-btn {
+    color: var(--filter-btn-color);
+    font-weight: bold;
+}
+
+th.has-active-filter .column-filter-btn::after {
+    content: "•";
+    color: var(--filter-btn-color);
+    font-size: 18px;
+    position: absolute;
+    top: -5px;
+    right: -5px;
+}
+
+/* Custom scrollbar for filter dropdown */
+.filter-dropdown-content::-webkit-scrollbar,
+.filter-options-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.filter-dropdown-content::-webkit-scrollbar-track,
+.filter-options-container::-webkit-scrollbar-track {
+    background-color: #f1f1f1;
+    border-radius: 3px;
+}
+
+.filter-dropdown-content::-webkit-scrollbar-thumb,
+.filter-options-container::-webkit-scrollbar-thumb {
+    background-color: #c1c1c1;
+    border-radius: 3px;
+}
+
+.filter-dropdown-content::-webkit-scrollbar-thumb:hover,
+.filter-options-container::-webkit-scrollbar-thumb:hover {
+    background-color: #a8a8a8;
+}
+
+/* Applied filters display */
+.applied-filters-container {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
     gap: 8px;
-    margin-bottom: 1rem;
-    min-height: 36px;
-    padding: 4px 0;
+    margin: 12px 0;
 }
 
-/* Filter tag styling */
-.filter-tag {
-    display: flex;
+.applied-filter-tag {
+    display: inline-flex;
     align-items: center;
     background-color: #e3f2fd;
-    color: #1976D2;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    animation: fadeIn 0.3s ease forwards;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Filter heading */
-.filter-heading {
-    margin-right: 8px;
-    font-weight: 500;
-    color: #6c757d;
-    display: flex;
-    align-items: center;
-}
-
-.filter-heading i {
-    margin-right: 4px;
-    color: #1976D2;
-}
-
-/* Tag parts */
-.tag-name {
-    font-weight: 500;
-    margin-right: 4px;
-}
-
-.tag-value {
-    margin-right: 4px;
-}
-
-/* Remove button */
-.tag-remove {
-    background: none;
-    border: none;
-    color: #1976D2;
-    cursor: pointer;
-    padding: 0 4px;
-    display: flex;
-    align-items: center;
-}
-
-.tag-remove:hover {
     color: #0d47a1;
+    border-radius: 16px;
+    padding: 4px 10px;
+    font-size: 13px;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
 }
 
-/* Filter select styling */
-.filter-dropdown .filter-select {
-    width: 100%;
-    margin-bottom: 8px;
+.applied-filter-tag:hover {
+    background-color: #bbdefb;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
 }
 
-/* Filter button styling */
-.filter-dropdown .btn {
-    font-size: 0.875rem;
-    padding: 4px 8px;
+.applied-filter-tag .filter-column {
+    font-weight: 600;
+    margin-right: 4px;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .filter-dropdown {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 90%;
-        max-width: 320px;
-        z-index: 1050;
+.applied-filter-tag .filter-value {
+    font-weight: 500;
+}
+
+.applied-filter-tag .remove-filter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    cursor: pointer;
+    color: #0d47a1;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+    height: 18px;
+    width: 18px;
+    border-radius: 50%;
+    font-size: 14px;
+}
+
+.applied-filter-tag .remove-filter:hover {
+    opacity: 1;
+    background-color: rgba(13, 71, 161, 0.1);
+}
+
+/* Loading state */
+.filter-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px 0;
+}
+
+.filter-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid var(--filter-btn-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
     }
 
-    /* Right-align dropdowns that would overflow */
-    .column-filter:nth-child(n+4) .filter-dropdown {
-        left: auto;
-        right: 0;
+    100% {
+        transform: rotate(360deg);
     }
-}
-
-/* Select2 styling inside dropdowns */
-.filter-dropdown .select2-container {
-    width: 100% !important;
-    margin-bottom: 8px;
-}
-
-.filter-dropdown .select2-container--bootstrap4 .select2-selection--multiple {
-    min-height: 38px;
-}
-
-/* Text filter input styling */
-.filter-dropdown .text-filter {
-    margin-bottom: 8px;
-    padding: 6px 10px;
-    font-size: 0.9rem;
-}
-
-/* Make sure column header content has proper spacing */
-.header-content {
-    padding: 4px 0;
-    width: 100%;
 }

@@ -1,578 +1,516 @@
 /**
- * Column-based filtering system for the sample browser
- * This script handles filter dropdowns in table headers
+ * Column-based filters for sample browser
+ * This script implements the per-column filters in the table headers
  */
 
 document.addEventListener('DOMContentLoaded', function () {
-    console.log('Initializing column filters...');
-
-    // Initialize column filters
     initColumnFilters();
-
-    // Initialize active filters display
-    updateActiveFiltersDisplay();
-
-    // Initialize reset filters button
-    initResetFiltersButton();
 });
 
 /**
  * Initialize column filters
  */
 function initColumnFilters() {
-    // Get all filter toggles
-    const filterToggles = document.querySelectorAll('.filter-toggle');
+    // Add filter buttons to table headers
+    addFilterButtonsToHeaders();
 
-    // Initialize each filter
-    filterToggles.forEach(toggle => {
-        // Get the column field from the parent
-        const filterContainer = toggle.closest('.column-filter');
-        const field = filterContainer.dataset.field;
+    // Initialize filter dropdowns
+    setupFilterDropdowns();
 
-        // Get the filter dropdown
-        const dropdown = filterContainer.querySelector('.filter-dropdown');
-        const select = dropdown.querySelector('select.filter-select');
+    // Set up click-outside handler to close dropdowns
+    setupClickOutsideHandler();
 
-        // For dropdowns, populate options from table data
-        if (select) {
-            populateFilterOptions(field, select);
+    // Handle applied filters display
+    updateAppliedFiltersDisplay();
+}
 
-            // Initialize Select2 for dropdowns
-            if (jQuery && jQuery.fn.select2) {
-                jQuery(select).select2({
-                    theme: 'bootstrap4',
-                    width: '100%',
-                    placeholder: 'Select options',
-                    allowClear: true,
-                    closeOnSelect: false,
-                    dropdownParent: dropdown
-                });
+/**
+ * Add filter buttons to table headers
+ */
+function addFilterButtonsToHeaders() {
+    const tableHeaders = document.querySelectorAll('table.table th:not(.selection-column)');
 
-                // Initialize current value from URL parameters
-                initializeFilterValue(field, select);
-            }
+    tableHeaders.forEach(header => {
+        // Skip if already has a filter button
+        if (header.querySelector('.column-filter-btn')) {
+            return;
         }
 
-        // For text filters, initialize from URL parameters
-        const textInput = dropdown.querySelector('input.text-filter');
-        if (textInput) {
-            initializeFilterValue(field, textInput);
+        // Get column name
+        const columnName = header.textContent.trim();
+        const columnId = header.getAttribute('id') ||
+            'col-' + columnName.toLowerCase().replace(/\s+/g, '-');
+
+        // Set header ID if not present
+        if (!header.getAttribute('id')) {
+            header.setAttribute('id', columnId);
         }
 
-        // Handle toggle click
-        toggle.addEventListener('click', function (e) {
+        // Create filter button
+        const filterBtn = document.createElement('button');
+        filterBtn.className = 'column-filter-btn';
+        filterBtn.innerHTML = '<i class="bi bi-funnel"></i>';
+        filterBtn.setAttribute('data-column', columnId);
+        filterBtn.setAttribute('aria-label', `Filter ${columnName}`);
+        filterBtn.title = `Filter ${columnName}`;
+
+        // Create filter container
+        const filterContainer = document.createElement('div');
+        filterContainer.className = 'column-filter-container';
+
+        // Create dropdown
+        const dropdown = createFilterDropdown(columnName, columnId);
+
+        // Add to header
+        filterContainer.appendChild(filterBtn);
+        filterContainer.appendChild(dropdown);
+        header.appendChild(filterContainer);
+
+        // Check if there are active filters for this column
+        if (hasActiveFilters(columnId)) {
+            header.classList.add('has-active-filter');
+        }
+    });
+}
+
+/**
+ * Create filter dropdown for a column
+ */
+function createFilterDropdown(columnName, columnId) {
+    // Create dropdown element
+    const dropdown = document.createElement('div');
+    dropdown.className = 'column-filter-dropdown';
+    dropdown.id = `dropdown-${columnId}`;
+
+    // Create dropdown header
+    const header = document.createElement('div');
+    header.className = 'filter-dropdown-header';
+    header.innerHTML = `
+        <span class="filter-title">Filter: ${columnName}</span>
+        <button type="button" class="close-filter" aria-label="Close filter">
+            <i class="bi bi-x"></i>
+        </button>
+    `;
+
+    // Create dropdown content
+    const content = document.createElement('div');
+    content.className = 'filter-dropdown-content';
+
+    // Create search input
+    const search = document.createElement('div');
+    search.className = 'filter-search';
+    search.innerHTML = `
+        <i class="bi bi-search"></i>
+        <input type="text" class="filter-search-input" placeholder="Search values..." 
+               aria-label="Search filter values">
+    `;
+
+    // Create select/deselect all buttons
+    const selectButtons = document.createElement('div');
+    selectButtons.className = 'select-all-container';
+    selectButtons.innerHTML = `
+        <button type="button" class="select-all-btn">Select All</button>
+        <button type="button" class="deselect-all-btn">Deselect All</button>
+    `;
+
+    // Create filter options container
+    const optionsContainer = document.createElement('div');
+    optionsContainer.className = 'filter-options-container';
+    optionsContainer.innerHTML = `
+        <div class="filter-loading">
+            <div class="filter-spinner"></div>
+            <span>Loading filter values...</span>
+        </div>
+    `;
+
+    // Create footer with action buttons
+    const footer = document.createElement('div');
+    footer.className = 'filter-dropdown-footer';
+    footer.innerHTML = `
+        <button type="button" class="btn btn-outline-secondary btn-sm cancel-filter">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm apply-filter">Apply Filter</button>
+    `;
+
+    // Assemble dropdown
+    content.appendChild(search);
+    content.appendChild(selectButtons);
+    content.appendChild(optionsContainer);
+
+    dropdown.appendChild(header);
+    dropdown.appendChild(content);
+    dropdown.appendChild(footer);
+
+    return dropdown;
+}
+
+/**
+ * Set up filter dropdowns
+ */
+function setupFilterDropdowns() {
+    // Handle filter button clicks
+    document.querySelectorAll('.column-filter-btn').forEach(btn => {
+        btn.addEventListener('click', function (e) {
             e.stopPropagation();
+            const columnId = this.getAttribute('data-column');
+            const dropdown = document.getElementById(`dropdown-${columnId}`);
 
-            // Close any open dropdowns first
-            document.querySelectorAll('.filter-dropdown.show').forEach(openDropdown => {
-                if (openDropdown !== dropdown) {
-                    openDropdown.classList.remove('show');
-                    openDropdown.closest('.column-filter').querySelector('.filter-toggle').classList.remove('active');
+            // Close all other dropdowns
+            document.querySelectorAll('.column-filter-dropdown.show').forEach(d => {
+                if (d !== dropdown) {
+                    d.classList.remove('show');
                 }
             });
 
             // Toggle this dropdown
             dropdown.classList.toggle('show');
-            toggle.classList.toggle('active');
+
+            // If showing dropdown, load filter values
+            if (dropdown.classList.contains('show')) {
+                loadFilterValues(columnId);
+            }
         });
-
-        // Handle apply button click
-        const applyBtn = dropdown.querySelector('.apply-filter-btn');
-        if (applyBtn) {
-            applyBtn.addEventListener('click', function () {
-                applyFilter(field, dropdown);
-                dropdown.classList.remove('show');
-                toggle.classList.remove('active');
-            });
-        }
-
-        // Handle clear button click
-        const clearBtn = dropdown.querySelector('.clear-filter-btn');
-        if (clearBtn) {
-            clearBtn.addEventListener('click', function () {
-                clearFilter(field, dropdown);
-            });
-        }
     });
 
-    // Close dropdown when clicking outside
+    // Handle close button clicks
+    document.querySelectorAll('.close-filter').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            this.closest('.column-filter-dropdown').classList.remove('show');
+        });
+    });
+
+    // Handle cancel button clicks
+    document.querySelectorAll('.cancel-filter').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            this.closest('.column-filter-dropdown').classList.remove('show');
+        });
+    });
+
+    // Handle apply button clicks
+    document.querySelectorAll('.apply-filter').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const dropdown = this.closest('.column-filter-dropdown');
+            const columnId = dropdown.id.replace('dropdown-', '');
+
+            applyFilter(columnId, dropdown);
+        });
+    });
+
+    // Handle select all button clicks
+    document.querySelectorAll('.select-all-btn').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const dropdown = this.closest('.column-filter-dropdown');
+            const checkboxes = dropdown.querySelectorAll('.filter-option input[type="checkbox"]');
+
+            checkboxes.forEach(cb => {
+                cb.checked = true;
+            });
+        });
+    });
+
+    // Handle deselect all button clicks
+    document.querySelectorAll('.deselect-all-btn').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const dropdown = this.closest('.column-filter-dropdown');
+            const checkboxes = dropdown.querySelectorAll('.filter-option input[type="checkbox"]');
+
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+            });
+        });
+    });
+
+    // Handle filter search
+    document.querySelectorAll('.filter-search-input').forEach(input => {
+        input.addEventListener('input', function (e) {
+            const searchValue = this.value.toLowerCase();
+            const dropdown = this.closest('.column-filter-dropdown');
+            const options = dropdown.querySelectorAll('.filter-option');
+
+            options.forEach(option => {
+                const text = option.querySelector('label').textContent.toLowerCase();
+                option.style.display = text.includes(searchValue) ? '' : 'none';
+            });
+        });
+    });
+}
+
+/**
+ * Setup click outside handler to close dropdowns when clicking outside
+ */
+function setupClickOutsideHandler() {
     document.addEventListener('click', function (e) {
-        if (!e.target.closest('.column-filter')) {
-            document.querySelectorAll('.filter-dropdown.show').forEach(dropdown => {
+        if (!e.target.closest('.column-filter-container')) {
+            document.querySelectorAll('.column-filter-dropdown').forEach(dropdown => {
                 dropdown.classList.remove('show');
-                dropdown.closest('.column-filter').querySelector('.filter-toggle').classList.remove('active');
             });
         }
     });
-
-    // Update toggle state for active filters
-    updateFilterToggles();
 }
 
 /**
- * Populate filter options based on table data
- * @param {string} field - The field name to populate options for
- * @param {HTMLElement} select - The select element to populate
+ * Load filter values for a column
  */
-function populateFilterOptions(field, select) {
-    // Get all unique values from the table for this field
+function loadFilterValues(columnId) {
+    const dropdown = document.getElementById(`dropdown-${columnId}`);
+    const optionsContainer = dropdown.querySelector('.filter-options-container');
+
+    // Show loading indicator
+    optionsContainer.innerHTML = `
+        <div class="filter-loading">
+            <div class="filter-spinner"></div>
+            <span>Loading filter values...</span>
+        </div>
+    `;
+
+    // Get unique values from the table column
+    setTimeout(() => {
+        const values = getUniqueColumnValues(columnId);
+        const activeFilters = getActiveFiltersForColumn(columnId);
+
+        // Create filter options
+        let optionsHTML = '';
+        values.forEach(value => {
+            const isChecked = !activeFilters.length || activeFilters.includes(value);
+            optionsHTML += `
+                <div class="filter-option">
+                    <input type="checkbox" id="${columnId}-${value.replace(/[^a-zA-Z0-9]/g, '-')}" 
+                           ${isChecked ? 'checked' : ''} value="${value}">
+                    <label for="${columnId}-${value.replace(/[^a-zA-Z0-9]/g, '-')}">${value}</label>
+                </div>
+            `;
+        });
+
+        // If no values found
+        if (!values.length) {
+            optionsHTML = '<div class="p-3 text-center text-muted">No values found</div>';
+        }
+
+        // Update options container
+        optionsContainer.innerHTML = optionsHTML;
+    }, 300);
+}
+
+/**
+ * Get unique values from a table column
+ */
+function getUniqueColumnValues(columnId) {
+    const header = document.getElementById(columnId);
+    const columnIndex = Array.from(header.parentNode.children).indexOf(header);
+    const tableRows = document.querySelectorAll('table.table tbody tr');
     const values = new Set();
-    const columnIndex = getColumnIndexByField(field);
 
-    if (columnIndex !== -1) {
-        // Get all values from table rows
-        document.querySelectorAll('table tbody tr').forEach(row => {
-            const cell = row.cells[columnIndex];
-            if (cell) {
-                const value = cell.textContent.trim();
-                if (value && value !== '—' && value !== '-') {
-                    values.add(value);
-                }
+    tableRows.forEach(row => {
+        const cell = row.cells[columnIndex];
+        if (cell) {
+            const value = cell.textContent.trim();
+            if (value) {
+                values.add(value);
             }
-        });
-
-        // Sort values alphabetically
-        const sortedValues = Array.from(values).sort();
-
-        // Add options to select
-        sortedValues.forEach(value => {
-            const option = document.createElement('option');
-            option.value = value;
-            option.textContent = value;
-            select.appendChild(option);
-        });
-    }
-}
-
-/**
- * Get column index by field name
- * @param {string} field - The field name to find
- * @returns {number} - The column index or -1 if not found
- */
-function getColumnIndexByField(field) {
-    // Add 1 to account for the selection column
-    let index = 1;
-
-    // Look through table headers
-    const headers = document.querySelectorAll('table thead tr th');
-    for (let i = 1; i < headers.length; i++) {
-        const filterContainer = headers[i].querySelector('.column-filter');
-        if (filterContainer && filterContainer.dataset.field === field) {
-            return i;
         }
-        index++;
-    }
+    });
 
-    return -1;
+    return Array.from(values).sort();
 }
 
 /**
- * Initialize filter value from URL parameters
- * @param {string} field - The field name
- * @param {HTMLElement} element - The filter element (select or input)
+ * Apply filter for column
  */
-function initializeFilterValue(field, element) {
+function applyFilter(columnId, dropdown) {
+    const checkedOptions = dropdown.querySelectorAll('.filter-option input[type="checkbox"]:checked');
+    const columnName = dropdown.querySelector('.filter-title').textContent.replace('Filter:', '').trim();
+
+    // Get selected values
+    const selectedValues = Array.from(checkedOptions).map(opt => opt.value);
+
+    // If all options are selected, don't apply any filter
+    const allOptions = dropdown.querySelectorAll('.filter-option input[type="checkbox"]');
+    if (selectedValues.length === allOptions.length) {
+        // Clear existing filter if any
+        if (hasActiveFilters(columnId)) {
+            updateFiltersInQueryString(columnId, []);
+            window.location.href = window.location.pathname + '?' + getUpdatedQueryString();
+        } else {
+            // Just close the dropdown if no change
+            dropdown.classList.remove('show');
+        }
+        return;
+    }
+
+    // Update query string and reload
+    updateFiltersInQueryString(columnId, selectedValues);
+    dropdown.classList.remove('show');
+
+    // Submit form or reload page
+    window.location.href = window.location.pathname + '?' + getUpdatedQueryString();
+}
+
+/**
+ * Get active filters for a column from URL
+ */
+function getActiveFiltersForColumn(columnId) {
     const urlParams = new URLSearchParams(window.location.search);
+    const paramName = columnToParamName(columnId);
 
-    if (element.tagName.toLowerCase() === 'select') {
-        // Handle multi-select
-        const paramName = `${field}_list`;
-        if (urlParams.has(paramName)) {
-            const values = urlParams.get(paramName).split(',');
-            if (jQuery && jQuery.fn.select2) {
-                jQuery(element).val(values).trigger('change');
-            } else {
-                values.forEach(value => {
-                    const option = element.querySelector(`option[value="${value}"]`);
-                    if (option) option.selected = true;
-                });
-            }
+    if (urlParams.has(paramName)) {
+        return urlParams.get(paramName).split(',');
+    }
 
-            // Mark the filter as active
-            const toggle = element.closest('.column-filter').querySelector('.filter-toggle');
-            toggle.classList.add('active');
-        }
+    return [];
+}
+
+/**
+ * Check if a column has active filters
+ */
+function hasActiveFilters(columnId) {
+    return getActiveFiltersForColumn(columnId).length > 0;
+}
+
+/**
+ * Update filters in query string
+ */
+function updateFiltersInQueryString(columnId, values) {
+    const paramName = columnToParamName(columnId);
+    let currentQueryString = window.location.search;
+    const urlParams = new URLSearchParams(currentQueryString);
+
+    if (values.length) {
+        urlParams.set(paramName, values.join(','));
     } else {
-        // Handle text input
-        if (urlParams.has(field)) {
-            element.value = urlParams.get(field);
-
-            // Mark the filter as active
-            const toggle = element.closest('.column-filter').querySelector('.filter-toggle');
-            toggle.classList.add('active');
-        }
+        urlParams.delete(paramName);
     }
+
+    // Update page to 1 when applying a new filter
+    if (urlParams.has('page')) {
+        urlParams.set('page', '1');
+    }
+
+    return urlParams.toString();
 }
 
 /**
- * Apply filter to the form
- * @param {string} field - The field name
- * @param {HTMLElement} dropdown - The dropdown element
+ * Get updated query string
  */
-function applyFilter(field, dropdown) {
-    const form = document.getElementById('filter-form');
-
-    // Handle different filter types
-    const select = dropdown.querySelector('select.filter-select');
-    const textInput = dropdown.querySelector('input.text-filter');
-
-    if (select) {
-        // Handle multi-select
-        const values = jQuery(select).val();
-        if (values && values.length) {
-            // Add or update hidden input for the field
-            let input = form.querySelector(`input[name="${field}_list"]`);
-            if (!input) {
-                input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = `${field}_list`;
-                form.appendChild(input);
-            }
-            input.value = values.join(',');
-        } else {
-            // Remove hidden input if no values selected
-            const input = form.querySelector(`input[name="${field}_list"]`);
-            if (input) input.remove();
-        }
-    } else if (textInput) {
-        // Handle text input
-        const value = textInput.value.trim();
-        if (value) {
-            // Add or update hidden input for the field
-            let input = form.querySelector(`input[name="${field}"]`);
-            if (!input) {
-                input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = field;
-                form.appendChild(input);
-            }
-            input.value = value;
-        } else {
-            // Remove hidden input if empty
-            const input = form.querySelector(`input[name="${field}"]`);
-            if (input) input.remove();
-        }
-    }
-
-    // Reset to first page
-    let pageInput = form.querySelector('input[name="page"]');
-    if (!pageInput) {
-        pageInput = document.createElement('input');
-        pageInput.type = 'hidden';
-        pageInput.name = 'page';
-        form.appendChild(pageInput);
-    }
-    pageInput.value = '1';
-
-    // Submit the form
-    form.submit();
+function getUpdatedQueryString() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.toString();
 }
 
 /**
- * Clear a specific filter
- * @param {string} field - The field name
- * @param {HTMLElement} dropdown - The dropdown element
+ * Convert column ID to parameter name
  */
-function clearFilter(field, dropdown) {
-    const form = document.getElementById('filter-form');
-
-    // Clear filter in the UI
-    const select = dropdown.querySelector('select.filter-select');
-    const textInput = dropdown.querySelector('input.text-filter');
-
-    if (select && jQuery && jQuery.fn.select2) {
-        jQuery(select).val(null).trigger('change');
-    } else if (textInput) {
-        textInput.value = '';
-    }
-
-    // Remove hidden inputs
-    const hiddenInputs = form.querySelectorAll(`input[name="${field}"], input[name="${field}_list"]`);
-    hiddenInputs.forEach(input => input.remove());
-
-    // Reset to first page
-    let pageInput = form.querySelector('input[name="page"]');
-    if (!pageInput) {
-        pageInput = document.createElement('input');
-        pageInput.type = 'hidden';
-        pageInput.name = 'page';
-        form.appendChild(pageInput);
-    }
-    pageInput.value = '1';
-
-    // Submit form to apply changes
-    form.submit();
+function columnToParamName(columnId) {
+    // Convert from col-fastq-name to fastq_name
+    let paramName = columnId.replace(/^col-/, '').replace(/-/g, '_');
+    return paramName + '_filter';
 }
 
 /**
- * Update the active filters display
+ * Update applied filters display
  */
-function updateActiveFiltersDisplay() {
-    const container = document.querySelector('.active-filters-container');
+function updateAppliedFiltersDisplay() {
+    const container = document.querySelector('.applied-filters-container');
     if (!container) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let hasActiveFilters = false;
 
     // Clear existing content
     container.innerHTML = '';
 
-    // Set to track unique filter combinations
-    const uniqueFilters = new Set();
-    let hasActiveFilters = false;
-
-    // Process URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-
+    // Process all filter parameters
     for (const [key, value] of urlParams.entries()) {
-        if (key !== 'page' && key !== 'per_page' && value) {
-            // Skip search parameter, handled separately
-            if (key === 'search') {
-                hasActiveFilters = true;
-                const filterKey = `search:${value}`;
-                if (!uniqueFilters.has(filterKey)) {
-                    uniqueFilters.add(filterKey);
-                    createFilterTag(container, 'search', null, value, 'Search');
-                }
-                continue;
-            }
-
+        if (key.endsWith('_filter') && value) {
             hasActiveFilters = true;
 
-            if (key.endsWith('_list')) {
-                // Handle multi-select parameters
-                const baseKey = key.replace('_list', '');
-                const values = value.split(',');
+            // Convert parameter name to column name
+            const baseKey = key.replace('_filter', '');
+            const columnId = 'col-' + baseKey.replace(/_/g, '-');
 
-                values.forEach(val => {
-                    if (val) {
-                        const filterKey = `${baseKey}:${val}`;
-                        if (!uniqueFilters.has(filterKey)) {
-                            uniqueFilters.add(filterKey);
-                            // Get friendly field name from th content
-                            const fieldName = getFieldDisplayName(baseKey);
-                            createFilterTag(container, baseKey, val, val, fieldName);
-                        }
-                    }
-                });
-            } else {
-                // Handle text filter parameters
-                const filterKey = `${key}:${value}`;
-                if (!uniqueFilters.has(filterKey)) {
-                    uniqueFilters.add(filterKey);
-                    // Get friendly field name from th content
-                    const fieldName = getFieldDisplayName(key);
-                    createFilterTag(container, key, null, value, fieldName);
-                }
+            // Get column header text
+            const header = document.getElementById(columnId);
+            let columnName = baseKey.replace(/_/g, ' ');
+
+            if (header) {
+                const headerText = header.textContent.trim();
+                columnName = headerText.replace(/[\n\t]/g, '').replace(/\s+/g, ' ');
             }
+
+            // Create filter tag for each value
+            value.split(',').forEach(val => {
+                if (val.trim()) {
+                    createFilterTag(container, columnId, columnName, val.trim());
+                }
+            });
         }
     }
 
-    // Show or hide container based on filters
+    // Show or hide container based on active filters
     if (hasActiveFilters) {
         container.style.display = 'flex';
-
-        // Add a title if not present
-        if (!container.querySelector('.filter-heading')) {
-            const heading = document.createElement('div');
-            heading.className = 'filter-heading';
-            heading.innerHTML = '<i class="bi bi-funnel-fill me-1"></i> Active Filters:';
-            container.prepend(heading);
-        }
     } else {
         container.style.display = 'none';
     }
 }
 
 /**
- * Get field display name from table header
- * @param {string} field - The field name
- * @returns {string} - The display name
+ * Create a filter tag element
  */
-function getFieldDisplayName(field) {
-    // Find column with matching data-field
-    const headers = document.querySelectorAll('table thead th');
-    for (const header of headers) {
-        const filterContainer = header.querySelector(`.column-filter[data-field="${field}"]`);
-        if (filterContainer) {
-            // Get text content of header excluding the filter toggle
-            const headerContent = header.querySelector('.header-content');
-            if (headerContent) {
-                // Clone to avoid modifying the DOM
-                const clone = headerContent.cloneNode(true);
-                // Remove the filter container from the clone
-                const filterInClone = clone.querySelector('.column-filter');
-                if (filterInClone) filterInClone.remove();
-                // Return the cleaned text
-                return clone.textContent.trim();
-            }
-            return header.textContent.trim();
-        }
-    }
-
-    // Fallback: format field name nicely
-    return field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-}
-
-/**
- * Creates a filter tag element
- * @param {HTMLElement} container - Container for the filter tags
- * @param {string} filter - Filter field name
- * @param {string|null} value - Filter value (null for text inputs)
- * @param {string} displayText - Text to display
- * @param {string} fieldName - Display name for the field
- */
-function createFilterTag(container, filter, value, displayText, fieldName) {
+function createFilterTag(container, columnId, columnName, value) {
     // Create tag element
     const tag = document.createElement('div');
-    tag.className = 'filter-tag';
+    tag.className = 'applied-filter-tag';
+    tag.dataset.column = columnId;
+    tag.dataset.value = value;
 
-    // Create a data attribute to store the filter and value for removal
-    tag.dataset.filter = filter;
-    if (value) {
-        tag.dataset.value = value;
-    }
-
-    // Set tag content with remove button
+    // Set tag content
     tag.innerHTML = `
-        <span class="tag-name">${fieldName}:</span>
-        <span class="tag-value">${displayText}</span>
-        <button type="button" class="tag-remove" aria-label="Remove filter">
+        <span class="filter-column">${columnName}:</span>
+        <span class="filter-value">${value}</span>
+        <button type="button" class="remove-filter" aria-label="Remove filter">
             <i class="bi bi-x"></i>
         </button>
     `;
 
-    // Add event listener to the remove button
-    const removeButton = tag.querySelector('.tag-remove');
+    // Add event listener to remove button
+    const removeButton = tag.querySelector('.remove-filter');
     if (removeButton) {
         removeButton.addEventListener('click', function () {
-            removeFilter(filter, value);
+            removeFilter(columnId, value);
         });
     }
 
-    // Add to DOM
+    // Add to container
     container.appendChild(tag);
-
-    // Add appearance animation
-    tag.style.opacity = '0';
-    tag.style.transform = 'translateY(10px)';
-
-    // Trigger animation
-    setTimeout(() => {
-        tag.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-        tag.style.opacity = '1';
-        tag.style.transform = 'translateY(0)';
-    }, 10);
 }
 
 /**
- * Remove a filter and submit the form
- * @param {string} filter - The filter field name
- * @param {string|null} value - The filter value (null for text inputs)
+ * Remove a specific filter
  */
-function removeFilter(filter, value) {
-    const form = document.getElementById('filter-form');
-
-    if (value) {
-        // For multi-select filters, remove specific value
-        const inputName = `${filter}_list`;
-        const input = form.querySelector(`input[name="${inputName}"]`);
-        if (input) {
-            const values = input.value.split(',');
-            const newValues = values.filter(v => v !== value);
-
-            if (newValues.length) {
-                input.value = newValues.join(',');
-            } else {
-                input.remove();
-            }
-        }
-    } else {
-        // For text filters, remove the entire filter
-        const input = form.querySelector(`input[name="${filter}"]`);
-        if (input) {
-            input.remove();
-        }
-    }
-
-    // Reset to first page
-    let pageInput = form.querySelector('input[name="page"]');
-    if (!pageInput) {
-        pageInput = document.createElement('input');
-        pageInput.type = 'hidden';
-        pageInput.name = 'page';
-        form.appendChild(pageInput);
-    }
-    pageInput.value = '1';
-
-    // Submit the form
-    form.submit();
-}
-
-/**
- * Update filter toggle states based on active filters
- */
-function updateFilterToggles() {
+function removeFilter(columnId, value) {
+    const paramName = columnToParamName(columnId);
     const urlParams = new URLSearchParams(window.location.search);
 
-    // For each filter toggle, check if its filter is active
-    document.querySelectorAll('.column-filter').forEach(filterContainer => {
-        const field = filterContainer.dataset.field;
-        const toggle = filterContainer.querySelector('.filter-toggle');
+    if (urlParams.has(paramName)) {
+        const values = urlParams.get(paramName).split(',');
+        const updatedValues = values.filter(val => val !== value);
 
-        // Check if the filter has an active value
-        if (urlParams.has(field) || urlParams.has(`${field}_list`)) {
-            toggle.classList.add('active');
+        if (updatedValues.length) {
+            urlParams.set(paramName, updatedValues.join(','));
+        } else {
+            urlParams.delete(paramName);
         }
-    });
-}
 
-/**
- * Initialize reset filters button
- */
-function initResetFiltersButton() {
-    const resetButton = document.getElementById('resetFilters');
+        // Reset to page 1
+        if (urlParams.has('page')) {
+            urlParams.set('page', '1');
+        }
 
-    if (resetButton) {
-        resetButton.addEventListener('click', function () {
-            // Get the current URL
-            const url = new URL(window.location);
-
-            // Keep only pagination parameters
-            const params = new URLSearchParams();
-            params.set('page', '1');
-            if (url.searchParams.has('per_page')) {
-                params.set('per_page', url.searchParams.get('per_page'));
-            }
-
-            // Redirect to the filtered URL
-            window.location.href = `${url.pathname}?${params.toString()}`;
-        });
+        // Reload page with updated query string
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
     }
-}
-
-// Add CSS for filter toggles active state
-document.addEventListener('DOMContentLoaded', function () {
-    const style = document.createElement('style');
-    style.textContent = `
-        .filter-toggle.active {
-            background-color: #e3f2fd;
-            color: #1976D2;
-            border-color: #1976D2;
-        }
-        
-        .filter-dropdown {
-            min-width: 250px;
-        }
-        
-        @media (max-width: 768px) {
-            .filter-dropdown {
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 90%;
-                max-width: 320px;
-                z-index: 1050;
-            }
-        }
-    `;
-    document.head.appendChild(style);
-}); 
+} 
