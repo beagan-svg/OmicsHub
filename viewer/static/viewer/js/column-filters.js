@@ -61,6 +61,7 @@ function addFilterButtonsToHeaders() {
         filterBtn.setAttribute('data-column', columnId);
         filterBtn.setAttribute('aria-label', `Filter ${header.textContent.trim()}`);
         filterBtn.setAttribute('title', `Filter ${header.textContent.trim()}`);
+        filterBtn.type = 'button'; // Explicitly set button type to prevent form submission
 
         // Create filter container
         const filterContainer = document.createElement('div');
@@ -148,6 +149,11 @@ function createFilterDropdown(columnName, columnId) {
     dropdown.appendChild(content);
     dropdown.appendChild(footer);
 
+    // Prevent clicks inside the dropdown from propagating to the document
+    dropdown.addEventListener('click', function (e) {
+        e.stopPropagation();
+    });
+
     return dropdown;
 }
 
@@ -158,34 +164,70 @@ function setupFilterDropdowns() {
     // Handle filter button clicks
     document.querySelectorAll('.column-filter-btn').forEach(btn => {
         btn.addEventListener('click', function (e) {
-            e.stopPropagation();
+            e.preventDefault(); // Prevent default button behavior
+            e.stopPropagation(); // Stop event from bubbling up
+
             const columnId = this.getAttribute('data-column');
             const dropdown = document.getElementById(`dropdown-${columnId}`);
+
+            // If the dropdown doesn't exist or was removed, recreate it
+            if (!dropdown) {
+                console.warn(`Dropdown for ${columnId} not found, recreating...`);
+                const header = document.getElementById(columnId);
+                if (header) {
+                    const container = header.querySelector('.column-filter-container');
+                    if (container) {
+                        const newDropdown = createFilterDropdown(header.textContent.trim(), columnId);
+                        container.appendChild(newDropdown);
+                        setupDropdownEvents(newDropdown);
+                    }
+                }
+                return;
+            }
 
             // Close all other dropdowns
             document.querySelectorAll('.column-filter-dropdown.show').forEach(d => {
                 if (d !== dropdown) {
                     d.classList.remove('show');
+                    // Find and remove active state from the associated button
+                    const btnId = d.id.replace('dropdown-', '');
+                    const otherBtn = document.querySelector(`.column-filter-btn[data-column="${btnId}"]`);
+                    if (otherBtn) otherBtn.classList.remove('active');
                 }
             });
 
-            // Toggle this dropdown
-            dropdown.classList.toggle('show');
+            // Toggle this dropdown with a small delay to ensure proper event handling
+            setTimeout(() => {
+                dropdown.classList.toggle('show');
 
-            // Toggle active state on button
-            this.classList.toggle('active', dropdown.classList.contains('show'));
+                // Toggle active state on button
+                this.classList.toggle('active', dropdown.classList.contains('show'));
 
-            // If showing dropdown, load filter values
-            if (dropdown.classList.contains('show')) {
-                loadFilterValues(columnId);
-            }
+                // If showing dropdown, load filter values
+                if (dropdown.classList.contains('show')) {
+                    loadFilterValues(columnId);
+                }
+            }, 10);
         });
     });
 
+    // Set up events for all existing dropdowns
+    document.querySelectorAll('.column-filter-dropdown').forEach(dropdown => {
+        setupDropdownEvents(dropdown);
+    });
+}
+
+/**
+ * Set up events for a dropdown
+ */
+function setupDropdownEvents(dropdown) {
     // Handle close button clicks
-    document.querySelectorAll('.close-filter').forEach(btn => {
-        btn.addEventListener('click', function (e) {
+    const closeBtn = dropdown.querySelector('.close-filter');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function (e) {
+            e.preventDefault();
             e.stopPropagation();
+
             const dropdown = this.closest('.column-filter-dropdown');
             dropdown.classList.remove('show');
 
@@ -194,12 +236,15 @@ function setupFilterDropdowns() {
             const btn = document.querySelector(`.column-filter-btn[data-column="${columnId}"]`);
             if (btn) btn.classList.remove('active');
         });
-    });
+    }
 
     // Handle cancel button clicks
-    document.querySelectorAll('.cancel-filter').forEach(btn => {
-        btn.addEventListener('click', function (e) {
+    const cancelBtn = dropdown.querySelector('.cancel-filter');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function (e) {
+            e.preventDefault();
             e.stopPropagation();
+
             const dropdown = this.closest('.column-filter-dropdown');
             dropdown.classList.remove('show');
 
@@ -208,23 +253,29 @@ function setupFilterDropdowns() {
             const btn = document.querySelector(`.column-filter-btn[data-column="${columnId}"]`);
             if (btn) btn.classList.remove('active');
         });
-    });
+    }
 
     // Handle apply button clicks
-    document.querySelectorAll('.apply-filter').forEach(btn => {
-        btn.addEventListener('click', function (e) {
+    const applyBtn = dropdown.querySelector('.apply-filter');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', function (e) {
+            e.preventDefault();
             e.stopPropagation();
+
             const dropdown = this.closest('.column-filter-dropdown');
             const columnId = dropdown.id.replace('dropdown-', '');
 
             applyFilter(columnId, dropdown);
         });
-    });
+    }
 
     // Handle select all button clicks
-    document.querySelectorAll('.select-all-btn').forEach(btn => {
-        btn.addEventListener('click', function (e) {
+    const selectAllBtn = dropdown.querySelector('.select-all-btn');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function (e) {
+            e.preventDefault();
             e.stopPropagation();
+
             const dropdown = this.closest('.column-filter-dropdown');
             const checkboxes = dropdown.querySelectorAll('.filter-option input[type="checkbox"]');
 
@@ -232,12 +283,15 @@ function setupFilterDropdowns() {
                 cb.checked = true;
             });
         });
-    });
+    }
 
     // Handle deselect all button clicks
-    document.querySelectorAll('.deselect-all-btn').forEach(btn => {
-        btn.addEventListener('click', function (e) {
+    const deselectAllBtn = dropdown.querySelector('.deselect-all-btn');
+    if (deselectAllBtn) {
+        deselectAllBtn.addEventListener('click', function (e) {
+            e.preventDefault();
             e.stopPropagation();
+
             const dropdown = this.closest('.column-filter-dropdown');
             const checkboxes = dropdown.querySelectorAll('.filter-option input[type="checkbox"]');
 
@@ -245,11 +299,14 @@ function setupFilterDropdowns() {
                 cb.checked = false;
             });
         });
-    });
+    }
 
     // Handle filter search
-    document.querySelectorAll('.filter-search-input').forEach(input => {
-        input.addEventListener('input', function (e) {
+    const searchInput = dropdown.querySelector('.filter-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('click', e => e.stopPropagation());
+        searchInput.addEventListener('input', function (e) {
+            e.stopPropagation();
             const searchValue = this.value.toLowerCase();
             const dropdown = this.closest('.column-filter-dropdown');
             const options = dropdown.querySelectorAll('.filter-option');
@@ -259,7 +316,7 @@ function setupFilterDropdowns() {
                 option.style.display = text.includes(searchValue) ? '' : 'none';
             });
         });
-    });
+    }
 }
 
 /**
@@ -267,8 +324,9 @@ function setupFilterDropdowns() {
  */
 function setupClickOutsideHandler() {
     document.addEventListener('click', function (e) {
-        if (!e.target.closest('.column-filter-container')) {
-            document.querySelectorAll('.column-filter-dropdown').forEach(dropdown => {
+        // Only close dropdowns if click is outside column filter containers
+        if (!e.target.closest('.column-filter-container') && !e.target.closest('.column-filter-dropdown')) {
+            document.querySelectorAll('.column-filter-dropdown.show').forEach(dropdown => {
                 dropdown.classList.remove('show');
             });
 
@@ -285,7 +343,10 @@ function setupClickOutsideHandler() {
  */
 function loadFilterValues(columnId) {
     const dropdown = document.getElementById(`dropdown-${columnId}`);
+    if (!dropdown) return;
+
     const optionsContainer = dropdown.querySelector('.filter-options-container');
+    if (!optionsContainer) return;
 
     // Show loading indicator
     optionsContainer.innerHTML = `
@@ -321,6 +382,20 @@ function loadFilterValues(columnId) {
 
         // Update options container
         optionsContainer.innerHTML = optionsHTML;
+
+        // Add click handlers to prevent propagation for all checkboxes and labels
+        const filterOptions = dropdown.querySelectorAll('.filter-option');
+        filterOptions.forEach(option => {
+            option.addEventListener('click', e => e.stopPropagation());
+            const checkbox = option.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                checkbox.addEventListener('click', e => e.stopPropagation());
+            }
+            const label = option.querySelector('label');
+            if (label) {
+                label.addEventListener('click', e => e.stopPropagation());
+            }
+        });
     }, 300);
 }
 
@@ -329,6 +404,8 @@ function loadFilterValues(columnId) {
  */
 function getUniqueColumnValues(columnId) {
     const header = document.getElementById(columnId);
+    if (!header) return [];
+
     const columnIndex = Array.from(header.parentNode.children).indexOf(header);
     const tableRows = document.querySelectorAll('table.table tbody tr');
     const values = new Set();
@@ -512,7 +589,9 @@ function createFilterTag(container, columnId, columnName, value) {
     // Add event listener to remove button
     const removeButton = tag.querySelector('.remove-filter');
     if (removeButton) {
-        removeButton.addEventListener('click', function () {
+        removeButton.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
             removeFilter(columnId, value);
         });
     }

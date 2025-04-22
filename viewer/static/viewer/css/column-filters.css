@@ -68,6 +68,8 @@
     border-radius: 3px;
     width: 24px;
     height: 24px;
+    position: relative;
+    z-index: 1;
 }
 
 .column-filter-btn:hover,
@@ -93,27 +95,37 @@
     border-radius: var(--filter-radius);
     box-shadow: var(--filter-dropdown-shadow);
     border: 1px solid var(--filter-border-color);
-    z-index: 1000;
+    z-index: 1050;
+    /* Higher z-index to ensure visibility */
     display: none;
     margin-top: 8px;
     animation: filterDropdownFadeIn 0.2s ease;
     overflow: hidden;
+    transform-origin: top right;
 }
 
 @keyframes filterDropdownFadeIn {
     from {
         opacity: 0;
-        transform: translateY(-10px);
+        transform: translateY(-10px) scale(0.97);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
 .column-filter-dropdown.show {
-    display: block;
+    display: block !important;
+    /* Force display with !important */
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Ensure dropdown stays visible when mouse enters it */
+.column-filter-dropdown:hover {
+    display: block !important;
 }
 
 /* Filter dropdown header */
@@ -125,6 +137,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 2;
 }
 
 .filter-dropdown-header .filter-title {
@@ -143,10 +158,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
 }
 
 .filter-dropdown-header .close-filter:hover {
     color: #212529;
+    background-color: rgba(108, 117, 125, 0.1);
 }
 
 /* Filter dropdown content */
@@ -154,6 +174,8 @@
     padding: 15px;
     max-height: 350px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Smooth scrolling on iOS */
 }
 
 /* Filter dropdown footer */
@@ -163,11 +185,16 @@
     padding: 10px 15px;
     border-top: 1px solid var(--filter-border-color);
     background-color: var(--filter-header-bg);
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
 }
 
 .filter-dropdown-footer button {
     font-size: 13px;
     padding: 5px 10px;
+    position: relative;
+    z-index: 3;
 }
 
 /* Filter options */
@@ -177,6 +204,8 @@
     margin-bottom: 15px;
     border: 1px solid var(--filter-border-color);
     border-radius: var(--filter-radius);
+    -webkit-overflow-scrolling: touch;
+    /* Smooth scrolling on iOS */
 }
 
 .filter-option {
@@ -184,6 +213,11 @@
     align-items: center;
     padding: 8px 12px;
     border-bottom: 1px solid var(--filter-border-color);
+    transition: background-color 0.15s ease;
+}
+
+.filter-option:hover {
+    background-color: rgba(25, 118, 210, 0.04);
 }
 
 .filter-option:last-child {
@@ -202,6 +236,8 @@
 
 .filter-option input[type="checkbox"] {
     cursor: pointer;
+    min-width: 16px;
+    min-height: 16px;
 }
 
 /* Filter search */
@@ -246,13 +282,16 @@
     border: none;
     color: var(--filter-btn-color);
     font-size: 13px;
-    padding: 0;
+    padding: 6px 8px;
     cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
 }
 
 .select-all-container button:hover {
     text-decoration: underline;
     color: var(--filter-btn-hover);
+    background-color: rgba(25, 118, 210, 0.08);
 }
 
 /* Active filter indicator */
@@ -413,4 +452,18 @@ th.has-active-filter .column-filter-btn::after {
 .table thead th:last-child {
     border-top-right-radius: 4px;
     border-right: none;
+}
+
+/* Prevent clicks on filter options from closing dropdown */
+.filter-option label,
+.filter-option input,
+.filter-options-container,
+.filter-search input,
+.filter-dropdown-footer button {
+    pointer-events: auto !important;
+}
+
+/* Reset any overflow issues that might be causing layout problems */
+.table-responsive {
+    overflow: visible;
 }
