@@ -1,6 +1,6 @@
 from django.urls import path
 from viewer.views.main import MainListView
-from viewer.views.api import metadata_field_view
+from viewer.views.api import metadata_field_view, pipeline_config
 from viewer.views.pipeline import (
     PipelineDashboardView, 
     PipelineApiView, 
@@ -21,6 +21,7 @@ urlpatterns = [
     path('pipeline/failed/', FailedJobsView.as_view(), name='failed_jobs'),
     
     # Pipeline API endpoints
+    path('api/pipeline/config/', pipeline_config, name='pipeline_config'),
     path('api/pipeline/submit-alignment/', PipelineApiView.submit_alignment, name='submit_alignment'),
     path('api/pipeline/check-alignment-status/', PipelineApiView.check_alignment_status, name='check_alignment_status'),
     path('api/pipeline/stop-alignment/', PipelineApiView.stop_alignment, name='stop_alignment'),

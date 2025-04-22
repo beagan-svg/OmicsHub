@@ -19,7 +19,16 @@ class PipelineSubmitModal {
         this.postQCSamples = [];
         this.incompleteSamples = [];
 
+        // Add new properties for unknown library prep tracking
+        this.unknownLibPrepSamples = {
+            alignment: new Map(),
+            postqc: new Map()
+        };
+
         this.setupEventListeners();
+
+        // Add styles for unknown library prep UI
+        this.addStyles();
     }
 
     setupEventListeners() {
@@ -55,6 +64,12 @@ class PipelineSubmitModal {
     }
 
     populateModal() {
+        // Reset unknown library prep tracking
+        this.unknownLibPrepSamples = {
+            alignment: new Map(),
+            postqc: new Map()
+        };
+
         // Clear existing content
         this.sampleList.innerHTML = '';
         this.incompleteList.innerHTML = '';
@@ -101,7 +116,7 @@ class PipelineSubmitModal {
             const libraryPrepMethod = sample.library_prep || '';
             const ingestStatus = sample.ingest_status || 'Not started';
             const alignmentStatus = sample.alignment_status || 'Not started';
-            const postQCStatus = sample.post_qc_status || 'Not Started';
+            const postQCStatus = sample.postqc_status || 'Not Started';
 
             // Categorize the sample
             if (ingestStatus.toLowerCase() === 'not started') {
@@ -135,8 +150,38 @@ class PipelineSubmitModal {
             });
         }
 
+        // Only track unknown library preps for RTX workflow
+        selectedSamples.forEach(sample => {
+            const workflow = this.determineWorkflow(sample);
+            if (workflow === 'RTX') {
+                const libraryPrep = sample.library_prep || '';
+                const isLibPrepKnown = this.isLibraryPrepKnown(libraryPrep);
+
+                if (!isLibPrepKnown) {
+                    if (sample.ingest_status.toLowerCase() === 'completed' &&
+                        sample.alignment_status.toLowerCase() !== 'completed') {
+                        // Unknown library prep for alignment
+                        if (!this.unknownLibPrepSamples.alignment.has(libraryPrep)) {
+                            this.unknownLibPrepSamples.alignment.set(libraryPrep, []);
+                        }
+                        this.unknownLibPrepSamples.alignment.get(libraryPrep).push(sample);
+                    } else if (sample.alignment_status.toLowerCase() === 'completed' &&
+                        sample.postqc_status.toLowerCase() !== 'completed') {
+                        // Unknown library prep for postqc
+                        if (!this.unknownLibPrepSamples.postqc.has(libraryPrep)) {
+                            this.unknownLibPrepSamples.postqc.set(libraryPrep, []);
+                        }
+                        this.unknownLibPrepSamples.postqc.get(libraryPrep).push(sample);
+                    }
+                }
+            }
+        });
+
         // Update the command lists
         this.updateCommandLists();
+
+        // Add unknown library prep warnings if needed
+        this.addUnknownLibPrepWarnings();
     }
 
     updateCommandLists() {
@@ -149,24 +194,47 @@ class PipelineSubmitModal {
         // Populate alignment commands list
         if (this.alignmentSamples.length > 0) {
             this.alignmentSamples.forEach(sample => {
+                const workflow = sample.workflow || this.determineWorkflow(sample);
+                const libraryPrep = sample.library_prep || '';
+                const isUnknownLibPrep = workflow === 'RTX' && !this.isLibraryPrepKnown(libraryPrep);
+
                 const listItem = document.createElement('div');
                 listItem.className = 'list-group-item';
 
-                const alignmentCmd = this.generateAlignmentCommand(sample);
+                // Generate base command or empty command for unknown library prep
+                let alignmentCmd = '';
+                if (!isUnknownLibPrep) {
+                    alignmentCmd = this.generateAlignmentCommand(sample);
+                }
+
+                // Create the interactive command builder
+                const commandBuilder = this.createCommandBuilder(sample, 'alignment', alignmentCmd);
+
+                // Create the list item content
                 listItem.innerHTML = `
-                    <h6 class="mb-1">${sample.fastqName} <span class="badge ${sample.workflow === 'MTX' ? 'rainbow-badge' : 'bg-primary'}">${sample.workflow || this.determineWorkflow(sample)}</span></h6>
-                    <div class="bg-light p-2 rounded mb-2 code-block">
-                        <small><code>${alignmentCmd}</code></small>
-                    </div>
-                    ${autoProceed ? `
-                    <div class="mt-2">
-                        <span class="badge bg-success">Auto-proceed to Post-QC</span>
-                        <div class="bg-light p-2 rounded mt-1 code-block">
-                            <small><code>${this.generatePostQCCommand(sample)}</code></small>
-                        </div>
-                    </div>
-                    ` : ''}
+                    <h6 class="mb-1">${sample.fastq_name} <span class="badge ${workflow === 'MTX' ? 'rainbow-badge' : 'bg-primary'}">${workflow}</span></h6>
                 `;
+
+                // Append the command builder
+                listItem.appendChild(commandBuilder);
+
+                // Add auto-proceed PostQC section if enabled
+                if (autoProceed) {
+                    const postQCCmd = this.generatePostQCCommand(sample);
+                    const autoProceedDiv = document.createElement('div');
+                    autoProceedDiv.className = 'mt-3';
+                    autoProceedDiv.innerHTML = `
+                        <span class="badge bg-success">Auto-proceed to Post-QC</span>
+                    `;
+
+                    // Create PostQC command builder for auto-proceed
+                    const postQCBuilder = this.createCommandBuilder(sample, 'postqc', postQCCmd);
+                    autoProceedDiv.appendChild(postQCBuilder);
+
+                    // Append to the list item
+                    listItem.appendChild(autoProceedDiv);
+                }
+
                 this.alignmentCommandsList.appendChild(listItem);
             });
         } else {
@@ -178,16 +246,28 @@ class PipelineSubmitModal {
         // Populate post-QC commands list
         if (this.postQCSamples.length > 0) {
             this.postQCSamples.forEach(sample => {
+                const workflow = sample.workflow || this.determineWorkflow(sample);
+                const libraryPrep = sample.library_prep || '';
+                const isUnknownLibPrep = workflow === 'RTX' && !this.isLibraryPrepKnown(libraryPrep);
+
                 const listItem = document.createElement('div');
                 listItem.className = 'list-group-item';
 
-                const postQCCmd = this.generatePostQCCommand(sample);
+                // Generate base command or empty command for unknown library prep
+                let postQCCmd = '';
+                if (!isUnknownLibPrep) {
+                    postQCCmd = this.generatePostQCCommand(sample);
+                }
+
+                // Create the list item content
                 listItem.innerHTML = `
-                    <h6 class="mb-1">${sample.fastqName} <span class="badge ${sample.workflow === 'MTX' ? 'rainbow-badge' : 'bg-primary'}">${sample.workflow || this.determineWorkflow(sample)}</span></h6>
-                    <div class="bg-light p-2 rounded code-block">
-                        <small><code>${postQCCmd}</code></small>
-                    </div>
+                    <h6 class="mb-1">${sample.fastq_name} <span class="badge ${workflow === 'MTX' ? 'rainbow-badge' : 'bg-primary'}">${workflow}</span></h6>
                 `;
+
+                // Create the command builder
+                const commandBuilder = this.createCommandBuilder(sample, 'postqc', postQCCmd);
+                listItem.appendChild(commandBuilder);
+
                 this.postQCCommandsList.appendChild(listItem);
             });
         } else {
@@ -239,41 +319,109 @@ class PipelineSubmitModal {
 
     generateAlignmentCommand(sample) {
         const workflow = sample.workflow || this.determineWorkflow(sample);
-        const fastqName = sample.fastq_name || sample.fastqName;
         const loadName = sample.load_name || '';
         const organism = sample.organism_common_name || '';
         const reference = this.getReference(organism);
         const libraryPrep = sample.library_prep || '';
+        const notificationEmail = this.getNotificationEmail();
 
-        // Generate command according to workflow type
-        if (workflow === 'MTX') {
-            return `ocs fastqs align tenx-arc --reference-names "${reference}" --asset-name cellranger-arc --load-names "${loadName}" --notify-on FAILED --notify beagan.nguy@alleninstitute.org`;
+        // Get command template from config if available
+        let commandTemplate = '';
+
+        if (window.pipelineConfig && window.pipelineConfig.isLoaded) {
+            commandTemplate = window.pipelineConfig.getCommandTemplate(workflow, 'alignment');
+        }
+
+        // Use template from config or fallback to hardcoded templates
+        if (commandTemplate) {
+            // Replace placeholders in the template
+            return commandTemplate
+                .replace('{reference}', reference)
+                .replace('{load_name}', loadName)
+                .replace('{chemistry}', this.getChemistry(libraryPrep))
+                .replace('{notification_email}', notificationEmail);
         } else {
-            // RTX workflow
-            const chemistry = this.getChemistry(libraryPrep);
-
-            // Determine command based on library prep method
-            if (['10xV3.1D', '10xRseq_Mult_noATAC', '10xV3.1_HT', '10Xv3.1'].includes(libraryPrep)) {
-                return `ocs fastqs align tenx-rnaseq --reference-names "${reference}" --asset-name cellranger-rnaseq --load-names "${loadName}" --cellranger-addopts "--chemistry ${chemistry} --include-introns"`;
-            } else if (['10xV3.1_HT_CP', '10xV3.1_HT_CP-BC'].includes(libraryPrep)) {
-                return `ocs fastqs align tenx-rnaseq-multi --asset-name cellranger-multi --reference-names "${reference}" --cellranger-addopts "--include-introns" --execution-priority HIGH --load-names "${loadName}"`;
-            } else if (libraryPrep === '10xV4') {
-                return `ocs fastqs align tenx-rnaseq --reference-names "${reference}" --asset-name cellranger-rnaseq --load-names "${loadName}" --asset-tag 8.0.1 --cellranger-addopts "--chemistry ${chemistry}"`;
+            // Fallback to hardcoded templates if config is not available
+            if (workflow === 'MTX') {
+                return `ocs fastqs align tenx-arc --reference-names "${reference}" --asset-name cellranger-arc --load-names "${loadName}" --notify-on FAILED --notify ${notificationEmail}`;
             } else {
-                return `ocs fastqs align tenx-rnaseq --reference-names "${reference}" --asset-name cellranger-rnaseq --load-names "${loadName}" --cellranger-addopts "--chemistry ${chemistry} --include-introns"`;
+                // RTX workflow
+                // Get chemistry from config
+                const chemistry = this.getChemistry(libraryPrep);
+
+                // Determine cellranger-addopts based on library prep method
+                let cellrangerAddopts = '';
+                if (['10xV3.1D', '10xRseq_Mult_noATAC', '10xV3.1_HT', '10Xv3.1'].includes(libraryPrep)) {
+                    cellrangerAddopts = `--chemistry ${chemistry} --include-introns`;
+                } else if (libraryPrep === '10xV4') {
+                    cellrangerAddopts = `--chemistry ${chemistry}`;
+                }
+
+                if (cellrangerAddopts) {
+                    return `ocs fastqs align tenx-rnaseq --reference-names "${reference}" --asset-name cellranger-rnaseq --load-names "${loadName}" --cellranger-addopts "${cellrangerAddopts}"`;
+                } else {
+                    return `ocs fastqs align tenx-rnaseq --reference-names "${reference}" --asset-name cellranger-rnaseq --load-names "${loadName}"`;
+                }
             }
         }
     }
 
     generatePostQCCommand(sample) {
         const workflow = sample.workflow || this.determineWorkflow(sample);
-        const fastqName = sample.fastq_name || sample.fastqName;
+        const loadName = sample.load_name || '';
+        const notificationEmail = this.getNotificationEmail();
 
-        if (workflow === 'MTX') {
-            return `python run_mtx_postqc.py --config=pipeline_config.yaml --fastq=${fastqName}`;
-        } else {
-            return `python run_rtx_postqc.py --config=pipeline_config.yaml --fastq=${fastqName}`;
+        // Get command template from config if available
+        let commandTemplate = '';
+        let assetTag = '25.03.27'; // Default asset tag
+
+        if (window.pipelineConfig && window.pipelineConfig.isLoaded) {
+            commandTemplate = window.pipelineConfig.getCommandTemplate(workflow, 'postqc');
+
+            // Get asset tags from config
+            const assetTags = window.pipelineConfig.getAssetTags(workflow, 'postqc');
+            if (assetTags && assetTags.length > 0) {
+                assetTag = assetTags[0]; // Use the first tag by default
+            }
         }
+
+        // Use template from config or fallback to hardcoded templates
+        if (commandTemplate) {
+            // Replace placeholders in the template
+            let command = commandTemplate
+                .replace('{load_name}', loadName)
+                .replace('{notification_email}', notificationEmail);
+
+            // Add asset tag if not in template
+            if (!command.includes('--asset-tag') && assetTag !== 'latest') {
+                command = command.replace(/--asset-name ([^ ]+)/, `--asset-name $1 --asset-tag ${assetTag}`);
+            }
+
+            // Add notification if not in template
+            if (!command.includes('--notify-on')) {
+                command += ` --notify-on FAILED --notify ${notificationEmail}`;
+            }
+
+            return command;
+        } else {
+            // Fallback to hardcoded templates if config is not available
+            if (workflow === 'MTX') {
+                return `ocs fastqs postalign tenx-arc --asset-name multi_gex_qc --asset-tag ${assetTag} --load-names "${loadName}" --notify-on FAILED --notify ${notificationEmail}`;
+            } else {
+                return `ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc --asset-tag ${assetTag} --load-names "${loadName}" --notify-on FAILED --notify ${notificationEmail}`;
+            }
+        }
+    }
+
+    /**
+     * Get notification email from config or use default
+     * @returns {string} Email address
+     */
+    getNotificationEmail() {
+        if (window.pipelineConfig && window.pipelineConfig.isLoaded) {
+            return window.pipelineConfig.getNotificationEmail();
+        }
+        return '$USER@alleninstitute.org';
     }
 
     getReference(organism) {
@@ -321,6 +469,55 @@ class PipelineSubmitModal {
         this.confirmButton.disabled = true;
         this.confirmButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
 
+        // Collect all custom commands from the interface
+        const commands = {
+            alignment: [],
+            postqc: []
+        };
+
+        // Collect alignment commands
+        const alignmentBuilders = this.alignmentCommandsList.querySelectorAll('.command-builder');
+        alignmentBuilders.forEach(builder => {
+            const sample = builder.dataset.sample;
+            const command = builder.dataset.command || builder.querySelector('.command-preview').textContent;
+
+            commands.alignment.push({
+                sample,
+                command
+            });
+
+            // If auto-proceed is enabled, also collect post-QC commands
+            if (this.autoProceedToggle.checked) {
+                const postQCBuilder = builder.closest('.list-group-item').querySelector('.mt-3 .command-builder');
+                if (postQCBuilder) {
+                    const postQCCommand = postQCBuilder.dataset.command || postQCBuilder.querySelector('.command-preview').textContent;
+                    commands.postqc.push({
+                        sample,
+                        command: postQCCommand
+                    });
+                }
+            }
+        });
+
+        // Collect post-QC commands (excluding those already added from auto-proceed)
+        const postQCBuilders = this.postQCCommandsList.querySelectorAll('.command-builder');
+        postQCBuilders.forEach(builder => {
+            const sample = builder.dataset.sample;
+            const command = builder.dataset.command || builder.querySelector('.command-preview').textContent;
+
+            // Check if this sample's post-QC is already in the list (from auto-proceed)
+            const exists = commands.postqc.some(item => item.sample === sample);
+            if (!exists) {
+                commands.postqc.push({
+                    sample,
+                    command
+                });
+            }
+        });
+
+        // Log collected commands for debugging
+        console.log('Collected commands:', commands);
+
         // Simulate API call (replace with actual API call)
         setTimeout(() => {
             // Success handling
@@ -341,18 +538,595 @@ class PipelineSubmitModal {
             }
         }, 1000);
     }
+
+    /**
+     * Create an interactive command builder UI
+     * @param {Object} sample - Sample data
+     * @param {string} stage - Pipeline stage ('alignment' or 'postqc')
+     * @param {string} baseCommand - Initial command string
+     * @returns {HTMLElement} The command builder element
+     */
+    createCommandBuilder(sample, stage, baseCommand) {
+        const workflow = sample.workflow || this.determineWorkflow(sample);
+        const libraryPrep = sample.library_prep || '';
+
+        // Check if this is an RTX sample with unknown library prep
+        const isUnknownLibPrep = workflow === 'RTX' &&
+            this.unknownLibPrepSamples[stage].has(libraryPrep);
+
+        // Create container
+        const container = document.createElement('div');
+        container.className = 'command-builder';
+        container.dataset.sample = sample.fastq_name;
+        container.dataset.stage = stage;
+        container.dataset.workflow = workflow;
+        container.dataset.libraryPrep = libraryPrep;
+
+        // Create header
+        const header = document.createElement('div');
+        header.className = 'command-header';
+        header.innerHTML = `
+            <span>${stage === 'alignment' ? 'Alignment Command' : 'Post-QC Command'}</span>
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-secondary me-2 reset-command-btn">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary edit-command-btn">
+                    <i class="bi bi-pencil-square"></i> Edit
+                </button>
+            </div>
+        `;
+
+        // Create command preview section
+        const preview = document.createElement('div');
+        preview.className = 'command-preview' + (isUnknownLibPrep ? ' empty' : '');
+
+        if (isUnknownLibPrep) {
+            preview.textContent = 'Select an asset name to generate the command';
+            container.dataset.command = '';
+        } else {
+            preview.textContent = baseCommand;
+            container.dataset.command = baseCommand;
+            container.dataset.originalCommand = baseCommand;
+        }
+
+        // Create command breakdown display
+        const commandParts = document.createElement('div');
+        commandParts.className = 'command-params mb-3';
+
+        // Only parse and display command parts if we have a command
+        if (!isUnknownLibPrep && baseCommand) {
+            const parts = this.parseCommand(baseCommand);
+
+            // Add base command line
+            const baseLine = document.createElement('div');
+            baseLine.className = 'command-line';
+            baseLine.textContent = parts.base;
+            commandParts.appendChild(baseLine);
+
+            // Add parameters
+            parts.params.forEach(param => {
+                const paramLine = document.createElement('div');
+                paramLine.className = 'command-part';
+                paramLine.innerHTML = `<span class="param-name">${param.name}</span> <span class="param-value">${param.value}</span>`;
+                commandParts.appendChild(paramLine);
+            });
+        }
+
+        // Assemble the command builder
+        container.appendChild(header);
+        container.appendChild(preview);
+        container.appendChild(commandParts);
+
+        // Add event listeners
+        this.addCommandBuilderEventListeners(container);
+
+        return container;
+    }
+
+    /**
+     * Parse a command string into its component parts
+     * @param {string} command - The command string to parse
+     * @returns {Object} Object with base command and parameters
+     */
+    parseCommand(command) {
+        // Split the command into parts
+        const parts = command.split(' ');
+
+        // Base command (ocs fastqs align tenx-rnaseq)
+        const baseEndIndex = command.indexOf('--');
+        const base = baseEndIndex > -1 ? command.substring(0, baseEndIndex).trim() : parts.slice(0, 3).join(' ');
+
+        // Extract parameters
+        const params = [];
+        let currentParam = null;
+
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+
+            if (part.startsWith('--')) {
+                // If we already have a parameter, add it to the list
+                if (currentParam) {
+                    params.push(currentParam);
+                }
+
+                // Start a new parameter
+                currentParam = { name: part, value: '' };
+            } else if (currentParam) {
+                // Add to current parameter value
+                if (currentParam.value) {
+                    currentParam.value += ' ' + part;
+                } else {
+                    currentParam.value = part;
+                }
+            }
+        }
+
+        // Add the last parameter if there is one
+        if (currentParam) {
+            params.push(currentParam);
+        }
+
+        // Clean up parameter values (remove quotes)
+        params.forEach(param => {
+            if (param.value.startsWith('"') && param.value.endsWith('"')) {
+                param.value = param.value.substring(1, param.value.length - 1);
+            }
+        });
+
+        return { base, params };
+    }
+
+    /**
+     * Add event listeners to the command builder
+     * @param {HTMLElement} container - Command builder container
+     */
+    addCommandBuilderEventListeners(container) {
+        // Toggle edit mode
+        const editBtn = container.querySelector('.edit-command-btn');
+        const options = container.querySelector('.command-options');
+        const editableCommand = container.querySelector('.editable-command');
+        const commandParams = container.querySelector('.command-params');
+        const preview = container.querySelector('.command-preview');
+
+        editBtn.addEventListener('click', () => {
+            // Toggle visibility of options panel
+            if (options.classList.contains('d-none')) {
+                options.classList.remove('d-none');
+                editBtn.innerHTML = '<i class="bi bi-x"></i> Close';
+                editBtn.classList.remove('btn-outline-primary');
+                editBtn.classList.add('btn-outline-danger');
+            } else {
+                options.classList.add('d-none');
+                editableCommand.classList.add('d-none');
+                commandParams.classList.remove('d-none');
+                editBtn.innerHTML = '<i class="bi bi-pencil-square"></i> Edit';
+                editBtn.classList.remove('btn-outline-danger');
+                editBtn.classList.add('btn-outline-primary');
+            }
+        });
+
+        // Direct edit button handling
+        const directEditBtn = container.querySelector('.btn-outline-secondary');
+        if (directEditBtn) {
+            directEditBtn.addEventListener('click', () => {
+                // Show textarea editor
+                editableCommand.classList.remove('d-none');
+                commandParams.classList.add('d-none');
+            });
+        }
+
+        // Cancel edit button
+        const cancelEditBtn = container.querySelector('.cancel-edit-btn');
+        if (cancelEditBtn) {
+            cancelEditBtn.addEventListener('click', () => {
+                editableCommand.classList.add('d-none');
+                commandParams.classList.remove('d-none');
+            });
+        }
+
+        // Save changes from direct edit
+        const saveCommandBtn = container.querySelector('.save-command-btn');
+        if (saveCommandBtn) {
+            saveCommandBtn.addEventListener('click', () => {
+                const textarea = container.querySelector('.command-textarea');
+                const newCommand = textarea.value.trim();
+
+                // Update preview
+                preview.textContent = newCommand;
+
+                // Parse command and update visual display
+                const parts = this.parseCommand(newCommand);
+
+                // Close edit mode
+                editableCommand.classList.add('d-none');
+                commandParams.classList.remove('d-none');
+
+                // Store updated command for submission
+                container.dataset.command = newCommand;
+            });
+        }
+
+        // Handle parameter changes in dropdown selects
+        const selects = container.querySelectorAll('select');
+        selects.forEach(select => {
+            select.addEventListener('change', () => {
+                this.updateCommandFromInputs(container);
+            });
+        });
+
+        // Handle parameter changes in text inputs
+        const inputs = container.querySelectorAll('input:not([readonly])');
+        inputs.forEach(input => {
+            input.addEventListener('change', () => {
+                this.updateCommandFromInputs(container);
+            });
+        });
+
+        // Add event listeners for chemistry dropdown and include-introns checkbox
+        const chemistryDropdown = container.querySelector('.chemistry-dropdown');
+        const includeIntronsCheckbox = container.querySelector('.include-introns-checkbox');
+
+        if (chemistryDropdown) {
+            chemistryDropdown.addEventListener('change', () => {
+                this.updateCommandFromInputs(container);
+            });
+        }
+
+        if (includeIntronsCheckbox) {
+            includeIntronsCheckbox.addEventListener('change', () => {
+                this.updateCommandFromInputs(container);
+            });
+        }
+    }
+
+    /**
+     * Update command from input changes
+     * @param {HTMLElement} container - Command builder container
+     */
+    updateCommandFromInputs(container) {
+        const stage = container.dataset.stage;
+        const workflow = container.dataset.workflow;
+        const sample = {
+            fastqName: container.dataset.sample,
+            workflow: workflow
+        };
+
+        // Get the base command
+        let baseCommand = '';
+        if (stage === 'alignment') {
+            baseCommand = workflow === 'MTX' ? 'ocs fastqs align tenx-arc' : 'ocs fastqs align tenx-rnaseq';
+        } else {
+            baseCommand = workflow === 'MTX' ? 'ocs fastqs postalign tenx-arc' : 'ocs fastqs postalign tenx-rnaseq';
+        }
+
+        // Build command from inputs
+        let command = baseCommand;
+        const inputs = container.querySelectorAll('select, input');
+
+        inputs.forEach(input => {
+            const param = input.dataset.param || input.closest('.command-arg')?.querySelector('.arg-name')?.textContent;
+            if (param) {
+                if (param === 'chemistry') {
+                    // Handle chemistry dropdown specially
+                    const includeIntronsCheckbox = container.querySelector('.include-introns-checkbox');
+                    const includeIntrons = includeIntronsCheckbox && includeIntronsCheckbox.checked;
+                    const chemistryValue = `--chemistry ${input.value}${includeIntrons ? ' --include-introns' : ''}`;
+                    command += ` --cellranger-addopts "${chemistryValue}"`;
+                } else if (param !== 'include-introns' && input.value) {
+                    // Handle all other parameters normally
+                    let value = input.value;
+                    if (param === '--reference-names' || param === '--load-names' || value.includes(' ')) {
+                        value = `"${value}"`;
+                    }
+                    command += ` ${param} ${value}`;
+                }
+            }
+        });
+
+        // Update command preview
+        const preview = container.querySelector('.command-preview');
+        preview.textContent = command;
+
+        // Store updated command
+        container.dataset.command = command;
+
+        // Update the breakdown view
+        const parts = this.parseCommand(command);
+        const commandParams = container.querySelector('.command-params');
+        commandParams.innerHTML = '';
+
+        // Create base command line
+        const baseLine = document.createElement('div');
+        baseLine.className = 'command-line';
+        baseLine.textContent = parts.base;
+        commandParams.appendChild(baseLine);
+
+        // Create parameter lines
+        parts.params.forEach(param => {
+            const paramLine = document.createElement('div');
+            paramLine.className = 'command-part';
+
+            // Determine value class based on parameter
+            let valueClass = '';
+            if (param.name === '--reference-names') valueClass = 'param-reference';
+            else if (param.name === '--asset-name' || param.name === '--asset-tag') valueClass = 'param-asset';
+            else if (param.name === '--load-names') valueClass = 'param-load';
+            else if (param.name === '--cellranger-addopts') valueClass = 'param-chemistry';
+            else if (param.name === '--notify-on' || param.name === '--notify') valueClass = 'param-notify';
+            else if (param.name === '--execution-priority') valueClass = 'param-priority';
+
+            paramLine.innerHTML = `<span class="param-name">${param.name}</span> <span class="${valueClass}">${param.value}</span>`;
+            commandParams.appendChild(paramLine);
+        });
+    }
+
+    isLibraryPrepKnown(libraryPrep) {
+        if (!window.pipelineConfig || !window.pipelineConfig.isLoaded) {
+            return false;
+        }
+
+        const rtxConfig = window.pipelineConfig.config.workflows.rtx;
+
+        // Check alignment patterns
+        for (const pattern of Object.keys(rtxConfig.alignment)) {
+            const patterns = pattern.split('|');
+            if (patterns.includes(libraryPrep)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    addUnknownLibPrepWarnings() {
+        // Create warning sections for both alignment and postqc
+        const stages = ['alignment', 'postqc'];
+
+        stages.forEach(stage => {
+            const unknownSamples = this.unknownLibPrepSamples[stage];
+            if (unknownSamples.size > 0) {
+                const warningSection = document.createElement('div');
+                warningSection.className = 'alert alert-warning mt-3';
+                warningSection.innerHTML = `
+                    <h5>Unknown Library Prep Methods for ${stage === 'alignment' ? 'Alignment' : 'Post-QC'}</h5>
+                    <p>The following samples have library prep methods not defined in the configuration. Please select an asset name for each group:</p>
+                `;
+
+                const container = document.createElement('div');
+                container.className = 'unknown-libprep-container';
+
+                unknownSamples.forEach((samples, libPrep) => {
+                    const libPrepSection = document.createElement('div');
+                    libPrepSection.className = 'mb-4 library-prep-group';
+                    libPrepSection.dataset.libprep = libPrep;
+                    libPrepSection.dataset.stage = stage;
+
+                    // Create asset name selector
+                    const assetSelector = this.createAssetSelector(stage, libPrep);
+
+                    libPrepSection.innerHTML = `
+                        <div class="lib-prep-header">
+                            <h6>Library Prep Method: ${libPrep}</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Select Asset Name:</label>
+                                ${assetSelector}
+                            </div>
+                        </div>
+                        <div class="samples-list">
+                            <strong>Affected Samples:</strong>
+                            <ul class="list-unstyled">
+                                ${samples.map(s => `<li>${s.fastq_name}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+
+                    container.appendChild(libPrepSection);
+                });
+
+                warningSection.appendChild(container);
+
+                // Add to appropriate section
+                const targetList = stage === 'alignment' ? this.alignmentCommandsList : this.postQCCommandsList;
+                targetList.insertBefore(warningSection, targetList.firstChild);
+
+                // Add event listeners for asset selectors
+                container.querySelectorAll('.asset-selector').forEach(selector => {
+                    selector.addEventListener('change', (event) => {
+                        const libPrep = event.target.closest('.library-prep-group').dataset.libprep;
+                        const stage = event.target.closest('.library-prep-group').dataset.stage;
+                        const selectedAsset = event.target.value;
+                        this.updateUnknownLibPrepCommands(stage, libPrep, selectedAsset);
+                    });
+                });
+            }
+        });
+    }
+
+    createAssetSelector(stage, libPrep) {
+        const assets = this.getAvailableAssets(stage);
+        return `
+            <select class="form-select asset-selector">
+                <option value="">Select an asset...</option>
+                ${assets.map(asset => `<option value="${asset}">${asset}</option>`).join('')}
+            </select>
+        `;
+    }
+
+    getAvailableAssets(stage) {
+        // Default assets if config is not available
+        const defaultAssets = {
+            alignment: ['cellranger-rnaseq', 'cellranger-multi'],
+            postqc: ['tenx_rnaseq_qc']
+        };
+
+        // If no config is available, return default assets
+        if (!window.pipelineConfig?.config?.workflows?.rtx?.[stage]) {
+            return defaultAssets[stage] || [];
+        }
+
+        try {
+            const rtxConfig = window.pipelineConfig.config.workflows.rtx[stage];
+            const assets = new Set();
+
+            // Extract unique asset names from the config
+            for (const [pattern, config] of Object.entries(rtxConfig)) {
+                if (config && typeof config === 'object' && config.asset_name) {
+                    assets.add(config.asset_name);
+                }
+            }
+
+            // If no assets found in config, use defaults
+            if (assets.size === 0) {
+                return defaultAssets[stage] || [];
+            }
+
+            return Array.from(assets);
+        } catch (error) {
+            console.warn('Error getting assets from config:', error);
+            return defaultAssets[stage] || [];
+        }
+    }
+
+    updateUnknownLibPrepCommands(stage, libPrep, selectedAsset) {
+        const samples = this.unknownLibPrepSamples[stage].get(libPrep) || [];
+
+        // Find the template for the selected asset from config
+        const rtxConfig = window.pipelineConfig?.config?.workflows?.rtx?.[stage] || {};
+        let selectedTemplate = '';
+        let assetTag = '';
+
+        // Look through all config entries to find matching asset name
+        for (const [pattern, config] of Object.entries(rtxConfig)) {
+            if (config && typeof config === 'object' && config.asset_name === selectedAsset) {
+                selectedTemplate = config.command_template;
+                assetTag = config.asset_tag || '';
+                break;
+            }
+        }
+
+        // If no template found in config, use default templates
+        if (!selectedTemplate) {
+            if (stage === 'alignment') {
+                selectedTemplate = 'ocs fastqs align tenx-rnaseq --reference-names "{reference}" --asset-name ' +
+                    selectedAsset + ' --load-names "{load_name}" --cellranger-addopts "--chemistry {chemistry} --include-introns"';
+            } else {
+                selectedTemplate = 'ocs fastqs postalign tenx-rnaseq --asset-name ' +
+                    selectedAsset + ' --load-names "{load_name}"';
+            }
+        }
+
+        samples.forEach(sample => {
+            const existingBuilder = document.querySelector(`.command-builder[data-sample="${sample.fastq_name}"][data-stage="${stage}"]`);
+            if (existingBuilder) {
+                if (selectedAsset) {
+                    // Generate command using the template
+                    const command = this.generateCommandFromTemplate(selectedTemplate, sample);
+                    existingBuilder.dataset.command = command;
+                    existingBuilder.dataset.originalCommand = command;
+                    existingBuilder.querySelector('.command-preview').textContent = command;
+
+                    // Update the command breakdown
+                    const parts = this.parseCommand(command);
+                    const commandParams = existingBuilder.querySelector('.command-params');
+                    commandParams.innerHTML = '';
+
+                    // Add base command
+                    const baseLine = document.createElement('div');
+                    baseLine.className = 'command-line';
+                    baseLine.textContent = parts.base;
+                    commandParams.appendChild(baseLine);
+
+                    // Add parameters
+                    parts.params.forEach(param => {
+                        const paramLine = document.createElement('div');
+                        paramLine.className = 'command-part';
+                        paramLine.innerHTML = `<span class="param-name">${param.name}</span> <span class="param-value">${param.value}</span>`;
+                        commandParams.appendChild(paramLine);
+                    });
+                } else {
+                    // Clear the command if no asset is selected
+                    existingBuilder.dataset.command = '';
+                    existingBuilder.dataset.originalCommand = '';
+                    existingBuilder.querySelector('.command-preview').textContent = 'Select an asset name to generate the command';
+                    existingBuilder.querySelector('.command-params').innerHTML = '';
+                }
+            }
+        });
+    }
+
+    generateCommandFromTemplate(template, sample) {
+        const reference = this.getReference(sample.organism_common_name || '');
+        const chemistry = this.getChemistry(sample.library_prep || '');
+        const loadName = sample.load_name || '';
+        const notificationEmail = this.getNotificationEmail();
+
+        return template
+            .replace('{reference}', reference)
+            .replace('{load_name}', loadName)
+            .replace('{chemistry}', chemistry)
+            .replace('{notification_email}', notificationEmail);
+    }
+
+    addStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+            .library-prep-group {
+                border: 1px solid #ffeeba;
+                border-radius: 4px;
+                padding: 15px;
+                margin-bottom: 15px;
+                background-color: #fff;
+            }
+
+            .lib-prep-header {
+                margin-bottom: 10px;
+            }
+
+            .lib-prep-header h6 {
+                color: #856404;
+                font-weight: 600;
+                margin-bottom: 10px;
+            }
+
+            .samples-list {
+                margin-top: 10px;
+            }
+
+            .samples-list ul {
+                margin-top: 5px;
+                padding-left: 20px;
+            }
+
+            .samples-list li {
+                color: #666;
+                font-size: 0.9rem;
+                margin-bottom: 3px;
+            }
+
+            .command-preview.empty {
+                color: #856404;
+                font-style: italic;
+                background-color: #fff3cd;
+            }
+        `;
+        document.head.appendChild(style);
+    }
 }
 
 // Add CSS for code blocks and rainbow badge
 document.addEventListener('DOMContentLoaded', () => {
     const style = document.createElement('style');
     style.textContent = `
-        .code-block {
-            max-height: 80px;
-            overflow-y: auto;
+        .command-preview {
+            background-color: #2d2d2d;
+            color: #f8f9fa;
+            padding: 12px 15px;
             font-family: monospace;
-            white-space: pre-wrap;
-            word-break: break-all;
+            white-space: nowrap;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            max-height: 120px;
         }
         
         #submit-modal .card {
@@ -381,6 +1155,55 @@ document.addEventListener('DOMContentLoaded', () => {
             0% { background-position: 0% 80% }
             50% { background-position: 100% 20% }
             100% { background-position: 0% 80% }
+        }
+
+        .cellranger-options {
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+
+        .chemistry-select {
+            max-width: 200px;
+        }
+
+        .include-introns-check {
+            margin-top: 8px;
+        }
+
+        .unknown-libprep-container {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 4px;
+        }
+
+        .unknown-libprep-container h6 {
+            color: #856404;
+            margin-bottom: 0.5rem;
+        }
+
+        .unknown-libprep-container ul {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .unknown-libprep-container .form-label {
+            font-size: 0.875rem;
+            color: #495057;
+        }
+
+        .unknown-libprep-container .asset-selector {
+            max-width: 300px;
+        }
+
+        .alert.alert-warning h5 {
+            color: #856404;
+            margin-bottom: 1rem;
+        }
+
+        .alert.alert-warning p {
+            margin-bottom: 0.5rem;
         }
     `;
     document.head.appendChild(style);

@@ -1,6 +1,10 @@
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from viewer.models import Metadata
+import json
+import yaml
+import os
+from django.views.decorators.http import require_http_methods
 
 def metadata_field_view(request, fastq_name, field_name):
     """
@@ -17,4 +21,22 @@ def metadata_field_view(request, fastq_name, field_name):
     # Return the field value
     value = getattr(metadata, field_name, None)
     
-    return JsonResponse({field_name: value}) 
+    return JsonResponse({field_name: value})
+
+@require_http_methods(["GET"])
+def pipeline_config(request):
+    """
+    API endpoint to serve the pipeline configuration from YAML file.
+    """
+    try:
+        config_path = os.path.join('config', 'pipeline_config.yaml')
+        
+        with open(config_path, 'r') as file:
+            config = yaml.safe_load(file)
+            
+        return JsonResponse(config)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e),
+            'message': 'Failed to load pipeline configuration'
+        }, status=500) 

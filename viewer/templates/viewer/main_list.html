@@ -706,12 +706,15 @@
                                 </thead>
                                 <tbody>
                                     {% for row in table.page.object_list|default:table.rows %}
-                                    <tr {% if row.fastq_name__id %}data-fastq-id="{{ row.fastq_name__id }}"
+                                    <tr {% if row.fastq_name %}data-fastq-id="{{ row.fastq_name }}"
                                         data-fastq-name="{{ row.fastq_name }}"
-                                        data-batch-name="{{ row.fastq_name__batch_name_from_vendor }}"
-                                        data-organism="{{ row.organism_common_name }}"
-                                        data-library-prep="{{ row.library_prep_method_name }}"
-                                        data-ingest-status="{{ row.ingest_status }}" {% endif %}>
+                                        data-batch-name-from-vendor="{{ row.batch_name_from_vendor }}"
+                                        data-organism-common-name="{{ row.organism_common_name }}"
+                                        data-library-prep-method="{{ row.library_prep_method }}"
+                                        data-study-set="{{ row.study_set }}" data-load-name="{{ row.load_name }}"
+                                        data-ingest-status="{{ row.ingest_status }}"
+                                        data-alignment-status="{{ row.alignment_status }}"
+                                        data-postqc-status="{{ row.postqc_status }}" {% endif %}>
                                         <td class="selection-column">
                                             <input type="checkbox" class="sample-select">
                                         </td>

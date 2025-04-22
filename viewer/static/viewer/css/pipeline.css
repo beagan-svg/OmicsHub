@@ -507,7 +507,7 @@ input:checked~.toggle-label {
         0 1px 18px 0 rgba(25, 118, 210, 0.12);
     display: flex;
     align-items: center;
-    min-width: 250px;
+    min-width: 180px;
     z-index: 1050;
     animation: fadeInUp 0.3s ease forwards;
     font-family: var(--bs-font-sans-serif);
@@ -515,6 +515,13 @@ input:checked~.toggle-label {
     font-weight: 400;
     line-height: 1.5;
     letter-spacing: 0.25px;
+}
+
+/* Specific style for clear selection alerts */
+.toggle-toast.clear-selection {
+    min-width: 150px;
+    padding: 12px 20px;
+    font-size: 13px;
 }
 
 .toggle-toast-icon {
@@ -589,4 +596,246 @@ input:checked~.toggle-label {
     color: white;
     cursor: not-allowed;
     opacity: 0.8;
+}
+
+/* Command builder styles */
+.command-builder {
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 15px;
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.command-builder .command-header {
+    background-color: #f8f9fa;
+    padding: 10px 15px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    font-weight: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.command-builder .command-header .badge {
+    font-size: 0.75rem;
+}
+
+.command-preview {
+    background-color: #2d2d2d;
+    color: #f8f9fa;
+    padding: 12px 15px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.command-options {
+    padding: 15px;
+    background-color: #f8f9fa;
+}
+
+.command-options .command-arg {
+    display: flex;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.command-options .command-arg .arg-name {
+    flex: 0 0 50%;
+    font-weight: 500;
+    font-family: monospace;
+    color: #0d6efd;
+}
+
+.command-options .command-arg .arg-value {
+    flex: 1;
+}
+
+.command-options .command-arg .form-select,
+.command-options .command-arg .form-control {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+.command-line {
+    background-color: #f8f9fa;
+    padding: 10px 15px;
+    font-family: monospace;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    border-left: 3px solid #0d6efd;
+}
+
+.command-params {
+    display: flex;
+    flex-direction: column;
+}
+
+.editable-command {
+    margin-top: 10px;
+}
+
+.editable-command label {
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.editable-command textarea {
+    font-family: monospace;
+    font-size: 0.9rem;
+    padding: 10px;
+    min-height: 100px;
+}
+
+/* Rainbow badge for MTX */
+.rainbow-badge {
+    background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
+    background-size: 1800% 1800%;
+    animation: rainbow 8s ease infinite;
+    color: white;
+    font-weight: bold;
+    padding: 0.35em 0.65em;
+    border-radius: 0.375rem;
+}
+
+@keyframes rainbow {
+    0% {
+        background-position: 0% 80%
+    }
+
+    50% {
+        background-position: 100% 20%
+    }
+
+    100% {
+        background-position: 0% 80%
+    }
+}
+
+/* Pipeline steps */
+.pipeline-steps {
+    display: flex;
+    flex-direction: column;
+}
+
+.pipeline-steps .step {
+    display: flex;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.pipeline-steps .step:not(:last-child):after {
+    content: '';
+    position: absolute;
+    top: 40px;
+    left: 20px;
+    height: calc(100% - 20px);
+    width: 2px;
+    background-color: #dee2e6;
+}
+
+.pipeline-steps .step-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.5rem;
+    color: #0d6efd;
+    margin-right: 15px;
+    position: relative;
+    z-index: 1;
+}
+
+.pipeline-steps .step-content {
+    flex: 1;
+}
+
+.pipeline-steps .step-content h6 {
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.pipeline-steps .step-content p {
+    margin-bottom: 0;
+    color: #6c757d;
+}
+
+/* Command blocks in the list items */
+.code-block {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 10px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.command-part {
+    display: block;
+    margin-bottom: 5px;
+    color: #0d6efd;
+}
+
+.command-part .param-name {
+    color: #198754;
+    font-weight: 500;
+}
+
+.command-part .param-value {
+    color: #333;
+}
+
+/* Parameter color highlight styles */
+.param-reference {
+    color: #6f42c1;
+    font-weight: 500;
+}
+
+.param-asset {
+    color: #e83e8c;
+    font-weight: 500;
+}
+
+.param-load {
+    color: #fd7e14;
+    font-weight: 500;
+}
+
+.param-chemistry {
+    color: #20c997;
+    font-weight: 500;
+}
+
+.param-notify {
+    color: #6c757d;
+}
+
+.param-priority {
+    color: #dc3545;
+    font-weight: 500;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .command-options .command-arg {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .command-options .command-arg .arg-name {
+        flex: 0 0 100%;
+        margin-bottom: 5px;
+    }
+
+    .command-options .command-arg .arg-value {
+        width: 100%;
+    }
 }

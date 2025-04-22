@@ -188,33 +188,48 @@ class PipelineLocalData {
 
     // Add back reinitialize method
     reinitialize() {
-        // Backup current samples
-        const currentSamples = [...this.selectedSamples];
+        try {
+            // Try to load from localStorage
+            const storedData = localStorage.getItem('selectedSamplesForPipeline');
+            if (storedData) {
+                const data = JSON.parse(storedData);
+                if (data && data.samples && Array.isArray(data.samples)) {
+                    // Format samples to match expected structure
+                    this.selectedSamples = data.samples.map(sample => ({
+                        fastq_name: sample.fastq_name || '',
+                        study_set: sample.study_set || '',
+                        load_name: sample.load_name || '',
+                        batch_name_from_vendor: sample.batch_name_from_vendor || '',
+                        organism_common_name: sample.organism_common_name || '',
+                        library_prep_method: sample.library_prep_method || '',
+                        ingest_status: sample.ingest_status || '',
+                        alignment_status: sample.alignment_status || '',
+                        postqc_status: sample.postqc_status || ''
+                    }));
 
-        // Load samples again, which will merge from both storage keys
-        this.loadSamples();
-
-        // Check if samples changed
-        if (this.selectedSamples.length !== currentSamples.length) {
-            // Rebuild the table to reflect the updated samples
-            this.rebuildSamplesTable();
-            return true;
+                    // Rebuild the table with the loaded samples
+                    this.rebuildSamplesTable();
+                    return true;
+                }
+            }
+            return false;
+        } catch (error) {
+            console.error('Error reinitializing pipeline data:', error);
+            return false;
         }
-
-        return false;
     }
 
     normalizeSamples(samples) {
         return samples.map(sample => ({
-            fastq_name: sample.fastq_name || sample.fastqName || '',
-            study_set: sample.study_set || sample.studySet || '',
-            load_name: sample.load_name || sample.loadName || '',
-            batch_name_from_vendor: sample.batch_name_from_vendor || sample.batchNameFromVendor || '',
-            organism_common_name: sample.organism_common_name || sample.organismCommonName || '',
-            library_prep: sample.library_prep || sample.libraryPrep || '',
-            ingest_status: sample.ingest_status || sample.ingestStatus || '',
-            alignment_status: sample.alignment_status || sample.alignmentStatus || '',
-            postqc_status: sample.postqc_status || sample.postqcStatus || '',
+            fastq_name: sample.fastq_name || '',
+            study_set: sample.study_set || '',
+            load_name: sample.load_name || '',
+            batch_name_from_vendor: sample.batch_name_from_vendor || '',
+            organism_common_name: sample.organism_common_name || '',
+            library_prep_method: sample.library_prep_method || '',
+            ingest_status: sample.ingest_status || '',
+            alignment_status: sample.alignment_status || '',
+            postqc_status: sample.postqc_status || '',
         }));
     }
 
@@ -498,7 +513,7 @@ class PipelineLocalData {
                     load_name: row.querySelector('td:nth-child(4)').textContent.trim(),
                     batch_name_from_vendor: row.querySelector('td:nth-child(5)').textContent.trim(),
                     organism_common_name: row.querySelector('td:nth-child(6)').textContent.trim(),
-                    library_prep: row.querySelector('td:nth-child(7)').textContent.trim(),
+                    library_prep_method: row.querySelector('td.field-library_prep_method').textContent.trim(),
                     ingest_status: row.querySelector('td:nth-child(8)').textContent.trim(),
                     alignment_status: row.querySelector('td:nth-child(9)').textContent.trim(),
                     postqc_status: row.querySelector('td:nth-child(10)').textContent.trim()
@@ -632,7 +647,7 @@ class PipelineLocalData {
                 <td>${sample.load_name || ''}</td>
                 <td>${sample.batch_name_from_vendor || ''}</td>
                 <td>${sample.organism_common_name || ''}</td>
-                <td>${sample.library_prep || ''}</td>
+                <td>${sample.library_prep_method || ''}</td>
                 <td>${ingestBadge}</td>
                 <td>${alignmentBadge}</td>
                 <td>${postqcBadge}</td>
@@ -1119,7 +1134,7 @@ class PipelineLocalData {
                         <td>${sample.load_name}</td>
                         <td>${sample.batch_name_from_vendor}</td>
                         <td>${sample.organism_common_name}</td>
-                        <td>${sample.library_prep}</td>
+                        <td>${sample.library_prep_method}</td>
                         <td>${sample.ingest_status}</td>
                         <td>${sample.alignment_status}</td>
                         <td>${sample.postqc_status}</td>
@@ -1366,8 +1381,8 @@ class PipelineLocalData {
                                         <td>${metadata.load_name || 'Unknown'}</td>
                                     </tr>
                                     <tr>
-                                        <th>Library Prep:</th>
-                                        <td>${metadata.library_prep || 'Unknown'}</td>
+                                        <th>Library Prep Method:</th>
+                                        <td>${metadata.library_prep_method || 'Unknown'}</td>
                                     </tr>
                                 </table>
                             </div>

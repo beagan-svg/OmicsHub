@@ -634,6 +634,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{% static 'viewer/js/pipeline-config.js' %}"></script>
 <script src="{% static 'viewer/js/pipeline-local-data.js' %}"></script>
 <script src="{% static 'viewer/js/pipeline-submit-modal.js' %}"></script>
 <script>
@@ -1236,6 +1237,10 @@
             // Create new toast
             const toast = document.createElement('div');
             toast.className = 'toggle-toast';
+            // Add clear-selection class if the message is about clearing selections
+            if (message.includes('Clearing selections')) {
+                toast.classList.add('clear-selection');
+            }
             toast.setAttribute('role', 'alert');
             toast.setAttribute('aria-live', 'assertive');
 

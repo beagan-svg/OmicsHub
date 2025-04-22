@@ -24,14 +24,13 @@ references:
   squirrel-monkey: "squirrel-monkey_ncbi_bcm.sbol.2.1_genome_star2.7.1a"
   treeshrew: "treeshrew_ncbi_kiz.ts.3.0_genome.fixed_star2.7.1a"
 
-
 # Chemistries
 chemistries:
   10xV3.1D: "SC3Pv3"
   10xRseq_Mult_noATAC: "ARC-v1"
   10xV3.1_HT: "SC3Pv3HT"
   10xV4: "SC3Pv4"
-  "10Xv2": "SC3Pv2"
+  10Xv2: "SC3Pv2"
 
 # Pipeline settings
 settings:
@@ -40,7 +39,7 @@ settings:
     check_interval_minutes: 30
     max_retries: 3
     timeout_hours: 24
-    
+
   # Notification settings
   notifications:
     email:
@@ -54,8 +53,36 @@ settings:
 # Workflow mappings
 workflows:
   mtx:
-    asset_name: "cellranger-arc"
-    command_template: "ocs fastqs align tenx-arc --reference-names \"{reference}\" --asset-name cellranger-arc --load-names \"{load_name}\" --notify-on FAILED --notify {notification_email}"
+    alignment:
+      asset_name: "cellranger-arc"
+      command_template: "ocs fastqs align tenx-arc --asset-name cellranger-arc --reference-names \"{reference}\"  --load-names \"{load_name}\" --notify-on FAILED --notify {notification_email}"
+    postqc:
+      asset_name: "multi_gex_qc"
+      asset_tag: "latest"
+      command_template: "ocs fastqs postalign tenx-arc --asset-name multi_gex_qc --asset-tag latest --load-names \"{load_name}\" --notify-on FAILED --notify {notification_email}"
+
   rtx:
-    asset_name: "cellranger-rnaseq"
-    command_template: "ocs fastqs align tenx-rnaseq --reference-names \"{reference}\" --asset-name cellranger-rnaseq --load-names \"{load_name}\" --cellranger-addopts \"--chemistry {chemistry} --include-introns\"" 
+    alignment:
+      "10xV3.1D|10xRseq_Mult_noATAC|10xV3.1_HT|10Xv3.1":
+        asset_name: "cellranger-rnaseq"
+        command_template: "ocs fastqs align tenx-rnaseq --asset-name cellranger-rnaseq --reference-names \"{reference}\" --load-names \"{load_name}\" --cellranger-addopts \"--chemistry {chemistry} --include-introns\" --notify-on FAILED --notify {notification_email}"
+
+      "10xV3.1_HT_CP|10xV3.1_HT_CP-BC":
+        asset_name: "cellranger-multi"
+        command_template: "ocs fastqs align tenx-rnaseq-multi --asset-name cellranger-multi --reference-names \"{reference}\" --load-names \"{load_name}\" --cellranger-addopts '--include-introns' --execution-priority HIGH --notify-on FAILED --notify {notification_email}"
+
+      "10xV4":
+        asset_name: "cellranger-rnaseq"
+        asset_tag: "8.0.1"
+        command_template: "ocs fastqs align tenx-rnaseq --asset-name cellranger-rnaseq --reference-names \"{reference}\" --asset-tag 8.0.1 --load-names \"{load_name}\" --cellranger-addopts \"--chemistry {chemistry}\" --notify-on FAILED --notify {notification_email}"
+        
+    postqc:
+      "10xV4":
+        asset_name: "tenx_rnaseq_qc"
+        asset_tag: "25.03.27"
+        command_template: "ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc --asset-tag 25.03.27 --load-names \"{load_name}\" --notify-on FAILED --notify {notification_email}"
+
+      "10xV3.1D|10xRseq_Mult_noATAC|10xV3.1_HT|10Xv3.1|10xV3.1_HT_CP|10xV3.1_HT_CP-BC":
+        asset_name: "tenx_rnaseq_qc"
+        asset_tag: "25.03.27"
+        command_template: "ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc --asset-tag 25.03.27 --load-names \"{load_name}\" --notify-on FAILED --notify {notification_email}"
