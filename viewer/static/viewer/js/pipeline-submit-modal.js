@@ -118,13 +118,13 @@ class PipelineSubmitModal {
             const alignmentStatus = sample.alignment_status || 'Not started';
             const postQCStatus = sample.postqc_status || 'Not Started';
 
-            // Categorize the sample
+            // Categorize the sample based on status (case-insensitive comparison)
             if (ingestStatus.toLowerCase() === 'not started') {
-                this.incompleteSamples.push({ ...sample, fastqName });
-            } else if (alignmentStatus.toLowerCase() === 'completed' && postQCStatus.toLowerCase() !== 'completed') {
-                this.postQCSamples.push({ ...sample, fastqName });
-            } else if (ingestStatus.toLowerCase() === 'completed' && alignmentStatus.toLowerCase() !== 'completed') {
-                this.alignmentSamples.push({ ...sample, fastqName });
+                this.incompleteSamples.push(sample);
+            } else if (alignmentStatus.toLowerCase() !== 'completed' && ingestStatus.toLowerCase() === 'completed') {
+                this.alignmentSamples.push(sample);
+            } else if (postQCStatus.toLowerCase() !== 'completed' && alignmentStatus.toLowerCase() === 'completed') {
+                this.postQCSamples.push(sample);
             }
 
             row.innerHTML = `
@@ -145,7 +145,7 @@ class PipelineSubmitModal {
             this.warningDiv.classList.remove('d-none');
             this.incompleteSamples.forEach(sample => {
                 const li = document.createElement('li');
-                li.textContent = sample.fastqName;
+                li.textContent = sample.fastq_name;
                 this.incompleteList.appendChild(li);
             });
         }
@@ -590,14 +590,124 @@ class PipelineSubmitModal {
             container.dataset.originalCommand = baseCommand;
         }
 
+        // Create command options section (initially hidden)
+        const options = document.createElement('div');
+        options.className = 'command-options d-none';
+
+        // Parse the current command to get values
+        const parts = this.parseCommand(baseCommand);
+        const currentValues = {};
+        parts.params.forEach(param => {
+            currentValues[param.name] = param.value;
+        });
+
+        // Create editable options form
+        const editForm = document.createElement('div');
+        editForm.className = 'edit-form p-3';
+
+        // Add reference names dropdown
+        if (stage === 'alignment') {
+            const referenceGroup = document.createElement('div');
+            referenceGroup.className = 'mb-3';
+            referenceGroup.innerHTML = `
+                <label class="form-label">Reference Name</label>
+                <select class="form-select" data-param="--reference-names">
+                    <option value="human_10x_grch38_genome_star2.7.1a">human_10x_grch38_genome_star2.7.1a</option>
+                    <option value="mouse_10x_mm10_genome_star2.7.1a">mouse_10x_mm10_genome_star2.7.1a</option>
+                    <option value="rat_10x_rn6">rat_10x_rn6</option>
+                    <option value="macaque_10x_mmul10">macaque_10x_mmul10</option>
+                    <option value="armadillo_ncbi_mdasnov1-hap2_genome_star2-7-1a">armadillo_ncbi_mdasnov1-hap2_genome_star2-7-1a</option>
+                </select>
+            `;
+            editForm.appendChild(referenceGroup);
+
+            // Set current value
+            const referenceSelect = referenceGroup.querySelector('select');
+            referenceSelect.value = currentValues['--reference-names'] || this.getReference(sample.organism_common_name);
+        }
+
+        // Add asset name dropdown
+        const assetGroup = document.createElement('div');
+        assetGroup.className = 'mb-3';
+        const assets = this.getAvailableAssets(stage);
+        assetGroup.innerHTML = `
+            <label class="form-label">Asset Name</label>
+            <select class="form-select" data-param="--asset-name">
+                ${assets.map(asset => `<option value="${asset}">${asset}</option>`).join('')}
+            </select>
+        `;
+        editForm.appendChild(assetGroup);
+
+        // Set current value
+        const assetSelect = assetGroup.querySelector('select');
+        assetSelect.value = currentValues['--asset-name'] || '';
+
+        // Add chemistry options for RTX alignment
+        if (workflow === 'RTX' && stage === 'alignment') {
+            const chemistryGroup = document.createElement('div');
+            chemistryGroup.className = 'mb-3';
+            chemistryGroup.innerHTML = `
+                <label class="form-label">Chemistry</label>
+                <select class="form-select" data-param="chemistry">
+                    <option value="SC3Pv3">SC3Pv3 (10xV3.1)</option>
+                    <option value="SC3Pv3HT">SC3Pv3HT (10xV3.1_HT)</option>
+                    <option value="SC3Pv4">SC3Pv4 (10xV4)</option>
+                    <option value="SC3Pv2">SC3Pv2 (10Xv2)</option>
+                </select>
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="include-introns-${sample.fastq_name}" data-param="include-introns">
+                    <label class="form-check-label" for="include-introns-${sample.fastq_name}">
+                        Include introns
+                    </label>
+                </div>
+            `;
+            editForm.appendChild(chemistryGroup);
+
+            // Set current values
+            const chemistrySelect = chemistryGroup.querySelector('select');
+            const includeIntronsCheck = chemistryGroup.querySelector('input[type="checkbox"]');
+
+            // Parse current cellranger-addopts
+            const cellrangerAddopts = currentValues['--cellranger-addopts'] || '';
+            const chemistryMatch = cellrangerAddopts.match(/--chemistry\s+(\S+)/);
+            if (chemistryMatch) {
+                chemistrySelect.value = chemistryMatch[1];
+            }
+            includeIntronsCheck.checked = cellrangerAddopts.includes('--include-introns');
+        }
+
+        // Add notification options
+        const notifyGroup = document.createElement('div');
+        notifyGroup.className = 'mb-3';
+        notifyGroup.innerHTML = `
+            <label class="form-label">Notification Email</label>
+            <input type="email" class="form-control" data-param="--notify" value="${currentValues['--notify'] || this.getNotificationEmail()}">
+            <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="notify-failed-${sample.fastq_name}" data-param="notify-on" checked>
+                <label class="form-check-label" for="notify-failed-${sample.fastq_name}">
+                    Notify on failure
+                </label>
+            </div>
+        `;
+        editForm.appendChild(notifyGroup);
+
+        // Add buttons
+        const buttonGroup = document.createElement('div');
+        buttonGroup.className = 'mt-3';
+        buttonGroup.innerHTML = `
+            <button type="button" class="btn btn-primary save-command-btn">Save Changes</button>
+            <button type="button" class="btn btn-secondary ms-2 cancel-edit-btn">Cancel</button>
+        `;
+        editForm.appendChild(buttonGroup);
+
+        options.appendChild(editForm);
+
         // Create command breakdown display
         const commandParts = document.createElement('div');
         commandParts.className = 'command-params mb-3';
 
         // Only parse and display command parts if we have a command
         if (!isUnknownLibPrep && baseCommand) {
-            const parts = this.parseCommand(baseCommand);
-
             // Add base command line
             const baseLine = document.createElement('div');
             baseLine.className = 'command-line';
@@ -616,6 +726,7 @@ class PipelineSubmitModal {
         // Assemble the command builder
         container.appendChild(header);
         container.appendChild(preview);
+        container.appendChild(options);
         container.appendChild(commandParts);
 
         // Add event listeners
@@ -685,178 +796,123 @@ class PipelineSubmitModal {
         // Toggle edit mode
         const editBtn = container.querySelector('.edit-command-btn');
         const options = container.querySelector('.command-options');
-        const editableCommand = container.querySelector('.editable-command');
         const commandParams = container.querySelector('.command-params');
         const preview = container.querySelector('.command-preview');
 
         editBtn.addEventListener('click', () => {
-            // Toggle visibility of options panel
+            options.classList.toggle('d-none');
             if (options.classList.contains('d-none')) {
-                options.classList.remove('d-none');
-                editBtn.innerHTML = '<i class="bi bi-x"></i> Close';
-                editBtn.classList.remove('btn-outline-primary');
-                editBtn.classList.add('btn-outline-danger');
-            } else {
-                options.classList.add('d-none');
-                editableCommand.classList.add('d-none');
-                commandParams.classList.remove('d-none');
                 editBtn.innerHTML = '<i class="bi bi-pencil-square"></i> Edit';
                 editBtn.classList.remove('btn-outline-danger');
                 editBtn.classList.add('btn-outline-primary');
+            } else {
+                editBtn.innerHTML = '<i class="bi bi-x"></i> Close';
+                editBtn.classList.remove('btn-outline-primary');
+                editBtn.classList.add('btn-outline-danger');
             }
         });
 
-        // Direct edit button handling
-        const directEditBtn = container.querySelector('.btn-outline-secondary');
-        if (directEditBtn) {
-            directEditBtn.addEventListener('click', () => {
-                // Show textarea editor
-                editableCommand.classList.remove('d-none');
-                commandParams.classList.add('d-none');
-            });
-        }
-
-        // Cancel edit button
-        const cancelEditBtn = container.querySelector('.cancel-edit-btn');
-        if (cancelEditBtn) {
-            cancelEditBtn.addEventListener('click', () => {
-                editableCommand.classList.add('d-none');
-                commandParams.classList.remove('d-none');
-            });
-        }
-
-        // Save changes from direct edit
-        const saveCommandBtn = container.querySelector('.save-command-btn');
-        if (saveCommandBtn) {
-            saveCommandBtn.addEventListener('click', () => {
-                const textarea = container.querySelector('.command-textarea');
-                const newCommand = textarea.value.trim();
-
-                // Update preview
-                preview.textContent = newCommand;
-
-                // Parse command and update visual display
-                const parts = this.parseCommand(newCommand);
-
-                // Close edit mode
-                editableCommand.classList.add('d-none');
-                commandParams.classList.remove('d-none');
-
-                // Store updated command for submission
-                container.dataset.command = newCommand;
-            });
-        }
-
-        // Handle parameter changes in dropdown selects
-        const selects = container.querySelectorAll('select');
-        selects.forEach(select => {
-            select.addEventListener('change', () => {
-                this.updateCommandFromInputs(container);
-            });
+        // Reset button
+        const resetBtn = container.querySelector('.reset-command-btn');
+        resetBtn.addEventListener('click', () => {
+            const originalCommand = container.dataset.originalCommand;
+            if (originalCommand) {
+                preview.textContent = originalCommand;
+                container.dataset.command = originalCommand;
+                this.updateCommandPartsDisplay(container, originalCommand);
+            }
         });
 
-        // Handle parameter changes in text inputs
-        const inputs = container.querySelectorAll('input:not([readonly])');
+        // Save changes
+        const saveBtn = container.querySelector('.save-command-btn');
+        saveBtn.addEventListener('click', () => {
+            const newCommand = this.buildCommandFromInputs(container);
+            preview.textContent = newCommand;
+            container.dataset.command = newCommand;
+            this.updateCommandPartsDisplay(container, newCommand);
+            options.classList.add('d-none');
+            editBtn.innerHTML = '<i class="bi bi-pencil-square"></i> Edit';
+            editBtn.classList.remove('btn-outline-danger');
+            editBtn.classList.add('btn-outline-primary');
+        });
+
+        // Cancel edit
+        const cancelBtn = container.querySelector('.cancel-edit-btn');
+        cancelBtn.addEventListener('click', () => {
+            options.classList.add('d-none');
+            editBtn.innerHTML = '<i class="bi bi-pencil-square"></i> Edit';
+            editBtn.classList.remove('btn-outline-danger');
+            editBtn.classList.add('btn-outline-primary');
+        });
+
+        // Handle input changes
+        const inputs = container.querySelectorAll('select, input');
         inputs.forEach(input => {
             input.addEventListener('change', () => {
-                this.updateCommandFromInputs(container);
+                const previewCommand = this.buildCommandFromInputs(container);
+                preview.textContent = previewCommand;
             });
         });
-
-        // Add event listeners for chemistry dropdown and include-introns checkbox
-        const chemistryDropdown = container.querySelector('.chemistry-dropdown');
-        const includeIntronsCheckbox = container.querySelector('.include-introns-checkbox');
-
-        if (chemistryDropdown) {
-            chemistryDropdown.addEventListener('change', () => {
-                this.updateCommandFromInputs(container);
-            });
-        }
-
-        if (includeIntronsCheckbox) {
-            includeIntronsCheckbox.addEventListener('change', () => {
-                this.updateCommandFromInputs(container);
-            });
-        }
     }
 
-    /**
-     * Update command from input changes
-     * @param {HTMLElement} container - Command builder container
-     */
-    updateCommandFromInputs(container) {
+    buildCommandFromInputs(container) {
         const stage = container.dataset.stage;
         const workflow = container.dataset.workflow;
-        const sample = {
-            fastqName: container.dataset.sample,
-            workflow: workflow
-        };
 
-        // Get the base command
-        let baseCommand = '';
-        if (stage === 'alignment') {
-            baseCommand = workflow === 'MTX' ? 'ocs fastqs align tenx-arc' : 'ocs fastqs align tenx-rnaseq';
-        } else {
-            baseCommand = workflow === 'MTX' ? 'ocs fastqs postalign tenx-arc' : 'ocs fastqs postalign tenx-rnaseq';
-        }
+        // Start with base command
+        let command = workflow === 'MTX' ?
+            `ocs fastqs ${stage === 'alignment' ? 'align' : 'postalign'} tenx-arc` :
+            `ocs fastqs ${stage === 'alignment' ? 'align' : 'postalign'} tenx-rnaseq`;
 
-        // Build command from inputs
-        let command = baseCommand;
-        const inputs = container.querySelectorAll('select, input');
+        // Get all inputs
+        const inputs = container.querySelectorAll('[data-param]');
+        const params = new Map();
 
         inputs.forEach(input => {
-            const param = input.dataset.param || input.closest('.command-arg')?.querySelector('.arg-name')?.textContent;
-            if (param) {
-                if (param === 'chemistry') {
-                    // Handle chemistry dropdown specially
-                    const includeIntronsCheckbox = container.querySelector('.include-introns-checkbox');
-                    const includeIntrons = includeIntronsCheckbox && includeIntronsCheckbox.checked;
-                    const chemistryValue = `--chemistry ${input.value}${includeIntrons ? ' --include-introns' : ''}`;
-                    command += ` --cellranger-addopts "${chemistryValue}"`;
-                } else if (param !== 'include-introns' && input.value) {
-                    // Handle all other parameters normally
-                    let value = input.value;
-                    if (param === '--reference-names' || param === '--load-names' || value.includes(' ')) {
-                        value = `"${value}"`;
-                    }
-                    command += ` ${param} ${value}`;
+            const param = input.dataset.param;
+            if (input.type === 'checkbox') {
+                if (param === 'notify-on' && input.checked) {
+                    params.set('--notify-on', 'FAILED');
+                } else if (param === 'include-introns' && input.checked) {
+                    // Handle in chemistry section
                 }
+            } else if (param === 'chemistry') {
+                const includeIntrons = container.querySelector('[data-param="include-introns"]').checked;
+                const chemistryOpts = `--chemistry ${input.value}${includeIntrons ? ' --include-introns' : ''}`;
+                params.set('--cellranger-addopts', chemistryOpts);
+            } else if (input.value) {
+                params.set(`--${param}`, input.value);
             }
         });
 
-        // Update command preview
-        const preview = container.querySelector('.command-preview');
-        preview.textContent = command;
+        // Build command string
+        params.forEach((value, param) => {
+            if (value.includes(' ') && !value.startsWith('"')) {
+                command += ` ${param} "${value}"`;
+            } else {
+                command += ` ${param} ${value}`;
+            }
+        });
 
-        // Store updated command
-        container.dataset.command = command;
+        return command;
+    }
 
-        // Update the breakdown view
+    updateCommandPartsDisplay(container, command) {
         const parts = this.parseCommand(command);
         const commandParams = container.querySelector('.command-params');
         commandParams.innerHTML = '';
 
-        // Create base command line
+        // Add base command line
         const baseLine = document.createElement('div');
         baseLine.className = 'command-line';
         baseLine.textContent = parts.base;
         commandParams.appendChild(baseLine);
 
-        // Create parameter lines
+        // Add parameters
         parts.params.forEach(param => {
             const paramLine = document.createElement('div');
             paramLine.className = 'command-part';
-
-            // Determine value class based on parameter
-            let valueClass = '';
-            if (param.name === '--reference-names') valueClass = 'param-reference';
-            else if (param.name === '--asset-name' || param.name === '--asset-tag') valueClass = 'param-asset';
-            else if (param.name === '--load-names') valueClass = 'param-load';
-            else if (param.name === '--cellranger-addopts') valueClass = 'param-chemistry';
-            else if (param.name === '--notify-on' || param.name === '--notify') valueClass = 'param-notify';
-            else if (param.name === '--execution-priority') valueClass = 'param-priority';
-
-            paramLine.innerHTML = `<span class="param-name">${param.name}</span> <span class="${valueClass}">${param.value}</span>`;
+            paramLine.innerHTML = `<span class="param-name">${param.name}</span> <span class="param-value">${param.value}</span>`;
             commandParams.appendChild(paramLine);
         });
     }

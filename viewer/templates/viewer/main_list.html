@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
 <link rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@x.x.x/dist/select2-bootstrap4.min.css" />
-<link rel="stylesheet" href="{% static 'viewer/css/column-filters.css' %}" />
+<link rel="stylesheet" href="{% static 'viewer/css/multiselect-filters.css' %}" />
 <style>
     .selection-column {
         width: 40px;
@@ -110,6 +110,11 @@
                             </div>
 
                             <div class="col-md-4 text-end">
+                                <!-- Advanced filters toggle button with icon -->
+                                <button type="button" id="toggleAdvancedFilters" class="btn btn-outline-primary me-2">
+                                    <i class="bi bi-sliders"></i> Advanced Filters
+                                </button>
+
                                 <!-- Column Settings Dropdown -->
                                 <div class="dropdown column-settings-dropdown d-inline-block">
                                     <button type="button" id="column-settings-toggle" class="btn btn-outline-secondary"
@@ -509,13 +514,180 @@
                                                 <i class="bi bi-arrow-counterclockwise"></i> Reset to Default
                                             </button>
                                         </div>
+
+                                        <!-- Default Column Documentation (not visible to users, for devs only) -->
+                                        <!-- 
+                                            Default visible columns:
+                                            - FASTQ NAME
+                                            - STUDY SET
+                                            - LOAD NAME
+                                            - LIBRARY PREP METHOD
+                                            - ORGANISM COMMON NAME
+                                            - INGEST STATUS
+                                            - ALIGNMENT STATUS
+                                            - POSTQC STATUS
+                                            
+                                            Note: These default settings are configured in:
+                                            1. HTML data-default-visible attributes
+                                            2. The defaultVisibleColumns array in column-settings-rebuild.js
+                                        -->
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Applied filters display -->
-                        <div class="applied-filters-container mb-3" style="display: none;"></div>
+                        <!-- Active filters display -->
+                        <div class="active-filters-container mb-3" {% if has_active_filters %}style="display: flex;" {%
+                            else %}style="display: none;" {% endif %}></div>
+
+                        <!-- Advanced Filters Section with card-based layout -->
+                        <div id="advancedFilters" class="advanced-filters-container" style="display: none;"
+                            data-has-active-filters="{{ has_active_filters|yesno:'true,false' }}">
+
+                            <!-- Sample Information Card -->
+                            <div class="filter-card filter-card-info">
+                                <h6 class="filter-section-heading"><i class="bi bi-info-circle"></i> Sample Information
+                                </h6>
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="batch_name_from_vendor" class="form-label">Batch Name From
+                                            Vendor</label>
+                                        <div class="select-container">
+                                            <select name="batch_name_from_vendor" id="batch_name_from_vendor"
+                                                class="form-select filter-select" multiple="multiple"
+                                                data-placeholder="Select options">
+                                                {% for batch_name in batch_names_from_vendor %}
+                                                <option value="{{ batch_name }}" {{
+                                                    batch_name|is_selected:current_filters.batch_name_from_vendor_list
+                                                    }}>
+                                                    {{ batch_name }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label for="study_set" class="form-label">Study Set</label>
+                                        <div class="select-container">
+                                            <select name="study_set" id="study_set" class="form-select filter-select"
+                                                multiple="multiple" data-placeholder="Select options">
+                                                {% for study_set in study_sets %}
+                                                <option value="{{ study_set }}" {{
+                                                    study_set|is_selected:current_filters.study_set_list }}>
+                                                    {{ study_set }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Sample Characteristics Card -->
+                            <div class="filter-card filter-card-characteristics">
+                                <h6 class="filter-section-heading"><i class="bi bi-tag"></i> Sample Characteristics</h6>
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="organism" class="form-label">Organism Common Name</label>
+                                        <div class="select-container">
+                                            <select name="organism" id="organism" class="form-select filter-select"
+                                                multiple="multiple" data-placeholder="Select options">
+                                                {% for organism in organisms %}
+                                                <option value="{{ organism }}" {{
+                                                    organism|is_selected:current_filters.organism_list }}>
+                                                    {{ organism }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label for="library_prep_method" class="form-label">Library Prep Method</label>
+                                        <div class="select-container">
+                                            <select name="library_prep_method" id="library_prep_method"
+                                                class="form-select filter-select" multiple="multiple"
+                                                data-placeholder="Select options">
+                                                {% for method in library_prep_methods %}
+                                                <option value="{{ method }}" {{
+                                                    method|is_selected:current_filters.library_prep_method_list }}>
+                                                    {{ method }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Processing Status Card -->
+                            <div class="filter-card filter-card-status">
+                                <h6 class="filter-section-heading"><i class="bi bi-check2-circle"></i> Processing Status
+                                </h6>
+
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ingest_status" class="form-label">Ingest Status</label>
+                                        <div class="select-container">
+                                            <select name="ingest_status" id="ingest_status"
+                                                class="form-select filter-select" multiple="multiple"
+                                                data-placeholder="Select options">
+                                                {% for status in ingest_status_options %}
+                                                <option value="{{ status }}" {{
+                                                    status|is_selected:current_filters.ingest_status_list }}>
+                                                    {{ status }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label for="alignment_status" class="form-label">Alignment Status</label>
+                                        <div class="select-container">
+                                            <select name="alignment_status" id="alignment_status"
+                                                class="form-select filter-select" multiple="multiple"
+                                                data-placeholder="Select options">
+                                                {% for status in alignment_status_options %}
+                                                <option value="{{ status }}" {{
+                                                    status|is_selected:current_filters.alignment_status_list }}>
+                                                    {{ status }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label for="postqc_status" class="form-label">PostQC Status</label>
+                                        <div class="select-container">
+                                            <select name="postqc_status" id="postqc_status"
+                                                class="form-select filter-select" multiple="multiple"
+                                                data-placeholder="Select options">
+                                                {% for status in postqc_status_options %}
+                                                <option value="{{ status }}" {{
+                                                    status|is_selected:current_filters.postqc_status_list }}>
+                                                    {{ status }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="filter-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-funnel"></i> Apply Filters
+                                </button>
+                                <button type="button" id="resetFilters" class="btn btn-outline-secondary">
+                                    <i class="bi bi-x-circle"></i> Clear Filters
+                                </button>
+                            </div>
+                        </div>
                     </form>
 
                     <!-- Main data table -->
@@ -528,8 +700,7 @@
                                             <input type="checkbox" id="select-all-samples" class="sample-select">
                                         </th>
                                         {% for column in table.columns %}
-                                        <th {{ column.attrs.th.as_html }} id="col-{{ column.name|slugify }}">{{
-                                            column.header }}</th>
+                                        <th {{ column.attrs.th.as_html }}>{{ column.header }}</th>
                                         {% endfor %}
                                     </tr>
                                 </thead>
@@ -1770,7 +1941,196 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="{% static 'viewer/js/column-manager.js' %}"></script>
 <script src="{% static 'viewer/js/multiselect-filters.js' %}"></script>
-<script src="{% static 'viewer/js/column-settings-rebuild.js' %}"></script>
-<script src="{% static 'viewer/js/column-filters.js' %}"></script>
-{% endblock %}
+<script>
+    // Additional initialization for animations and UI effects
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initialize multiselect filters
+        $('.filter-select').select2({
+            theme: 'bootstrap4',
+            width: '100%',
+            placeholder: $(this).data('placeholder')
+        });
+
+        // Enhanced Google-style FID handling
+        document.querySelectorAll('td.fid-column').forEach(cell => {
+            const fidValue = cell.textContent.trim();
+            if (fidValue && fidValue !== '—') {
+                // Set tooltip title
+                cell.setAttribute('title', fidValue);
+
+                // Add ripple effect
+                cell.addEventListener('mousedown', function (e) {
+                    const x = e.pageX - this.offsetLeft;
+                    const y = e.pageY - this.offsetTop;
+
+                    const rippleElement = document.createElement('div');
+                    rippleElement.classList.add('ripple');
+                    rippleElement.style.top = y + 'px';
+                    rippleElement.style.left = x + 'px';
+
+                    this.appendChild(rippleElement);
+
+                    setTimeout(() => {
+                        rippleElement.remove();
+                    }, 600);
+                });
+
+                // Add a click handler to copy FID to clipboard with Material Design feedback
+                cell.addEventListener('click', function (e) {
+                    const textToCopy = this.textContent.trim();
+                    if (textToCopy && textToCopy !== '—') {
+                        navigator.clipboard.writeText(textToCopy)
+                            .then(() => {
+                                // Add copy animation
+                                this.classList.add('copied');
+
+                                // Show Material Design toast message
+                                const toast = document.createElement('div');
+                                toast.className = 'material-toast';
+                                toast.innerHTML = `
+                                    <div class="material-toast-icon">
+                                        <i class="bi bi-clipboard-check"></i>
+                                    </div>
+                                    <div class="material-toast-message">
+                                        FID copied to clipboard
+                                    </div>
+                                `;
+
+                                document.body.appendChild(toast);
+
+                                // Show toast
+                                setTimeout(() => {
+                                    toast.classList.add('show');
+                                }, 10);
+
+                                // Remove toast after delay
+                                setTimeout(() => {
+                                    toast.classList.remove('show');
+                                    setTimeout(() => {
+                                        toast.remove();
+                                    }, 300);
+                                }, 2500);
+
+                                // Remove copied class after animation
+                                setTimeout(() => {
+                                    this.classList.remove('copied');
+                                }, 1500);
+                            })
+                            .catch(err => {
+                                console.error('Failed to copy: ', err);
+                                showFeedbackMessage('Failed to copy to clipboard', true);
+                            });
+                    }
+                });
+            } else {
+                // Add special styling for empty values
+                cell.classList.add('fid-empty');
+            }
+        });
+
+        // Go to page form validation
+        const gotoPageForm = document.getElementById('gotoPageForm');
+        const gotoPageInput = document.getElementById('gotoPage');
+
+        if (gotoPageForm && gotoPageInput) {
+            const maxPage = parseInt(gotoPageInput.getAttribute('max'));
+
+            gotoPageForm.addEventListener('submit', function (e) {
+                const pageValue = parseInt(gotoPageInput.value);
+
+                if (isNaN(pageValue) || pageValue < 1) {
+                    e.preventDefault();
+                    gotoPageInput.value = 1;
+                } else if (pageValue > maxPage) {
+                    e.preventDefault();
+                    gotoPageInput.value = maxPage;
+                }
+            });
+
+            // Better UX: Submit form when user presses Enter
+            gotoPageInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    gotoPageForm.dispatchEvent(new Event('submit'));
+                    gotoPageForm.submit();
+                }
+            });
+        }
+
+        // Fix for dropdown scrolling issue
+        const columnDropdown = document.getElementById('column-settings-dropdown');
+        const categoriesContainer = columnDropdown?.querySelector('.column-categories-container');
+
+        if (categoriesContainer) {
+            // Add class to help with initial load
+            categoriesContainer.classList.add('initializing');
+
+            // Handle proper scrolling
+            categoriesContainer.addEventListener('wheel', function (e) {
+                const isScrollable = this.scrollHeight > this.clientHeight;
+                if (!isScrollable) return;
+
+                // Check if at top or bottom boundary
+                const atTop = this.scrollTop === 0 && e.deltaY < 0;
+                const atBottom = this.scrollTop + this.clientHeight >= this.scrollHeight - 1 && e.deltaY > 0;
+
+                if (!atTop && !atBottom) {
+                    e.stopPropagation();
+                }
+            });
+
+            // Remove initializing class after animation
+            setTimeout(() => {
+                categoriesContainer.classList.remove('initializing');
+            }, 500);
+        }
+
+        // Clean up dropdown behavior
+        document.addEventListener('click', function (event) {
+            if (!event.target.closest('#column-settings-dropdown') &&
+                !event.target.closest('#column-settings-toggle')) {
+
+                // Get the Bootstrap dropdown instance and manually hide it if open
+                const dropdownMenu = document.getElementById('column-settings-dropdown');
+                if (dropdownMenu && dropdownMenu.classList.contains('show')) {
+                    const dropdown = bootstrap.Dropdown.getInstance(document.getElementById('column-settings-toggle'));
+                    if (dropdown) {
+                        dropdown.hide();
+                    }
+                }
+            }
+        });
+
+        // Animate dropdown when opened
+        $('#column-settings-toggle').on('shown.bs.dropdown', function () {
+            const dropdown = $('#column-settings-dropdown');
+            dropdown.find('.column-category').each(function (index) {
+                const category = $(this);
+                setTimeout(function () {
+                    category.css({
+                        opacity: 1,
+                        transform: 'translateY(0)'
+                    });
+                }, index * 50);
+            });
+
+            // Ensure proper z-index stacking for headers
+            dropdown.find('.column-category h6').css('z-index', function (index) {
+                return 10 + (dropdown.find('.column-category').length - index);
+            });
+        });
+
+        // Initialize any other UI effects
+        $('#column-settings-dropdown .column-category').css({
+            opacity: 0,
+            transform: 'translateY(10px)',
+            transition: 'opacity 0.3s ease, transform 0.3s ease'
+        });
+    });
+</script>
+
+
+
+</script>
 </body>
+{% endblock %}

@@ -196,7 +196,6 @@ class MainListView(FilterView):
             context['current_filters']['per_page'] = str(context['current_per_page'])
         
         self._add_multi_select_filters(context)
-        self._add_column_filters(context)
         context['has_active_filters'] = self._check_active_filters(context)
 
     def _add_multi_select_filters(self, context: Dict[str, Any]) -> None:
@@ -210,17 +209,6 @@ class MainListView(FilterView):
         for filter_name in multi_select_filters:
             list_values = self.request.GET.getlist(filter_name)
             context['current_filters'][f"{filter_name}_list"] = list_values if list_values else []
-
-    def _add_column_filters(self, context: Dict[str, Any]) -> None:
-        """Add column filter values to context."""
-        # Collect all column filter parameters
-        column_filters = {}
-        for key, value in self.request.GET.items():
-            if key.endswith('_filter') and value:
-                base_key = key.replace('_filter', '')
-                column_filters[base_key] = value.split(',')
-                
-        context['column_filters'] = column_filters
 
     def _check_active_filters(self, context: Dict[str, Any]) -> bool:
         """Check if any filters are active."""

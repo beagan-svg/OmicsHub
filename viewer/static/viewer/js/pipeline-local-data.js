@@ -493,8 +493,11 @@ class PipelineLocalData {
         selectedRows.forEach(checkbox => {
             const row = checkbox.closest('tr');
             if (row) {
-                const fastqName = row.querySelector('td:nth-child(2)').textContent.trim();
-                selectedFastqNames.add(fastqName);
+                const fastqCell = row.querySelector('td:nth-child(2)');
+                if (fastqCell) {
+                    const fastqName = fastqCell.textContent.trim();
+                    selectedFastqNames.add(fastqName);
+                }
             }
         });
 
@@ -506,31 +509,63 @@ class PipelineLocalData {
         // Add newly selected samples
         selectedRows.forEach(checkbox => {
             const row = checkbox.closest('tr');
-            if (row) {
-                const sample = {
-                    fastq_name: row.querySelector('td:nth-child(2)').textContent.trim(),
-                    study_set: row.querySelector('td:nth-child(3)').textContent.trim(),
-                    load_name: row.querySelector('td:nth-child(4)').textContent.trim(),
-                    batch_name_from_vendor: row.querySelector('td:nth-child(5)').textContent.trim(),
-                    organism_common_name: row.querySelector('td:nth-child(6)').textContent.trim(),
-                    library_prep_method: row.querySelector('td.field-library_prep_method').textContent.trim(),
-                    ingest_status: row.querySelector('td:nth-child(8)').textContent.trim(),
-                    alignment_status: row.querySelector('td:nth-child(9)').textContent.trim(),
-                    postqc_status: row.querySelector('td:nth-child(10)').textContent.trim()
-                };
-                this.selectedSamples.push(sample);
+            if (!row) return;
+
+            try {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 10) {  // Make sure we have all required cells
+                    const sample = {
+                        fastq_name: cells[1]?.textContent?.trim() || '',
+                        study_set: cells[2]?.textContent?.trim() || '',
+                        load_name: cells[3]?.textContent?.trim() || '',
+                        batch_name_from_vendor: cells[4]?.textContent?.trim() || '',
+                        organism_common_name: cells[5]?.textContent?.trim() || '',
+                        library_prep_method: cells[6]?.textContent?.trim() || '',
+                        ingest_status: cells[7]?.textContent?.trim() || '',
+                        alignment_status: cells[8]?.textContent?.trim() || '',
+                        postqc_status: cells[9]?.textContent?.trim() || ''
+                    };
+
+                    // Only add if we have at least a fastq name
+                    if (sample.fastq_name) {
+                        this.selectedSamples.push(sample);
+                    }
+                }
+            } catch (error) {
+                console.error('Error processing row:', error);
             }
         });
 
         // Save to localStorage
         this.saveSamples();
+
+        // Update the selected count display if it exists
+        const selectedCount = document.getElementById('selected-count');
+        if (selectedCount) {
+            selectedCount.textContent = `${this.selectedSamples.length} samples selected`;
+        }
     }
 
     updateSubmitButtonState() {
         const submitButton = document.getElementById('submit-selected');
+        const actionSubmitButton = document.getElementById('submit-action-btn');
+        const selectedSamples = document.querySelectorAll('.sample-select:checked');
+        const isDisabled = selectedSamples.length === 0;
+
+        console.log('Submit button state update:', {
+            selectedCount: selectedSamples.length,
+            isDisabled: isDisabled,
+            submitButtonFound: !!submitButton,
+            actionSubmitButtonFound: !!actionSubmitButton
+        });
+
         if (submitButton) {
-            const selectedSamples = document.querySelectorAll('.sample-select:checked');
-            submitButton.disabled = selectedSamples.length === 0;
+            submitButton.disabled = isDisabled;
+            console.log('Hidden submit button state updated:', !isDisabled);
+        }
+        if (actionSubmitButton) {
+            actionSubmitButton.disabled = isDisabled;
+            console.log('Action submit button state updated:', !isDisabled);
         }
     }
 
@@ -1488,4 +1523,4 @@ class PipelineLocalData {
 
 // Initialize and export
 const pipelineLocalData = new PipelineLocalData();
-window.pipelineLocalData = pipelineLocalData;
+window.pipelineLocalData = pipelineLocalData; console.log('Testing pipeline-local-data.js loading...');
