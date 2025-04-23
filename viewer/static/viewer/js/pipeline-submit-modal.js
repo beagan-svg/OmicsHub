@@ -244,7 +244,8 @@ class PipelineSubmitModal {
                     reference: '',
                     chemistry: '',
                     includeIntrons: false,
-                    executionPriority: false
+                    executionPriority: false,
+                    assetName: ''  // Add assetName to tracked values
                 };
 
                 // Always check for these flags directly in the command string
@@ -890,9 +891,9 @@ class PipelineSubmitModal {
         let baseCommand = '';
         if (isAlignment) {
             if (this.isMtxWorkflow(sample, { checkCommand: true, command })) {
-                baseCommand = 'ocs fastqs align tenx-rnaseq-multi --asset-name cellranger-multi';
+                baseCommand = `ocs fastqs align tenx-rnaseq-multi --asset-name ${currentValues.assetName}`;
             } else {
-                baseCommand = 'ocs fastqs align tenx-rnaseq --asset-name cellranger-rnaseq';
+                baseCommand = `ocs fastqs align tenx-rnaseq --asset-name ${currentValues.assetName}`;
             }
         } else {
             if (this.isMtxWorkflow(sample, { checkCommand: true, command })) {
@@ -1004,8 +1005,16 @@ class PipelineSubmitModal {
             chemistry: '',
             includeIntrons: false,
             executionPriority: false,
-            notificationEmail: ''
+            notificationEmail: '',
+            assetName: ''  // Add assetName to tracked values
         };
+
+        // Extract asset name
+        const assetNameMatch = command.match(/--asset-name\s+([^\s"]+)/);
+        console.log('Asset name match:', assetNameMatch);
+        if (assetNameMatch) {
+            values.assetName = assetNameMatch[1];
+        }
 
         // Extract reference
         const referenceMatch = command.match(/--reference-names\s+"([^"]+)"/);
@@ -1618,10 +1627,11 @@ class PipelineSubmitModal {
             const command = this.buildCommand(baseCommand, sample, {
                 reference: this.getReference(sample.organism_common_name || ''),
                 chemistry: this.getChemistry(sample.library_prep_method || ''),
-                includeIntrons: true, // Default to true for unknown library preps
+                includeIntrons: true,
                 executionPriority: selectedAsset === 'cellranger-multi',
                 assetTag,
-                isAlignment: stage === 'alignment'
+                isAlignment: stage === 'alignment',
+                assetName: selectedAsset  // Use the selected asset name directly
             });
 
             console.log(`Generated command for ${sample.load_name}: ${command}`);
@@ -1673,10 +1683,15 @@ class PipelineSubmitModal {
             includeIntrons = false,
             executionPriority = false,
             assetTag = '',
-            isAlignment = false
+            isAlignment = false,
+            assetName = ''
         } = options;
 
-        let command = baseCommand;
+        // Start with the base parts of the command
+        const commandParts = baseCommand.split('--asset-name')[0].trim();
+
+        // Build command with explicit asset name, no fallback
+        let command = `${commandParts} --asset-name ${assetName}`;
 
         // Add reference if provided
         if (reference) {
@@ -1745,6 +1760,12 @@ class PipelineSubmitModal {
 
         const isAlignment = stage === 'alignment';
         const baseCommand = form.querySelector('.command-input').value;
+
+        // Extract asset name from base command
+        const assetNameMatch = baseCommand.match(/--asset-name\s+([^\s]+)/);
+        const assetName = assetNameMatch ? assetNameMatch[1] : '';
+        console.log('Extracted asset name:', assetName);
+
         const workflow = this.determineWorkflow(sample, { checkCommand: true, command: baseCommand });
 
         // Get form values
@@ -1759,7 +1780,14 @@ class PipelineSubmitModal {
             chemistry: chemistrySelect?.value,
             includeIntrons: includeIntronsCheck?.checked,
             executionPriority: executionPriorityCheck?.checked,
-            isAlignment
+            isAlignment,
+            assetName  // Pass the extracted asset name
+        });
+
+        console.log('Generated command:', {
+            baseCommand,
+            assetName,
+            newCommand
         });
 
         // Update the command display
