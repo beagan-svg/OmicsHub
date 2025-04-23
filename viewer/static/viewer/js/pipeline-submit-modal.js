@@ -211,13 +211,24 @@ class PipelineSubmitModal {
                     workflow
                 });
 
-                // Find sample directly from our tracked arrays
+                // Find sample directly from our tracked arrays by fastq_name
                 let sample = null;
 
                 if (stage === 'alignment') {
-                    sample = [...this.alignmentSamples, ...this.incompleteSamples].find(s => s.load_name === sampleName);
+                    sample = [...this.alignmentSamples, ...this.incompleteSamples].find(s => s.fastq_name === sampleName);
+                    console.log('Looking for sample in alignment/incomplete:', {
+                        alignmentSamples: this.alignmentSamples.length,
+                        incompleteSamples: this.incompleteSamples.length,
+                        found: !!sample,
+                        searchingFor: sampleName
+                    });
                 } else {
-                    sample = this.postQCSamples.find(s => s.load_name === sampleName);
+                    sample = this.postQCSamples.find(s => s.fastq_name === sampleName);
+                    console.log('Looking for sample in postQC:', {
+                        postQCSamples: this.postQCSamples.length,
+                        found: !!sample,
+                        searchingFor: sampleName
+                    });
                 }
 
                 if (!sample) {
@@ -511,7 +522,7 @@ class PipelineSubmitModal {
         // Populate the table
         selectedSamples.forEach(sample => {
             const row = document.createElement('tr');
-            row.dataset.sample = sample.load_name;
+            row.dataset.sample = sample.fastq_name;
 
             // Extract values from sample data
             const fastqName = sample.fastq_name || '';
@@ -583,47 +594,81 @@ class PipelineSubmitModal {
     }
 
     processUnknownLibraryPreps(samples) {
-        console.log('Processing unknown library preps for', samples.length, 'samples');
+        console.log('==================== Processing Unknown Library Preps ====================');
+        console.log('Total samples to process:', samples.length);
+        console.log('Current incomplete samples:', this.incompleteSamples.length);
+        console.log('Include incomplete checkbox state:', document.getElementById('include-incomplete-samples')?.checked);
 
         // Only track unknown library preps for RTX workflow
         samples.forEach(sample => {
+            console.log('\nProcessing sample:', {
+                fastqName: sample.fastq_name,
+                loadName: sample.load_name,
+                ingestStatus: sample.ingest_status,
+                alignmentStatus: sample.alignment_status,
+                libraryPrepMethod: sample.library_prep_method,
+                batchName: sample.batch_name_from_vendor
+            });
+
             const workflow = this.determineWorkflow(sample);
+            console.log('Determined workflow:', workflow);
+
             if (workflow === 'RTX') {
                 const libraryPrepMethod = sample.library_prep_method || '';
-                console.log(`Checking if ${libraryPrepMethod} is known for sample ${sample.fastq_name}`);
                 const isLibraryPrepMethodKnown = this.isLibraryPrepMethodKnown(libraryPrepMethod);
-                console.log(`${libraryPrepMethod} is ${isLibraryPrepMethodKnown ? 'known' : 'unknown'}`);
+                console.log('Library prep method check:', {
+                    method: libraryPrepMethod,
+                    isKnown: isLibraryPrepMethodKnown
+                });
 
                 if (!isLibraryPrepMethodKnown) {
-                    if (sample.ingest_status.toLowerCase() === 'completed' &&
-                        sample.alignment_status.toLowerCase() !== 'completed') {
+                    // Check if sample is incomplete and include-incomplete checkbox is checked
+                    const includeIncomplete = document.getElementById('include-incomplete-samples')?.checked || false;
+                    const isIncomplete = sample.ingest_status.toLowerCase() === 'not started';
+
+                    console.log('Sample eligibility check:', {
+                        sample: sample.fastq_name,
+                        isIncomplete,
+                        includeIncomplete,
+                        ingestStatus: sample.ingest_status,
+                        alignmentStatus: sample.alignment_status,
+                        shouldInclude: (sample.ingest_status.toLowerCase() === 'completed' &&
+                            sample.alignment_status.toLowerCase() !== 'completed') ||
+                            (isIncomplete && includeIncomplete)
+                    });
+
+                    if ((sample.ingest_status.toLowerCase() === 'completed' &&
+                        sample.alignment_status.toLowerCase() !== 'completed') ||
+                        (isIncomplete && includeIncomplete)) {
                         // Unknown library prep for alignment
-                        console.log(`Adding ${sample.fastq_name} with library prep method ${libraryPrepMethod} to alignment unknown list`);
+                        console.log(`Adding ${sample.fastq_name} to alignment unknown list`);
                         if (!this.unknownLibraryPrepMethodSamples.alignment.has(libraryPrepMethod)) {
                             this.unknownLibraryPrepMethodSamples.alignment.set(libraryPrepMethod, []);
                         }
                         this.unknownLibraryPrepMethodSamples.alignment.get(libraryPrepMethod).push(sample);
-                    } else if (sample.alignment_status.toLowerCase() === 'completed' &&
-                        sample.postqc_status.toLowerCase() !== 'completed') {
-                        // Unknown library prep for postqc
-                        console.log(`Adding ${sample.fastq_name} with library prep method ${libraryPrepMethod} to postqc unknown list`);
-                        if (!this.unknownLibraryPrepMethodSamples.postqc.has(libraryPrepMethod)) {
-                            this.unknownLibraryPrepMethodSamples.postqc.set(libraryPrepMethod, []);
-                        }
-                        this.unknownLibraryPrepMethodSamples.postqc.get(libraryPrepMethod).push(sample);
+                    } else {
+                        console.log(`Skipping ${sample.fastq_name} - does not meet criteria for unknown library prep handling`);
                     }
                 }
+            } else {
+                console.log(`Skipping ${sample.fastq_name} - not RTX workflow`);
             }
         });
 
-        // Log the detected unknown library preps
-        console.log('Unknown library prep method samples for alignment:',
-            Array.from(this.unknownLibraryPrepMethodSamples.alignment.keys()));
-        console.log('Unknown library prep method samples for postqc:',
-            Array.from(this.unknownLibraryPrepMethodSamples.postqc.keys()));
+        console.log('\nFinal unknown library prep state:', {
+            alignmentMethods: Array.from(this.unknownLibraryPrepMethodSamples.alignment.keys()),
+            alignmentSampleCounts: Array.from(this.unknownLibraryPrepMethodSamples.alignment.entries()).map(([method, samples]) => ({
+                method,
+                count: samples.length,
+                samples: samples.map(s => s.fastq_name)
+            })),
+            postqcMethods: Array.from(this.unknownLibraryPrepMethodSamples.postqc.keys())
+        });
+        console.log('==================================================================\n');
     }
 
     updateCommandLists() {
+        console.log('==================== Updating Command Lists ====================');
         // Clear existing content
         this.alignmentBatches.innerHTML = '';
         this.postQCBatches.innerHTML = '';
@@ -631,14 +676,42 @@ class PipelineSubmitModal {
         const autoProceed = this.autoProceedToggle.checked;
         const includeIncomplete = document.getElementById('include-incomplete-samples')?.checked || false;
 
+        console.log('Update context:', {
+            autoProceed,
+            includeIncomplete,
+            alignmentSamplesCount: this.alignmentSamples.length,
+            incompleteSamplesCount: this.incompleteSamples.length,
+            postQCSamplesCount: this.postQCSamples.length
+        });
+
         // Group samples by batch name
         const alignmentSamples = [...this.alignmentSamples];
         if (includeIncomplete) {
+            console.log('Including incomplete samples:', {
+                count: this.incompleteSamples.length,
+                samples: this.incompleteSamples.map(s => ({
+                    fastqName: s.fastq_name,
+                    ingestStatus: s.ingest_status,
+                    libraryPrepMethod: s.library_prep_method
+                }))
+            });
             alignmentSamples.push(...this.incompleteSamples);
         }
 
         const alignmentBatches = this.groupSamplesByBatch(alignmentSamples);
         const postQCBatches = this.groupSamplesByBatch(this.postQCSamples);
+
+        console.log('Grouped samples:', {
+            alignmentBatchCount: alignmentBatches.size,
+            postQCBatchCount: postQCBatches.size
+        });
+
+        // Process unknown library preps again with current samples
+        this.unknownLibraryPrepMethodSamples = {
+            alignment: new Map(),
+            postqc: new Map()
+        };
+        this.processUnknownLibraryPreps([...alignmentSamples, ...this.postQCSamples]);
 
         // Render alignment batches
         if (alignmentBatches.size > 0) {
@@ -662,6 +735,7 @@ class PipelineSubmitModal {
 
         // Add unknown library prep warnings if needed
         this.addUnknownLibPrepWarnings();
+        console.log('==================================================================\n');
     }
 
     groupSamplesByBatch(samples) {
@@ -762,7 +836,7 @@ class PipelineSubmitModal {
             this.generatePostQCCommand(sample);
 
         return `
-            <tr data-sample="${sample.load_name}" data-stage="${stage}" data-workflow="${workflow}">
+            <tr data-sample="${sample.fastq_name}" data-stage="${stage}" data-workflow="${workflow}">
                 <td>${sample.fastq_name}</td>
                 <td><span class="badge ${workflow === 'MTX' ? 'rainbow-badge' : 'bg-primary'}">${workflow}</span></td>
                 <td class="command-cell">
@@ -815,35 +889,35 @@ class PipelineSubmitModal {
         ).join('')}
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Chemistry</label>
-                        <select class="form-select chemistry-select">
-                            ${this.getChemistries().map(chem =>
+                        <div class="mb-3">
+                            <label class="form-label">Chemistry</label>
+                            <select class="form-select chemistry-select">
+                                ${this.getChemistries().map(chem =>
             `<option value="${chem.value}" ${chem.value === currentValues.chemistry ? 'selected' : ''}>
-                                    ${chem.name}
-                                </option>`
+                                        ${chem.name}
+                                    </option>`
         ).join('')}
-                        </select>
-                    </div>
+                            </select>
+                        </div>
                     <div class="mb-3">
                         <div class="form-check">
-                            <input class="form-check-input include-introns" type="checkbox" id="include-introns-${sample.load_name}" 
+                            <input class="form-check-input include-introns" type="checkbox" id="include-introns-${sample.fastq_name}" 
                                 ${currentValues.includeIntrons ? 'checked' : ''}>
-                            <label class="form-check-label" for="include-introns-${sample.load_name}">
+                            <label class="form-check-label" for="include-introns-${sample.fastq_name}">
                                 Include introns
                             </label>
                         </div>
                     </div>
                     <div class="mb-3">
                         <div class="form-check">
-                            <input class="form-check-input execution-priority" type="checkbox" id="execution-priority-${sample.load_name}"
+                            <input class="form-check-input execution-priority" type="checkbox" id="execution-priority-${sample.fastq_name}"
                                 ${currentValues.executionPriority ? 'checked' : ''}>
-                            <label class="form-check-label" for="execution-priority-${sample.load_name}">
+                            <label class="form-check-label" for="execution-priority-${sample.fastq_name}">
                                 High execution priority
                             </label>
                         </div>
-                    </div>
-                ` : ''}
+                        </div>
+                    ` : ''}
                 <div class="d-flex justify-content-end gap-2">
                     <button type="button" class="btn btn-secondary cancel-edit">Cancel</button>
                     <button type="button" class="btn btn-primary save-command">Save</button>
@@ -1402,18 +1476,18 @@ class PipelineSubmitModal {
         if (!selectedAsset) {
             console.log('No asset selected, clearing commands');
             affectedSamples.forEach(sample => {
-                const rowSelector = `tr[data-sample="${sample.load_name}"][data-stage="${stage}"]`;
+                const rowSelector = `tr[data-sample="${sample.fastq_name}"][data-stage="${stage}"]`;
                 console.log(`Looking for command cell with selector: ${rowSelector}`);
                 const row = this.modal.querySelector(rowSelector);
                 if (!row) {
-                    console.error(`Could not find row for sample ${sample.load_name}`);
+                    console.error(`Could not find row for sample ${sample.fastq_name}`);
                     return;
                 }
                 const commandCell = row.querySelector('.command-cell code');
                 if (commandCell) {
                     commandCell.textContent = '';
                 } else {
-                    console.error(`Could not find command cell for sample ${sample.load_name}`);
+                    console.error(`Could not find command cell for sample ${sample.fastq_name}`);
                 }
             });
             return;
@@ -1447,16 +1521,17 @@ class PipelineSubmitModal {
 
         // Update command for each affected sample
         affectedSamples.forEach(sample => {
-            const rowSelector = `tr[data-sample="${sample.load_name}"][data-stage="${stage}"]`;
+            console.log(`Processing sample: ${sample.fastq_name}`);
+            const rowSelector = `tr[data-sample="${sample.fastq_name}"][data-stage="${stage}"]`;
             console.log(`Looking for command cell with selector: ${rowSelector}`);
             const row = this.modal.querySelector(rowSelector);
             if (!row) {
-                console.error(`Could not find row for sample ${sample.load_name}`);
+                console.error(`Could not find row for sample ${sample.fastq_name}`);
                 return;
             }
             const commandCell = row.querySelector('.command-cell code');
             if (!commandCell) {
-                console.error(`Could not find command cell for sample ${sample.load_name}`);
+                console.error(`Could not find command cell for sample ${sample.fastq_name}`);
                 return;
             }
 
@@ -1464,17 +1539,20 @@ class PipelineSubmitModal {
             const baseCommand = commandTemplate.split(' ').slice(0, 5).join(' ');
 
             // Build the command using the new method
-            const command = this.buildCommand(baseCommand, sample, {
+            const command = this.buildCommand(baseCommand, {
+                ...sample,
+                load_name: sample.load_name === '—' ? '' : sample.load_name  // Keep load_name blank if it's "—"
+            }, {
                 reference: this.getReference(sample.organism_common_name || ''),
                 chemistry: this.getChemistry(sample.library_prep_method || ''),
                 includeIntrons: true,
                 executionPriority: selectedAsset === 'cellranger-multi',
                 assetTag,
                 isAlignment: stage === 'alignment',
-                assetName: selectedAsset  // Use the selected asset name directly
+                assetName: selectedAsset
             });
 
-            console.log(`Generated command for ${sample.load_name}: ${command}`);
+            console.log(`Generated command for ${sample.fastq_name}: ${command}`);
             commandCell.textContent = command;
 
             // Store the command in the sample object
