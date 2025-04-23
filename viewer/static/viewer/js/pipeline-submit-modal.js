@@ -229,120 +229,23 @@ class PipelineSubmitModal {
                 const isMtxCommand = currentCommand.includes('tenx-rnaseq-multi') ||
                     currentCommand.includes('cellranger-multi');
 
+                console.log('Command analysis:', {
+                    originalCommand: currentCommand,
+                    isMtxCommand,
+                    sampleWorkflow: sample.workflow,
+                    commandContainsArc: currentCommand.includes('tenx-arc'),
+                    commandContainsMulti: currentCommand.includes('tenx-rnaseq-multi')
+                });
+
                 // Force workflow based on command for more reliability
                 if (isMtxCommand) {
                     sample.workflow = 'MTX';
                     console.log('Forced workflow to MTX based on command');
                 }
 
-                // Calculate all the values based on the current command
-                const isAlignment = stage === 'alignment';
-                const isArc = sample.workflow === 'MTX' || isMtxCommand;
-
                 // CRITICAL: Parse the command to extract values
-                const currentValues = {
-                    reference: '',
-                    chemistry: '',
-                    includeIntrons: false,
-                    executionPriority: false,
-                    assetName: ''  // Add assetName to tracked values
-                };
-
-                // Always check for these flags directly in the command string
-                currentValues.includeIntrons = currentCommand.includes('--include-introns');
-                currentValues.executionPriority = currentCommand.includes('--execution-priority HIGH');
-
-                // Extract reference
-                const referenceMatch = currentCommand.match(/--reference-names\s+"([^"]+)"/);
-                if (referenceMatch) {
-                    currentValues.reference = referenceMatch[1];
-                }
-
-                // Extract chemistry from cellranger-addopts
-                const cellrangerAddoptsMatch = currentCommand.match(/--cellranger-addopts\s+['"]([^'"]+)['"]/);
-                if (cellrangerAddoptsMatch) {
-                    const addopts = cellrangerAddoptsMatch[1];
-                    const chemistryMatch = addopts.match(/--chemistry\s+([^\s"']+)/);
-                    if (chemistryMatch) {
-                        currentValues.chemistry = chemistryMatch[1];
-                    }
-                }
-
-                console.log('Extracted values for form:', currentValues);
-
-                // Get base command based on workflow and stage
-                let baseCommand = '';
-                if (isAlignment) {
-                    if (isArc) {
-                        baseCommand = 'ocs fastqs align tenx-rnaseq-multi --asset-name cellranger-multi';
-                    } else {
-                        baseCommand = 'ocs fastqs align tenx-rnaseq --asset-name cellranger-rnaseq';
-                    }
-                } else {
-                    if (isArc) {
-                        baseCommand = 'ocs fastqs postalign tenx-arc --asset-name multi_gex_qc';
-                    } else {
-                        baseCommand = 'ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc';
-                    }
-                }
-
-                // Get the organism for default reference selection
-                const organism = sample.organism_common_name || '';
-                const defaultReference = this.getReference(organism);
-
-                // Now create the form HTML
-                const formHtml = `
-                    <div class="command-edit-form">
-                        <div class="mb-3">
-                            <label class="form-label">Base Command</label>
-                            <input type="text" class="form-control command-input" value="${baseCommand}" data-workflow="${sample.workflow || 'RTX'}">
-                        </div>
-                        ${isAlignment ? `
-                            <div class="mb-3">
-                                <label class="form-label">Reference</label>
-                                <select class="form-select reference-select">
-                                    ${this.getReferences().map(ref =>
-                    `<option value="${ref.value}" ${ref.value === (currentValues.reference || defaultReference) ? 'selected' : ''}>
-                                        ${ref.name}
-                                    </option>`
-                ).join('')}
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Chemistry</label>
-                                <select class="form-select chemistry-select">
-                                    ${this.getChemistries().map(chem =>
-                    `<option value="${chem.value}" ${chem.value === currentValues.chemistry || chem.prep === sample.library_prep_method ? 'selected' : ''}>
-                                        ${chem.name}
-                                    </option>`
-                ).join('')}
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input include-introns" type="checkbox" id="include-introns-${sample.load_name}" 
-                                        ${currentValues.includeIntrons ? 'checked' : ''}>
-                                    <label class="form-check-label" for="include-introns-${sample.load_name}">
-                                        Include introns
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input execution-priority" type="checkbox" id="execution-priority-${sample.load_name}"
-                                        ${currentValues.executionPriority ? 'checked' : ''}>
-                                    <label class="form-check-label" for="execution-priority-${sample.load_name}">
-                                        High execution priority
-                                    </label>
-                                </div>
-                            </div>
-                        ` : ''}
-                        <div class="d-flex justify-content-end gap-2">
-                            <button type="button" class="btn btn-secondary cancel-edit">Cancel</button>
-                            <button type="button" class="btn btn-primary save-command">Save</button>
-                        </div>
-                    </div>
-                `;
+                const currentValues = this.parseCommand(currentCommand);
+                console.log('Parsed values from command:', currentValues);
 
                 // Get the existing form and replace it
                 const existingForm = cell.querySelector('.command-edit-form');
@@ -350,6 +253,8 @@ class PipelineSubmitModal {
                     console.log('Replacing existing form with newly generated one');
                     // Create a temporary container to parse the HTML
                     const tempContainer = document.createElement('div');
+                    const formHtml = this.createCommandEditForm(sample, stage, currentCommand);
+                    console.log('Generated form HTML with command:', currentCommand);
                     tempContainer.innerHTML = formHtml;
                     const newForm = tempContainer.firstElementChild;
 
@@ -358,6 +263,16 @@ class PipelineSubmitModal {
 
                     // Show the new form
                     newForm.classList.add('show');
+
+                    // Log the form state before adding event listeners
+                    const formState = {
+                        baseCommand: newForm.querySelector('.command-input')?.value,
+                        reference: newForm.querySelector('.reference-select')?.value,
+                        chemistry: newForm.querySelector('.chemistry-select')?.value,
+                        includeIntrons: newForm.querySelector('.include-introns')?.checked,
+                        executionPriority: newForm.querySelector('.execution-priority')?.checked
+                    };
+                    console.log('Form state after creation:', formState);
 
                     // Add event listeners to the new form
                     const inputs = newForm.querySelectorAll('input, select');
@@ -402,16 +317,14 @@ class PipelineSubmitModal {
                         });
                     }
 
-                    // Log the generated form state
-                    console.log('New form state:', {
+                    // Log the final form state
+                    console.log('Final form state:', {
                         baseCommand: newForm.querySelector('.command-input')?.value,
                         reference: newForm.querySelector('.reference-select')?.value,
                         chemistry: newForm.querySelector('.chemistry-select')?.value,
                         includeIntrons: newForm.querySelector('.include-introns')?.checked,
                         executionPriority: newForm.querySelector('.execution-priority')?.checked
                     });
-                } else {
-                    console.error('Could not find existing form to replace');
                 }
             }
         });
@@ -880,84 +793,38 @@ class PipelineSubmitModal {
             command
         });
 
-        const isAlignment = stage === 'alignment';
-        const workflow = this.determineWorkflow(sample, { checkCommand: true, command });
-
         // Parse the command to extract current values
-        const currentValues = this.parseCommand(command, isAlignment, this.isMtxWorkflow(sample, { checkCommand: true, command }));
-        console.log('Current values for form creation:', currentValues);
+        const currentValues = this.parseCommand(command);
+        console.log('Current values from command:', currentValues);
 
-        // Get the base command based on workflow and stage
-        let baseCommand = '';
-        if (isAlignment) {
-            if (this.isMtxWorkflow(sample, { checkCommand: true, command })) {
-                baseCommand = `ocs fastqs align tenx-rnaseq-multi --asset-name ${currentValues.assetName}`;
-            } else {
-                baseCommand = `ocs fastqs align tenx-rnaseq --asset-name ${currentValues.assetName}`;
-            }
-        } else {
-            if (this.isMtxWorkflow(sample, { checkCommand: true, command })) {
-                baseCommand = 'ocs fastqs postalign tenx-arc --asset-name multi_gex_qc';
-            } else {
-                baseCommand = 'ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc';
-            }
-        }
-
-        // Get the organism for default reference selection
-        const organism = sample.organism_common_name || '';
-        const defaultReference = this.getReference(organism);
-
-        console.log('Form generation values:', {
-            baseCommand,
-            currentValues,
-            isAlignment,
-            workflow,
-            isArc: this.isMtxWorkflow(sample, { checkCommand: true, command }),
-            isMtxCommand: this.isMtxWorkflow(sample, { checkCommand: true, command }),
-            command
-        });
-
-        // Force include introns to true if command string contains it
-        if (command.includes('--include-introns')) {
-            currentValues.includeIntrons = true;
-            console.log('Forced includeIntrons to true based on command string');
-        }
-
-        // Debug log for checkbox states
-        console.log('Checkbox states before form generation:', {
-            includeIntrons: currentValues.includeIntrons,
-            executionPriority: currentValues.executionPriority,
-            commandContainsIncludeIntrons: command.includes('--include-introns'),
-            commandContainsExecutionPriority: command.includes('--execution-priority HIGH')
-        });
-
+        // Create the form HTML
         const formHtml = `
             <div class="command-edit-form">
                 <div class="mb-3">
                     <label class="form-label">Base Command</label>
-                    <input type="text" class="form-control command-input" value="${baseCommand}" data-workflow="${workflow}">
+                    <input type="text" class="form-control command-input" value="${currentValues.baseCommand || ''}" data-workflow="${this.determineWorkflow(sample)}">
                 </div>
-                ${isAlignment ? `
+                ${stage === 'alignment' ? `
                     <div class="mb-3">
                         <label class="form-label">Reference</label>
                         <select class="form-select reference-select">
                             ${this.getReferences().map(ref =>
-            `<option value="${ref.value}" ${ref.value === (currentValues.reference || defaultReference) ? 'selected' : ''}>
+            `<option value="${ref.value}" ${ref.value === currentValues.reference ? 'selected' : ''}>
                                     ${ref.name}
                                 </option>`
         ).join('')}
                         </select>
                     </div>
-                        <div class="mb-3">
-                            <label class="form-label">Chemistry</label>
-                            <select class="form-select chemistry-select">
-                                ${this.getChemistries().map(chem =>
-            `<option value="${chem.value}" ${chem.value === currentValues.chemistry || chem.prep === sample.library_prep_method ? 'selected' : ''}>
-                                        ${chem.name}
-                                    </option>`
+                    <div class="mb-3">
+                        <label class="form-label">Chemistry</label>
+                        <select class="form-select chemistry-select">
+                            ${this.getChemistries().map(chem =>
+            `<option value="${chem.value}" ${chem.value === currentValues.chemistry ? 'selected' : ''}>
+                                    ${chem.name}
+                                </option>`
         ).join('')}
-                            </select>
-                        </div>
+                        </select>
+                    </div>
                     <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input include-introns" type="checkbox" id="include-introns-${sample.load_name}" 
@@ -975,8 +842,8 @@ class PipelineSubmitModal {
                                 High execution priority
                             </label>
                         </div>
-                        </div>
-                    ` : ''}
+                    </div>
+                ` : ''}
                 <div class="d-flex justify-content-end gap-2">
                     <button type="button" class="btn btn-secondary cancel-edit">Cancel</button>
                     <button type="button" class="btn btn-primary save-command">Save</button>
@@ -984,92 +851,65 @@ class PipelineSubmitModal {
             </div>
         `;
 
-        // Debug log for generated HTML
-        console.log('Generated form HTML with checkbox states:', {
-            includeIntronsChecked: currentValues.includeIntrons || command.includes('--include-introns'),
-            executionPriorityChecked: currentValues.executionPriority || command.includes('--execution-priority HIGH'),
-            sampleLoadName: sample.load_name,
-            baseCommand: baseCommand,
-            workflow: workflow
-        });
-
         return formHtml;
     }
 
-    parseCommand(command, isAlignment, isArc) {
+    parseCommand(command) {
         console.log('Parsing command:', command);
-        console.log('isAlignment:', isAlignment, 'isArc:', isArc);
+        const values = {};
 
-        const values = {
-            reference: '',
-            chemistry: '',
-            includeIntrons: false,
-            executionPriority: false,
-            notificationEmail: '',
-            assetName: ''  // Add assetName to tracked values
-        };
-
-        // Extract asset name
-        const assetNameMatch = command.match(/--asset-name\s+([^\s"]+)/);
-        console.log('Asset name match:', assetNameMatch);
-        if (assetNameMatch) {
-            values.assetName = assetNameMatch[1];
+        if (!command) {
+            console.log('No command to parse');
+            return values;
         }
+
+        // Extract the base command up to the first -- flag
+        const commandParts = command.split(/\s+--/);
+        values.baseCommand = commandParts[0];
+
+        // Add back the asset-name part if it exists in the original command
+        const assetNameMatch = command.match(/--asset-name\s+([^\s"]+)/);
+        if (assetNameMatch) {
+            values.baseCommand += ` --asset-name ${assetNameMatch[1]}`;
+            console.log('Found asset name in command:', assetNameMatch[1]);
+        }
+
+        console.log('Extracted base command:', values.baseCommand);
 
         // Extract reference
         const referenceMatch = command.match(/--reference-names\s+"([^"]+)"/);
-        console.log('Reference match:', referenceMatch);
         if (referenceMatch) {
             values.reference = referenceMatch[1];
+            console.log('Found reference in command:', values.reference);
         }
 
-        // Extract cellranger-addopts - handle both single and double quotes
-        // First try with double quotes
-        let cellrangerAddoptsMatch = command.match(/--cellranger-addopts\s+"([^"]+)"/);
-        if (!cellrangerAddoptsMatch) {
-            // If not found with double quotes, try single quotes
-            cellrangerAddoptsMatch = command.match(/--cellranger-addopts\s+'([^']+)'/);
-        }
-
-        console.log('Cellranger addopts match:', cellrangerAddoptsMatch);
-
+        // Extract cellranger-addopts
+        const cellrangerAddoptsMatch = command.match(/--cellranger-addopts\s+["']([^"']+)["']/);
         if (cellrangerAddoptsMatch) {
             const addopts = cellrangerAddoptsMatch[1];
-            console.log('Parsed addopts:', addopts);
+            console.log('Found cellranger-addopts:', addopts);
 
             // Extract chemistry from addopts
             const chemistryMatch = addopts.match(/--chemistry\s+([^\s"']+)/);
-            console.log('Chemistry match:', chemistryMatch);
             if (chemistryMatch) {
                 values.chemistry = chemistryMatch[1];
+                console.log('Found chemistry in addopts:', values.chemistry);
             }
 
-            // Check for include-introns in addopts (handle both with and without quotes)
+            // Check for include-introns in addopts
             values.includeIntrons = addopts.includes('--include-introns');
-            console.log('Include introns from addopts:', values.includeIntrons);
+            console.log('Include introns in addopts:', values.includeIntrons);
         }
 
-        // Also check for include-introns directly in the command (for MTX workflow)
-        if (!values.includeIntrons) {
+        // Also check for include-introns directly in command
+        if (!values.hasOwnProperty('includeIntrons')) {
             values.includeIntrons = command.includes('--include-introns');
-            console.log('Include introns from direct command:', values.includeIntrons);
+            console.log('Include introns in command:', values.includeIntrons);
         }
 
         // Check for execution priority
         values.executionPriority = command.includes('--execution-priority HIGH');
-        console.log('Execution priority:', values.executionPriority);
-
-        // Extract notification email
-        const notifyMatch = command.match(/--notify\s+([^\s]+)/);
-        if (notifyMatch) {
-            values.notificationEmail = notifyMatch[1];
-        }
-
-        // For MTX workflow, always set includeIntrons to true if it's in the command
-        if (isArc && command.includes('--include-introns')) {
-            values.includeIntrons = true;
-            console.log('Setting include introns to true for MTX workflow');
-        }
+        console.log('Execution priority in command:', values.executionPriority);
 
         console.log('Final parsed values:', values);
         return values;
@@ -1684,14 +1524,12 @@ class PipelineSubmitModal {
             executionPriority = false,
             assetTag = '',
             isAlignment = false,
-            assetName = ''
+            assetName = '',
+            preserveBaseCommand = false
         } = options;
 
-        // Start with the base parts of the command
-        const commandParts = baseCommand.split('--asset-name')[0].trim();
-
-        // Build command with explicit asset name, no fallback
-        let command = `${commandParts} --asset-name ${assetName}`;
+        // If preserveBaseCommand is true, use the entire base command as is
+        let command = preserveBaseCommand ? baseCommand : `${baseCommand.split('--asset-name')[0].trim()} --asset-name ${assetName}`;
 
         // Add reference if provided
         if (reference) {
@@ -1766,8 +1604,6 @@ class PipelineSubmitModal {
         const assetName = assetNameMatch ? assetNameMatch[1] : '';
         console.log('Extracted asset name:', assetName);
 
-        const workflow = this.determineWorkflow(sample, { checkCommand: true, command: baseCommand });
-
         // Get form values
         const referenceSelect = form.querySelector('.reference-select');
         const chemistrySelect = form.querySelector('.chemistry-select');
@@ -1781,7 +1617,8 @@ class PipelineSubmitModal {
             includeIntrons: includeIntronsCheck?.checked,
             executionPriority: executionPriorityCheck?.checked,
             isAlignment,
-            assetName  // Pass the extracted asset name
+            assetName,
+            preserveBaseCommand: true  // Add flag to preserve base command
         });
 
         console.log('Generated command:', {
