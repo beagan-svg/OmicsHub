@@ -876,46 +876,26 @@ class PipelineSubmitModal {
                 libraryPrepMethod: sample.library_prep_method
             } : 'No sample',
             stage,
-            command,
-            commandIncludesIntrons: command.includes('--include-introns')
+            command
         });
 
         const isAlignment = stage === 'alignment';
-        // Use stored workflow if available, otherwise determine it
-        const workflow = sample.workflow || this.determineWorkflow(sample);
-        const isArc = workflow === 'MTX';
-
-        console.log('Workflow determination:', {
-            directWorkflow: sample.workflow,
-            determinedWorkflow: this.determineWorkflow(sample),
-            finalWorkflow: workflow,
-            isArc: isArc
-        });
-
-        // Detect if command contains MTX indicators regardless of workflow
-        const isMtxCommand = command.includes('tenx-rnaseq-multi') ||
-            command.includes('cellranger-multi');
-
-        // If command indicates MTX but workflow is not MTX, log warning
-        if (isMtxCommand && workflow !== 'MTX') {
-            console.warn('Command indicates MTX but workflow is not MTX, overriding to MTX');
-            sample.workflow = 'MTX';
-        }
+        const workflow = this.determineWorkflow(sample, { checkCommand: true, command });
 
         // Parse the command to extract current values
-        const currentValues = this.parseCommand(command, isAlignment, isArc || isMtxCommand);
+        const currentValues = this.parseCommand(command, isAlignment, this.isMtxWorkflow(sample, { checkCommand: true, command }));
         console.log('Current values for form creation:', currentValues);
 
         // Get the base command based on workflow and stage
         let baseCommand = '';
         if (isAlignment) {
-            if (isArc || isMtxCommand) {
+            if (this.isMtxWorkflow(sample, { checkCommand: true, command })) {
                 baseCommand = 'ocs fastqs align tenx-rnaseq-multi --asset-name cellranger-multi';
             } else {
                 baseCommand = 'ocs fastqs align tenx-rnaseq --asset-name cellranger-rnaseq';
             }
         } else {
-            if (isArc || isMtxCommand) {
+            if (this.isMtxWorkflow(sample, { checkCommand: true, command })) {
                 baseCommand = 'ocs fastqs postalign tenx-arc --asset-name multi_gex_qc';
             } else {
                 baseCommand = 'ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc';
@@ -931,8 +911,8 @@ class PipelineSubmitModal {
             currentValues,
             isAlignment,
             workflow,
-            isArc,
-            isMtxCommand,
+            isArc: this.isMtxWorkflow(sample, { checkCommand: true, command }),
+            isMtxCommand: this.isMtxWorkflow(sample, { checkCommand: true, command }),
             command
         });
 
@@ -1086,12 +1066,30 @@ class PipelineSubmitModal {
         return values;
     }
 
-    determineWorkflow(sample) {
+    determineWorkflow(sample, options = {}) {
+        const {
+            checkCommand = false,
+            command = '',
+            forceMtx = false
+        } = options;
+
+        // If forceMtx is true, return MTX immediately
+        if (forceMtx) {
+            return 'MTX';
+        }
+
         // Get batch name from vendor, default to empty string if not present
         const batchName = (sample.batch_name_from_vendor || '').toUpperCase();
 
-        // Check for MTX workflow
-        if (batchName.startsWith('MTX') || batchName.includes('ATX')) {
+        // Check for MTX workflow indicators
+        const isMtxBatch = batchName.startsWith('MTX') || batchName.includes('ATX');
+        const isMtxCommand = checkCommand && command && (
+            command.includes('tenx-rnaseq-multi') ||
+            command.includes('cellranger-multi')
+        );
+
+        // Return MTX if either indicator is present
+        if (isMtxBatch || isMtxCommand) {
             return 'MTX';
         }
 
@@ -1102,6 +1100,14 @@ class PipelineSubmitModal {
 
         // Default to RTX for unrecognized patterns
         return 'RTX';
+    }
+
+    isMtxWorkflow(sample, options = {}) {
+        return this.determineWorkflow(sample, options) === 'MTX';
+    }
+
+    isRtxWorkflow(sample, options = {}) {
+        return this.determineWorkflow(sample, options) === 'RTX';
     }
 
     getStatusBadgeClass(status) {
@@ -1200,11 +1206,11 @@ class PipelineSubmitModal {
     }
 
     generateAlignmentCommand(sample) {
-        const workflow = sample.workflow || this.determineWorkflow(sample);
+        const workflow = this.determineWorkflow(sample);
         const libraryPrepMethod = sample.library_prep_method || '';
 
         // Check if this is an unknown library prep method
-        if (workflow === 'RTX' && !this.isLibraryPrepMethodKnown(libraryPrepMethod)) {
+        if (this.isRtxWorkflow(sample) && !this.isLibraryPrepMethodKnown(libraryPrepMethod)) {
             // For unknown library preps, return empty command until user selects an asset
             return '';
         }
@@ -1219,7 +1225,7 @@ class PipelineSubmitModal {
     }
 
     generatePostQCCommand(sample) {
-        const workflow = sample.workflow || this.determineWorkflow(sample);
+        const workflow = this.determineWorkflow(sample);
         const libraryPrepMethod = sample.library_prep_method || '';
 
         const commandTemplate = this.getCommandTemplate(workflow, 'postqc', libraryPrepMethod);
@@ -1605,8 +1611,19 @@ class PipelineSubmitModal {
                 return;
             }
 
-            // Generate command
-            const command = this.generateCommandFromTemplate(commandTemplate, sample);
+            // Get the base command from the template
+            const baseCommand = commandTemplate.split(' ').slice(0, 5).join(' ');
+
+            // Build the command using the new method
+            const command = this.buildCommand(baseCommand, sample, {
+                reference: this.getReference(sample.organism_common_name || ''),
+                chemistry: this.getChemistry(sample.library_prep_method || ''),
+                includeIntrons: true, // Default to true for unknown library preps
+                executionPriority: selectedAsset === 'cellranger-multi',
+                assetTag,
+                isAlignment: stage === 'alignment'
+            });
+
             console.log(`Generated command for ${sample.load_name}: ${command}`);
             commandCell.textContent = command;
 
@@ -1649,6 +1666,63 @@ class PipelineSubmitModal {
         });
     }
 
+    buildCommand(baseCommand, sample, options = {}) {
+        const {
+            reference = '',
+            chemistry = '',
+            includeIntrons = false,
+            executionPriority = false,
+            assetTag = '',
+            isAlignment = false
+        } = options;
+
+        let command = baseCommand;
+
+        // Add reference if provided
+        if (reference) {
+            command += ` --reference-names "${reference}"`;
+        }
+
+        // Add load name
+        command += ` --load-names "${sample.load_name}"`;
+
+        // Add asset tag if provided
+        if (assetTag) {
+            command += ` --asset-tag ${assetTag}`;
+        }
+
+        // Add chemistry and include-introns for alignment
+        if (isAlignment) {
+            // Only add cellranger-addopts if chemistry is selected or include-introns is checked
+            if (chemistry || includeIntrons) {
+                let addopts = '';
+                if (chemistry) {
+                    addopts += `--chemistry ${chemistry}`;
+                }
+                if (includeIntrons) {
+                    addopts += (addopts ? ' ' : '') + '--include-introns';
+                }
+                if (addopts) {
+                    command += ` --cellranger-addopts "${addopts}"`;
+                }
+            }
+
+            // Add execution priority if checked
+            if (executionPriority) {
+                command += ' --execution-priority HIGH';
+            }
+        }
+
+        // Add notification settings
+        command += ' --notify-on FAILED';
+        const email = this.getNotificationEmail();
+        if (email) {
+            command += ` --notify ${email}`;
+        }
+
+        return command;
+    }
+
     updateCommandPreview(form) {
         const cell = form.closest('.command-cell');
         const row = cell.closest('tr');
@@ -1670,58 +1744,23 @@ class PipelineSubmitModal {
         }
 
         const isAlignment = stage === 'alignment';
-        const workflow = this.determineWorkflow(sample);
-        const isArc = workflow === 'MTX';
+        const baseCommand = form.querySelector('.command-input').value;
+        const workflow = this.determineWorkflow(sample, { checkCommand: true, command: baseCommand });
 
         // Get form values
-        const baseCommand = form.querySelector('.command-input').value;
         const referenceSelect = form.querySelector('.reference-select');
         const chemistrySelect = form.querySelector('.chemistry-select');
         const includeIntronsCheck = form.querySelector('.include-introns');
         const executionPriorityCheck = form.querySelector('.execution-priority');
 
-        // Build the command
-        let newCommand = baseCommand;
-
-        // Add reference if selected
-        if (referenceSelect && referenceSelect.value) {
-            newCommand += ` --reference-names "${referenceSelect.value}"`;
-        }
-
-        // Add load name
-        newCommand += ` --load-names "${sample.load_name}"`;
-
-        // Add chemistry and include-introns for alignment
-        if (isAlignment) {
-            // Only add cellranger-addopts if chemistry is selected or include-introns is checked
-            const selectedChemistry = chemistrySelect?.value;
-            const includeIntrons = includeIntronsCheck?.checked;
-
-            if (selectedChemistry || includeIntrons) {
-                let addopts = '';
-                if (selectedChemistry) {
-                    addopts += `--chemistry ${selectedChemistry}`;
-                }
-                if (includeIntrons) {
-                    addopts += (addopts ? ' ' : '') + '--include-introns';
-                }
-                if (addopts) {
-                    newCommand += ` --cellranger-addopts "${addopts}"`;
-                }
-            }
-
-            // Add execution priority if checked
-            if (executionPriorityCheck && executionPriorityCheck.checked) {
-                newCommand += ' --execution-priority HIGH';
-            }
-        }
-
-        // Add notification settings
-        newCommand += ' --notify-on FAILED';
-        const email = this.getNotificationEmail();
-        if (email) {
-            newCommand += ` --notify ${email}`;
-        }
+        // Build the command using the new method
+        const newCommand = this.buildCommand(baseCommand, sample, {
+            reference: referenceSelect?.value,
+            chemistry: chemistrySelect?.value,
+            includeIntrons: includeIntronsCheck?.checked,
+            executionPriority: executionPriorityCheck?.checked,
+            isAlignment
+        });
 
         // Update the command display
         const codeElement = cell.querySelector('code');

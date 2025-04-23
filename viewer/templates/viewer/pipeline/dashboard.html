@@ -20,6 +20,322 @@
     .pagination-dropdown .dropdown-item {
         padding: 0.25rem 1rem;
     }
+
+    .batches-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .batch-group {
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        overflow: hidden;
+    }
+
+    .batch-header {
+        background-color: #f8f9fa;
+        padding: 0.75rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .batch-content {
+        padding: 1rem;
+    }
+
+    .batch-table {
+        width: 100%;
+        margin-bottom: 0;
+    }
+
+    .batch-table th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .command-cell {
+        position: relative;
+    }
+
+    .command-actions {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .command-edit-form {
+        display: none;
+        padding: 1.25rem;
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        margin-top: 1rem;
+        border: 1px solid rgba(0, 0, 0, 0.125);
+    }
+
+    .command-edit-form.show {
+        display: block;
+    }
+
+    .command-edit-form .form-label {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.5rem;
+    }
+
+    .command-edit-form .form-control,
+    .command-edit-form .form-select {
+        border-color: #ced4da;
+        background-color: #fff;
+    }
+
+    .command-edit-form .form-control:focus,
+    .command-edit-form .form-select:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+
+    .command-edit-form .form-text {
+        color: #6c757d;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .command-edit-form .form-check {
+        margin-bottom: 0;
+    }
+
+    .command-edit-form .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    .command-edit-form .form-check-label {
+        color: #495057;
+    }
+
+    .command-edit-form .btn {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+    }
+
+    .command-edit-form .btn-primary {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    .command-edit-form .btn-primary:hover {
+        background-color: #0b5ed7;
+        border-color: #0a58ca;
+    }
+
+    .command-edit-form .btn-secondary {
+        background-color: #6c757d;
+        border-color: #6c757d;
+    }
+
+    .command-edit-form .btn-secondary:hover {
+        background-color: #5c636a;
+        border-color: #565e64;
+    }
+
+    .auto-proceed-section {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #dee2e6;
+    }
+
+    .auto-proceed-badge {
+        background-color: #198754;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .submission-card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        transition: box-shadow 0.2s ease-in-out;
+    }
+
+    .submission-card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+
+    .submission-card .card-header {
+        border-bottom: none;
+        padding: 1rem 1.25rem;
+    }
+
+    .batches-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1.25rem;
+    }
+
+    .batch-group {
+        background-color: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.125);
+        border-radius: 0.5rem;
+        overflow: hidden;
+        transition: all 0.2s ease-in-out;
+    }
+
+    .batch-group:hover {
+        border-color: rgba(0, 0, 0, 0.2);
+    }
+
+    .batch-header {
+        background-color: #f8f9fa;
+        padding: 0.75rem 1.25rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    }
+
+    .batch-name {
+        font-weight: 500;
+        color: #212529;
+    }
+
+    .batch-content {
+        padding: 1.25rem;
+    }
+
+    .batch-table {
+        width: 100%;
+        margin-bottom: 0;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .batch-table th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        padding: 0.75rem 1rem;
+        font-weight: 500;
+        color: #495057;
+    }
+
+    .batch-table td {
+        padding: 1rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .batch-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .command-cell {
+        position: relative;
+        min-width: 300px;
+    }
+
+    .command-cell code {
+        display: block;
+        background-color: #f8f9fa;
+        padding: 0.75rem;
+        border-radius: 0.375rem;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 0.875rem;
+        color: #212529;
+        margin-bottom: 0.5rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .command-actions {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        gap: 0.5rem;
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+    }
+
+    .command-cell:hover .command-actions {
+        opacity: 1;
+    }
+
+    .auto-proceed-section {
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid rgba(0, 0, 0, 0.125);
+    }
+
+    .auto-proceed-badge {
+        background-color: #198754;
+        color: white;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-bottom: 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .auto-proceed-badge i {
+        font-size: 1rem;
+    }
+
+    .toggle-batch {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease-in-out;
+    }
+
+    .toggle-batch:hover {
+        background-color: #e9ecef;
+    }
+
+    .toggle-batch i {
+        transition: transform 0.2s ease-in-out;
+    }
+
+    .toggle-batch.collapsed i {
+        transform: rotate(-90deg);
+    }
+
+    /* Rainbow badge for MTX workflow */
+    .rainbow-badge {
+        background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
+        background-size: 1800% 1800%;
+        animation: rainbow 8s ease infinite;
+        color: white;
+        font-weight: 500;
+        padding: 0.35em 0.65em;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+    }
+
+    @keyframes rainbow {
+        0% {
+            background-position: 0% 80%
+        }
+
+        50% {
+            background-position: 100% 20%
+        }
+
+        100% {
+            background-position: 0% 80%
+        }
+    }
 </style>
 {% endblock %}
 
@@ -463,6 +779,7 @@
                             <tr>
                                 <th>FASTQ Name</th>
                                 <th>Load Name</th>
+                                <th>Batch Name From Vendor</th>
                                 <th>Workflow</th>
                                 <th>Organism</th>
                                 <th>Library Prep Method</th>
@@ -483,7 +800,12 @@
                         Detected</h6>
                     <p>The following samples have not completed ingest:</p>
                     <ul id="incomplete-samples-list" class="mb-2"></ul>
-                    <p class="mb-0">Would you like to proceed with submission?</p>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="include-incomplete-samples">
+                        <label class="form-check-label" for="include-incomplete-samples">
+                            Include incomplete samples in submission
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Auto-proceed to Post-QC toggle -->
@@ -494,42 +816,258 @@
                     </label>
                 </div>
 
+                <!-- Notification Email Section -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="bi bi-envelope"></i>
+                            <h6 class="mb-0">Notification Email</h6>
+                        </div>
+                        <div class="mb-3">
+                            <input type="email" class="form-control" id="global-notification-email"
+                                placeholder="Enter email...">
+                            <div class="form-text">You will be notified at this email address if any jobs fail.</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Submission Commands Section -->
-                <div class="row g-3">
+                <div class="row g-4">
                     <!-- Alignment Submissions -->
-                    <div class="col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header bg-primary text-white">
-                                <h6 class="mb-0">Alignment Submissions</h6>
-                                <small>Samples that have completed ingest and will proceed to alignment</small>
+                    <div class="col-12">
+                        <div class="card submission-card">
+                            <div
+                                class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-gear-fill me-2"></i>
+                                    <h6 class="mb-0">Alignment Submissions</h6>
+                                </div>
+                                <small class="text-white-50">Samples that have completed ingest and will proceed to
+                                    alignment</small>
                             </div>
-                            <div class="card-body">
-                                <div class="list-group list-group-flush" id="alignment-commands-list">
+                            <div class="card-body p-0">
+                                <div id="alignment-batches" class="batches-container">
                                     <!-- Will be populated dynamically -->
-                                    <div class="list-group-item text-center text-muted">No samples eligible for
-                                        alignment</div>
+                                    <div class="text-center text-muted p-4">No samples eligible for alignment</div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Post-QC Submissions -->
-                    <div class="col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header bg-success text-white">
-                                <h6 class="mb-0">Post-QC Submissions</h6>
-                                <small>Samples that have completed alignment and will proceed to post-QC</small>
+                    <div class="col-12">
+                        <div class="card submission-card">
+                            <div
+                                class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-check-circle-fill me-2"></i>
+                                    <h6 class="mb-0">Post-QC Submissions</h6>
+                                </div>
+                                <small class="text-white-50">Samples that have completed alignment and will proceed to
+                                    post-QC</small>
                             </div>
-                            <div class="card-body">
-                                <div class="list-group list-group-flush" id="postqc-commands-list">
+                            <div class="card-body p-0">
+                                <div id="postqc-batches" class="batches-container">
                                     <!-- Will be populated dynamically -->
-                                    <div class="list-group-item text-center text-muted">No samples eligible for post-QC
-                                    </div>
+                                    <div class="text-center text-muted p-4">No samples eligible for post-QC</div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <style>
+                    .submission-card {
+                        border: none;
+                        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+                        transition: box-shadow 0.2s ease-in-out;
+                    }
+
+                    .submission-card:hover {
+                        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+                    }
+
+                    .submission-card .card-header {
+                        border-bottom: none;
+                        padding: 1rem 1.25rem;
+                    }
+
+                    .batches-container {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 1rem;
+                        padding: 1.25rem;
+                    }
+
+                    .batch-group {
+                        background-color: #fff;
+                        border: 1px solid rgba(0, 0, 0, 0.125);
+                        border-radius: 0.5rem;
+                        overflow: hidden;
+                        transition: all 0.2s ease-in-out;
+                    }
+
+                    .batch-group:hover {
+                        border-color: rgba(0, 0, 0, 0.2);
+                    }
+
+                    .batch-header {
+                        background-color: #f8f9fa;
+                        padding: 0.75rem 1.25rem;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+                    }
+
+                    .batch-name {
+                        font-weight: 500;
+                        color: #212529;
+                    }
+
+                    .batch-content {
+                        padding: 1.25rem;
+                    }
+
+                    .batch-table {
+                        width: 100%;
+                        margin-bottom: 0;
+                        border-collapse: separate;
+                        border-spacing: 0;
+                    }
+
+                    .batch-table th {
+                        background-color: #f8f9fa;
+                        border-bottom: 2px solid #dee2e6;
+                        padding: 0.75rem 1rem;
+                        font-weight: 500;
+                        color: #495057;
+                    }
+
+                    .batch-table td {
+                        padding: 1rem;
+                        vertical-align: middle;
+                        border-bottom: 1px solid #dee2e6;
+                    }
+
+                    .batch-table tr:last-child td {
+                        border-bottom: none;
+                    }
+
+                    .command-cell {
+                        position: relative;
+                        min-width: 300px;
+                    }
+
+                    .command-cell code {
+                        display: block;
+                        background-color: #f8f9fa;
+                        padding: 0.75rem;
+                        border-radius: 0.375rem;
+                        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+                        font-size: 0.875rem;
+                        color: #212529;
+                        margin-bottom: 0.5rem;
+                        white-space: pre-wrap;
+                        word-break: break-word;
+                    }
+
+                    .command-actions {
+                        position: absolute;
+                        right: 0;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        display: flex;
+                        gap: 0.5rem;
+                        opacity: 0;
+                        transition: opacity 0.2s ease-in-out;
+                    }
+
+                    .command-cell:hover .command-actions {
+                        opacity: 1;
+                    }
+
+                    .command-edit-form {
+                        display: none;
+                        padding: 1.25rem;
+                        background-color: #f8f9fa;
+                        border-radius: 0.5rem;
+                        margin-top: 1rem;
+                        border: 1px solid rgba(0, 0, 0, 0.125);
+                    }
+
+                    .command-edit-form.show {
+                        display: block;
+                    }
+
+                    .auto-proceed-section {
+                        margin-top: 1.5rem;
+                        padding-top: 1.5rem;
+                        border-top: 1px solid rgba(0, 0, 0, 0.125);
+                    }
+
+                    .auto-proceed-badge {
+                        background-color: #198754;
+                        color: white;
+                        padding: 0.375rem 0.75rem;
+                        border-radius: 0.375rem;
+                        font-size: 0.875rem;
+                        font-weight: 500;
+                        margin-bottom: 1rem;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                    }
+
+                    .auto-proceed-badge i {
+                        font-size: 1rem;
+                    }
+
+                    .toggle-batch {
+                        padding: 0.25rem 0.5rem;
+                        font-size: 0.875rem;
+                        border-radius: 0.375rem;
+                        transition: all 0.2s ease-in-out;
+                    }
+
+                    .toggle-batch:hover {
+                        background-color: #e9ecef;
+                    }
+
+                    .toggle-batch i {
+                        transition: transform 0.2s ease-in-out;
+                    }
+
+                    .toggle-batch.collapsed i {
+                        transform: rotate(-90deg);
+                    }
+
+                    /* Rainbow badge for MTX workflow */
+                    .rainbow-badge {
+                        background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
+                        background-size: 1800% 1800%;
+                        animation: rainbow 8s ease infinite;
+                        color: white;
+                        font-weight: 500;
+                        padding: 0.35em 0.65em;
+                        border-radius: 0.375rem;
+                        font-size: 0.875rem;
+                    }
+
+                    @keyframes rainbow {
+                        0% {
+                            background-position: 0% 80%
+                        }
+
+                        50% {
+                            background-position: 100% 20%
+                        }
+
+                        100% {
+                            background-position: 0% 80%
+                        }
+                    }
+                </style>
 
                 <div class="alert alert-info my-3">
                     <small>
@@ -635,7 +1173,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="{% static 'viewer/js/pipeline-config.js' %}"></script>
 <script src="{% static 'viewer/js/pipeline-local-data.js' %}"></script>
 <script src="{% static 'viewer/js/pipeline-submit-modal.js' %}"></script>
 <script>
