@@ -76,11 +76,23 @@ class PipelineSubmitModal {
     getChemistries() {
         if (!this.config) return [];
 
-        return Object.entries(this.config.chemistries).map(([prep, chemistry]) => ({
-            name: `${chemistry} (${prep})`,
-            value: chemistry,
-            prep: prep
-        }));
+        // Add None option first
+        const chemistries = [{
+            name: 'None',
+            value: '',
+            prep: ''
+        }];
+
+        // Add other chemistries from config
+        Object.entries(this.config.chemistries).forEach(([prep, chemistry]) => {
+            chemistries.push({
+                name: `${chemistry} (${prep})`,
+                value: chemistry,
+                prep: prep
+            });
+        });
+
+        return chemistries;
     }
 
     getAssetName(workflow, stage, libraryPrep) {
@@ -183,73 +195,222 @@ class PipelineSubmitModal {
         this.modal.addEventListener('click', (e) => {
             const editButton = e.target.closest('.edit-command');
             if (editButton) {
+                console.log('Edit button clicked');
                 e.preventDefault();
                 const cell = editButton.closest('.command-cell');
                 const row = cell.closest('tr');
-                const command = cell.querySelector('code').textContent;
-                const stage = cell.closest('.batch-group')?.dataset.stage || 'alignment';
-                const fastqName = row.querySelector('td:first-child').textContent.trim();
+                const currentCommand = cell.querySelector('code').textContent;
+                const stage = row.dataset.stage;
+                const sampleName = row.dataset.sample;
+                const workflow = row.dataset.workflow;
 
-                console.log('Edit button clicked:', {
-                    fastqName,
+                console.log('Edit command context:', {
+                    currentCommand,
+                    sampleName,
                     stage,
-                    command
+                    workflow
                 });
 
-                // Find the sample data
-                let sample;
+                // Find sample directly from our tracked arrays
+                let sample = null;
+
                 if (stage === 'alignment') {
-                    sample = [...this.alignmentSamples, ...this.incompleteSamples].find(s => s.fastq_name === fastqName);
+                    sample = [...this.alignmentSamples, ...this.incompleteSamples].find(s => s.load_name === sampleName);
                 } else {
-                    sample = this.postQCSamples.find(s => s.fastq_name === fastqName);
+                    sample = this.postQCSamples.find(s => s.load_name === sampleName);
                 }
 
-                console.log('Found sample:', sample);
+                if (!sample) {
+                    console.error('Could not find sample in our data arrays');
+                    return;
+                }
 
-                const form = cell.querySelector('.command-edit-form');
-                console.log('Current command before edit:', command);
+                // Look for MTX indicators in the command
+                const isMtxCommand = currentCommand.includes('tenx-rnaseq-multi') ||
+                    currentCommand.includes('cellranger-multi');
 
-                // Parse the command to check flags
-                const parsedCommand = this.parseCommand(command, stage === 'alignment', this.determineWorkflow(sample) === 'MTX');
-                console.log('Parsed command values:', parsedCommand);
+                // Force workflow based on command for more reliability
+                if (isMtxCommand) {
+                    sample.workflow = 'MTX';
+                    console.log('Forced workflow to MTX based on command');
+                }
 
-                // Toggle the form visibility
-                if (form.classList.contains('show')) {
-                    form.classList.remove('show');
+                // Calculate all the values based on the current command
+                const isAlignment = stage === 'alignment';
+                const isArc = sample.workflow === 'MTX' || isMtxCommand;
+
+                // CRITICAL: Parse the command to extract values
+                const currentValues = {
+                    reference: '',
+                    chemistry: '',
+                    includeIntrons: false,
+                    executionPriority: false
+                };
+
+                // Always check for these flags directly in the command string
+                currentValues.includeIntrons = currentCommand.includes('--include-introns');
+                currentValues.executionPriority = currentCommand.includes('--execution-priority HIGH');
+
+                // Extract reference
+                const referenceMatch = currentCommand.match(/--reference-names\s+"([^"]+)"/);
+                if (referenceMatch) {
+                    currentValues.reference = referenceMatch[1];
+                }
+
+                // Extract chemistry from cellranger-addopts
+                const cellrangerAddoptsMatch = currentCommand.match(/--cellranger-addopts\s+['"]([^'"]+)['"]/);
+                if (cellrangerAddoptsMatch) {
+                    const addopts = cellrangerAddoptsMatch[1];
+                    const chemistryMatch = addopts.match(/--chemistry\s+([^\s"']+)/);
+                    if (chemistryMatch) {
+                        currentValues.chemistry = chemistryMatch[1];
+                    }
+                }
+
+                console.log('Extracted values for form:', currentValues);
+
+                // Get base command based on workflow and stage
+                let baseCommand = '';
+                if (isAlignment) {
+                    if (isArc) {
+                        baseCommand = 'ocs fastqs align tenx-rnaseq-multi --asset-name cellranger-multi';
+                    } else {
+                        baseCommand = 'ocs fastqs align tenx-rnaseq --asset-name cellranger-rnaseq';
+                    }
                 } else {
-                    // Hide any other open forms first
-                    this.modal.querySelectorAll('.command-edit-form.show').forEach(openForm => {
-                        openForm.classList.remove('show');
+                    if (isArc) {
+                        baseCommand = 'ocs fastqs postalign tenx-arc --asset-name multi_gex_qc';
+                    } else {
+                        baseCommand = 'ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc';
+                    }
+                }
+
+                // Get the organism for default reference selection
+                const organism = sample.organism_common_name || '';
+                const defaultReference = this.getReference(organism);
+
+                // Now create the form HTML
+                const formHtml = `
+                    <div class="command-edit-form">
+                        <div class="mb-3">
+                            <label class="form-label">Base Command</label>
+                            <input type="text" class="form-control command-input" value="${baseCommand}" data-workflow="${sample.workflow || 'RTX'}">
+                        </div>
+                        ${isAlignment ? `
+                            <div class="mb-3">
+                                <label class="form-label">Reference</label>
+                                <select class="form-select reference-select">
+                                    ${this.getReferences().map(ref =>
+                    `<option value="${ref.value}" ${ref.value === (currentValues.reference || defaultReference) ? 'selected' : ''}>
+                                        ${ref.name}
+                                    </option>`
+                ).join('')}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Chemistry</label>
+                                <select class="form-select chemistry-select">
+                                    ${this.getChemistries().map(chem =>
+                    `<option value="${chem.value}" ${chem.value === currentValues.chemistry || chem.prep === sample.library_prep_method ? 'selected' : ''}>
+                                        ${chem.name}
+                                    </option>`
+                ).join('')}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input include-introns" type="checkbox" id="include-introns-${sample.load_name}" 
+                                        ${currentValues.includeIntrons ? 'checked' : ''}>
+                                    <label class="form-check-label" for="include-introns-${sample.load_name}">
+                                        Include introns
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input execution-priority" type="checkbox" id="execution-priority-${sample.load_name}"
+                                        ${currentValues.executionPriority ? 'checked' : ''}>
+                                    <label class="form-check-label" for="execution-priority-${sample.load_name}">
+                                        High execution priority
+                                    </label>
+                                </div>
+                            </div>
+                        ` : ''}
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-secondary cancel-edit">Cancel</button>
+                            <button type="button" class="btn btn-primary save-command">Save</button>
+                        </div>
+                    </div>
+                `;
+
+                // Get the existing form and replace it
+                const existingForm = cell.querySelector('.command-edit-form');
+                if (existingForm) {
+                    console.log('Replacing existing form with newly generated one');
+                    // Create a temporary container to parse the HTML
+                    const tempContainer = document.createElement('div');
+                    tempContainer.innerHTML = formHtml;
+                    const newForm = tempContainer.firstElementChild;
+
+                    // Replace the existing form
+                    existingForm.parentNode.replaceChild(newForm, existingForm);
+
+                    // Show the new form
+                    newForm.classList.add('show');
+
+                    // Add event listeners to the new form
+                    const inputs = newForm.querySelectorAll('input, select');
+                    inputs.forEach(input => {
+                        input.addEventListener('change', () => {
+                            console.log('Input changed:', {
+                                type: input.type,
+                                class: input.className,
+                                value: input.type === 'checkbox' ? input.checked : input.value
+                            });
+                            this.updateCommandPreview(newForm);
+                        });
                     });
-                    form.classList.add('show');
 
-                    // Explicitly set checkbox states after form is shown
-                    const includeIntronsCheckbox = form.querySelector('.include-introns');
-                    const executionPriorityCheckbox = form.querySelector('.execution-priority');
+                    // For text inputs, also listen for keyup events
+                    const textInputs = newForm.querySelectorAll('input[type="text"]');
+                    textInputs.forEach(input => {
+                        input.addEventListener('keyup', () => {
+                            console.log('Text input keyup:', {
+                                class: input.className,
+                                value: input.value
+                            });
+                            this.updateCommandPreview(newForm);
+                        });
+                    });
 
-                    if (includeIntronsCheckbox) {
-                        includeIntronsCheckbox.checked = parsedCommand.includeIntrons === true;
-                        console.log('Setting include-introns checkbox:', {
-                            parsedValue: parsedCommand.includeIntrons,
-                            checkboxState: includeIntronsCheckbox.checked
+                    // Handle cancel button
+                    const cancelButton = newForm.querySelector('.cancel-edit');
+                    if (cancelButton) {
+                        cancelButton.addEventListener('click', () => {
+                            console.log('Cancel button clicked');
+                            newForm.classList.remove('show');
                         });
                     }
 
-                    if (executionPriorityCheckbox) {
-                        executionPriorityCheckbox.checked = parsedCommand.executionPriority === true;
-                        console.log('Setting execution-priority checkbox:', {
-                            parsedValue: parsedCommand.executionPriority,
-                            checkboxState: executionPriorityCheckbox.checked
+                    // Handle save button
+                    const saveButton = newForm.querySelector('.save-command');
+                    if (saveButton) {
+                        saveButton.addEventListener('click', () => {
+                            console.log('Save button clicked');
+                            newForm.classList.remove('show');
                         });
                     }
 
-                    // Verify final checkbox states
-                    console.log('Final checkbox states:', {
-                        includeIntrons: includeIntronsCheckbox?.checked,
-                        executionPriority: executionPriorityCheckbox?.checked,
-                        includeIntronsExists: !!includeIntronsCheckbox,
-                        executionPriorityExists: !!executionPriorityCheckbox
+                    // Log the generated form state
+                    console.log('New form state:', {
+                        baseCommand: newForm.querySelector('.command-input')?.value,
+                        reference: newForm.querySelector('.reference-select')?.value,
+                        chemistry: newForm.querySelector('.chemistry-select')?.value,
+                        includeIntrons: newForm.querySelector('.include-introns')?.checked,
+                        executionPriority: newForm.querySelector('.execution-priority')?.checked
                     });
+                } else {
+                    console.error('Could not find existing form to replace');
                 }
             }
         });
@@ -259,89 +420,21 @@ class PipelineSubmitModal {
             const cancelButton = e.target.closest('.cancel-edit');
             if (cancelButton) {
                 e.preventDefault();
+                console.log('Cancel button clicked');
                 const form = cancelButton.closest('.command-edit-form');
-                form.classList.remove('show');
+                if (form) {
+                    console.log('Hiding form');
+                    form.classList.remove('show');
+                }
             }
         });
 
-        // Save button click
+        // Save button click (now just confirms and closes the form)
         this.modal.addEventListener('click', (e) => {
             const saveButton = e.target.closest('.save-command');
             if (saveButton) {
                 e.preventDefault();
                 const form = saveButton.closest('.command-edit-form');
-                const cell = form.closest('.command-cell');
-                const row = cell.closest('tr');
-                const fastqName = row.querySelector('td:first-child').textContent.trim();
-                const batchGroup = cell.closest('.batch-group');
-                const stage = batchGroup ? batchGroup.dataset.stage : 'alignment';
-
-                // Find the sample data from our tracked samples
-                let sample;
-                if (stage === 'alignment') {
-                    sample = [...this.alignmentSamples, ...this.incompleteSamples].find(s => s.fastq_name === fastqName);
-                } else {
-                    sample = this.postQCSamples.find(s => s.fastq_name === fastqName);
-                }
-
-                if (!sample) {
-                    console.error('Sample not found:', fastqName);
-                    return;
-                }
-
-                const isAlignment = stage === 'alignment';
-                const workflow = this.determineWorkflow(sample);
-                const isArc = workflow === 'MTX';
-
-                // Get form values
-                const baseCommand = form.querySelector('.command-input').value;
-                const referenceSelect = form.querySelector('.reference-select');
-                const chemistrySelect = form.querySelector('.chemistry-select');
-                const includeIntronsCheck = form.querySelector('.include-introns');
-                const executionPriorityCheck = form.querySelector('.execution-priority');
-
-                // Build the command
-                let newCommand = baseCommand;
-
-                // Add reference if selected
-                if (referenceSelect && referenceSelect.value) {
-                    newCommand += ` --reference-names "${referenceSelect.value}"`;
-                }
-
-                // Add load name
-                newCommand += ` --load-names "${sample.load_name}"`;
-
-                // Add chemistry and include-introns for alignment
-                if (isAlignment) {
-                    if (chemistrySelect && chemistrySelect.value) {
-                        newCommand += ` --cellranger-addopts "--chemistry ${chemistrySelect.value}${includeIntronsCheck && includeIntronsCheck.checked ? ' --include-introns' : ''}"`;
-                    }
-
-                    // Add execution priority if checked
-                    if (executionPriorityCheck && executionPriorityCheck.checked) {
-                        newCommand += ' --execution-priority HIGH';
-                    }
-                }
-
-                // Add notification settings
-                newCommand += ' --notify-on FAILED';
-                const email = this.getNotificationEmail();
-                if (email) {
-                    newCommand += ` --notify ${email}`;
-                }
-
-                // Update the command display
-                const codeElement = cell.querySelector('code');
-                codeElement.textContent = newCommand;
-
-                // Update the command in the sample data
-                if (stage === 'alignment') {
-                    sample.alignmentCommand = newCommand;
-                } else {
-                    sample.postQCCommand = newCommand;
-                }
-
-                // Hide the form
                 form.classList.remove('show');
             }
         });
@@ -745,13 +838,17 @@ class PipelineSubmitModal {
     }
 
     createSampleRow(sample, stage) {
+        // Determine workflow
         const workflow = this.determineWorkflow(sample);
+        // Store workflow directly on the sample for later reference
+        sample.workflow = workflow;
+
         const command = stage === 'alignment' ?
             this.generateAlignmentCommand(sample) :
             this.generatePostQCCommand(sample);
 
         return `
-            <tr data-sample="${sample.load_name}" data-stage="${stage}">
+            <tr data-sample="${sample.load_name}" data-stage="${stage}" data-workflow="${workflow}">
                 <td>${sample.fastq_name}</td>
                 <td><span class="badge ${workflow === 'MTX' ? 'rainbow-badge' : 'bg-primary'}">${workflow}</span></td>
                 <td class="command-cell">
@@ -772,29 +869,53 @@ class PipelineSubmitModal {
 
     createCommandEditForm(sample, stage, command) {
         console.log('Creating command edit form for:', {
-            sample,
+            sample: sample ? {
+                fastqName: sample.fastq_name,
+                loadName: sample.load_name,
+                workflow: sample.workflow || this.determineWorkflow(sample),
+                libraryPrepMethod: sample.library_prep_method
+            } : 'No sample',
             stage,
-            command
+            command,
+            commandIncludesIntrons: command.includes('--include-introns')
         });
 
         const isAlignment = stage === 'alignment';
-        const workflow = this.determineWorkflow(sample);
+        // Use stored workflow if available, otherwise determine it
+        const workflow = sample.workflow || this.determineWorkflow(sample);
         const isArc = workflow === 'MTX';
 
+        console.log('Workflow determination:', {
+            directWorkflow: sample.workflow,
+            determinedWorkflow: this.determineWorkflow(sample),
+            finalWorkflow: workflow,
+            isArc: isArc
+        });
+
+        // Detect if command contains MTX indicators regardless of workflow
+        const isMtxCommand = command.includes('tenx-rnaseq-multi') ||
+            command.includes('cellranger-multi');
+
+        // If command indicates MTX but workflow is not MTX, log warning
+        if (isMtxCommand && workflow !== 'MTX') {
+            console.warn('Command indicates MTX but workflow is not MTX, overriding to MTX');
+            sample.workflow = 'MTX';
+        }
+
         // Parse the command to extract current values
-        const currentValues = this.parseCommand(command, isAlignment, isArc);
+        const currentValues = this.parseCommand(command, isAlignment, isArc || isMtxCommand);
         console.log('Current values for form creation:', currentValues);
 
         // Get the base command based on workflow and stage
         let baseCommand = '';
         if (isAlignment) {
-            if (isArc) {
+            if (isArc || isMtxCommand) {
                 baseCommand = 'ocs fastqs align tenx-rnaseq-multi --asset-name cellranger-multi';
             } else {
                 baseCommand = 'ocs fastqs align tenx-rnaseq --asset-name cellranger-rnaseq';
             }
         } else {
-            if (isArc) {
+            if (isArc || isMtxCommand) {
                 baseCommand = 'ocs fastqs postalign tenx-arc --asset-name multi_gex_qc';
             } else {
                 baseCommand = 'ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc';
@@ -810,59 +931,85 @@ class PipelineSubmitModal {
             currentValues,
             isAlignment,
             workflow,
-            isArc
+            isArc,
+            isMtxCommand,
+            command
+        });
+
+        // Force include introns to true if command string contains it
+        if (command.includes('--include-introns')) {
+            currentValues.includeIntrons = true;
+            console.log('Forced includeIntrons to true based on command string');
+        }
+
+        // Debug log for checkbox states
+        console.log('Checkbox states before form generation:', {
+            includeIntrons: currentValues.includeIntrons,
+            executionPriority: currentValues.executionPriority,
+            commandContainsIncludeIntrons: command.includes('--include-introns'),
+            commandContainsExecutionPriority: command.includes('--execution-priority HIGH')
         });
 
         const formHtml = `
             <div class="command-edit-form">
                 <div class="mb-3">
                     <label class="form-label">Base Command</label>
-                    <input type="text" class="form-control command-input" value="${baseCommand}">
+                    <input type="text" class="form-control command-input" value="${baseCommand}" data-workflow="${workflow}">
                 </div>
                 ${isAlignment ? `
                     <div class="mb-3">
                         <label class="form-label">Reference</label>
                         <select class="form-select reference-select">
                             ${this.getReferences().map(ref =>
-            `<option value="${ref.value}" ${ref.value === defaultReference ? 'selected' : ''}>
+            `<option value="${ref.value}" ${ref.value === (currentValues.reference || defaultReference) ? 'selected' : ''}>
                                     ${ref.name}
                                 </option>`
         ).join('')}
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Chemistry</label>
-                        <select class="form-select chemistry-select">
-                            ${this.getChemistries().map(chem =>
-            `<option value="${chem.value}" ${chem.prep === sample.library_prep_method ? 'selected' : ''}>
-                                    ${chem.name}
-                                </option>`
+                        <div class="mb-3">
+                            <label class="form-label">Chemistry</label>
+                            <select class="form-select chemistry-select">
+                                ${this.getChemistries().map(chem =>
+            `<option value="${chem.value}" ${chem.value === currentValues.chemistry || chem.prep === sample.library_prep_method ? 'selected' : ''}>
+                                        ${chem.name}
+                                    </option>`
         ).join('')}
-                        </select>
-                    </div>
+                            </select>
+                        </div>
                     <div class="mb-3">
                         <div class="form-check">
-                            <input class="form-check-input include-introns" type="checkbox" ${currentValues.includeIntrons === true ? 'checked="checked"' : ''}>
-                            <label class="form-check-label">Include introns</label>
+                            <input class="form-check-input include-introns" type="checkbox" id="include-introns-${sample.load_name}" 
+                                ${currentValues.includeIntrons ? 'checked' : ''}>
+                            <label class="form-check-label" for="include-introns-${sample.load_name}">
+                                Include introns
+                            </label>
                         </div>
                     </div>
                     <div class="mb-3">
                         <div class="form-check">
-                            <input class="form-check-input execution-priority" type="checkbox" ${currentValues.executionPriority === true ? 'checked="checked"' : ''}>
-                            <label class="form-check-label">High execution priority</label>
+                            <input class="form-check-input execution-priority" type="checkbox" id="execution-priority-${sample.load_name}"
+                                ${currentValues.executionPriority ? 'checked' : ''}>
+                            <label class="form-check-label" for="execution-priority-${sample.load_name}">
+                                High execution priority
+                            </label>
                         </div>
-                    </div>
-                ` : ''}
+                        </div>
+                    ` : ''}
                 <div class="d-flex justify-content-end gap-2">
-                    <button class="btn btn-secondary cancel-edit">Cancel</button>
-                    <button class="btn btn-primary save-command">Save</button>
+                    <button type="button" class="btn btn-secondary cancel-edit">Cancel</button>
+                    <button type="button" class="btn btn-primary save-command">Save</button>
                 </div>
             </div>
         `;
 
-        console.log('Generated form HTML with explicit checkbox states:', {
-            includeIntronsChecked: currentValues.includeIntrons === true ? 'checked="checked"' : '',
-            executionPriorityChecked: currentValues.executionPriority === true ? 'checked="checked"' : ''
+        // Debug log for generated HTML
+        console.log('Generated form HTML with checkbox states:', {
+            includeIntronsChecked: currentValues.includeIntrons || command.includes('--include-introns'),
+            executionPriorityChecked: currentValues.executionPriority || command.includes('--execution-priority HIGH'),
+            sampleLoadName: sample.load_name,
+            baseCommand: baseCommand,
+            workflow: workflow
         });
 
         return formHtml;
@@ -887,10 +1034,16 @@ class PipelineSubmitModal {
             values.reference = referenceMatch[1];
         }
 
-        // Extract chemistry and include-introns from cellranger-addopts
-        // Handle both single and double quotes
-        const cellrangerAddoptsMatch = command.match(/--cellranger-addopts\s+['"]([^'"]+)['"]/);
+        // Extract cellranger-addopts - handle both single and double quotes
+        // First try with double quotes
+        let cellrangerAddoptsMatch = command.match(/--cellranger-addopts\s+"([^"]+)"/);
+        if (!cellrangerAddoptsMatch) {
+            // If not found with double quotes, try single quotes
+            cellrangerAddoptsMatch = command.match(/--cellranger-addopts\s+'([^']+)'/);
+        }
+
         console.log('Cellranger addopts match:', cellrangerAddoptsMatch);
+
         if (cellrangerAddoptsMatch) {
             const addopts = cellrangerAddoptsMatch[1];
             console.log('Parsed addopts:', addopts);
@@ -901,7 +1054,8 @@ class PipelineSubmitModal {
             if (chemistryMatch) {
                 values.chemistry = chemistryMatch[1];
             }
-            // Check for include-introns in addopts
+
+            // Check for include-introns in addopts (handle both with and without quotes)
             values.includeIntrons = addopts.includes('--include-introns');
             console.log('Include introns from addopts:', values.includeIntrons);
         }
@@ -920,6 +1074,12 @@ class PipelineSubmitModal {
         const notifyMatch = command.match(/--notify\s+([^\s]+)/);
         if (notifyMatch) {
             values.notificationEmail = notifyMatch[1];
+        }
+
+        // For MTX workflow, always set includeIntrons to true if it's in the command
+        if (isArc && command.includes('--include-introns')) {
+            values.includeIntrons = true;
+            console.log('Setting include introns to true for MTX workflow');
         }
 
         console.log('Final parsed values:', values);
@@ -966,13 +1126,82 @@ class PipelineSubmitModal {
         }
     }
 
+    getCommandTemplate(workflow, stage, libraryPrepMethod) {
+        if (!this.config?.workflows?.[workflow.toLowerCase()]?.[stage]) {
+            console.error(`No workflow configuration found for ${workflow} ${stage}`);
+            return '';
+        }
+
+        // Get command template from config
+        let commandTemplate = '';
+        const workflowConfig = this.config.workflows[workflow.toLowerCase()][stage];
+
+        // For workflows with patterns like RTX
+        if (typeof workflowConfig === 'object' && !workflowConfig.command_template) {
+            // Find matching pattern for this library prep method
+            for (const [pattern, config] of Object.entries(workflowConfig)) {
+                if (pattern.includes('|')) {
+                    // Multi-value pattern (separated by |)
+                    const patterns = pattern.split('|');
+                    if (patterns.includes(libraryPrepMethod)) {
+                        commandTemplate = config.command_template;
+                        break;
+                    }
+                } else if (pattern === libraryPrepMethod) {
+                    // Single value pattern
+                    commandTemplate = config.command_template;
+                    break;
+                }
+            }
+        } else {
+            // For workflows with direct command_template like MTX
+            commandTemplate = workflowConfig.command_template;
+        }
+
+        return commandTemplate;
+    }
+
+    generateCommandFromTemplate(template, sample) {
+        if (!template) return '';
+
+        const reference = this.getReference(sample.organism_common_name || '');
+        const libraryPrep = sample.library_prep_method || '';
+        const chemistry = this.getChemistry(libraryPrep);
+        const notificationEmail = this.getNotificationEmail();
+        const loadName = sample.load_name || '';
+
+        // Replace known placeholders
+        let command = template
+            .replace(/{load_name}/g, loadName)
+            .replace(/{reference}/g, reference)
+            .replace(/{notification_email}/g, notificationEmail);
+
+        // Handle chemistry placeholder specially
+        if (command.includes('{chemistry}')) {
+            if (chemistry) {
+                command = command.replace(/{chemistry}/g, chemistry);
+            } else {
+                console.warn(`No chemistry found for library prep: ${libraryPrep}`);
+                // Try to get a default chemistry from config
+                const defaultChemistry = Object.values(this.config?.chemistries || {})[0];
+                if (defaultChemistry) {
+                    console.log(`Using default chemistry: ${defaultChemistry}`);
+                    command = command.replace(/{chemistry}/g, defaultChemistry);
+                } else {
+                    // If no chemistry available, remove the chemistry parameter entirely
+                    command = command.replace(/--chemistry\s+{chemistry}/g, '');
+                }
+            }
+        }
+
+        // Log the generated command
+        console.log(`Generated command for ${sample.load_name}:`, command);
+        return command;
+    }
+
     generateAlignmentCommand(sample) {
         const workflow = sample.workflow || this.determineWorkflow(sample);
-        const loadName = sample.load_name || '';
-        const organism = sample.organism_common_name || '';
-        const reference = this.getReference(organism);
         const libraryPrepMethod = sample.library_prep_method || '';
-        const notificationEmail = this.getNotificationEmail();
 
         // Check if this is an unknown library prep method
         if (workflow === 'RTX' && !this.isLibraryPrepMethodKnown(libraryPrepMethod)) {
@@ -980,109 +1209,26 @@ class PipelineSubmitModal {
             return '';
         }
 
-        if (!this.config?.workflows?.[workflow.toLowerCase()]?.alignment) {
-            console.error(`No workflow configuration found for ${workflow} alignment`);
-            return '';
-        }
-
-        // Get command template from config
-        let commandTemplate = '';
-        const workflowConfig = this.config.workflows[workflow.toLowerCase()].alignment;
-
-        // For workflows with patterns like RTX
-        if (typeof workflowConfig === 'object' && !workflowConfig.command_template) {
-            // Find matching pattern for this library prep method
-            for (const [pattern, config] of Object.entries(workflowConfig)) {
-                if (pattern.includes('|')) {
-                    // Multi-value pattern (separated by |)
-                    const patterns = pattern.split('|');
-                    if (patterns.includes(libraryPrepMethod)) {
-                        commandTemplate = config.command_template;
-                        break;
-                    }
-                } else if (pattern === libraryPrepMethod) {
-                    // Single value pattern
-                    commandTemplate = config.command_template;
-                    break;
-                }
-            }
-        } else {
-            // For workflows with direct command_template like MTX
-            commandTemplate = workflowConfig.command_template;
-        }
-
+        const commandTemplate = this.getCommandTemplate(workflow, 'alignment', libraryPrepMethod);
         if (!commandTemplate) {
             console.error(`No command template found for ${workflow} alignment with library prep method ${libraryPrepMethod}`);
             return '';
         }
 
-        // Replace placeholders in the template
-        let command = commandTemplate
-            .replace(/{reference}/g, reference)
-            .replace(/{load_name}/g, loadName)
-            .replace(/{notification_email}/g, notificationEmail);
-
-        // Replace chemistry placeholder if present in template
-        if (command.includes('{chemistry}')) {
-            const chemistry = this.getChemistry(libraryPrepMethod);
-            if (chemistry) {
-                command = command.replace(/{chemistry}/g, chemistry);
-            } else {
-                console.warn(`No chemistry found for library prep method: ${libraryPrepMethod}`);
-                // If no chemistry, remove the chemistry parameter entirely
-                command = command.replace(/--chemistry\s+{chemistry}/g, '');
-            }
-        }
-
-        return command;
+        return this.generateCommandFromTemplate(commandTemplate, sample);
     }
 
     generatePostQCCommand(sample) {
         const workflow = sample.workflow || this.determineWorkflow(sample);
-        const loadName = sample.load_name || '';
         const libraryPrepMethod = sample.library_prep_method || '';
-        const notificationEmail = this.getNotificationEmail();
 
-        if (!this.config?.workflows?.[workflow.toLowerCase()]?.postqc) {
-            console.error(`No workflow configuration found for ${workflow} post-QC`);
-            return '';
-        }
-
-        // Get command template from config
-        let commandTemplate = '';
-        const workflowConfig = this.config.workflows[workflow.toLowerCase()].postqc;
-
-        // For workflows with patterns like RTX
-        if (typeof workflowConfig === 'object' && !workflowConfig.command_template) {
-            // Find matching pattern for this library prep method
-            for (const [pattern, config] of Object.entries(workflowConfig)) {
-                if (pattern.includes('|')) {
-                    // Multi-value pattern (separated by |)
-                    const patterns = pattern.split('|');
-                    if (patterns.includes(libraryPrepMethod)) {
-                        commandTemplate = config.command_template;
-                        break;
-                    }
-                } else if (pattern === libraryPrepMethod) {
-                    // Single value pattern
-                    commandTemplate = config.command_template;
-                    break;
-                }
-            }
-        } else {
-            // For workflows with direct command_template like MTX
-            commandTemplate = workflowConfig.command_template;
-        }
-
+        const commandTemplate = this.getCommandTemplate(workflow, 'postqc', libraryPrepMethod);
         if (!commandTemplate) {
             console.error(`No command template found for ${workflow} post-QC with library prep method ${libraryPrepMethod}`);
             return '';
         }
 
-        // Replace placeholders in the template
-        return commandTemplate
-            .replace(/{load_name}/g, loadName)
-            .replace(/{notification_email}/g, notificationEmail);
+        return this.generateCommandFromTemplate(commandTemplate, sample);
     }
 
     handleSubmission() {
@@ -1159,17 +1305,20 @@ class PipelineSubmitModal {
         const rtxConfig = this.config.workflows.rtx;
         console.log('Checking if library prep method is known:', libraryPrepMethod);
 
+        // Function to check if a pattern matches the library prep method
+        const matchesPattern = (pattern) => {
+            if (pattern.includes('|')) {
+                const patterns = pattern.split('|');
+                return patterns.some(p => p.trim() === libraryPrepMethod);
+            }
+            return pattern.trim() === libraryPrepMethod;
+        };
+
         // Check alignment patterns
         if (rtxConfig.alignment) {
             for (const pattern of Object.keys(rtxConfig.alignment)) {
-                if (pattern.includes('|')) {
-                    const patterns = pattern.split('|');
-                    if (patterns.some(p => p.trim() === libraryPrepMethod)) {
-                        console.log(`Library prep method ${libraryPrepMethod} found in alignment pattern: ${pattern}`);
-                        return true;
-                    }
-                } else if (pattern.trim() === libraryPrepMethod) {
-                    console.log(`Library prep method ${libraryPrepMethod} found as exact alignment pattern`);
+                if (matchesPattern(pattern)) {
+                    console.log(`Library prep method ${libraryPrepMethod} found in alignment pattern: ${pattern}`);
                     return true;
                 }
             }
@@ -1178,14 +1327,8 @@ class PipelineSubmitModal {
         // Check post-QC patterns 
         if (rtxConfig.postqc) {
             for (const pattern of Object.keys(rtxConfig.postqc)) {
-                if (pattern.includes('|')) {
-                    const patterns = pattern.split('|');
-                    if (patterns.some(p => p.trim() === libraryPrepMethod)) {
-                        console.log(`Library prep method ${libraryPrepMethod} found in postqc pattern: ${pattern}`);
-                        return true;
-                    }
-                } else if (pattern.trim() === libraryPrepMethod) {
-                    console.log(`Library prep method ${libraryPrepMethod} found as exact postqc pattern`);
+                if (matchesPattern(pattern)) {
+                    console.log(`Library prep method ${libraryPrepMethod} found in postqc pattern: ${pattern}`);
                     return true;
                 }
             }
@@ -1371,14 +1514,10 @@ class PipelineSubmitModal {
                 }
             }
 
-            // If no assets found in config, return empty array
-            if (assets.size === 0) {
-                console.warn('No assets found in config for stage:', stage);
-                return [];
-            }
-
-            console.log(`Available assets for ${stage}:`, Array.from(assets));
-            return Array.from(assets);
+            // Sort assets alphabetically for consistent display
+            const sortedAssets = Array.from(assets).sort();
+            console.log(`Available assets for ${stage}:`, sortedAssets);
+            return sortedAssets;
         } catch (error) {
             console.error('Error getting assets from config:', error);
             return [];
@@ -1425,15 +1564,12 @@ class PipelineSubmitModal {
             return;
         }
 
-        // Get workflow based on first sample
-        const workflow = 'rtx'; // Always rtx for unknown lib preps
-
         // Find a matching asset template in the workflow/stage configuration
         let commandTemplate = '';
         let assetConfig = null;
 
-        if (this.config?.workflows?.[workflow]?.[stage]) {
-            const workflowConfig = this.config.workflows[workflow][stage];
+        if (this.config?.workflows?.rtx?.[stage]) {
+            const workflowConfig = this.config.workflows.rtx[stage];
 
             // Find any template with the matching asset name
             for (const [pattern, config] of Object.entries(workflowConfig)) {
@@ -1444,40 +1580,11 @@ class PipelineSubmitModal {
                     break;
                 }
             }
-
-            // If no template found, create one based on other similar templates
-            if (!commandTemplate) {
-                // Get any template as a base for structure
-                const anyTemplate = Object.values(workflowConfig)[0]?.command_template || '';
-                if (anyTemplate) {
-                    // Create a template by replacing the asset name
-                    commandTemplate = anyTemplate.replace(
-                        /--asset-name\s+([^\s]+)/,
-                        `--asset-name ${selectedAsset}`
-                    );
-
-                    // Add asset tag if provided
-                    if (assetTag && !commandTemplate.includes('--asset-tag')) {
-                        commandTemplate = commandTemplate.replace(
-                            /--asset-name\s+([^\s]+)/,
-                            `--asset-name $1 --asset-tag "${assetTag}"`
-                        );
-                    }
-
-                    console.log(`Created template for ${selectedAsset} based on other templates: ${commandTemplate}`);
-                }
-            } else if (assetTag && !commandTemplate.includes('--asset-tag') && assetConfig) {
-                // Add asset tag to existing template if provided
-                commandTemplate = commandTemplate.replace(
-                    /--asset-name\s+([^\s]+)/,
-                    `--asset-name $1 --asset-tag "${assetTag}"`
-                );
-            }
         }
 
-        // If still no command template, show an error
+        // If no template found, show an error
         if (!commandTemplate) {
-            console.error(`Could not create command template for ${selectedAsset}`);
+            console.error(`Could not find command template for ${selectedAsset}`);
             return;
         }
 
@@ -1512,43 +1619,6 @@ class PipelineSubmitModal {
         });
     }
 
-    generateCommandFromTemplate(template, sample) {
-        if (!template) return '';
-
-        const reference = this.getReference(sample.organism_common_name || '');
-        const libraryPrep = sample.library_prep_method || '';
-        const chemistry = this.getChemistry(libraryPrep);
-        const notificationEmail = this.getNotificationEmail();
-
-        // Replace known placeholders
-        let command = template
-            .replace(/{load_name}/g, sample.load_name || '')
-            .replace(/{reference}/g, reference)
-            .replace(/{notification_email}/g, notificationEmail);
-
-        // Handle chemistry placeholder specially
-        if (command.includes('{chemistry}')) {
-            if (chemistry) {
-                command = command.replace(/{chemistry}/g, chemistry);
-            } else {
-                console.warn(`No chemistry found for library prep: ${libraryPrep}`);
-                // Try to get a default chemistry from config
-                const defaultChemistry = Object.values(this.config?.chemistries || {})[0];
-                if (defaultChemistry) {
-                    console.log(`Using default chemistry: ${defaultChemistry}`);
-                    command = command.replace(/{chemistry}/g, defaultChemistry);
-                } else {
-                    // If no chemistry available, remove the chemistry parameter entirely
-                    command = command.replace(/--chemistry\s+{chemistry}/g, '');
-                }
-            }
-        }
-
-        // Log the generated command
-        console.log(`Generated command for ${sample.load_name}:`, command);
-        return command;
-    }
-
     updateAllCommandsWithEmail() {
         const email = this.globalNotificationEmail.value.trim();
 
@@ -1577,6 +1647,92 @@ class PipelineSubmitModal {
                 sample.postQCCommand = sample.postQCCommand.replace(/--notify\s+[^\s]+/, `--notify ${email}`);
             }
         });
+    }
+
+    updateCommandPreview(form) {
+        const cell = form.closest('.command-cell');
+        const row = cell.closest('tr');
+        const fastqName = row.querySelector('td:first-child').textContent.trim();
+        const batchGroup = cell.closest('.batch-group');
+        const stage = batchGroup ? batchGroup.dataset.stage : 'alignment';
+
+        // Find the sample data
+        let sample;
+        if (stage === 'alignment') {
+            sample = [...this.alignmentSamples, ...this.incompleteSamples].find(s => s.fastq_name === fastqName);
+        } else {
+            sample = this.postQCSamples.find(s => s.fastq_name === fastqName);
+        }
+
+        if (!sample) {
+            console.error('Sample not found:', fastqName);
+            return;
+        }
+
+        const isAlignment = stage === 'alignment';
+        const workflow = this.determineWorkflow(sample);
+        const isArc = workflow === 'MTX';
+
+        // Get form values
+        const baseCommand = form.querySelector('.command-input').value;
+        const referenceSelect = form.querySelector('.reference-select');
+        const chemistrySelect = form.querySelector('.chemistry-select');
+        const includeIntronsCheck = form.querySelector('.include-introns');
+        const executionPriorityCheck = form.querySelector('.execution-priority');
+
+        // Build the command
+        let newCommand = baseCommand;
+
+        // Add reference if selected
+        if (referenceSelect && referenceSelect.value) {
+            newCommand += ` --reference-names "${referenceSelect.value}"`;
+        }
+
+        // Add load name
+        newCommand += ` --load-names "${sample.load_name}"`;
+
+        // Add chemistry and include-introns for alignment
+        if (isAlignment) {
+            // Only add cellranger-addopts if chemistry is selected or include-introns is checked
+            const selectedChemistry = chemistrySelect?.value;
+            const includeIntrons = includeIntronsCheck?.checked;
+
+            if (selectedChemistry || includeIntrons) {
+                let addopts = '';
+                if (selectedChemistry) {
+                    addopts += `--chemistry ${selectedChemistry}`;
+                }
+                if (includeIntrons) {
+                    addopts += (addopts ? ' ' : '') + '--include-introns';
+                }
+                if (addopts) {
+                    newCommand += ` --cellranger-addopts "${addopts}"`;
+                }
+            }
+
+            // Add execution priority if checked
+            if (executionPriorityCheck && executionPriorityCheck.checked) {
+                newCommand += ' --execution-priority HIGH';
+            }
+        }
+
+        // Add notification settings
+        newCommand += ' --notify-on FAILED';
+        const email = this.getNotificationEmail();
+        if (email) {
+            newCommand += ` --notify ${email}`;
+        }
+
+        // Update the command display
+        const codeElement = cell.querySelector('code');
+        codeElement.textContent = newCommand;
+
+        // Update the command in the sample data
+        if (stage === 'alignment') {
+            sample.alignmentCommand = newCommand;
+        } else {
+            sample.postQCCommand = newCommand;
+        }
     }
 
     addStyles() {
