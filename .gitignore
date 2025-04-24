@@ -58,4 +58,4 @@ data/
 logs/*.log
 
 # Exclude staticfiles in debug
-staticfiles/ 
+staticfiles/ viewer/static/viewer/js/trash.js
