@@ -23,12 +23,15 @@ function getCookie(name) {
 
 class PipelineLocalData {
     constructor() {
+        console.time('PipelineLocalData-constructor');
+        console.log('Starting PipelineLocalData initialization...');
         this.storageKey = 'pipelineSelectedSamples';
         this.legacyStorageKey = 'selectedSamplesForPipeline';
         this.selectedSamples = [];
         this.itemsPerPage = 25;
         this.currentPage = 1;
         this.init();
+        console.timeEnd('PipelineLocalData-constructor');
     }
 
     // Create a reusable function to show bottom toast notifications
@@ -54,7 +57,10 @@ class PipelineLocalData {
         // Create the toast element
         const toastDiv = document.createElement('div');
         toastDiv.className = 'toast align-items-center text-white border-0';
-        toastDiv.style.backgroundColor = '#1976D2'; // Use consistent blue background
+        toastDiv.style.backgroundColor = '#1976D2'; // 
+        toastDiv.style.maxWidth = '250px';
+        toastDiv.style.minWidth = '180px'; // Smaller minimum width
+        toastDiv.style.width = 'fit-content';
         toastDiv.setAttribute('role', 'alert');
         toastDiv.setAttribute('aria-live', 'assertive');
         toastDiv.setAttribute('aria-atomic', 'true');
@@ -74,7 +80,10 @@ class PipelineLocalData {
         toastContainer.appendChild(toastDiv);
 
         // Initialize and show toast
-        const bsToast = new bootstrap.Toast(toastDiv, { delay: duration });
+        const bsToast = new bootstrap.Toast(toastDiv, {
+            delay: duration,
+            animation: true
+        });
         bsToast.show();
 
         // Remove after hiding
@@ -101,41 +110,74 @@ class PipelineLocalData {
     }
 
     init() {
+        console.group('Pipeline Initialization');
+        console.time('Total Initialization');
+
         // Initialize data and UI
+        console.log('Starting data loading...');
         this.loadSamples();
+
+        console.log('Starting pagination initialization...');
         this.initializePagination();
 
         // Set up event listeners when DOM is ready
         if (document.readyState === 'loading') {
+            console.log('DOM still loading, waiting for DOMContentLoaded...');
             document.addEventListener('DOMContentLoaded', () => {
-                this.setupEventListeners();
-                this.reinitialize();
+                this._initializeAfterDOM();
             });
         } else {
-            this.setupEventListeners();
-            this.reinitialize();
+            console.log('DOM already loaded, initializing immediately...');
+            this._initializeAfterDOM();
         }
+
+        console.timeEnd('Total Initialization');
+        console.groupEnd();
+    }
+
+    _initializeAfterDOM() {
+        console.group('Post-DOM Initialization');
+        console.time('Post-DOM Setup');
+
+        console.time('Event Listeners Setup');
+        this.setupEventListeners();
+        console.timeEnd('Event Listeners Setup');
+
+        console.time('Table Reinitialization');
+        this.reinitialize();
+        console.timeEnd('Table Reinitialization');
+
+        console.timeEnd('Post-DOM Setup');
+        console.groupEnd();
     }
 
     loadSamples() {
+        console.group('Sample Loading');
+        console.time('Total Sample Loading');
+
         try {
-            // First try with primary storage key
+            // Load primary storage
+            console.time('Primary Storage Load');
             const storedData = localStorage.getItem(this.storageKey);
             let primarySamples = [];
 
             if (storedData) {
+                console.log('Primary storage data size:', new Blob([storedData]).size / 1024, 'KB');
                 primarySamples = JSON.parse(storedData);
+                console.log('Primary samples count:', primarySamples.length);
             }
+            console.timeEnd('Primary Storage Load');
 
-            // Check legacy storage
+            // Load legacy storage
+            console.time('Legacy Storage Load');
             const legacyData = localStorage.getItem(this.legacyStorageKey);
             if (legacyData) {
+                console.log('Legacy storage data size:', new Blob([legacyData]).size / 1024, 'KB');
                 let legacySamples = [];
 
                 try {
                     const parsedData = JSON.parse(legacyData);
-
-                    // Handle different data formats
+                    console.time('Legacy Data Processing');
                     if (Array.isArray(parsedData)) {
                         legacySamples = this.normalizeSamples(parsedData);
                     } else if (parsedData && typeof parsedData === 'object' && parsedData.samples) {
@@ -143,25 +185,31 @@ class PipelineLocalData {
                     } else if (parsedData && typeof parsedData === 'object') {
                         legacySamples = this.normalizeSamples([parsedData]);
                     }
+                    console.timeEnd('Legacy Data Processing');
 
-                    // Merge samples from both storages
+                    console.time('Sample Merging');
                     this.selectedSamples = this.mergeSamples(primarySamples, legacySamples);
+                    console.timeEnd('Sample Merging');
 
-                    // Save to primary storage and clear legacy
+                    console.time('Storage Update');
                     this.saveSamples();
                     localStorage.removeItem(this.legacyStorageKey);
+                    console.timeEnd('Storage Update');
                 } catch (parseError) {
-                    console.error('Error parsing legacy data:', parseError);
+                    console.error('Legacy data parse error:', parseError);
                     this.selectedSamples = primarySamples;
                 }
             } else {
-                // Just use primary samples
                 this.selectedSamples = primarySamples;
             }
+            console.timeEnd('Legacy Storage Load');
         } catch (error) {
-            console.error('Error loading samples:', error);
+            console.error('Sample loading error:', error);
             this.selectedSamples = [];
         }
+
+        console.timeEnd('Total Sample Loading');
+        console.groupEnd();
     }
 
     // Add this method to merge samples without duplicates
@@ -234,23 +282,34 @@ class PipelineLocalData {
     }
 
     saveSamples() {
+        console.group('Sample Saving');
+        console.time('Total Save Operation');
+
         try {
-            // Check if the data has actually changed before saving
             const currentData = localStorage.getItem(this.storageKey);
             const newData = JSON.stringify(this.selectedSamples);
 
-            // Only save if the data has changed or doesn't exist
+            console.log('Current storage size:', currentData ? new Blob([currentData]).size / 1024 : 0, 'KB');
+            console.log('New data size:', new Blob([newData]).size / 1024, 'KB');
+
             if (!currentData || currentData !== newData) {
+                console.time('Storage Write');
                 localStorage.setItem(this.storageKey, newData);
+                console.timeEnd('Storage Write');
+            } else {
+                console.log('No changes to save');
             }
         } catch (error) {
-            console.error('Error saving samples to localStorage:', error);
-
-            // If localStorage is full, try to save only essential data
+            console.error('Save error:', error);
             if (error.name === 'QuotaExceededError' || error.code === 22) {
+                console.time('Storage Recovery');
                 this._handleStorageFullError();
+                console.timeEnd('Storage Recovery');
             }
         }
+
+        console.timeEnd('Total Save Operation');
+        console.groupEnd();
     }
 
     // Handle localStorage quota exceeded errors
@@ -430,6 +489,43 @@ class PipelineLocalData {
             submitBtn.addEventListener('click', (e) => this.handleSampleSubmission(e));
         }
 
+        const clearToggle = document.getElementById('clear-toggle');
+        if (clearToggle) {
+            clearToggle.addEventListener('change', () => {
+                if (clearToggle.checked) {
+                    // Show toast notification
+                    this.showToastNotification('Clearing selections...', 'info');
+
+                    // Clear selections
+                    this.clearStoredData();
+
+                    // Reset toggle after action
+                    setTimeout(() => {
+                        clearToggle.checked = false;
+                    }, 500);
+                }
+            });
+        }
+
+        // Clear ATAC toggle
+        const clearAtacToggle = document.getElementById('clear-atac-toggle');
+        if (clearAtacToggle) {
+            clearAtacToggle.addEventListener('change', () => {
+                if (clearAtacToggle.checked) {
+                    // Show toast notification
+                    this.showToastNotification('Clearing ATAC samples...', 'info');
+
+                    // Clear ATAC samples
+                    this.clearAtacSamples();
+
+                    // Reset toggle after action
+                    setTimeout(() => {
+                        clearAtacToggle.checked = false;
+                    }, 500);
+                }
+            });
+        }
+
         // Clear selection button
         const clearBtn = document.getElementById('clear-selection');
         if (clearBtn) {
@@ -465,6 +561,40 @@ class PipelineLocalData {
         const refreshQueueBtn = document.getElementById('refresh-queue');
         if (refreshQueueBtn) {
             refreshQueueBtn.addEventListener('click', () => this.fetchQueueData());
+        }
+    }
+
+    clearAtacSamples() {
+        // Get all rows in the table for visible UI updates
+        const tableBody = document.querySelector('#samples-table tbody');
+        if (!tableBody) return;
+
+        // Track removed samples for reporting
+        let removedCount = 0;
+
+        // Filter out ATAC samples from selectedSamples
+        const originalLength = this.selectedSamples.length;
+        this.selectedSamples = this.selectedSamples.filter(sample => {
+            const isAtac = sample.batch_name_from_vendor &&
+                (sample.batch_name_from_vendor.toUpperCase().startsWith('ATX') ||
+                    sample.batch_name_from_vendor.toUpperCase().includes('ATAC'));
+            if (isAtac) {
+                removedCount++;
+            }
+            return !isAtac;
+        });
+
+        // Save updated samples to localStorage
+        this.saveSamples();
+
+        // Update UI
+        this.rebuildSamplesTable();
+
+        // Show notification
+        if (removedCount > 0) {
+            this.showToastNotification(`Removed ${removedCount} ATAC samples`, 'success');
+        } else {
+            this.showToastNotification('No ATAC samples found to remove', 'info');
         }
     }
 
@@ -561,11 +691,9 @@ class PipelineLocalData {
 
         if (submitButton) {
             submitButton.disabled = isDisabled;
-            console.log('Hidden submit button state updated:', !isDisabled);
         }
         if (actionSubmitButton) {
             actionSubmitButton.disabled = isDisabled;
-            console.log('Action submit button state updated:', !isDisabled);
         }
     }
 
@@ -622,34 +750,90 @@ class PipelineLocalData {
     }
 
     rebuildSamplesTable() {
+        console.group('Table Rebuild');
+        console.time('Total Table Rebuild');
+
         const tableBody = document.querySelector('#samples-table tbody');
-        if (!tableBody) return;
-
-        // Clear existing rows
-        tableBody.innerHTML = '';
-
-        // Get stored samples
-        if (!this.selectedSamples || this.selectedSamples.length === 0) {
-            this.showEmptyState(tableBody);
+        if (!tableBody) {
+            console.warn('Table body not found in DOM');
+            console.timeEnd('Total Table Rebuild');
+            console.groupEnd();
             return;
         }
 
-        // Calculate pagination values
+        // Memory usage before rebuild
+        if (window.performance && window.performance.memory) {
+            console.log('Memory usage before rebuild:',
+                Math.round(window.performance.memory.usedJSHeapSize / 1024 / 1024), 'MB');
+        }
+
+        // Clear existing rows
+        console.time('Clear Table');
+        tableBody.innerHTML = '';
+        console.timeEnd('Clear Table');
+
+        // Handle empty state
+        if (!this.selectedSamples || this.selectedSamples.length === 0) {
+            console.log('No samples to display, showing empty state');
+            this.showEmptyState(tableBody);
+            console.timeEnd('Total Table Rebuild');
+            console.groupEnd();
+            return;
+        }
+
+        // Calculate pagination
+        console.time('Pagination Calculation');
         const startIndex = (this.currentPage - 1) * this.itemsPerPage;
         const endIndex = Math.min(startIndex + this.itemsPerPage, this.selectedSamples.length);
         const totalPages = Math.ceil(this.selectedSamples.length / this.itemsPerPage);
+        console.timeEnd('Pagination Calculation');
 
-        // Update pagination info
+        // Update pagination UI
+        console.time('Pagination UI Update');
         this.updatePaginationInfo(startIndex, endIndex, totalPages);
+        console.timeEnd('Pagination UI Update');
 
-        // Use document fragment for better performance
+        // Build table rows
+        console.time('Row Building');
         const fragment = document.createDocumentFragment();
-
-        // Build rows for current page
         const currentPageSamples = this.selectedSamples.slice(startIndex, endIndex);
 
-        // Pre-cache status badge HTML for performance
-        const statusBadgeCache = {
+        console.log(`Building ${currentPageSamples.length} rows for current page`);
+
+        // Pre-cache status badges
+        const statusBadgeCache = this._createStatusBadgeCache();
+
+        currentPageSamples.forEach((sample, index) => {
+            console.time(`Row ${index + 1} Creation`);
+            const row = this._createTableRow(sample, statusBadgeCache);
+            fragment.appendChild(row);
+            console.timeEnd(`Row ${index + 1} Creation`);
+        });
+        console.timeEnd('Row Building');
+
+        // DOM insertion
+        console.time('DOM Insertion');
+        tableBody.appendChild(fragment);
+        console.timeEnd('DOM Insertion');
+
+        // Setup UI state
+        console.time('UI State Update');
+        this.setupSelectionListeners();
+        this.updateSubmitButtonState();
+        console.timeEnd('UI State Update');
+
+        // Memory usage after rebuild
+        if (window.performance && window.performance.memory) {
+            console.log('Memory usage after rebuild:',
+                Math.round(window.performance.memory.usedJSHeapSize / 1024 / 1024), 'MB');
+        }
+
+        console.timeEnd('Total Table Rebuild');
+        console.groupEnd();
+    }
+
+    _createStatusBadgeCache() {
+        return {
             'Completed': '<span class="badge bg-success">Completed</span>',
             'In Progress': '<span class="badge bg-warning">In Progress</span>',
             'Not Started': '<span class="badge bg-secondary">Not Started</span>',
@@ -657,48 +841,34 @@ class PipelineLocalData {
             'Error': '<span class="badge bg-danger">Error</span>',
             'Failed': '<span class="badge bg-danger">Failed</span>'
         };
+    }
 
-        // Create all rows at once for better performance
-        for (let i = 0; i < currentPageSamples.length; i++) {
-            const sample = currentPageSamples[i];
-            const row = document.createElement('tr');
-            row.setAttribute('data-fastq', sample.fastq_name || '');
+    _createTableRow(sample, statusBadgeCache) {
+        const row = document.createElement('tr');
+        row.setAttribute('data-fastq', sample.fastq_name || '');
 
-            // Format status with cached badges when possible
-            const ingestStatus = this.formatStatus(sample.ingest_status);
-            const alignmentStatus = this.formatStatus(sample.alignment_status);
-            const postqcStatus = this.formatStatus(sample.postqc_status);
+        const ingestStatus = this.formatStatus(sample.ingest_status);
+        const alignmentStatus = this.formatStatus(sample.alignment_status);
+        const postqcStatus = this.formatStatus(sample.postqc_status);
 
-            const ingestBadge = statusBadgeCache[ingestStatus] || this.formatStatusWithBadge(sample.ingest_status);
-            const alignmentBadge = statusBadgeCache[alignmentStatus] || this.formatStatusWithBadge(sample.alignment_status);
-            const postqcBadge = statusBadgeCache[postqcStatus] || this.formatStatusWithBadge(sample.postqc_status);
+        const ingestBadge = statusBadgeCache[ingestStatus] || this.formatStatusWithBadge(sample.ingest_status);
+        const alignmentBadge = statusBadgeCache[alignmentStatus] || this.formatStatusWithBadge(sample.alignment_status);
+        const postqcBadge = statusBadgeCache[postqcStatus] || this.formatStatusWithBadge(sample.postqc_status);
 
-            row.innerHTML = `
-                <td>
-                    <input type="checkbox" class="sample-select">
-                </td>
-                <td>${sample.fastq_name || ''}</td>
-                <td>${sample.study_set || ''}</td>
-                <td>${sample.load_name || ''}</td>
-                <td>${sample.batch_name_from_vendor || ''}</td>
-                <td>${sample.organism_common_name || ''}</td>
-                <td>${sample.library_prep_method || ''}</td>
-                <td>${ingestBadge}</td>
-                <td>${alignmentBadge}</td>
-                <td>${postqcBadge}</td>
-            `;
+        row.innerHTML = `
+            <td><input type="checkbox" class="sample-select"></td>
+            <td>${sample.fastq_name || ''}</td>
+            <td>${sample.study_set || ''}</td>
+            <td>${sample.load_name || ''}</td>
+            <td>${sample.batch_name_from_vendor || ''}</td>
+            <td>${sample.organism_common_name || ''}</td>
+            <td>${sample.library_prep_method || ''}</td>
+            <td>${ingestBadge}</td>
+            <td>${alignmentBadge}</td>
+            <td>${postqcBadge}</td>
+        `;
 
-            fragment.appendChild(row);
-        }
-
-        // Add fragment to DOM in one operation
-        tableBody.appendChild(fragment);
-
-        // Update UI state
-        setTimeout(() => {
-            this.setupSelectionListeners();
-            this.updateSubmitButtonState();
-        }, 0);
+        return row;
     }
 
     showEmptyState(tableBody) {
@@ -1523,4 +1693,5 @@ class PipelineLocalData {
 
 // Initialize and export
 const pipelineLocalData = new PipelineLocalData();
-window.pipelineLocalData = pipelineLocalData; console.log('Testing pipeline-local-data.js loading...');
+window.pipelineLocalData = pipelineLocalData;
+console.log('Testing pipeline-local-data.js loading...');
