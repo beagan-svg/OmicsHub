@@ -203,18 +203,21 @@ class PipelineSubmitModal {
                 const stage = row.dataset.stage;
                 const sampleName = row.dataset.sample;
                 const workflow = row.dataset.workflow;
+                const isAutoProceed = row.hasAttribute('data-auto-proceed');
 
                 console.log('Edit command context:', {
                     currentCommand,
                     sampleName,
                     stage,
-                    workflow
+                    workflow,
+                    isAutoProceed
                 });
 
                 // Find sample directly from our tracked arrays by fastq_name
                 let sample = null;
 
-                if (stage === 'alignment') {
+                if (stage === 'alignment' || (stage === 'postqc' && isAutoProceed)) {
+                    // For alignment or auto-proceed post-QC, look in alignment samples
                     sample = [...this.alignmentSamples, ...this.incompleteSamples].find(s => s.fastq_name === sampleName);
                     console.log('Looking for sample in alignment/incomplete:', {
                         alignmentSamples: this.alignmentSamples.length,
@@ -223,6 +226,7 @@ class PipelineSubmitModal {
                         searchingFor: sampleName
                     });
                 } else {
+                    // Regular post-QC samples
                     sample = this.postQCSamples.find(s => s.fastq_name === sampleName);
                     console.log('Looking for sample in postQC:', {
                         postQCSamples: this.postQCSamples.length,
@@ -372,17 +376,20 @@ class PipelineSubmitModal {
                 const row = cell.closest('tr');
                 const fastqName = row.querySelector('td:first-child').textContent.trim();
                 const batchGroup = cell.closest('.batch-group');
-                const stage = batchGroup ? batchGroup.dataset.stage : 'alignment';
+                const stage = row.dataset.stage; // Use row's dataset instead of batchGroup
+                const isAutoProceed = row.hasAttribute('data-auto-proceed');
 
                 console.log('Reset context:', {
                     fastqName,
                     stage,
+                    isAutoProceed,
                     batchGroup: batchGroup ? batchGroup.dataset.batchName : 'none'
                 });
 
                 // Find the sample data from our tracked samples
                 let sample;
-                if (stage === 'alignment') {
+                if (stage === 'alignment' || (stage === 'postqc' && isAutoProceed)) {
+                    // For alignment or auto-proceed post-QC, look in alignment samples
                     sample = [...this.alignmentSamples, ...this.incompleteSamples].find(s => s.fastq_name === fastqName);
                     console.log('Looking for sample in alignment/incomplete:', {
                         alignmentSamples: this.alignmentSamples.length,
@@ -445,25 +452,91 @@ class PipelineSubmitModal {
                     }
                 }
 
+                // For post-QC stage, try to regenerate command
+                if (stage === 'postqc') {
+                    const workflow = this.determineWorkflow(sample);
+                    console.log(`Regenerating post-QC command for ${sample.fastq_name} with workflow ${workflow}`);
+
+                    // Try to get template from config
+                    const libraryPrepMethod = sample.library_prep_method || '';
+                    const commandTemplate = this.getCommandTemplate(workflow, 'postqc', libraryPrepMethod);
+
+                    let command = '';
+
+                    // Generate command from template if available
+                    if (commandTemplate) {
+                        console.log('Using template from config:', commandTemplate);
+                        command = this.generateCommandFromTemplate(commandTemplate, sample);
+                        console.log('Generated command from template:', command);
+                    }
+
+                    // If no command generated yet, use default template
+                    if (!command) {
+                        // Create a default template based on workflow
+                        let defaultTemplate;
+                        if (workflow === 'MTX') {
+                            defaultTemplate = 'ocs fastqs postalign tenx-rnaseq-multi --asset-name multi_gex_qc --load-names "{load_name}" --notify-on FAILED --notify {notification_email}';
+                        } else {
+                            defaultTemplate = 'ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc --asset-tag 25.03.27 --load-names "{load_name}" --notify-on FAILED --notify {notification_email}';
+                        }
+                        console.log('Using default template:', defaultTemplate);
+                        command = this.generateCommandFromTemplate(defaultTemplate, sample);
+                        console.log('Generated command from default template:', command);
+                    }
+
+                    // Apply the generated command
+                    if (command) {
+                        console.log('Final post-QC command:', command);
+                        const codeElement = cell.querySelector('code');
+                        codeElement.textContent = command;
+                        sample.postQCCommand = command;
+                        console.log('Post-QC command reset complete');
+                        return;
+                    } else {
+                        console.error('Failed to generate post-QC command');
+                    }
+                }
+
                 // For known library preps or when no asset is selected for unknown preps
-                const originalCommand = stage === 'alignment' ?
-                    this.generateAlignmentCommand(sample) :
-                    this.generatePostQCCommand(sample);
+                let originalCommand;
+                if (stage === 'alignment') {
+                    originalCommand = this.generateAlignmentCommand(sample);
+                } else {
+                    // For post-QC, ensure we generate a command even in auto-proceed section
+                    originalCommand = this.generatePostQCCommand(sample);
+
+                    // If still no command and in auto-proceed, use a default template
+                    if (!originalCommand && isAutoProceed) {
+                        const workflow = this.determineWorkflow(sample);
+                        let defaultTemplate;
+                        if (workflow === 'MTX') {
+                            defaultTemplate = 'ocs fastqs postalign tenx-rnaseq-multi --asset-name multi_gex_qc --load-names "{load_name}" --notify-on FAILED --notify {notification_email}';
+                        } else {
+                            defaultTemplate = 'ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc --asset-tag 25.03.27 --load-names "{load_name}" --notify-on FAILED --notify {notification_email}';
+                        }
+                        originalCommand = this.generateCommandFromTemplate(defaultTemplate, sample);
+                    }
+                }
 
                 console.log('Generated original command:', originalCommand);
 
-                // Update the command display
-                const codeElement = cell.querySelector('code');
-                codeElement.textContent = originalCommand;
+                // Only update if we got a valid command
+                if (originalCommand) {
+                    // Update the command display
+                    const codeElement = cell.querySelector('code');
+                    codeElement.textContent = originalCommand;
 
-                // Update the command in the sample data
-                if (stage === 'alignment') {
-                    sample.alignmentCommand = originalCommand;
+                    // Update the command in the sample data
+                    if (stage === 'alignment') {
+                        sample.alignmentCommand = originalCommand;
+                    } else {
+                        sample.postQCCommand = originalCommand;
+                    }
+
+                    console.log('Command reset complete');
                 } else {
-                    sample.postQCCommand = originalCommand;
+                    console.warn('No valid command generated for reset');
                 }
-
-                console.log('Command reset complete');
             }
         });
 
@@ -606,6 +679,7 @@ class PipelineSubmitModal {
                 loadName: sample.load_name,
                 ingestStatus: sample.ingest_status,
                 alignmentStatus: sample.alignment_status,
+                postQCStatus: sample.postqc_status,
                 libraryPrepMethod: sample.library_prep_method,
                 batchName: sample.batch_name_from_vendor
             });
@@ -632,11 +706,15 @@ class PipelineSubmitModal {
                         includeIncomplete,
                         ingestStatus: sample.ingest_status,
                         alignmentStatus: sample.alignment_status,
-                        shouldInclude: (sample.ingest_status.toLowerCase() === 'completed' &&
+                        postQCStatus: sample.postqc_status,
+                        shouldIncludeForAlignment: (sample.ingest_status.toLowerCase() === 'completed' &&
                             sample.alignment_status.toLowerCase() !== 'completed') ||
-                            (isIncomplete && includeIncomplete)
+                            (isIncomplete && includeIncomplete),
+                        shouldIncludeForPostQC: sample.alignment_status.toLowerCase() === 'completed' &&
+                            sample.postqc_status.toLowerCase() !== 'completed'
                     });
 
+                    // Alignment: include completed ingest with incomplete alignment or include-incomplete selected
                     if ((sample.ingest_status.toLowerCase() === 'completed' &&
                         sample.alignment_status.toLowerCase() !== 'completed') ||
                         (isIncomplete && includeIncomplete)) {
@@ -647,7 +725,20 @@ class PipelineSubmitModal {
                         }
                         this.unknownLibraryPrepMethodSamples.alignment.get(libraryPrepMethod).push(sample);
                     } else {
-                        console.log(`Skipping ${sample.fastq_name} - does not meet criteria for unknown library prep handling`);
+                        console.log(`Skipping ${sample.fastq_name} for alignment - does not meet criteria for unknown library prep handling`);
+                    }
+
+                    // Post-QC: include completed alignment with incomplete post-QC
+                    if (sample.alignment_status.toLowerCase() === 'completed' &&
+                        sample.postqc_status.toLowerCase() !== 'completed') {
+                        // Unknown library prep for post-QC
+                        console.log(`Adding ${sample.fastq_name} to post-QC unknown list`);
+                        if (!this.unknownLibraryPrepMethodSamples.postqc.has(libraryPrepMethod)) {
+                            this.unknownLibraryPrepMethodSamples.postqc.set(libraryPrepMethod, []);
+                        }
+                        this.unknownLibraryPrepMethodSamples.postqc.get(libraryPrepMethod).push(sample);
+                    } else {
+                        console.log(`Skipping ${sample.fastq_name} for post-QC - does not meet criteria for unknown library prep handling`);
                     }
                 }
             } else {
@@ -662,7 +753,12 @@ class PipelineSubmitModal {
                 count: samples.length,
                 samples: samples.map(s => s.fastq_name)
             })),
-            postqcMethods: Array.from(this.unknownLibraryPrepMethodSamples.postqc.keys())
+            postqcMethods: Array.from(this.unknownLibraryPrepMethodSamples.postqc.keys()),
+            postqcSampleCounts: Array.from(this.unknownLibraryPrepMethodSamples.postqc.entries()).map(([method, samples]) => ({
+                method,
+                count: samples.length,
+                samples: samples.map(s => s.fastq_name)
+            }))
         });
         console.log('==================================================================\n');
     }
@@ -711,7 +807,27 @@ class PipelineSubmitModal {
             alignment: new Map(),
             postqc: new Map()
         };
-        this.processUnknownLibraryPreps([...alignmentSamples, ...this.postQCSamples]);
+
+        // Process samples for alignment stage
+        this.processUnknownLibraryPreps([...alignmentSamples]);
+
+        // Also process samples for post-QC stage
+        this.processUnknownLibraryPreps([...this.postQCSamples]);
+
+        // If auto-proceed is enabled, also process the same samples for post-QC stage
+        if (autoProceed) {
+            console.log('Auto-proceed enabled, processing alignment samples for post-QC unknown library preps');
+            // Add samples to post-QC unknown library preps if they have unknown library prep methods
+            alignmentSamples.forEach(sample => {
+                if (this.isRtxWorkflow(sample) && !this.isLibraryPrepMethodKnown(sample.library_prep_method)) {
+                    const libraryPrepMethod = sample.library_prep_method || '';
+                    if (!this.unknownLibraryPrepMethodSamples.postqc.has(libraryPrepMethod)) {
+                        this.unknownLibraryPrepMethodSamples.postqc.set(libraryPrepMethod, []);
+                    }
+                    this.unknownLibraryPrepMethodSamples.postqc.get(libraryPrepMethod).push(sample);
+                }
+            });
+        }
 
         // Render alignment batches
         if (alignmentBatches.size > 0) {
@@ -804,7 +920,7 @@ class PipelineSubmitModal {
                         </tr>
                     </thead>
                     <tbody>
-                        ${samples.map(sample => this.createSampleRow(sample, 'postqc')).join('')}
+                        ${samples.map(sample => this.createSampleRow(sample, 'postqc', true)).join('')}
                     </tbody>
                 </table>
             `;
@@ -825,7 +941,7 @@ class PipelineSubmitModal {
         return batchGroup;
     }
 
-    createSampleRow(sample, stage) {
+    createSampleRow(sample, stage, isAutoProceed = false) {
         // Determine workflow
         const workflow = this.determineWorkflow(sample);
         // Store workflow directly on the sample for later reference
@@ -835,8 +951,11 @@ class PipelineSubmitModal {
             this.generateAlignmentCommand(sample) :
             this.generatePostQCCommand(sample);
 
+        // Add data-auto-proceed attribute if this is part of auto-proceed
+        const autoProceedAttr = isAutoProceed ? 'data-auto-proceed="true"' : '';
+
         return `
-            <tr data-sample="${sample.fastq_name}" data-stage="${stage}" data-workflow="${workflow}">
+            <tr data-sample="${sample.fastq_name}" data-stage="${stage}" data-workflow="${workflow}" ${autoProceedAttr}>
                 <td>${sample.fastq_name}</td>
                 <td><span class="badge ${workflow === 'MTX' ? 'rainbow-badge' : 'bg-primary'}">${workflow}</span></td>
                 <td class="command-cell">
@@ -871,13 +990,33 @@ class PipelineSubmitModal {
         const currentValues = this.parseCommand(command);
         console.log('Current values from command:', currentValues);
 
+        // Check if this is post-QC stage
+        const isPostQC = stage === 'postqc';
+
+        // Try to extract asset tag from command if it's post-QC
+        let assetTag = '';
+        if (isPostQC) {
+            const assetTagMatch = command.match(/--asset-tag\s+([^\s"]+)/);
+            if (assetTagMatch) {
+                assetTag = assetTagMatch[1];
+                console.log('Found asset tag in command:', assetTag);
+            }
+        }
+
         // Create the form HTML
         const formHtml = `
             <div class="command-edit-form">
                 <div class="mb-3">
                     <label class="form-label">Base Command</label>
-                    <input type="text" class="form-control command-input" value="${currentValues.baseCommand || ''}" data-workflow="${this.determineWorkflow(sample)}">
+                    <input type="text" class="form-control command-input" value="${currentValues.baseCommand || ''}" data-workflow="${this.determineWorkflow(sample)}" style="font-family: monospace;">
                 </div>
+                ${isPostQC ? `
+                    <div class="mb-3">
+                        <label class="form-label">Asset Tag</label>
+                        <input type="text" class="form-control asset-tag-input" value="${assetTag}" placeholder="e.g., 25.03.27">
+                        <div class="form-text">Leave empty for no asset tag</div>
+                    </div>
+                ` : ''}
                 ${stage === 'alignment' ? `
                     <div class="mb-3">
                         <label class="form-label">Reference</label>
@@ -889,16 +1028,16 @@ class PipelineSubmitModal {
         ).join('')}
                         </select>
                     </div>
-                        <div class="mb-3">
-                            <label class="form-label">Chemistry</label>
-                            <select class="form-select chemistry-select">
-                                ${this.getChemistries().map(chem =>
+                    <div class="mb-3">
+                        <label class="form-label">Chemistry</label>
+                        <select class="form-select chemistry-select">
+                            ${this.getChemistries().map(chem =>
             `<option value="${chem.value}" ${chem.value === currentValues.chemistry ? 'selected' : ''}>
-                                        ${chem.name}
-                                    </option>`
+                                    ${chem.name}
+                                </option>`
         ).join('')}
-                            </select>
-                        </div>
+                        </select>
+                    </div>
                     <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input include-introns" type="checkbox" id="include-introns-${sample.fastq_name}" 
@@ -916,8 +1055,8 @@ class PipelineSubmitModal {
                                 High execution priority
                             </label>
                         </div>
-                        </div>
-                    ` : ''}
+                    </div>
+                ` : ''}
                 <div class="d-flex justify-content-end gap-2">
                     <button type="button" class="btn btn-secondary cancel-edit">Cancel</button>
                     <button type="button" class="btn btn-primary save-command">Save</button>
@@ -1150,6 +1289,12 @@ class PipelineSubmitModal {
     generatePostQCCommand(sample) {
         const workflow = this.determineWorkflow(sample);
         const libraryPrepMethod = sample.library_prep_method || '';
+
+        // Check if this is an unknown library prep method
+        if (this.isRtxWorkflow(sample) && !this.isLibraryPrepMethodKnown(libraryPrepMethod)) {
+            // For unknown library preps, return empty command until user selects an asset
+            return '';
+        }
 
         const commandTemplate = this.getCommandTemplate(workflow, 'postqc', libraryPrepMethod);
         if (!commandTemplate) {
@@ -1443,6 +1588,11 @@ class PipelineSubmitModal {
                 }
             }
 
+            // For post-QC stage, always include tenx_rnaseq_qc
+            if (stage === 'postqc') {
+                assets.add('tenx_rnaseq_qc');
+            }
+
             // Sort assets alphabetically for consistent display
             const sortedAssets = Array.from(assets).sort();
             console.log(`Available assets for ${stage}:`, sortedAssets);
@@ -1493,28 +1643,60 @@ class PipelineSubmitModal {
             return;
         }
 
-        // Find a matching asset template in the workflow/stage configuration
+        // Find the appropriate command template from the config
         let commandTemplate = '';
-        let assetConfig = null;
+        let workflow = 'rtx';
 
-        if (this.config?.workflows?.rtx?.[stage]) {
-            const workflowConfig = this.config.workflows.rtx[stage];
+        // For post-QC stage, check if we should use MTX workflow for the template
+        if (stage === 'postqc' && selectedAsset === 'multi_gex_qc') {
+            workflow = 'mtx';
+        }
 
-            // Find any template with the matching asset name
-            for (const [pattern, config] of Object.entries(workflowConfig)) {
-                if (config.asset_name === selectedAsset) {
-                    commandTemplate = config.command_template;
-                    assetConfig = config;
-                    console.log(`Found template for asset ${selectedAsset}: ${commandTemplate}`);
-                    break;
+        // Look for a template matching the selected asset
+        if (this.config?.workflows?.[workflow]) {
+            const workflowConfig = this.config.workflows[workflow][stage];
+
+            if (typeof workflowConfig === 'object') {
+                // For direct command_template like MTX
+                if (workflowConfig.asset_name === selectedAsset) {
+                    commandTemplate = workflowConfig.command_template;
+                    console.log(`Found simple template for ${workflow} ${stage} with asset ${selectedAsset}: ${commandTemplate}`);
+                }
+                // For pattern-based configs like RTX
+                else if (!workflowConfig.command_template) {
+                    for (const [pattern, config] of Object.entries(workflowConfig)) {
+                        if (config.asset_name === selectedAsset) {
+                            commandTemplate = config.command_template;
+                            console.log(`Found pattern-based template for ${selectedAsset}: ${commandTemplate}`);
+                            break;
+                        }
+                    }
                 }
             }
         }
 
-        // If no template found, show an error
+        // If no template found, create a basic one based on the stage and asset
         if (!commandTemplate) {
-            console.error(`Could not find command template for ${selectedAsset}`);
-            return;
+            console.warn(`No command template found for ${workflow} ${stage} with asset ${selectedAsset}, creating fallback`);
+            if (stage === 'alignment') {
+                if (workflow === 'mtx') {
+                    commandTemplate = `ocs fastqs align tenx-arc --asset-name ${selectedAsset} --reference-names "{reference}" --load-names "{load_name}" --notify-on FAILED --notify {notification_email}`;
+                } else {
+                    commandTemplate = `ocs fastqs align tenx-rnaseq --asset-name ${selectedAsset} --reference-names "{reference}" --load-names "{load_name}" --notify-on FAILED --notify {notification_email}`;
+                }
+            } else { // post-QC
+                if (workflow === 'mtx') {
+                    commandTemplate = `ocs fastqs postalign tenx-arc --asset-name ${selectedAsset} --load-names "{load_name}" --notify-on FAILED --notify {notification_email}`;
+                } else {
+                    commandTemplate = `ocs fastqs postalign tenx-rnaseq --asset-name ${selectedAsset} --load-names "{load_name}" --notify-on FAILED --notify {notification_email}`;
+                }
+            }
+        }
+
+        // Add asset tag to template if provided in form but not in template
+        if (assetTag && !commandTemplate.includes('--asset-tag')) {
+            const assetNamePart = `--asset-name ${selectedAsset}`;
+            commandTemplate = commandTemplate.replace(assetNamePart, `${assetNamePart} --asset-tag ${assetTag}`);
         }
 
         console.log(`Using command template: ${commandTemplate}`);
@@ -1535,23 +1717,8 @@ class PipelineSubmitModal {
                 return;
             }
 
-            // Get the base command from the template
-            const baseCommand = commandTemplate.split(' ').slice(0, 5).join(' ');
-
-            // Build the command using the new method
-            const command = this.buildCommand(baseCommand, {
-                ...sample,
-                load_name: sample.load_name === '—' ? '' : sample.load_name  // Keep load_name blank if it's "—"
-            }, {
-                reference: this.getReference(sample.organism_common_name || ''),
-                chemistry: this.getChemistry(sample.library_prep_method || ''),
-                includeIntrons: true,
-                executionPriority: selectedAsset === 'cellranger-multi',
-                assetTag,
-                isAlignment: stage === 'alignment',
-                assetName: selectedAsset
-            });
-
+            // Generate command from template
+            const command = this.generateCommandFromTemplate(commandTemplate, sample);
             console.log(`Generated command for ${sample.fastq_name}: ${command}`);
             commandCell.textContent = command;
 
@@ -1609,8 +1776,8 @@ class PipelineSubmitModal {
         // If preserveBaseCommand is true, use the entire base command as is
         let command = preserveBaseCommand ? baseCommand : `${baseCommand.split('--asset-name')[0].trim()} --asset-name ${assetName}`;
 
-        // Add reference if provided
-        if (reference) {
+        // Add reference only for alignment commands
+        if (reference && isAlignment) {
             command += ` --reference-names "${reference}"`;
         }
 
@@ -1675,7 +1842,11 @@ class PipelineSubmitModal {
         }
 
         const isAlignment = stage === 'alignment';
+        const isPostQC = stage === 'postqc';
         const baseCommand = form.querySelector('.command-input').value;
+
+        // Get asset tag for post-QC
+        const assetTag = isPostQC ? form.querySelector('.asset-tag-input')?.value?.trim() : '';
 
         // Extract asset name from base command
         const assetNameMatch = baseCommand.match(/--asset-name\s+([^\s]+)/);
@@ -1688,20 +1859,36 @@ class PipelineSubmitModal {
         const includeIntronsCheck = form.querySelector('.include-introns');
         const executionPriorityCheck = form.querySelector('.execution-priority');
 
-        // Build the command using the new method
-        const newCommand = this.buildCommand(baseCommand, sample, {
-            reference: referenceSelect?.value,
-            chemistry: chemistrySelect?.value,
-            includeIntrons: includeIntronsCheck?.checked,
-            executionPriority: executionPriorityCheck?.checked,
-            isAlignment,
-            assetName,
-            preserveBaseCommand: true  // Add flag to preserve base command
-        });
+        // Build the command
+        let newCommand;
+
+        if (isPostQC) {
+            // For post-QC, specially handle asset tag
+            let processedBaseCommand = baseCommand;
+
+            // Remove existing asset tag if present
+            processedBaseCommand = processedBaseCommand.replace(/--asset-tag\s+[^\s]+/, '').trim();
+
+            // Add load names and notifications
+            newCommand = `${processedBaseCommand} ${assetTag ? `--asset-tag ${assetTag} ` : ''}--load-names "${sample.load_name}" --notify-on FAILED --notify ${this.getNotificationEmail()}`;
+        } else {
+            // For alignment, use the regular build method
+            newCommand = this.buildCommand(baseCommand, sample, {
+                reference: referenceSelect?.value,
+                chemistry: chemistrySelect?.value,
+                includeIntrons: includeIntronsCheck?.checked,
+                executionPriority: executionPriorityCheck?.checked,
+                isAlignment,
+                assetName,
+                assetTag: '',  // Not used for alignment
+                preserveBaseCommand: true
+            });
+        }
 
         console.log('Generated command:', {
             baseCommand,
             assetName,
+            assetTag: isPostQC ? assetTag : '',
             newCommand
         });
 
