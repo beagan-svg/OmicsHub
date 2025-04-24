@@ -29,13 +29,21 @@ def pipeline_config(request):
     API endpoint to serve the pipeline configuration from YAML file.
     """
     try:
+        print("Loading pipeline configuration...")
         config_path = os.path.join('config', 'pipeline_config.yaml')
+        print(f"Config path: {config_path}")
         
         with open(config_path, 'r') as file:
             config = yaml.safe_load(file)
             
+        print("Configuration loaded successfully")
+        print(f"References: {list(config.get('references', {}).keys())[:3]}")
+        print(f"Chemistries: {config.get('chemistries', {})}")
+        print(f"Workflows: {list(config.get('workflows', {}).keys())}")
+            
         return JsonResponse(config)
     except Exception as e:
+        print(f"Error loading pipeline configuration: {str(e)}")
         return JsonResponse({
             'error': str(e),
             'message': 'Failed to load pipeline configuration'

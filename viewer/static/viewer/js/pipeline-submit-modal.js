@@ -30,6 +30,11 @@ class PipelineSubmitModal {
         // Configuration will be loaded from server
         this.config = null;
 
+        this.finalCommandsModal = new bootstrap.Modal(document.getElementById('final-commands-modal'));
+        this.executeSubmitBtn = document.getElementById('execute-submit');
+        this.finalAlignmentCommandsContainer = document.getElementById('final-alignment-commands');
+        this.finalPostQCCommandsContainer = document.getElementById('final-postqc-commands');
+
         this.setupEventListeners();
         this.loadConfig();
 
@@ -163,6 +168,18 @@ class PipelineSubmitModal {
         return chemistry;
     }
 
+    // Add this helper method at the top of the class
+    cleanupModal() {
+        console.log('Cleaning up modal state...');
+        document.body.classList.remove('modal-open');
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.remove();
+        }
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    }
+
     setupEventListeners() {
         // Handle modal show event
         this.modal.addEventListener('show.bs.modal', (event) => {
@@ -171,16 +188,25 @@ class PipelineSubmitModal {
 
         // Handle modal hidden event to ensure cleanup
         this.modal.addEventListener('hidden.bs.modal', (event) => {
-            // Remove backdrop if it's still present
-            const backdrop = document.querySelector('.modal-backdrop');
-            if (backdrop) {
-                backdrop.remove();
+            // Only cleanup if no other modal is visible
+            if (!document.querySelector('.modal.show')) {
+                this.cleanupModal();
             }
-            // Remove modal-open class from body
-            document.body.classList.remove('modal-open');
-            // Remove inline styles from body
-            document.body.removeAttribute('style');
         });
+
+        // Add close button handler for submit modal
+        const submitModalCloseBtn = this.modal.querySelector('.btn-close');
+        if (submitModalCloseBtn) {
+            submitModalCloseBtn.onclick = (e) => {
+                e.preventDefault();
+                console.log('Submit modal close button clicked');
+                const modalInstance = bootstrap.Modal.getInstance(this.modal);
+                if (modalInstance) {
+                    modalInstance.hide();
+                    this.cleanupModal();
+                }
+            };
+        }
 
         // Handle auto-proceed toggle change
         if (this.autoProceedToggle) {
@@ -449,7 +475,7 @@ class PipelineSubmitModal {
                 const row = cell.closest('tr');
                 const fastqName = row.querySelector('td:first-child').textContent.trim();
                 const batchGroup = cell.closest('.batch-group');
-                const stage = row.dataset.stage; // Use row's dataset instead of batchGroup
+                const stage = row.dataset.stage;
                 const isAutoProceed = row.hasAttribute('data-auto-proceed');
 
                 console.log('Reset context:', {
@@ -487,6 +513,20 @@ class PipelineSubmitModal {
                     libraryPrepMethod: sample.library_prep_method,
                     workflow: this.determineWorkflow(sample)
                 });
+
+                // Check if we have a stored original command
+                const originalCommand = sample.originalCommands?.[stage];
+                if (originalCommand) {
+                    console.log(`Found stored original ${stage} command:`, originalCommand);
+                    const codeElement = cell.querySelector('code');
+                    codeElement.textContent = originalCommand;
+                    if (stage === 'alignment') {
+                        sample.alignmentCommand = originalCommand;
+                    } else {
+                        sample.postQCCommand = originalCommand;
+                    }
+                    return;
+                }
 
                 // For unknown library prep methods, we need to check if there's a selected asset
                 if (stage === 'alignment' && !this.isLibraryPrepMethodKnown(sample.library_prep_method)) {
@@ -614,6 +654,11 @@ class PipelineSubmitModal {
             // Set initial value from config
             this.globalNotificationEmail.value = this.getNotificationEmail();
         }
+
+        this.executeSubmitBtn.addEventListener('click', () => {
+            this.finalCommandsModal.hide();
+            this.executeSubmission();
+        });
     }
 
     populateModal() {
@@ -735,7 +780,12 @@ class PipelineSubmitModal {
         console.log('==================== Processing Unknown Library Preps ====================');
         console.log('Total samples to process:', samples.length);
         console.log('Current incomplete samples:', this.incompleteSamples.length);
-        console.log('Include incomplete checkbox state:', document.getElementById('include-incomplete-samples')?.checked);
+        const includeIncomplete = document.getElementById('include-incomplete-samples')?.checked || false;
+        const autoProceed = document.getElementById('auto-proceed-toggle')?.checked || false;
+        console.log('Settings:', {
+            includeIncomplete,
+            autoProceed
+        });
 
         // Only track unknown library preps for RTX workflow
         samples.forEach(sample => {
@@ -761,55 +811,58 @@ class PipelineSubmitModal {
                 });
 
                 if (!isLibraryPrepMethodKnown) {
-                    // Check if sample is incomplete and include-incomplete checkbox is checked
-                    const includeIncomplete = document.getElementById('include-incomplete-samples')?.checked || false;
                     const isIncomplete = sample.ingest_status.toLowerCase() === 'not started';
+
+                    // First, check alignment eligibility
+                    const isEligibleForAlignment = isIncomplete ? includeIncomplete : true;
 
                     console.log('Sample eligibility check:', {
                         sample: sample.fastq_name,
                         isIncomplete,
                         includeIncomplete,
+                        isEligibleForAlignment,
                         ingestStatus: sample.ingest_status,
                         alignmentStatus: sample.alignment_status,
                         postQCStatus: sample.postqc_status,
-                        shouldIncludeForAlignment: (sample.ingest_status.toLowerCase() === 'completed' &&
-                            sample.alignment_status.toLowerCase() !== 'completed') ||
-                            (isIncomplete && includeIncomplete),
-                        shouldIncludeForPostQC: sample.alignment_status.toLowerCase() === 'completed' &&
-                            sample.postqc_status.toLowerCase() !== 'completed'
+                        autoProceed
                     });
 
-                    // Alignment: include completed ingest with incomplete alignment or include-incomplete selected
-                    if ((sample.ingest_status.toLowerCase() === 'completed' &&
-                        sample.alignment_status.toLowerCase() !== 'completed') ||
-                        (isIncomplete && includeIncomplete)) {
-                        // Unknown library prep for alignment
+                    // Handle alignment eligibility
+                    if (isEligibleForAlignment) {
                         console.log(`Adding ${sample.fastq_name} to alignment unknown list`);
                         if (!this.unknownLibraryPrepMethodSamples.alignment.has(libraryPrepMethod)) {
                             this.unknownLibraryPrepMethodSamples.alignment.set(libraryPrepMethod, []);
                         }
                         this.unknownLibraryPrepMethodSamples.alignment.get(libraryPrepMethod).push(sample);
                     } else {
-                        console.log(`Skipping ${sample.fastq_name} for alignment - does not meet criteria for unknown library prep handling`);
+                        console.log(`Skipping ${sample.fastq_name} for alignment - not eligible (incomplete sample and include-incomplete not checked)`);
                     }
 
-                    // Post-QC: include completed alignment with incomplete post-QC
-                    if (sample.alignment_status.toLowerCase() === 'completed' &&
-                        sample.postqc_status.toLowerCase() !== 'completed') {
-                        // Unknown library prep for post-QC
+                    // Handle post-QC eligibility separately
+                    const isEligibleForPostQC =
+                        // Either completed alignment and not completed post-QC
+                        (sample.alignment_status.toLowerCase() === 'completed' &&
+                            sample.postqc_status.toLowerCase() !== 'completed') ||
+                        // Or auto-proceed is enabled and sample is eligible for alignment
+                        (autoProceed && isEligibleForAlignment);
+
+                    if (isEligibleForPostQC) {
                         console.log(`Adding ${sample.fastq_name} to post-QC unknown list`);
                         if (!this.unknownLibraryPrepMethodSamples.postqc.has(libraryPrepMethod)) {
                             this.unknownLibraryPrepMethodSamples.postqc.set(libraryPrepMethod, []);
                         }
                         this.unknownLibraryPrepMethodSamples.postqc.get(libraryPrepMethod).push(sample);
                     } else {
-                        console.log(`Skipping ${sample.fastq_name} for post-QC - does not meet criteria for unknown library prep handling`);
+                        console.log(`Skipping ${sample.fastq_name} for post-QC - not eligible`);
                     }
                 }
             } else {
                 console.log(`Skipping ${sample.fastq_name} - not RTX workflow`);
             }
         });
+
+        // After processing all samples, ensure warnings are displayed
+        this.addUnknownLibPrepWarnings();
 
         console.log('\nFinal unknown library prep state:', {
             alignmentMethods: Array.from(this.unknownLibraryPrepMethodSamples.alignment.keys()),
@@ -867,7 +920,7 @@ class PipelineSubmitModal {
             postQCBatchCount: postQCBatches.size
         });
 
-        // Process unknown library preps again with current samples
+        // Reset unknown library prep tracking
         this.unknownLibraryPrepMethodSamples = {
             alignment: new Map(),
             postqc: new Map()
@@ -914,8 +967,17 @@ class PipelineSubmitModal {
             this.postQCBatches.innerHTML = '<div class="text-center text-muted">No samples eligible for post-QC</div>';
         }
 
-        // Add unknown library prep warnings if needed
-        this.addUnknownLibPrepWarnings();
+        // Remove all existing unknown library prep warnings
+        document.querySelectorAll('.unknown-libprep-section').forEach(section => {
+            section.remove();
+        });
+
+        // Add unknown library prep warnings only if there are samples with unknown library preps
+        if (this.unknownLibraryPrepMethodSamples.alignment.size > 0 ||
+            this.unknownLibraryPrepMethodSamples.postqc.size > 0) {
+            this.addUnknownLibPrepWarnings();
+        }
+
         console.log('==================================================================\n');
     }
 
@@ -1093,16 +1155,16 @@ class PipelineSubmitModal {
         ).join('')}
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Chemistry</label>
-                        <select class="form-select chemistry-select">
-                            ${this.getChemistries().map(chem =>
+                        <div class="mb-3">
+                            <label class="form-label">Chemistry</label>
+                            <select class="form-select chemistry-select">
+                                ${this.getChemistries().map(chem =>
             `<option value="${chem.value}" ${chem.value === currentValues.chemistry ? 'selected' : ''}>
-                                    ${chem.name}
-                                </option>`
+                                        ${chem.name}
+                                    </option>`
         ).join('')}
-                        </select>
-                    </div>
+                            </select>
+                        </div>
                     <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input include-introns" type="checkbox" id="include-introns-${sample.fastq_name}" 
@@ -1120,8 +1182,8 @@ class PipelineSubmitModal {
                                 High execution priority
                             </label>
                         </div>
-                    </div>
-                ` : ''}
+                        </div>
+                    ` : ''}
                 <div class="d-flex justify-content-end gap-2">
                     <button type="button" class="btn btn-secondary cancel-edit">Cancel</button>
                     <button type="button" class="btn btn-primary save-command">Save</button>
@@ -1383,235 +1445,303 @@ class PipelineSubmitModal {
     }
 
     handleSubmission() {
-        // Get the bootstrap modal instance
+        console.log('handleSubmission started');
+
+        // Collect all commands
+        const commands = {
+            alignment: [],
+            postQC: []
+        };
+
+        // Debug log DOM elements
+        console.log('Alignment batches container:', this.alignmentBatches);
+        console.log('PostQC batches container:', this.postQCBatches);
+
+        // Get alignment commands
+        const alignmentBatchGroups = this.alignmentBatches.querySelectorAll('.batch-group');
+        console.log('Found alignment batch groups:', alignmentBatchGroups.length);
+
+        alignmentBatchGroups.forEach((batchGroup, groupIndex) => {
+            const cells = batchGroup.querySelectorAll('tr[data-sample]');
+            console.log(`Processing alignment batch group ${groupIndex + 1}, found ${cells.length} cells`);
+
+            cells.forEach((row, index) => {
+                const sample = row.dataset.sample;
+                // Try to get command from the command cell first
+                let command = row.querySelector('.command-cell code')?.textContent?.trim();
+
+                // If no command found in code element, try to get it from the input if it exists
+                if (!command) {
+                    const commandInput = row.querySelector('.command-edit-form textarea[name="command"]');
+                    if (commandInput) {
+                        command = commandInput.value.trim();
+                    }
+                }
+
+                console.log(`Processing alignment row ${index + 1} in batch ${groupIndex + 1}:`, {
+                    sample: sample,
+                    command: command,
+                    hasCommand: !!command
+                });
+
+                if (command && sample) {
+                    commands.alignment.push({
+                        sampleId: sample,
+                        command: command
+                    });
+                    console.log(`Added alignment command for sample ${sample}:`, command);
+                } else {
+                    console.log('Skipped alignment command due to missing data:', {
+                        hasCommand: !!command,
+                        hasSample: !!sample,
+                        command: command
+                    });
+                }
+            });
+        });
+
+        // Get post-QC commands
+        const postQCBatchGroups = this.postQCBatches.querySelectorAll('.batch-group');
+        console.log('Found postQC batch groups:', postQCBatchGroups.length);
+
+        postQCBatchGroups.forEach((batchGroup, groupIndex) => {
+            const cells = batchGroup.querySelectorAll('tr[data-sample]');
+            console.log(`Processing postQC batch group ${groupIndex + 1}, found ${cells.length} cells`);
+
+            cells.forEach((row, index) => {
+                const sample = row.dataset.sample;
+                // Try to get command from the command cell first
+                let command = row.querySelector('.command-cell code')?.textContent?.trim();
+
+                // If no command found in code element, try to get it from the input if it exists
+                if (!command) {
+                    const commandInput = row.querySelector('.command-edit-form textarea[name="command"]');
+                    if (commandInput) {
+                        command = commandInput.value.trim();
+                    }
+                }
+
+                // For unknown library prep methods, check the generated command
+                if (!command) {
+                    const generatedCommand = row.querySelector('.generated-command')?.textContent?.trim();
+                    if (generatedCommand) {
+                        command = generatedCommand;
+                    }
+                }
+
+                console.log(`Processing postQC row ${index + 1} in batch ${groupIndex + 1}:`, {
+                    sample: sample,
+                    command: command,
+                    hasCommand: !!command
+                });
+
+                if (command && sample) {
+                    commands.postQC.push({
+                        sampleId: sample,
+                        command: command
+                    });
+                    console.log(`Added postQC command for sample ${sample}:`, command);
+                } else {
+                    console.log('Skipped postQC command due to missing data:', {
+                        hasCommand: !!command,
+                        hasSample: !!sample,
+                        command: command
+                    });
+                }
+            });
+        });
+
+        // Get all commands into a single list for console output
+        const allCommands = [];
+
+        console.log('Processing collected commands:', {
+            alignmentCommands: commands.alignment.length,
+            postQCCommands: commands.postQC.length
+        });
+
+        // Add alignment commands to the list
+        commands.alignment.forEach(item => {
+            allCommands.push({
+                type: 'alignment',
+                sampleId: item.sampleId,
+                command: item.command
+            });
+        });
+
+        // Add post-QC commands to the list
+        commands.postQC.forEach(item => {
+            allCommands.push({
+                type: 'postQC',
+                sampleId: item.sampleId,
+                command: item.command
+            });
+        });
+
+        // Print all commands to console
+        console.log('Final commands to be executed:', allCommands);
+        console.log('\nCommand list:');
+        allCommands.forEach((item, index) => {
+            console.log(`\n${index + 1}. [${item.type}] ${item.sampleId}:\n${item.command}`);
+        });
+
+        // Store the commands before hiding the modal
+        this.finalCommands = commands;
+
+        // Hide the submit modal and show the final commands modal
         const modalInstance = bootstrap.Modal.getInstance(this.modal);
+        if (modalInstance) {
+            console.log('Attempting to hide submit modal...');
+            try {
+                modalInstance.hide();
+                console.log('Submit modal hide() called');
+
+                // Use a short timeout to ensure the modal is hidden
+                setTimeout(() => {
+                    console.log('Checking if submit modal is hidden...');
+                    if (!this.modal.classList.contains('show')) {
+                        console.log('Submit modal is confirmed hidden, showing final commands modal');
+                        this.showFinalCommands(commands);
+                    } else {
+                        console.log('Submit modal is still visible, forcing hide and showing final commands');
+                        this.modal.classList.remove('show');
+                        this.modal.style.display = 'none';
+                        document.body.classList.remove('modal-open');
+                        const backdrop = document.querySelector('.modal-backdrop');
+                        if (backdrop) {
+                            backdrop.remove();
+                        }
+                        this.showFinalCommands(commands);
+                    }
+                }, 300);
+            } catch (error) {
+                console.error('Error hiding submit modal:', error);
+                // Still try to show final commands even if there's an error
+                this.showFinalCommands(commands);
+            }
+        } else {
+            console.error('Could not find submit modal instance');
+            this.showFinalCommands(commands);
+        }
+    }
+
+    showFinalCommands(commands) {
+        console.log('showFinalCommands started with commands:', commands);
+
+        const finalCommandsModalElement = document.getElementById('final-commands-modal');
+        this.finalAlignmentCommandsContainer = document.getElementById('final-alignment-commands');
+        this.finalPostQCCommandsContainer = document.getElementById('final-postqc-commands');
+        this.executeSubmitBtn = document.getElementById('execute-submit');
+
+        // Get the back button
+        const backButton = finalCommandsModalElement.querySelector('button[data-bs-dismiss="modal"].btn-secondary');
+        if (backButton) {
+            console.log('Setting up back button handler');
+            backButton.onclick = (e) => {
+                e.preventDefault();
+                console.log('Back button clicked');
+                this.finalCommandsModal.hide();
+                const submitModal = new bootstrap.Modal(this.modal);
+                submitModal.show();
+            };
+        }
+
+        if (!finalCommandsModalElement) {
+            console.error('Final commands modal element not found');
+            return;
+        }
+
+        // Initialize the modal with static backdrop
+        this.finalCommandsModal = new bootstrap.Modal(finalCommandsModalElement, {
+            backdrop: 'static',
+            keyboard: false
+        });
+
+        // Add event listener for modal hidden event
+        finalCommandsModalElement.addEventListener('hidden.bs.modal', () => {
+            console.log('Final commands modal hidden');
+            if (!document.querySelector('.modal.show')) {
+                this.cleanupModal();
+            }
+        });
+
+        // Clear previous commands
+        if (this.finalAlignmentCommandsContainer) {
+            this.finalAlignmentCommandsContainer.innerHTML = '';
+        }
+        if (this.finalPostQCCommandsContainer) {
+            this.finalPostQCCommandsContainer.innerHTML = '';
+        }
+
+        // Store commands for later use
+        this.finalCommands = commands;
+
+        // Add alignment commands
+        if (commands.alignment.length > 0) {
+            commands.alignment.forEach((item, index) => {
+                const commandDiv = document.createElement('div');
+                commandDiv.className = 'command-item';
+                commandDiv.innerHTML = `<strong>${item.sampleId}:</strong>\n${item.command}`;
+                this.finalAlignmentCommandsContainer?.appendChild(commandDiv);
+            });
+        } else {
+            this.finalAlignmentCommandsContainer.innerHTML = '<div class="alert alert-info">No alignment commands to display</div>';
+        }
+
+        // Add post-QC commands
+        if (commands.postQC.length > 0) {
+            commands.postQC.forEach((item, index) => {
+                const commandDiv = document.createElement('div');
+                commandDiv.className = 'command-item';
+                commandDiv.innerHTML = `<strong>${item.sampleId}:</strong>\n${item.command}`;
+                this.finalPostQCCommandsContainer?.appendChild(commandDiv);
+            });
+        } else {
+            this.finalPostQCCommandsContainer.innerHTML = '<div class="alert alert-info">No post-QC commands to display</div>';
+        }
+
+        // Set up event listener for execute submit button
+        if (this.executeSubmitBtn) {
+            this.executeSubmitBtn.onclick = () => {
+                this.executeSubmission();
+            };
+        }
+
+        // Set up event listener for close button
+        const closeButton = finalCommandsModalElement.querySelector('.btn-close');
+        if (closeButton) {
+            closeButton.onclick = (e) => {
+                e.preventDefault();
+                console.log('Final commands modal close button clicked');
+                this.finalCommandsModal.hide();
+                this.cleanupModal();
+            };
+        }
+
+        // Show the final commands modal
+        this.finalCommandsModal.show();
+    }
+
+    executeSubmission() {
+        console.log('executeSubmission started');
+        if (this.finalCommandsModal) {
+            this.finalCommandsModal.hide();
+            this.cleanupModal();
+        }
 
         // Show processing state
         this.confirmButton.disabled = true;
         this.confirmButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
 
-        // Collect all custom commands from the interface
-        const commands = {
-            alignment: [],
-            postqc: []
-        };
-
-        // Collect alignment commands
-        const alignmentBuilders = this.alignmentBatches.querySelectorAll('.command-cell');
-        alignmentBuilders.forEach(cell => {
-            const command = cell.querySelector('code').textContent.trim();
-            const sample = cell.closest('tr').dataset.sample;
-
-            commands.alignment.push({
-                sample,
-                command
-            });
-        });
-
-        // Collect post-QC commands (excluding those already added from auto-proceed)
-        const postQCBuilders = this.postQCBatches.querySelectorAll('.command-cell');
-        postQCBuilders.forEach(cell => {
-            const command = cell.querySelector('code').textContent.trim();
-            const sample = cell.closest('tr').dataset.sample;
-
-            // Check if this sample's post-QC is already in the list (from auto-proceed)
-            const exists = commands.postqc.some(item => item.sample === sample);
-            if (!exists) {
-                commands.postqc.push({
-                    sample,
-                    command
-                });
-            }
-        });
-
-        // Log collected commands for debugging
-        console.log('Collected commands:', commands);
-
-        // Reset the confirm button state
-        this.confirmButton.disabled = false;
-        this.confirmButton.innerHTML = 'Confirm and Submit';
-
-        // Hide the submit modal
-        modalInstance.hide();
-
-        // Show the command confirmation modal
-        this.showCommandConfirmationModal(commands);
-    }
-
-    showCommandConfirmationModal(commands) {
-        // Get the command confirmation modal elements
-        const confirmModal = document.getElementById('command-confirm-modal');
-        const alignmentCommandsList = document.getElementById('alignment-commands-list');
-        const postqcCommandsList = document.getElementById('postqc-commands-list');
-
-        if (!confirmModal || !alignmentCommandsList || !postqcCommandsList) {
-            console.error('Command confirmation modal elements not found');
-            return;
-        }
-
-        // Clear previous content
-        alignmentCommandsList.innerHTML = '';
-        postqcCommandsList.innerHTML = '';
-
-        // Populate alignment commands
-        if (commands.alignment.length > 0) {
-            commands.alignment.forEach(item => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><code>${item.sample}</code></td>
-                    <td><pre class="mb-0 p-2 bg-light rounded" style="max-width: 100%; overflow-x: auto; font-size: 0.8rem;">${item.command}</pre></td>
-                `;
-                alignmentCommandsList.appendChild(row);
-            });
-        } else {
-            const row = document.createElement('tr');
-            row.innerHTML = '<td colspan="2" class="text-center">No alignment commands to submit</td>';
-            alignmentCommandsList.appendChild(row);
-        }
-
-        // Populate post-QC commands
-        if (commands.postqc.length > 0) {
-            commands.postqc.forEach(item => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><code>${item.sample}</code></td>
-                    <td><pre class="mb-0 p-2 bg-light rounded" style="max-width: 100%; overflow-x: auto; font-size: 0.8rem;">${item.command}</pre></td>
-                `;
-                postqcCommandsList.appendChild(row);
-            });
-        } else {
-            const row = document.createElement('tr');
-            row.innerHTML = '<td colspan="2" class="text-center">No post-QC commands to submit</td>';
-            postqcCommandsList.appendChild(row);
-        }
-
-        // Store commands in window object for console access
-        window.pipelineCommands = commands;
-
-        // Log all commands to console
-        console.group('Final Commands for Submission');
-        console.log('Alignment Commands:', commands.alignment.map(item => item.command));
-        console.log('Post-QC Commands:', commands.postqc.map(item => item.command));
-        console.groupEnd();
-
-        // Set up event handler for final submit button
-        const finalSubmitBtn = document.getElementById('final-submit');
-        if (finalSubmitBtn) {
-            // Remove any existing event listeners
-            const newFinalSubmitBtn = finalSubmitBtn.cloneNode(true);
-            finalSubmitBtn.parentNode.replaceChild(newFinalSubmitBtn, finalSubmitBtn);
-
-            // Add new event listener
-            newFinalSubmitBtn.addEventListener('click', () => this.finalSubmit(commands));
-        }
-
-        // Set up event handler for copy all commands button
-        const copyAllBtn = document.getElementById('copy-all-commands');
-        if (copyAllBtn) {
-            // Remove any existing event listeners
-            const newCopyAllBtn = copyAllBtn.cloneNode(true);
-            copyAllBtn.parentNode.replaceChild(newCopyAllBtn, copyAllBtn);
-
-            // Add new event listener
-            newCopyAllBtn.addEventListener('click', () => this.copyAllCommands(commands));
-        }
-
-        // Show the confirmation modal
-        const bsConfirmModal = new bootstrap.Modal(confirmModal);
-        bsConfirmModal.show();
-    }
-
-    copyAllCommands(commands) {
-        // Prepare a formatted string with all commands
-        let allCommands = '';
-
-        // Add alignment commands
-        if (commands.alignment.length > 0) {
-            allCommands += '# Alignment Commands\n\n';
-            commands.alignment.forEach(item => {
-                allCommands += `# Sample: ${item.sample}\n${item.command}\n\n`;
-            });
-        }
-
-        // Add post-QC commands
-        if (commands.postqc.length > 0) {
-            allCommands += '# Post-QC Commands\n\n';
-            commands.postqc.forEach(item => {
-                allCommands += `# Sample: ${item.sample}\n${item.command}\n\n`;
-            });
-        }
-
-        // Copy to clipboard
-        navigator.clipboard.writeText(allCommands)
-            .then(() => {
-                // Change button text to indicate success
-                const copyAllBtn = document.getElementById('copy-all-commands');
-                if (copyAllBtn) {
-                    const originalText = copyAllBtn.innerHTML;
-                    copyAllBtn.innerHTML = '<i class="bi bi-check2 me-1"></i> Copied!';
-                    copyAllBtn.classList.remove('btn-outline-secondary');
-                    copyAllBtn.classList.add('btn-success');
-
-                    // Revert button after a delay
-                    setTimeout(() => {
-                        copyAllBtn.innerHTML = originalText;
-                        copyAllBtn.classList.remove('btn-success');
-                        copyAllBtn.classList.add('btn-outline-secondary');
-                    }, 2000);
-                }
-
-                console.log('All commands copied to clipboard');
-            })
-            .catch(err => {
-                console.error('Error copying commands to clipboard:', err);
-
-                // Show error in button
-                const copyAllBtn = document.getElementById('copy-all-commands');
-                if (copyAllBtn) {
-                    const originalText = copyAllBtn.innerHTML;
-                    copyAllBtn.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i> Copy failed';
-                    copyAllBtn.classList.remove('btn-outline-secondary');
-                    copyAllBtn.classList.add('btn-danger');
-
-                    // Revert button after a delay
-                    setTimeout(() => {
-                        copyAllBtn.innerHTML = originalText;
-                        copyAllBtn.classList.remove('btn-danger');
-                        copyAllBtn.classList.add('btn-outline-secondary');
-                    }, 2000);
-                }
-            });
-    }
-
-    finalSubmit(commands) {
-        // Hide the confirmation modal
-        const confirmModal = document.getElementById('command-confirm-modal');
-        const bsConfirmModal = bootstrap.Modal.getInstance(confirmModal);
-        if (bsConfirmModal) {
-            bsConfirmModal.hide();
-        }
-
-        // Show processing state on the final submit button
-        const finalSubmitBtn = document.getElementById('final-submit');
-        if (finalSubmitBtn) {
-            finalSubmitBtn.disabled = true;
-            finalSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
-        }
-
         // Simulate API call (replace with actual API call)
         setTimeout(() => {
-            // Success handling
-
             // Show success notification
             if (window.pipelineLocalData && typeof window.pipelineLocalData.showToastNotification === 'function') {
                 window.pipelineLocalData.showToastNotification('Samples submitted successfully', 'success');
             }
 
             // Reset button state
-            if (finalSubmitBtn) {
-                finalSubmitBtn.disabled = false;
-                finalSubmitBtn.innerHTML = 'Submit All Commands';
-            }
+            this.confirmButton.disabled = false;
+            this.confirmButton.innerHTML = 'Confirm and Submit';
 
             // Clear selected samples
             if (window.pipelineLocalData) {
@@ -1662,14 +1792,23 @@ class PipelineSubmitModal {
     }
 
     addUnknownLibPrepWarnings() {
-        // Create warning sections for both alignment and postqc
+        // Create warning sections for both alignment and postqc in correct order
         const stages = ['alignment', 'postqc'];
 
+        // Find the notification email card
+        const notificationCard = document.querySelector('.card.mb-4');
+        if (!notificationCard) {
+            console.error('Could not find notification email card');
+            return;
+        }
+
+        // Process stages in order
         stages.forEach(stage => {
             const unknownSamples = this.unknownLibraryPrepMethodSamples[stage];
             if (unknownSamples.size > 0) {
                 const warningSection = document.createElement('div');
                 warningSection.className = 'unknown-libprep-section';
+                warningSection.dataset.stage = stage; // Add data attribute to identify the stage
                 warningSection.innerHTML = `
                     <div class="unknown-libprep-header">
                         <div class="d-flex align-items-center gap-2">
@@ -1711,17 +1850,21 @@ class PipelineSubmitModal {
                     </div>
                 `;
 
-                // Add to appropriate section based on stage
-                const targetSection = stage === 'alignment' ? this.alignmentBatches : this.postQCBatches;
-
-                // Remove any existing warning section in this stage
-                const existingWarning = targetSection.querySelector('.unknown-libprep-section');
+                // Remove any existing warning section for this stage
+                const existingWarning = document.querySelector(`.unknown-libprep-section[data-stage="${stage}"]`);
                 if (existingWarning) {
                     existingWarning.remove();
                 }
 
-                // Insert the new warning section at the top of its respective section
-                targetSection.insertBefore(warningSection, targetSection.firstChild);
+                // Find the correct insertion point
+                // For alignment, insert after notification card
+                // For postqc, insert after alignment warning if it exists, otherwise after notification card
+                let insertAfterElement = stage === 'alignment' ?
+                    notificationCard :
+                    document.querySelector('.unknown-libprep-section[data-stage="alignment"]') || notificationCard;
+
+                // Insert the warning section
+                insertAfterElement.insertAdjacentElement('afterend', warningSection);
 
                 // Add event listeners for asset selectors
                 warningSection.querySelectorAll('.asset-selector').forEach(selector => {
@@ -1852,6 +1995,15 @@ class PipelineSubmitModal {
         }
     }
 
+    // Add this method to store original commands when generated
+    storeOriginalCommand(sample, stage, command) {
+        if (!sample.originalCommands) {
+            sample.originalCommands = {};
+        }
+        sample.originalCommands[stage] = command;
+        console.log(`Stored original ${stage} command:`, command);
+    }
+
     updateUnknownLibPrepCommands(stage, libraryPrepMethod, selectedAsset) {
         console.log(`Updating commands for ${stage} with library prep method ${libraryPrepMethod}, selected asset: ${selectedAsset}`);
 
@@ -1953,13 +2105,12 @@ class PipelineSubmitModal {
             // Store the command in the sample object
             if (stage === 'alignment') {
                 sample.alignmentCommand = command;
+                // Store the original command for reset functionality
+                this.storeOriginalCommand(sample, 'alignment', command);
             } else {
                 sample.postQCCommand = command;
                 // Store the original command for reset functionality
-                if (!sample.originalPostQCCommand) {
-                    sample.originalPostQCCommand = command;
-                    console.log('Stored original post-QC command:', command);
-                }
+                this.storeOriginalCommand(sample, 'postqc', command);
             }
         });
     }

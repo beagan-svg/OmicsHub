@@ -55,7 +55,7 @@ workflows:
   mtx:
     alignment:
       asset_name: "cellranger-arc"
-      command_template: "ocs fastqs align tenx-arc --asset-name cellranger-arc --reference-names \"{reference}\"  --load-names \"{load_name}\" --notify-on FAILED --notify {notification_email}"
+      command_template: "ocs fastqs align tenx-arc --asset-name cellranger-arc --reference-names \"{reference}\" --load-names \"{load_name}\" --notify-on FAILED --notify {notification_email}"
     postqc:
       asset_name: "multi_gex_qc"
       asset_tag: "latest"

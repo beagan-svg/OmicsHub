@@ -8,6 +8,7 @@ from viewer.views.pipeline import (
     FailedJobsView,
     submit_samples
 )
+from .views import pipeline
 
 app_name = 'viewer'
 
@@ -21,7 +22,7 @@ urlpatterns = [
     path('pipeline/failed/', FailedJobsView.as_view(), name='failed_jobs'),
     
     # Pipeline API endpoints
-    path('api/pipeline/config/', pipeline_config, name='pipeline_config'),
+    path('api/pipeline/config', pipeline.get_pipeline_config, name='pipeline_config'),
     path('api/pipeline/submit-alignment/', PipelineApiView.submit_alignment, name='submit_alignment'),
     path('api/pipeline/check-alignment-status/', PipelineApiView.check_alignment_status, name='check_alignment_status'),
     path('api/pipeline/stop-alignment/', PipelineApiView.stop_alignment, name='stop_alignment'),

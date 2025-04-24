@@ -5,6 +5,16 @@
     gap: 1.5rem;
 }
 
+/* Modal backdrop customization */
+.modal-backdrop {
+    background-color: rgba(200, 200, 200, 0.3) !important;
+    backdrop-filter: blur(2px);
+}
+
+.modal-backdrop.show {
+    opacity: 1;
+}
+
 /* Dashboard table title styling */
 .dashboard-title {
     font-size: 1.5rem;

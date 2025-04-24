@@ -807,4 +807,16 @@ def submit_samples(request):
         })
     
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}) 
+        return JsonResponse({'status': 'error', 'message': str(e)})
+
+@require_http_methods(["GET"])
+def get_pipeline_config(request):
+    """API endpoint to serve pipeline configuration to the frontend."""
+    try:
+        # Use the existing load_pipeline_config function
+        config = load_pipeline_config()
+        return JsonResponse(config)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500) 
