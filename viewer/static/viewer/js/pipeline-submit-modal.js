@@ -15,6 +15,9 @@ class PipelineSubmitModal {
         this.postQCBatches = document.getElementById('postqc-batches');
         this.globalNotificationEmail = document.getElementById('global-notification-email');
 
+        // Add originalCommands map to store commands before editing
+        this.originalCommands = new Map();
+
         // Sample tracking
         this.alignmentSamples = [];
         this.postQCSamples = [];
@@ -205,6 +208,18 @@ class PipelineSubmitModal {
                 const workflow = row.dataset.workflow;
                 const isAutoProceed = row.hasAttribute('data-auto-proceed');
 
+                // Store the original command state with a unique key
+                const commandKey = `${sampleName}-${stage}-${isAutoProceed ? 'auto' : 'regular'}`;
+                this.originalCommands.set(commandKey, {
+                    command: currentCommand,
+                    values: this.parseCommand(currentCommand)
+                });
+
+                console.log('Stored original command state:', {
+                    key: commandKey,
+                    state: this.originalCommands.get(commandKey)
+                });
+
                 console.log('Edit command context:', {
                     currentCommand,
                     sampleName,
@@ -351,10 +366,68 @@ class PipelineSubmitModal {
                 e.preventDefault();
                 console.log('Cancel button clicked');
                 const form = cancelButton.closest('.command-edit-form');
-                if (form) {
-                    console.log('Hiding form');
-                    form.classList.remove('show');
+                const cell = form.closest('.command-cell');
+                const row = cell.closest('tr');
+                const sampleName = row.dataset.sample;
+                const stage = row.dataset.stage;
+                const isAutoProceed = row.hasAttribute('data-auto-proceed');
+
+                // Get the original command state
+                const commandKey = `${sampleName}-${stage}-${isAutoProceed ? 'auto' : 'regular'}`;
+                const originalState = this.originalCommands.get(commandKey);
+
+                if (originalState) {
+                    console.log('Restoring original command state:', originalState);
+
+                    // Restore the command display
+                    const codeElement = cell.querySelector('code');
+                    codeElement.textContent = originalState.command;
+
+                    // Update the form inputs with original values
+                    if (originalState.values) {
+                        const baseCommandInput = form.querySelector('.command-input');
+                        if (baseCommandInput) baseCommandInput.value = originalState.values.baseCommand || '';
+
+                        const referenceSelect = form.querySelector('.reference-select');
+                        if (referenceSelect) referenceSelect.value = originalState.values.reference || '';
+
+                        const chemistrySelect = form.querySelector('.chemistry-select');
+                        if (chemistrySelect) chemistrySelect.value = originalState.values.chemistry || '';
+
+                        const includeIntronsCheck = form.querySelector('.include-introns');
+                        if (includeIntronsCheck) includeIntronsCheck.checked = originalState.values.includeIntrons || false;
+
+                        const executionPriorityCheck = form.querySelector('.execution-priority');
+                        if (executionPriorityCheck) executionPriorityCheck.checked = originalState.values.executionPriority || false;
+
+                        const assetTagInput = form.querySelector('.asset-tag-input');
+                        if (assetTagInput) assetTagInput.value = originalState.values.assetTag || '';
+                    }
+
+                    // Update the sample's stored command
+                    let sample;
+                    if (stage === 'alignment' || (stage === 'postqc' && isAutoProceed)) {
+                        sample = [...this.alignmentSamples, ...this.incompleteSamples].find(s => s.fastq_name === sampleName);
+                    } else {
+                        sample = this.postQCSamples.find(s => s.fastq_name === sampleName);
+                    }
+
+                    if (sample) {
+                        if (stage === 'alignment') {
+                            sample.alignmentCommand = originalState.command;
+                        } else {
+                            sample.postQCCommand = originalState.command;
+                        }
+                    }
+
+                    // Clean up the stored state
+                    this.originalCommands.delete(commandKey);
+                } else {
+                    console.warn('No original command state found for:', commandKey);
                 }
+
+                // Hide the form
+                form.classList.remove('show');
             }
         });
 
@@ -426,17 +499,27 @@ class PipelineSubmitModal {
                             if (selectedAsset === 'cellranger-rnaseq') {
                                 const assetTag = libraryPrepMethodContainer.querySelector('.asset-tag-input')?.value || '';
                                 const templateType = libraryPrepMethodContainer.querySelector(`input[name="template-${sample.library_prep_method}"]:checked`)?.value || 'standard';
-                                if (templateType === 'standard') {
-                                    commandTemplate = 'ocs fastqs align tenx-rnaseq --asset-name cellranger-rnaseq --reference-names "{reference}"' +
-                                        (assetTag ? ` --asset-tag ${assetTag}` : '') +
-                                        ' --load-names "{load_name}" --cellranger-addopts "--chemistry {chemistry} --include-introns" --notify-on FAILED --notify {notification_email}';
-                                } else {
-                                    commandTemplate = 'ocs fastqs align tenx-rnaseq --asset-name cellranger-rnaseq --reference-names "{reference}"' +
-                                        (assetTag ? ` --asset-tag ${assetTag}` : '') +
-                                        ' --load-names "{load_name}" --cellranger-addopts "--chemistry {chemistry}" --notify-on FAILED --notify {notification_email}';
+                                const commandTemplate = this.getCommandTemplate('rtx', 'alignment', sample.library_prep_method);
+                                if (commandTemplate) {
+                                    const command = this.generateCommandFromTemplate(commandTemplate, sample);
+                                    console.log('Generated command for unknown library prep method:', command);
+                                    const codeElement = cell.querySelector('code');
+                                    codeElement.textContent = command;
+                                    sample.alignmentCommand = command;
+                                    console.log('Command reset complete');
+                                    return;
                                 }
                             } else if (selectedAsset === 'cellranger-multi') {
-                                commandTemplate = 'ocs fastqs align tenx-rnaseq-multi --asset-name cellranger-multi --reference-names "{reference}" --load-names "{load_name}" --cellranger-addopts \'--include-introns\' --execution-priority HIGH --notify-on FAILED --notify {notification_email}';
+                                const commandTemplate = this.getCommandTemplate('mtx', 'alignment', sample.library_prep_method);
+                                if (commandTemplate) {
+                                    const command = this.generateCommandFromTemplate(commandTemplate, sample);
+                                    console.log('Generated command for unknown library prep method:', command);
+                                    const codeElement = cell.querySelector('code');
+                                    codeElement.textContent = command;
+                                    sample.alignmentCommand = command;
+                                    console.log('Command reset complete');
+                                    return;
+                                }
                             }
 
                             if (commandTemplate) {
@@ -457,85 +540,67 @@ class PipelineSubmitModal {
                     const workflow = this.determineWorkflow(sample);
                     console.log(`Regenerating post-QC command for ${sample.fastq_name} with workflow ${workflow}`);
 
-                    // Try to get template from config
-                    const libraryPrepMethod = sample.library_prep_method || '';
-                    const commandTemplate = this.getCommandTemplate(workflow, 'postqc', libraryPrepMethod);
+                    // Initialize originalCommand variable
+                    let originalCommand = '';
 
-                    let command = '';
+                    // Special case for RTX workflow with unknown library prep method
+                    if (workflow === 'RTX' && !this.isLibraryPrepMethodKnown(sample.library_prep_method)) {
+                        console.log('Unknown library prep method for RTX post-QC, checking for original command');
 
-                    // Generate command from template if available
-                    if (commandTemplate) {
-                        console.log('Using template from config:', commandTemplate);
-                        command = this.generateCommandFromTemplate(commandTemplate, sample);
-                        console.log('Generated command from template:', command);
-                    }
-
-                    // If no command generated yet, use default template
-                    if (!command) {
-                        // Create a default template based on workflow
-                        let defaultTemplate;
-                        if (workflow === 'MTX') {
-                            defaultTemplate = 'ocs fastqs postalign tenx-rnaseq-multi --asset-name multi_gex_qc --load-names "{load_name}" --notify-on FAILED --notify {notification_email}';
+                        // Check if we have the original command stored
+                        if (sample.originalPostQCCommand) {
+                            console.log('Found stored original command:', sample.originalPostQCCommand);
+                            originalCommand = sample.originalPostQCCommand;
                         } else {
-                            defaultTemplate = 'ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc --asset-tag 25.03.27 --load-names "{load_name}" --notify-on FAILED --notify {notification_email}';
+                            // If no original command stored, use the current command from UI
+                            const codeElement = cell.querySelector('code');
+                            originalCommand = codeElement.textContent.trim();
+                            console.log('No stored command found, using current command:', originalCommand);
+
+                            // Store this as the original command for future resets
+                            sample.originalPostQCCommand = originalCommand;
                         }
-                        console.log('Using default template:', defaultTemplate);
-                        command = this.generateCommandFromTemplate(defaultTemplate, sample);
-                        console.log('Generated command from default template:', command);
+
+                        console.log('Using command for unknown RTX post-QC:', originalCommand);
+                    } else {
+                        // Try to get template from config
+                        const libraryPrepMethod = sample.library_prep_method || '';
+                        const commandTemplate = this.getCommandTemplate(workflow, 'postqc', libraryPrepMethod);
+
+                        // Generate command from template if available
+                        if (commandTemplate) {
+                            console.log('Using template from config:', commandTemplate);
+                            originalCommand = this.generateCommandFromTemplate(commandTemplate, sample);
+                            console.log('Generated command from template:', originalCommand);
+                        } else {
+                            console.error('Failed to generate post-QC command');
+                        }
                     }
 
-                    // Apply the generated command
-                    if (command) {
-                        console.log('Final post-QC command:', command);
+                    console.log('Generated original command:', originalCommand);
+
+                    // Only update if we got a valid command
+                    if (originalCommand) {
+                        // Update the command display
                         const codeElement = cell.querySelector('code');
-                        codeElement.textContent = command;
-                        sample.postQCCommand = command;
-                        console.log('Post-QC command reset complete');
-                        return;
-                    } else {
-                        console.error('Failed to generate post-QC command');
-                    }
-                }
+                        codeElement.textContent = originalCommand;
 
-                // For known library preps or when no asset is selected for unknown preps
-                let originalCommand;
-                if (stage === 'alignment') {
-                    originalCommand = this.generateAlignmentCommand(sample);
-                } else {
-                    // For post-QC, ensure we generate a command even in auto-proceed section
-                    originalCommand = this.generatePostQCCommand(sample);
-
-                    // If still no command and in auto-proceed, use a default template
-                    if (!originalCommand && isAutoProceed) {
-                        const workflow = this.determineWorkflow(sample);
-                        let defaultTemplate;
-                        if (workflow === 'MTX') {
-                            defaultTemplate = 'ocs fastqs postalign tenx-rnaseq-multi --asset-name multi_gex_qc --load-names "{load_name}" --notify-on FAILED --notify {notification_email}';
+                        // Update the command in the sample data
+                        if (stage === 'alignment') {
+                            sample.alignmentCommand = originalCommand;
                         } else {
-                            defaultTemplate = 'ocs fastqs postalign tenx-rnaseq --asset-name tenx_rnaseq_qc --asset-tag 25.03.27 --load-names "{load_name}" --notify-on FAILED --notify {notification_email}';
+                            sample.postQCCommand = originalCommand;
+                            // Store the original command for reset functionality
+                            if (!sample.originalPostQCCommand) {
+                                sample.originalPostQCCommand = originalCommand;
+                                console.log('Stored original post-QC command:', originalCommand);
+                            }
                         }
-                        originalCommand = this.generateCommandFromTemplate(defaultTemplate, sample);
-                    }
-                }
 
-                console.log('Generated original command:', originalCommand);
-
-                // Only update if we got a valid command
-                if (originalCommand) {
-                    // Update the command display
-                    const codeElement = cell.querySelector('code');
-                    codeElement.textContent = originalCommand;
-
-                    // Update the command in the sample data
-                    if (stage === 'alignment') {
-                        sample.alignmentCommand = originalCommand;
+                        console.log('Command reset complete');
                     } else {
-                        sample.postQCCommand = originalCommand;
+                        console.warn('No valid command generated for reset');
                     }
-
-                    console.log('Command reset complete');
-                } else {
-                    console.warn('No valid command generated for reset');
                 }
             }
         });
@@ -1087,6 +1152,13 @@ class PipelineSubmitModal {
             console.log('Found asset name in command:', assetNameMatch[1]);
         }
 
+        // Extract asset tag
+        const assetTagMatch = command.match(/--asset-tag\s+([^\s"]+)/);
+        if (assetTagMatch) {
+            values.assetTag = assetTagMatch[1];
+            console.log('Found asset tag in command:', values.assetTag);
+        }
+
         console.log('Extracted base command:', values.baseCommand);
 
         // Extract reference
@@ -1224,6 +1296,11 @@ class PipelineSubmitModal {
         } else {
             // For workflows with direct command_template like MTX
             commandTemplate = workflowConfig.command_template;
+        }
+
+        if (!commandTemplate) {
+            console.error(`No command template found for ${workflow} ${stage} with library prep method ${libraryPrepMethod}`);
+            return '';
         }
 
         return commandTemplate;
@@ -1675,31 +1752,10 @@ class PipelineSubmitModal {
             }
         }
 
-        // If no template found, create a basic one based on the stage and asset
         if (!commandTemplate) {
-            console.warn(`No command template found for ${workflow} ${stage} with asset ${selectedAsset}, creating fallback`);
-            if (stage === 'alignment') {
-                if (workflow === 'mtx') {
-                    commandTemplate = `ocs fastqs align tenx-arc --asset-name ${selectedAsset} --reference-names "{reference}" --load-names "{load_name}" --notify-on FAILED --notify {notification_email}`;
-                } else {
-                    commandTemplate = `ocs fastqs align tenx-rnaseq --asset-name ${selectedAsset} --reference-names "{reference}" --load-names "{load_name}" --notify-on FAILED --notify {notification_email}`;
-                }
-            } else { // post-QC
-                if (workflow === 'mtx') {
-                    commandTemplate = `ocs fastqs postalign tenx-arc --asset-name ${selectedAsset} --load-names "{load_name}" --notify-on FAILED --notify {notification_email}`;
-                } else {
-                    commandTemplate = `ocs fastqs postalign tenx-rnaseq --asset-name ${selectedAsset} --load-names "{load_name}" --notify-on FAILED --notify {notification_email}`;
-                }
-            }
+            console.error(`No command template found for ${workflow} ${stage} with asset ${selectedAsset}`);
+            return;
         }
-
-        // Add asset tag to template if provided in form but not in template
-        if (assetTag && !commandTemplate.includes('--asset-tag')) {
-            const assetNamePart = `--asset-name ${selectedAsset}`;
-            commandTemplate = commandTemplate.replace(assetNamePart, `${assetNamePart} --asset-tag ${assetTag}`);
-        }
-
-        console.log(`Using command template: ${commandTemplate}`);
 
         // Update command for each affected sample
         affectedSamples.forEach(sample => {
@@ -1727,6 +1783,11 @@ class PipelineSubmitModal {
                 sample.alignmentCommand = command;
             } else {
                 sample.postQCCommand = command;
+                // Store the original command for reset functionality
+                if (!sample.originalPostQCCommand) {
+                    sample.originalPostQCCommand = command;
+                    console.log('Stored original post-QC command:', command);
+                }
             }
         });
     }
