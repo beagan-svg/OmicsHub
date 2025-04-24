@@ -1427,10 +1427,180 @@ class PipelineSubmitModal {
         // Log collected commands for debugging
         console.log('Collected commands:', commands);
 
+        // Reset the confirm button state
+        this.confirmButton.disabled = false;
+        this.confirmButton.innerHTML = 'Confirm and Submit';
+
+        // Hide the submit modal
+        modalInstance.hide();
+
+        // Show the command confirmation modal
+        this.showCommandConfirmationModal(commands);
+    }
+
+    showCommandConfirmationModal(commands) {
+        // Get the command confirmation modal elements
+        const confirmModal = document.getElementById('command-confirm-modal');
+        const alignmentCommandsList = document.getElementById('alignment-commands-list');
+        const postqcCommandsList = document.getElementById('postqc-commands-list');
+
+        if (!confirmModal || !alignmentCommandsList || !postqcCommandsList) {
+            console.error('Command confirmation modal elements not found');
+            return;
+        }
+
+        // Clear previous content
+        alignmentCommandsList.innerHTML = '';
+        postqcCommandsList.innerHTML = '';
+
+        // Populate alignment commands
+        if (commands.alignment.length > 0) {
+            commands.alignment.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><code>${item.sample}</code></td>
+                    <td><pre class="mb-0 p-2 bg-light rounded" style="max-width: 100%; overflow-x: auto; font-size: 0.8rem;">${item.command}</pre></td>
+                `;
+                alignmentCommandsList.appendChild(row);
+            });
+        } else {
+            const row = document.createElement('tr');
+            row.innerHTML = '<td colspan="2" class="text-center">No alignment commands to submit</td>';
+            alignmentCommandsList.appendChild(row);
+        }
+
+        // Populate post-QC commands
+        if (commands.postqc.length > 0) {
+            commands.postqc.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><code>${item.sample}</code></td>
+                    <td><pre class="mb-0 p-2 bg-light rounded" style="max-width: 100%; overflow-x: auto; font-size: 0.8rem;">${item.command}</pre></td>
+                `;
+                postqcCommandsList.appendChild(row);
+            });
+        } else {
+            const row = document.createElement('tr');
+            row.innerHTML = '<td colspan="2" class="text-center">No post-QC commands to submit</td>';
+            postqcCommandsList.appendChild(row);
+        }
+
+        // Store commands in window object for console access
+        window.pipelineCommands = commands;
+
+        // Log all commands to console
+        console.group('Final Commands for Submission');
+        console.log('Alignment Commands:', commands.alignment.map(item => item.command));
+        console.log('Post-QC Commands:', commands.postqc.map(item => item.command));
+        console.groupEnd();
+
+        // Set up event handler for final submit button
+        const finalSubmitBtn = document.getElementById('final-submit');
+        if (finalSubmitBtn) {
+            // Remove any existing event listeners
+            const newFinalSubmitBtn = finalSubmitBtn.cloneNode(true);
+            finalSubmitBtn.parentNode.replaceChild(newFinalSubmitBtn, finalSubmitBtn);
+
+            // Add new event listener
+            newFinalSubmitBtn.addEventListener('click', () => this.finalSubmit(commands));
+        }
+
+        // Set up event handler for copy all commands button
+        const copyAllBtn = document.getElementById('copy-all-commands');
+        if (copyAllBtn) {
+            // Remove any existing event listeners
+            const newCopyAllBtn = copyAllBtn.cloneNode(true);
+            copyAllBtn.parentNode.replaceChild(newCopyAllBtn, copyAllBtn);
+
+            // Add new event listener
+            newCopyAllBtn.addEventListener('click', () => this.copyAllCommands(commands));
+        }
+
+        // Show the confirmation modal
+        const bsConfirmModal = new bootstrap.Modal(confirmModal);
+        bsConfirmModal.show();
+    }
+
+    copyAllCommands(commands) {
+        // Prepare a formatted string with all commands
+        let allCommands = '';
+
+        // Add alignment commands
+        if (commands.alignment.length > 0) {
+            allCommands += '# Alignment Commands\n\n';
+            commands.alignment.forEach(item => {
+                allCommands += `# Sample: ${item.sample}\n${item.command}\n\n`;
+            });
+        }
+
+        // Add post-QC commands
+        if (commands.postqc.length > 0) {
+            allCommands += '# Post-QC Commands\n\n';
+            commands.postqc.forEach(item => {
+                allCommands += `# Sample: ${item.sample}\n${item.command}\n\n`;
+            });
+        }
+
+        // Copy to clipboard
+        navigator.clipboard.writeText(allCommands)
+            .then(() => {
+                // Change button text to indicate success
+                const copyAllBtn = document.getElementById('copy-all-commands');
+                if (copyAllBtn) {
+                    const originalText = copyAllBtn.innerHTML;
+                    copyAllBtn.innerHTML = '<i class="bi bi-check2 me-1"></i> Copied!';
+                    copyAllBtn.classList.remove('btn-outline-secondary');
+                    copyAllBtn.classList.add('btn-success');
+
+                    // Revert button after a delay
+                    setTimeout(() => {
+                        copyAllBtn.innerHTML = originalText;
+                        copyAllBtn.classList.remove('btn-success');
+                        copyAllBtn.classList.add('btn-outline-secondary');
+                    }, 2000);
+                }
+
+                console.log('All commands copied to clipboard');
+            })
+            .catch(err => {
+                console.error('Error copying commands to clipboard:', err);
+
+                // Show error in button
+                const copyAllBtn = document.getElementById('copy-all-commands');
+                if (copyAllBtn) {
+                    const originalText = copyAllBtn.innerHTML;
+                    copyAllBtn.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i> Copy failed';
+                    copyAllBtn.classList.remove('btn-outline-secondary');
+                    copyAllBtn.classList.add('btn-danger');
+
+                    // Revert button after a delay
+                    setTimeout(() => {
+                        copyAllBtn.innerHTML = originalText;
+                        copyAllBtn.classList.remove('btn-danger');
+                        copyAllBtn.classList.add('btn-outline-secondary');
+                    }, 2000);
+                }
+            });
+    }
+
+    finalSubmit(commands) {
+        // Hide the confirmation modal
+        const confirmModal = document.getElementById('command-confirm-modal');
+        const bsConfirmModal = bootstrap.Modal.getInstance(confirmModal);
+        if (bsConfirmModal) {
+            bsConfirmModal.hide();
+        }
+
+        // Show processing state on the final submit button
+        const finalSubmitBtn = document.getElementById('final-submit');
+        if (finalSubmitBtn) {
+            finalSubmitBtn.disabled = true;
+            finalSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
+        }
+
         // Simulate API call (replace with actual API call)
         setTimeout(() => {
             // Success handling
-            modalInstance.hide();
 
             // Show success notification
             if (window.pipelineLocalData && typeof window.pipelineLocalData.showToastNotification === 'function') {
@@ -1438,8 +1608,10 @@ class PipelineSubmitModal {
             }
 
             // Reset button state
-            this.confirmButton.disabled = false;
-            this.confirmButton.innerHTML = 'Confirm and Submit';
+            if (finalSubmitBtn) {
+                finalSubmitBtn.disabled = false;
+                finalSubmitBtn.innerHTML = 'Submit All Commands';
+            }
 
             // Clear selected samples
             if (window.pipelineLocalData) {
