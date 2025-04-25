@@ -23,49 +23,39 @@ function getCookie(name) {
 
 class PipelineLocalData {
     constructor() {
-        console.time('PipelineLocalData-constructor');
-        console.log('Starting PipelineLocalData initialization...');
         this.storageKey = 'pipelineSelectedSamples';
         this.legacyStorageKey = 'selectedSamplesForPipeline';
         this.selectedSamples = [];
         this.itemsPerPage = 25;
         this.currentPage = 1;
         this.init();
-        console.timeEnd('PipelineLocalData-constructor');
     }
 
     // Create a reusable function to show bottom toast notifications
     showToastNotification(message, type = 'success', duration = 2000) {
-        // Remove any existing toasts to prevent duplicates
-        const existingToasts = document.querySelectorAll('.toast');
-        existingToasts.forEach(toast => {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
-            }
+        // Remove any existing toasts
+        document.querySelectorAll('.toast').forEach(toast => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
         });
 
-        // Create toast container if it doesn't exist
-        let toastContainer = document.getElementById('toast-container');
-        if (!toastContainer) {
-            toastContainer = document.createElement('div');
-            toastContainer.id = 'toast-container';
-            toastContainer.className = 'position-fixed bottom-0 start-50 translate-middle-x p-3';
-            toastContainer.style.zIndex = '11'; // Above most content
-            document.body.appendChild(toastContainer);
-        }
+        // Create toast container if needed
+        let toastContainer = document.getElementById('toast-container') ||
+            (() => {
+                const container = document.createElement('div');
+                container.id = 'toast-container';
+                container.className = 'position-fixed bottom-0 start-50 translate-middle-x p-3';
+                container.style.zIndex = '11';
+                document.body.appendChild(container);
+                return container;
+            })();
 
-        // Create the toast element
+        // Create toast element
         const toastDiv = document.createElement('div');
         toastDiv.className = 'toast align-items-center text-white border-0';
-        toastDiv.style.backgroundColor = '#1976D2'; // 
-        toastDiv.style.maxWidth = '250px';
-        toastDiv.style.minWidth = '180px'; // Smaller minimum width
-        toastDiv.style.width = 'fit-content';
+        toastDiv.style.cssText = 'background-color: #1976D2; max-width: 250px; min-width: 180px; width: fit-content;';
         toastDiv.setAttribute('role', 'alert');
         toastDiv.setAttribute('aria-live', 'assertive');
         toastDiv.setAttribute('aria-atomic', 'true');
-
-        // Set inner HTML for toast with sparkle icon
         toastDiv.innerHTML = `
             <div class="d-flex">
                 <div class="toast-body">
@@ -76,24 +66,17 @@ class PipelineLocalData {
             </div>
         `;
 
-        // Add to container
+        // Add to container and show
         toastContainer.appendChild(toastDiv);
-
-        // Initialize and show toast
-        const bsToast = new bootstrap.Toast(toastDiv, {
-            delay: duration,
-            animation: true
-        });
+        const bsToast = new bootstrap.Toast(toastDiv, { delay: duration, animation: true });
         bsToast.show();
 
-        // Remove after hiding
+        // Auto-remove on hide
         toastDiv.addEventListener('hidden.bs.toast', () => {
-            if (toastDiv.parentNode) {
-                toastDiv.parentNode.removeChild(toastDiv);
-            }
+            if (toastDiv.parentNode) toastDiv.parentNode.removeChild(toastDiv);
         });
 
-        // Define sparkle animation if it doesn't exist
+        // Define sparkle animation if needed
         if (!document.querySelector('style#sparkle-animation')) {
             const styleEl = document.createElement('style');
             styleEl.id = 'sparkle-animation';
@@ -110,45 +93,21 @@ class PipelineLocalData {
     }
 
     init() {
-        console.group('Pipeline Initialization');
-        console.time('Total Initialization');
-
         // Initialize data and UI
-        console.log('Starting data loading...');
         this.loadSamples();
-
-        console.log('Starting pagination initialization...');
         this.initializePagination();
 
         // Set up event listeners when DOM is ready
         if (document.readyState === 'loading') {
-            console.log('DOM still loading, waiting for DOMContentLoaded...');
-            document.addEventListener('DOMContentLoaded', () => {
-                this._initializeAfterDOM();
-            });
+            document.addEventListener('DOMContentLoaded', () => this._initializeAfterDOM());
         } else {
-            console.log('DOM already loaded, initializing immediately...');
             this._initializeAfterDOM();
         }
-
-        console.timeEnd('Total Initialization');
-        console.groupEnd();
     }
 
     _initializeAfterDOM() {
-        console.group('Post-DOM Initialization');
-        console.time('Post-DOM Setup');
-
-        console.time('Event Listeners Setup');
         this.setupEventListeners();
-        console.timeEnd('Event Listeners Setup');
-
-        console.time('Table Reinitialization');
         this.reinitialize();
-        console.timeEnd('Table Reinitialization');
-
-        console.timeEnd('Post-DOM Setup');
-        console.groupEnd();
     }
 
     loadSamples() {
@@ -157,44 +116,38 @@ class PipelineLocalData {
 
         try {
             // Load primary storage
-            console.time('Primary Storage Load');
             const storedData = localStorage.getItem(this.storageKey);
-            let primarySamples = [];
-
+            let primarySamples = storedData ? JSON.parse(storedData) : [];
             if (storedData) {
-                console.log('Primary storage data size:', new Blob([storedData]).size / 1024, 'KB');
-                primarySamples = JSON.parse(storedData);
                 console.log('Primary samples count:', primarySamples.length);
             }
-            console.timeEnd('Primary Storage Load');
 
-            // Load legacy storage
-            console.time('Legacy Storage Load');
+            // Load and merge legacy storage if it exists
             const legacyData = localStorage.getItem(this.legacyStorageKey);
             if (legacyData) {
-                console.log('Legacy storage data size:', new Blob([legacyData]).size / 1024, 'KB');
-                let legacySamples = [];
-
                 try {
                     const parsedData = JSON.parse(legacyData);
-                    console.time('Legacy Data Processing');
+
+                    // Process legacy data to match current format
+                    let legacySamples = [];
                     if (Array.isArray(parsedData)) {
-                        legacySamples = this.normalizeSamples(parsedData);
-                    } else if (parsedData && typeof parsedData === 'object' && parsedData.samples) {
-                        legacySamples = this.normalizeSamples(parsedData.samples);
+                        legacySamples = this._convertLegacySamples(parsedData);
+                    } else if (parsedData?.samples) {
+                        legacySamples = this._convertLegacySamples(parsedData.samples);
                     } else if (parsedData && typeof parsedData === 'object') {
-                        legacySamples = this.normalizeSamples([parsedData]);
+                        legacySamples = this._convertLegacySamples([parsedData]);
                     }
-                    console.timeEnd('Legacy Data Processing');
 
-                    console.time('Sample Merging');
-                    this.selectedSamples = this.mergeSamples(primarySamples, legacySamples);
-                    console.timeEnd('Sample Merging');
+                    // Merge samples without duplicates
+                    const existingSamplesMap = new Map(primarySamples.map(s => [s.fastq_name, true]));
+                    this.selectedSamples = [
+                        ...primarySamples,
+                        ...legacySamples.filter(s => !existingSamplesMap.has(s.fastq_name))
+                    ];
 
-                    console.time('Storage Update');
+                    // Save merged samples and remove legacy data
                     this.saveSamples();
                     localStorage.removeItem(this.legacyStorageKey);
-                    console.timeEnd('Storage Update');
                 } catch (parseError) {
                     console.error('Legacy data parse error:', parseError);
                     this.selectedSamples = primarySamples;
@@ -202,7 +155,6 @@ class PipelineLocalData {
             } else {
                 this.selectedSamples = primarySamples;
             }
-            console.timeEnd('Legacy Storage Load');
         } catch (error) {
             console.error('Sample loading error:', error);
             this.selectedSamples = [];
@@ -212,54 +164,51 @@ class PipelineLocalData {
         console.groupEnd();
     }
 
-    // Add this method to merge samples without duplicates
-    mergeSamples(primarySamples, legacySamples) {
-        console.log('Merging samples from different sources');
-
-        // Create a map of existing samples by fastq_name for quick lookup
-        const existingSamplesMap = new Map();
-        primarySamples.forEach(sample => {
-            existingSamplesMap.set(sample.fastq_name, sample);
-        });
-
-        // Add new samples that don't already exist
-        legacySamples.forEach(sample => {
-            if (!existingSamplesMap.has(sample.fastq_name)) {
-                primarySamples.push(sample);
-                existingSamplesMap.set(sample.fastq_name, sample);
-            }
-        });
-
-        console.log(`Merged result: ${primarySamples.length} total samples`);
-        return primarySamples;
+    // Convert legacy samples to current format
+    _convertLegacySamples(samples) {
+        return samples.map(sample => ({
+            fastq_name: sample.fastq_name || sample.name || sample.id || '',
+            study_set: sample.study_set || sample.studySet || '',
+            load_name: sample.load_name || sample.loadName || '',
+            batch_name_from_vendor: sample.batch_name_from_vendor || sample.batchName || '',
+            organism_common_name: sample.organism_common_name || sample.organism || sample.ingestStatus || 'Unknown',
+            library_prep_method: sample.library_prep_method || sample.libraryPrep || '',
+            ingest_status: sample.ingest_status || 'Completed',
+            alignment_status: sample.alignment_status || 'Not Started',
+            postqc_status: sample.postqc_status || 'Not Started',
+        }));
     }
 
-    // Add back reinitialize method
+    // Simplified reinitialize method
     reinitialize() {
         try {
             // Try to load from localStorage
-            const storedData = localStorage.getItem('selectedSamplesForPipeline');
+            const storedData = localStorage.getItem(this.storageKey);
             if (storedData) {
-                const data = JSON.parse(storedData);
-                if (data && data.samples && Array.isArray(data.samples)) {
-                    // Format samples to match expected structure
-                    this.selectedSamples = data.samples.map(sample => ({
-                        fastq_name: sample.fastq_name || '',
-                        study_set: sample.study_set || '',
-                        load_name: sample.load_name || '',
-                        batch_name_from_vendor: sample.batch_name_from_vendor || '',
-                        organism_common_name: sample.organism_common_name || '',
-                        library_prep_method: sample.library_prep_method || '',
-                        ingest_status: sample.ingest_status || '',
-                        alignment_status: sample.alignment_status || '',
-                        postqc_status: sample.postqc_status || ''
-                    }));
+                this.selectedSamples = JSON.parse(storedData);
 
-                    // Rebuild the table with the loaded samples
-                    this.rebuildSamplesTable();
-                    return true;
+                // Rebuild the table with the loaded samples
+                this.rebuildSamplesTable();
+                return true;
+            }
+
+            // Try legacy storage if primary storage is empty
+            const legacyData = localStorage.getItem(this.legacyStorageKey);
+            if (legacyData) {
+                try {
+                    const parsedData = JSON.parse(legacyData);
+                    if (parsedData && parsedData.samples && Array.isArray(parsedData.samples)) {
+                        this.selectedSamples = this._convertLegacySamples(parsedData.samples);
+                        this.saveSamples();
+                        localStorage.removeItem(this.legacyStorageKey);
+                        this.rebuildSamplesTable();
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Error processing legacy data:', e);
                 }
             }
+
             return false;
         } catch (error) {
             console.error('Error reinitializing pipeline data:', error);
@@ -267,49 +216,20 @@ class PipelineLocalData {
         }
     }
 
-    normalizeSamples(samples) {
-        return samples.map(sample => ({
-            fastq_name: sample.fastq_name || '',
-            study_set: sample.study_set || '',
-            load_name: sample.load_name || '',
-            batch_name_from_vendor: sample.batch_name_from_vendor || '',
-            organism_common_name: sample.organism_common_name || '',
-            library_prep_method: sample.library_prep_method || '',
-            ingest_status: sample.ingest_status || '',
-            alignment_status: sample.alignment_status || '',
-            postqc_status: sample.postqc_status || '',
-        }));
-    }
-
     saveSamples() {
-        console.group('Sample Saving');
-        console.time('Total Save Operation');
-
         try {
             const currentData = localStorage.getItem(this.storageKey);
             const newData = JSON.stringify(this.selectedSamples);
 
-            console.log('Current storage size:', currentData ? new Blob([currentData]).size / 1024 : 0, 'KB');
-            console.log('New data size:', new Blob([newData]).size / 1024, 'KB');
-
             if (!currentData || currentData !== newData) {
-                console.time('Storage Write');
                 localStorage.setItem(this.storageKey, newData);
-                console.timeEnd('Storage Write');
-            } else {
-                console.log('No changes to save');
             }
         } catch (error) {
             console.error('Save error:', error);
             if (error.name === 'QuotaExceededError' || error.code === 22) {
-                console.time('Storage Recovery');
                 this._handleStorageFullError();
-                console.timeEnd('Storage Recovery');
             }
         }
-
-        console.timeEnd('Total Save Operation');
-        console.groupEnd();
     }
 
     // Handle localStorage quota exceeded errors
@@ -362,6 +282,8 @@ class PipelineLocalData {
         // Set up main event listeners
         this.setupSelectionListeners();
         this.setupPaginationListeners();
+        this.setupModalHandlers();
+        this.setupToastHandlers();
         this.setupActionButtons();
 
         // Rebuild the table initially
@@ -387,98 +309,161 @@ class PipelineLocalData {
     }
 
     setupPaginationListeners() {
-        // Pagination navigation
+        // Helper functions for pagination
+        const getCurrentPerPage = () => {
+            const dropdownBtn = document.getElementById('rowsPerPageDropdown');
+            return dropdownBtn ? parseInt(dropdownBtn.textContent.trim()) : 25;
+        };
+
+        const getPageUrl = (pageNum) => {
+            const url = new URL(window.location.href);
+            url.searchParams.set('page', pageNum);
+            url.searchParams.set('per_page', getCurrentPerPage());
+            return url.toString();
+        };
+
+        // Navigation button handlers
         const paginationNav = document.querySelector('.pagination-navigation');
         if (paginationNav) {
-            // Get current rows per page
-            const getCurrentPerPage = () => {
-                const dropdownBtn = document.getElementById('rowsPerPageDropdown');
-                return dropdownBtn ? parseInt(dropdownBtn.textContent.trim()) : 25;
-            };
-
-            // Generate page URL
-            const getPageUrl = (pageNum) => {
-                const url = new URL(window.location.href);
-                url.searchParams.set('page', pageNum);
-                url.searchParams.set('per_page', getCurrentPerPage());
-                return url.toString();
-            };
-
-            // First page
-            const firstPageBtn = paginationNav.querySelector('a[title="First page"]');
-            if (firstPageBtn) {
-                firstPageBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    window.location.href = getPageUrl(1);
-                });
-            }
-
-            // Previous page
-            const prevPageBtn = paginationNav.querySelector('a[title="Previous page"]');
-            if (prevPageBtn) {
-                prevPageBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const currentPage = parseInt(document.querySelector('.current-page').textContent);
-                    if (currentPage > 1) {
-                        window.location.href = getPageUrl(currentPage - 1);
-                    }
-                });
-            }
-
-            // Next page
-            const nextPageBtn = paginationNav.querySelector('a[title="Next page"]');
-            if (nextPageBtn) {
-                nextPageBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const currentPage = parseInt(document.querySelector('.current-page').textContent);
-                    const totalPages = parseInt(document.querySelector('.total-pages').textContent);
-                    if (currentPage < totalPages) {
-                        window.location.href = getPageUrl(currentPage + 1);
-                    }
-                });
-            }
-
-            // Last page
-            const lastPageBtn = paginationNav.querySelector('a[title="Last page"]');
-            if (lastPageBtn) {
-                lastPageBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const totalPages = parseInt(document.querySelector('.total-pages').textContent);
-                    window.location.href = getPageUrl(totalPages);
-                });
-            }
-        }
-
-        // Go to page form
-        const gotoPageForm = document.getElementById('gotoPageForm');
-        if (gotoPageForm) {
-            gotoPageForm.addEventListener('submit', (e) => {
+            // First page button
+            paginationNav.querySelector('a[title="First page"]')?.addEventListener('click', (e) => {
                 e.preventDefault();
-                const pageInput = document.getElementById('gotoPage');
-                if (pageInput) {
-                    const pageValue = parseInt(pageInput.value, 10);
-                    const maxPage = parseInt(pageInput.getAttribute('max'), 10) || 1;
+                window.location.href = getPageUrl(1);
+            });
 
-                    if (pageValue > 0 && pageValue <= maxPage) {
-                        this.goToPage(pageValue);
-                    } else {
-                        this.showToastNotification(`Page must be between 1 and ${maxPage}`, 'danger');
-                        pageInput.value = Math.min(Math.max(1, pageValue), maxPage);
-                    }
-                }
+            // Previous page button
+            paginationNav.querySelector('a[title="Previous page"]')?.addEventListener('click', (e) => {
+                e.preventDefault();
+                const currentPage = parseInt(document.querySelector('.current-page').textContent);
+                if (currentPage > 1) window.location.href = getPageUrl(currentPage - 1);
+            });
+
+            // Next page button
+            paginationNav.querySelector('a[title="Next page"]')?.addEventListener('click', (e) => {
+                e.preventDefault();
+                const currentPage = parseInt(document.querySelector('.current-page').textContent);
+                const totalPages = parseInt(document.querySelector('.total-pages').textContent);
+                if (currentPage < totalPages) window.location.href = getPageUrl(currentPage + 1);
+            });
+
+            // Last page button
+            paginationNav.querySelector('a[title="Last page"]')?.addEventListener('click', (e) => {
+                e.preventDefault();
+                const totalPages = parseInt(document.querySelector('.total-pages').textContent);
+                window.location.href = getPageUrl(totalPages);
             });
         }
 
+        // Go to page form
+        document.getElementById('gotoPageForm')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pageInput = document.getElementById('gotoPage');
+            if (pageInput) {
+                const pageValue = parseInt(pageInput.value, 10);
+                const maxPage = parseInt(pageInput.getAttribute('max'), 10) || 1;
+
+                if (pageValue > 0 && pageValue <= maxPage) {
+                    window.location.href = getPageUrl(pageValue);
+                } else {
+                    this.showToastNotification(`Page must be between 1 and ${maxPage}`, 'danger');
+                    pageInput.value = Math.min(Math.max(1, pageValue), maxPage);
+                }
+            }
+        });
+
         // Rows per page dropdown
-        const rowsPerPageLinks = document.querySelectorAll('.pagination-dropdown .dropdown-item');
-        rowsPerPageLinks.forEach(link => {
+        document.querySelectorAll('.pagination-dropdown .dropdown-item').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 const perPage = parseInt(link.textContent.trim(), 10);
                 if (!isNaN(perPage)) {
-                    this.changeRowsPerPage(perPage);
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('per_page', perPage);
+                    url.searchParams.set('page', '1');
+                    window.location.href = url.toString();
                 }
             });
+        });
+    }
+
+    setupModalHandlers() {
+        // Submit button handling
+        const submitActionBtn = document.getElementById('submit-action-btn');
+        if (submitActionBtn) {
+            submitActionBtn.addEventListener('click', () => {
+                this.showToastNotification('Submitting selected samples...', 'info');
+                const submitModal = new bootstrap.Modal(document.getElementById('submit-modal'));
+                submitModal.show();
+            });
+        }
+
+        // Show submit modal with sample list
+        const submitSelectedBtn = document.getElementById('submit-selected');
+        if (submitSelectedBtn) {
+            submitSelectedBtn.addEventListener('click', () => {
+                const selectedRows = document.querySelectorAll('.sample-select:checked');
+                const sampleList = document.getElementById('submit-sample-list');
+
+                if (sampleList) {
+                    // Clear previous list
+                    sampleList.innerHTML = '';
+
+                    // Add selected samples to the list
+                    selectedRows.forEach(checkbox => {
+                        const row = checkbox.closest('tr');
+                        const fastqName = row.querySelector('td:nth-child(2)').textContent;
+                        const batchName = row.querySelector('td:nth-child(3)').textContent;
+
+                        const li = document.createElement('li');
+                        li.innerHTML = `<strong>${fastqName}</strong> (${batchName})`;
+                        sampleList.appendChild(li);
+                    });
+
+                    const submitModal = new bootstrap.Modal(document.getElementById('submit-modal'));
+                    submitModal.show();
+                }
+            });
+        }
+
+        // Add modal cleanup handlers
+        document.querySelectorAll('.modal').forEach(modalEl => {
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                // Remove any lingering backdrops
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(backdrop => backdrop.remove());
+                // Remove modal-open class from body
+                document.body.classList.remove('modal-open');
+                // Remove inline styles from body
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+            });
+        });
+    }
+
+    setupToastHandlers() {
+        // Handle select all checkbox
+        const selectAllCheckbox = document.getElementById('select-all-samples');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', (event) => {
+                this.handleSelectAllChange(event);
+                // Show toast notification only when selecting all
+                if (event.target.checked) {
+                    const count = document.querySelectorAll('.sample-select').length;
+                    this.showToastNotification(`Selecting all ${count} samples...`, 'info', 750);
+                }
+            });
+        }
+
+        // Handle individual sample selection
+        document.addEventListener('change', (event) => {
+            if (event.target.matches('.sample-select')) {
+                this.updateSelectedSamples();
+                this.updateSubmitButtonState();
+
+                // Show toast for sample selection
+                const count = document.querySelectorAll('.sample-select:checked').length;
+                this.showToastNotification(`${count} sample${count !== 1 ? 's' : ''} selected`, 'info', 750);
+            }
         });
     }
 
@@ -489,17 +474,13 @@ class PipelineLocalData {
             submitBtn.addEventListener('click', (e) => this.handleSampleSubmission(e));
         }
 
+        // Clear toggle
         const clearToggle = document.getElementById('clear-toggle');
         if (clearToggle) {
             clearToggle.addEventListener('change', () => {
                 if (clearToggle.checked) {
-                    // Show toast notification
                     this.showToastNotification('Clearing selections...', 'info');
-
-                    // Clear selections
                     this.clearStoredData();
-
-                    // Reset toggle after action
                     setTimeout(() => {
                         clearToggle.checked = false;
                     }, 500);
@@ -512,13 +493,8 @@ class PipelineLocalData {
         if (clearAtacToggle) {
             clearAtacToggle.addEventListener('change', () => {
                 if (clearAtacToggle.checked) {
-                    // Show toast notification
                     this.showToastNotification('Clearing ATAC samples...', 'info');
-
-                    // Clear ATAC samples
                     this.clearAtacSamples();
-
-                    // Reset toggle after action
                     setTimeout(() => {
                         clearAtacToggle.checked = false;
                     }, 500);
@@ -530,37 +506,6 @@ class PipelineLocalData {
         const clearBtn = document.getElementById('clear-selection');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => this.clearStoredData());
-        }
-
-        // Refresh jobs button
-        const refreshJobsBtn = document.getElementById('refreshJobsBtn');
-        if (refreshJobsBtn) {
-            refreshJobsBtn.addEventListener('click', () => this.refreshJobs());
-        }
-
-        // Auto-refresh toggle
-        const autoRefreshToggle = document.getElementById('autoRefreshToggle');
-        if (autoRefreshToggle) {
-            let refreshInterval;
-            autoRefreshToggle.addEventListener('change', function () {
-                if (this.checked) {
-                    refreshInterval = setInterval(() => this.refreshJobs(), 30000);
-                } else {
-                    clearInterval(refreshInterval);
-                }
-            }.bind(this));
-        }
-
-        // View Queue button (in job monitor)
-        const viewQueueBtn = document.getElementById('view-queue-btn');
-        if (viewQueueBtn) {
-            viewQueueBtn.addEventListener('click', () => this.showQueueModal());
-        }
-
-        // Refresh Queue button (in queue modal)
-        const refreshQueueBtn = document.getElementById('refresh-queue');
-        if (refreshQueueBtn) {
-            refreshQueueBtn.addEventListener('click', () => this.fetchQueueData());
         }
     }
 
@@ -596,23 +541,6 @@ class PipelineLocalData {
         } else {
             this.showToastNotification('No ATAC samples found to remove', 'info');
         }
-    }
-
-    refreshJobs() {
-        fetch('/pipeline/api/update_all_jobs/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json'
-            }
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    window.location.reload();
-                }
-            })
-            .catch(error => console.error('Error updating jobs:', error));
     }
 
     updateSelectedSamples() {
@@ -750,86 +678,39 @@ class PipelineLocalData {
     }
 
     rebuildSamplesTable() {
-        console.group('Table Rebuild');
-        console.time('Total Table Rebuild');
-
         const tableBody = document.querySelector('#samples-table tbody');
-        if (!tableBody) {
-            console.warn('Table body not found in DOM');
-            console.timeEnd('Total Table Rebuild');
-            console.groupEnd();
-            return;
-        }
-
-        // Memory usage before rebuild
-        if (window.performance && window.performance.memory) {
-            console.log('Memory usage before rebuild:',
-                Math.round(window.performance.memory.usedJSHeapSize / 1024 / 1024), 'MB');
-        }
+        if (!tableBody) return;
 
         // Clear existing rows
-        console.time('Clear Table');
         tableBody.innerHTML = '';
-        console.timeEnd('Clear Table');
 
         // Handle empty state
         if (!this.selectedSamples || this.selectedSamples.length === 0) {
-            console.log('No samples to display, showing empty state');
             this.showEmptyState(tableBody);
-            console.timeEnd('Total Table Rebuild');
-            console.groupEnd();
             return;
         }
 
         // Calculate pagination
-        console.time('Pagination Calculation');
         const startIndex = (this.currentPage - 1) * this.itemsPerPage;
         const endIndex = Math.min(startIndex + this.itemsPerPage, this.selectedSamples.length);
         const totalPages = Math.ceil(this.selectedSamples.length / this.itemsPerPage);
-        console.timeEnd('Pagination Calculation');
 
         // Update pagination UI
-        console.time('Pagination UI Update');
         this.updatePaginationInfo(startIndex, endIndex, totalPages);
-        console.timeEnd('Pagination UI Update');
 
         // Build table rows
-        console.time('Row Building');
         const fragment = document.createDocumentFragment();
         const currentPageSamples = this.selectedSamples.slice(startIndex, endIndex);
-
-        console.log(`Building ${currentPageSamples.length} rows for current page`);
-
-        // Pre-cache status badges
         const statusBadgeCache = this._createStatusBadgeCache();
 
-        currentPageSamples.forEach((sample, index) => {
-            console.time(`Row ${index + 1} Creation`);
-            const row = this._createTableRow(sample, statusBadgeCache);
-            fragment.appendChild(row);
-            console.timeEnd(`Row ${index + 1} Creation`);
-        });
-        console.timeEnd('Row Building');
+        currentPageSamples.forEach(sample =>
+            fragment.appendChild(this._createTableRow(sample, statusBadgeCache))
+        );
 
-        // DOM insertion
-        console.time('DOM Insertion');
+        // Add to DOM and setup listeners
         tableBody.appendChild(fragment);
-        console.timeEnd('DOM Insertion');
-
-        // Setup UI state
-        console.time('UI State Update');
         this.setupSelectionListeners();
         this.updateSubmitButtonState();
-        console.timeEnd('UI State Update');
-
-        // Memory usage after rebuild
-        if (window.performance && window.performance.memory) {
-            console.log('Memory usage after rebuild:',
-                Math.round(window.performance.memory.usedJSHeapSize / 1024 / 1024), 'MB');
-        }
-
-        console.timeEnd('Total Table Rebuild');
-        console.groupEnd();
     }
 
     _createStatusBadgeCache() {
@@ -1034,73 +915,11 @@ class PipelineLocalData {
         );
 
         // Populate modal
-        const sampleList = document.getElementById('submit-sample-list');
-        if (sampleList) {
-            sampleList.innerHTML = '';
-
-            // Group samples by ingest status
-            const completedSamples = this.selectedSamples.filter(sample =>
-                sample.ingest_status === 'Completed'
-            );
-
-            // Add completed samples
-            if (completedSamples.length > 0) {
-                const completedHeader = document.createElement('h6');
-                completedHeader.className = 'mt-3 mb-2';
-                completedHeader.innerHTML = 'Ready for Submission:';
-                sampleList.appendChild(completedHeader);
-
-                completedSamples.forEach(sample => {
-                    const li = document.createElement('li');
-                    li.className = 'd-flex justify-content-between align-items-center mb-1';
-                    li.innerHTML = `
-                        <div>
-                            <strong>${sample.fastq_name}</strong>
-                            <span class="ms-2 badge bg-success">Ready</span>
-                        </div>
-                        <small class="text-muted">${sample.workflow || this.determineWorkflow(sample.batch_name_from_vendor)}</small>
-                    `;
-                    sampleList.appendChild(li);
-                });
-            }
-
-            // Add pending ingest samples
-            if (pendingIngest.length > 0) {
-                const pendingHeader = document.createElement('h6');
-                pendingHeader.className = 'mt-3 mb-2 text-warning';
-                pendingHeader.innerHTML = 'Not Ready (Ingest Incomplete):';
-                sampleList.appendChild(pendingHeader);
-
-                pendingIngest.forEach(sample => {
-                    const li = document.createElement('li');
-                    li.className = 'd-flex justify-content-between align-items-center mb-1';
-                    li.innerHTML = `
-                        <div>
-                            <strong>${sample.fastq_name}</strong>
-                            <span class="ms-2 badge bg-warning">Pending Ingest</span>
-                    </div>
-                        <small class="text-muted">${sample.workflow || this.determineWorkflow(sample.batch_name_from_vendor)}</small>
-                    `;
-                    sampleList.appendChild(li);
-                });
-
-                // Add warning about pending ingest samples
-                const warning = document.createElement('div');
-                warning.className = 'alert alert-warning mt-3';
-                warning.innerHTML = `
-                    <small>
-                        <i class="bi bi-exclamation-triangle me-2"></i>
-                        ${pendingIngest.length} sample${pendingIngest.length !== 1 ? 's' : ''} have not completed ingest. 
-                        These samples will be skipped unless you force submission.
-                    </small>
-                `;
-                sampleList.appendChild(warning);
-            }
-        }
+        this.populateSubmitModal(pendingIngest);
 
         // Setup submit handler
         const confirmSubmitBtn = document.getElementById('confirm-submit');
-        const forceSubmitCheckbox = document.getElementById('force-submit');
+        const forceSubmitCheckbox = document.getElementById('include-incomplete-samples');
 
         if (confirmSubmitBtn) {
             confirmSubmitBtn.disabled = this.selectedSamples.length === 0;
@@ -1116,26 +935,89 @@ class PipelineLocalData {
                 if (modal) modal.hide();
             };
         }
-
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('submit-modal'));
-        modal.show();
     }
 
-    determineWorkflow(batchName) {
-        if (!batchName) {
-            return 'RTX';  // Default to RTX if no batch name
-        }
+    populateSubmitModal(pendingIngest) {
+        const sampleList = document.getElementById('submit-sample-list');
+        if (sampleList) {
+            sampleList.innerHTML = '';
 
-        const batchNameUpper = batchName.toUpperCase();
+            // Group samples by ingest status
+            const completedSamples = this.selectedSamples.filter(sample =>
+                sample.ingest_status === 'Completed'
+            );
 
-        if (batchNameUpper.startsWith('MTX') || batchNameUpper.includes('ATX')) {
-            return 'MTX';
-        } else if (batchNameUpper.startsWith('RTX')) {
-            return 'RTX';
-        } else {
-            return 'RTX';  // Default to RTX for unrecognized patterns
+            // Add completed samples
+            if (completedSamples.length > 0) {
+                this.addSampleGroupToModal(sampleList, completedSamples, 'Ready for Submission:', 'bg-success', 'Ready');
+            }
+
+            // Add pending ingest samples
+            if (pendingIngest.length > 0) {
+                this.addSampleGroupToModal(sampleList, pendingIngest, 'Not Ready (Ingest Incomplete):', 'bg-warning', 'Pending Ingest');
+
+                // Show warning about pending ingest samples
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'alert alert-warning mt-3';
+                warningDiv.innerHTML = `
+                    <small>
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        ${pendingIngest.length} sample${pendingIngest.length !== 1 ? 's' : ''} have not completed ingest. 
+                        These samples will be skipped unless you force submission.
+                    </small>
+                `;
+                sampleList.appendChild(warningDiv);
+
+                // Show incomplete samples warning
+                const incompleteWarning = document.getElementById('incomplete-samples-warning');
+                if (incompleteWarning) {
+                    incompleteWarning.classList.remove('d-none');
+
+                    // Populate incomplete samples list
+                    const incompleteList = document.getElementById('incomplete-samples-list');
+                    if (incompleteList) {
+                        incompleteList.innerHTML = '';
+                        pendingIngest.slice(0, 5).forEach(sample => {
+                            const li = document.createElement('li');
+                            li.textContent = sample.fastq_name;
+                            incompleteList.appendChild(li);
+                        });
+
+                        if (pendingIngest.length > 5) {
+                            const li = document.createElement('li');
+                            li.textContent = `...and ${pendingIngest.length - 5} more`;
+                            incompleteList.appendChild(li);
+                        }
+                    }
+                }
+            } else {
+                // Hide incomplete samples warning
+                const incompleteWarning = document.getElementById('incomplete-samples-warning');
+                if (incompleteWarning) {
+                    incompleteWarning.classList.add('d-none');
+                }
+            }
         }
+    }
+
+    addSampleGroupToModal(container, samples, headerText, badgeClass, badgeText) {
+        const header = document.createElement('h6');
+        header.className = 'mt-3 mb-2';
+        header.innerHTML = headerText;
+        container.appendChild(header);
+
+        samples.forEach(sample => {
+            const li = document.createElement('li');
+            li.className = 'd-flex justify-content-between align-items-center mb-1';
+            li.innerHTML = `
+                <div>
+                    <strong>${sample.fastq_name}</strong>
+                    <span class="ms-2 badge ${badgeClass}">${badgeText}</span>
+                </div>
+                <small class="text-muted">${this.determineWorkflow(sample.batch_name_from_vendor)}</small>
+            `;
+            container.appendChild(li);
+        });
     }
 
     submitSamplesToAlignment(samples, forceSubmit = false) {
@@ -1154,19 +1036,6 @@ class PipelineLocalData {
         })
             .then(response => response.json())
             .then(data => {
-                // Check if confirmation is required for samples with incomplete ingest
-                if (data.status === 'warning' && data.requires_confirmation) {
-                    // Show confirmation dialog for samples with incomplete ingest
-                    this.showConfirmationDialog(
-                        data.message,
-                        () => {
-                            // User confirmed - resubmit with force_submit=true
-                            this.submitSamplesToAlignment(samples, true);
-                        }
-                    );
-                    return;
-                }
-
                 if (data.status === 'success' || data.status === 'warning') {
                     // Remove successfully submitted samples
                     if (data.submitted_samples && Array.isArray(data.submitted_samples)) {
@@ -1179,7 +1048,7 @@ class PipelineLocalData {
                         5000
                     );
 
-                    // Only redirect if there are no remaining samples
+                    // Redirect if no samples remain
                     if (this.selectedSamples.length === 0) {
                         setTimeout(() => {
                             window.location.href = '/pipeline/jobs/';
@@ -1199,115 +1068,37 @@ class PipelineLocalData {
             });
     }
 
-    showConfirmationDialog(message, onConfirm) {
-        // Create confirmation modal
-        const modalId = 'confirmation-dialog';
-        let confirmModal = document.getElementById(modalId);
-
-        // Remove existing modal if present
-        if (confirmModal) {
-            document.body.removeChild(confirmModal);
-        }
-
-        // Create new modal
-        confirmModal = document.createElement('div');
-        confirmModal.id = modalId;
-        confirmModal.className = 'modal fade';
-        confirmModal.setAttribute('tabindex', '-1');
-        confirmModal.setAttribute('aria-hidden', 'true');
-
-        confirmModal.innerHTML = `
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Confirm Submission</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                    <div class="modal-body">
-                        <div class="alert alert-warning">
-                            <i class="bi bi-exclamation-triangle me-2"></i>
-                            ${message}
-                        </div>
-                        <p>Would you like to proceed with only the valid samples, or force submission of all samples?</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="proceed-valid-only">
-                            Submit Valid Only
-                        </button>
-                        <button type="button" class="btn btn-warning" id="force-submit-all">
-                            Force Submit All
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(confirmModal);
-
-        // Initialize Bootstrap modal
-        const bsModal = new bootstrap.Modal(confirmModal);
-        bsModal.show();
-
-        // Add event listeners
-        document.getElementById('proceed-valid-only').addEventListener('click', () => {
-            bsModal.hide();
-            this.showToastNotification('Submitting valid samples only...', 'info');
-            // Submit only valid samples
-            const validSamples = this.selectedSamples.filter(
-                sample => sample.ingest_status === 'Completed'
-            );
-            this.submitSamplesToAlignment(validSamples, false);
-        });
-
-        document.getElementById('force-submit-all').addEventListener('click', () => {
-            bsModal.hide();
-            if (typeof onConfirm === 'function') {
-                onConfirm();
-            }
-        });
-    }
-
     removeSubmittedSamples(submittedSamples) {
-        // Create a Set of submitted sample names for faster lookup
         const submittedSet = new Set(submittedSamples.map(sample =>
             typeof sample === 'string' ? sample : sample.fastq_name
         ));
 
-        // Filter out submitted samples
         this.selectedSamples = this.selectedSamples.filter(sample =>
             !submittedSet.has(sample.fastq_name)
         );
 
-        // Save updated samples to localStorage
         this.saveSamples();
 
-        // Update UI elements
         const selectedCount = document.getElementById('selected-count');
         if (selectedCount) {
             selectedCount.textContent = `${this.selectedSamples.length} samples selected`;
         }
     }
 
-    goToPage(pageNumber) {
-        if (!this.selectedSamples || this.selectedSamples.length === 0) return;
+    determineWorkflow(batchName) {
+        if (!batchName) {
+            return 'RTX';  // Default to RTX if no batch name
+        }
 
-        const totalPages = Math.ceil(this.selectedSamples.length / this.itemsPerPage);
-        pageNumber = Math.min(Math.max(1, pageNumber), totalPages);
+        const batchNameUpper = batchName.toUpperCase();
 
-        const url = new URL(window.location);
-        url.searchParams.set('page', pageNumber);
-        url.searchParams.set('per_page', this.itemsPerPage);
-        window.location.href = url.toString();
-    }
-
-    changeRowsPerPage(perPage) {
-        if (isNaN(perPage) || perPage < 1) perPage = 25;
-
-        const url = new URL(window.location);
-        url.searchParams.set('per_page', perPage);
-        url.searchParams.set('page', '1');
-        window.location.href = url.toString();
+        if (batchNameUpper.startsWith('MTX') || batchNameUpper.includes('ATX')) {
+            return 'MTX';
+        } else if (batchNameUpper.startsWith('RTX')) {
+            return 'RTX';
+        } else {
+            return 'RTX';  // Default to RTX for unrecognized patterns
+        }
     }
 
     handleSelectAllChange(event) {
@@ -1353,345 +1144,8 @@ class PipelineLocalData {
         this.updateSelectedSamples();
         this.updateSubmitButtonState();
     }
-
-    showQueueModal() {
-        // Fetch and display queue data
-        this.fetchQueueData();
-
-        // Show the modal
-        const queueModal = new bootstrap.Modal(document.getElementById('queue-modal'));
-        queueModal.show();
-    }
-
-    fetchQueueData() {
-        // Show loading indicators
-        document.getElementById('alignment-queue-body').innerHTML = '<tr><td colspan="7" class="text-center">Loading queue data...</td></tr>';
-        document.getElementById('postqc-queue-body').innerHTML = '<tr><td colspan="7" class="text-center">Loading queue data...</td></tr>';
-
-        // Fetch data from API
-        fetch('/api/pipeline/get-queue-data/', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    // Update alignment queue
-                    this.displayQueueData(
-                        data.alignment_queue,
-                        'alignment-queue-body',
-                        'alignment-count'
-                    );
-
-                    // Update post-QC queue
-                    this.displayQueueData(
-                        data.postqc_queue,
-                        'postqc-queue-body',
-                        'postqc-count'
-                    );
-                } else {
-                    this.showToastNotification(`Error fetching queue data: ${data.message}`, 'danger');
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching queue data:', error);
-                this.showToastNotification('Error fetching queue data from server', 'danger');
-            });
-    }
-
-    displayQueueData(queueItems, tableBodyId, countId) {
-        const tableBody = document.getElementById(tableBodyId);
-        const countBadge = document.getElementById(countId);
-
-        if (!tableBody) return;
-
-        // Update count badge
-        if (countBadge) {
-            countBadge.textContent = queueItems.length;
-        }
-
-        // Clear table
-        tableBody.innerHTML = '';
-
-        if (queueItems.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No items in queue</td></tr>';
-            return;
-        }
-
-        // Add rows for each queue item
-        queueItems.forEach(item => {
-            // Parse metadata if available
-            let metadata = {};
-            if (item.metadata) {
-                try {
-                    metadata = JSON.parse(item.metadata);
-                } catch (e) {
-                    console.error('Error parsing metadata JSON:', e);
-                }
-            }
-
-            // Create badge based on status
-            let statusBadge = '';
-            switch (item.status) {
-                case 'pending':
-                    statusBadge = '<span class="badge bg-secondary">Pending</span>';
-                    break;
-                case 'submitted':
-                    statusBadge = '<span class="badge bg-info">Submitted</span>';
-                    break;
-                case 'running':
-                    statusBadge = '<span class="badge bg-warning">Running</span>';
-                    break;
-                case 'completed':
-                    statusBadge = '<span class="badge bg-success">Completed</span>';
-                    break;
-                case 'failed':
-                    statusBadge = '<span class="badge bg-danger">Failed</span>';
-                    break;
-                default:
-                    statusBadge = `<span class="badge bg-secondary">${item.status}</span>`;
-            }
-
-            // Format dates
-            const addedTime = new Date(item.added_time).toLocaleString();
-            const startTime = item.start_time ? new Date(item.start_time).toLocaleString() : '-';
-
-            // Create row
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${item.fastq_name}</td>
-                <td><span class="badge ${item.workflow === 'MTX' ? 'bg-info' : 'bg-primary'}">${item.workflow}</span></td>
-                <td>${statusBadge}</td>
-                <td>${item.demand_id || '-'}</td>
-                <td>${addedTime}</td>
-                <td>${startTime}</td>
-                <td>
-                    <div class="btn-group btn-group-sm">
-                        <button type="button" class="btn btn-outline-info btn-sm view-details-btn" 
-                                data-fastq="${item.fastq_name}" data-bs-toggle="tooltip" title="View Details">
-                            <i class="bi bi-info-circle"></i>
-                        </button>
-                        <button type="button" class="btn btn-outline-primary btn-sm refresh-status-btn"
-                                data-fastq="${item.fastq_name}" data-bs-toggle="tooltip" title="Refresh Status">
-                            <i class="bi bi-arrow-repeat"></i>
-                        </button>
-                    </div>
-                </td>
-            `;
-            tableBody.appendChild(row);
-
-            // Add event listeners for the buttons
-            const viewDetailsBtn = row.querySelector('.view-details-btn');
-            if (viewDetailsBtn) {
-                viewDetailsBtn.addEventListener('click', () => {
-                    this.showSampleDetails(item, metadata);
-                });
-            }
-
-            const refreshStatusBtn = row.querySelector('.refresh-status-btn');
-            if (refreshStatusBtn) {
-                refreshStatusBtn.addEventListener('click', () => {
-                    this.refreshSampleStatus(item.fastq_name, item.demand_id);
-                });
-            }
-        });
-
-        // Initialize tooltips
-        const tooltips = [].slice.call(tableBody.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltips.map(function (tooltipNode) {
-            return new bootstrap.Tooltip(tooltipNode);
-        });
-    }
-
-    showSampleDetails(item, metadata) {
-        // Create modal for displaying sample details
-        const modalId = 'sample-details-modal';
-        let detailsModal = document.getElementById(modalId);
-
-        // Remove existing modal if present
-        if (detailsModal) {
-            document.body.removeChild(detailsModal);
-        }
-
-        // Determine workflow from batch name
-        const workflow = item.workflow || this.determineWorkflow(metadata.batch_name_from_vendor || '');
-
-        // Format the command for display with line breaks
-        let formattedCommand = '';
-        if (item.command) {
-            formattedCommand = item.command.replace(/\n/g, '<br>');
-        }
-
-        // Create details modal
-        detailsModal = document.createElement('div');
-        detailsModal.id = modalId;
-        detailsModal.className = 'modal fade';
-        detailsModal.setAttribute('tabindex', '-1');
-        detailsModal.setAttribute('aria-hidden', 'true');
-
-        detailsModal.innerHTML = `
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Sample Details: ${item.fastq_name}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <h6>Status Information</h6>
-                                <table class="table table-sm table-bordered">
-                                    <tr>
-                                        <th>Workflow:</th>
-                                        <td><span class="badge ${workflow === 'MTX' ? 'bg-info' : 'bg-primary'}">${workflow}</span></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Status:</th>
-                                        <td>${item.status || 'Unknown'}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Demand ID:</th>
-                                        <td>${item.demand_id || 'Not yet assigned'}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Added:</th>
-                                        <td>${new Date(item.added_time).toLocaleString()}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Started:</th>
-                                        <td>${item.start_time ? new Date(item.start_time).toLocaleString() : 'Not started'}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                            <div class="col-md-6">
-                                <h6>Sample Metadata</h6>
-                                <table class="table table-sm table-bordered">
-                                    <tr>
-                                        <th>FASTQ Name:</th>
-                                        <td>${metadata.fastq_name || item.fastq_name}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Organism:</th>
-                                        <td>${metadata.organism_common_name || 'Unknown'}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Batch:</th>
-                                        <td>${metadata.batch_name_from_vendor || 'Unknown'}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Load Name:</th>
-                                        <td>${metadata.load_name || 'Unknown'}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Library Prep Method:</th>
-                                        <td>${metadata.library_prep_method || 'Unknown'}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
-                        
-                        <h6>Command</h6>
-                        <div class="border rounded p-2 bg-light">
-                            <pre class="mb-0"><code>${formattedCommand || 'Command not available'}</code></pre>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(detailsModal);
-
-        // Initialize and show Bootstrap modal
-        const bsModal = new bootstrap.Modal(detailsModal);
-        bsModal.show();
-    }
-
-    refreshSampleStatus(fastqName, demandId) {
-        // Show toast notification
-        this.showToastNotification(`Refreshing status for ${fastqName}...`, 'info');
-
-        // Determine which endpoint to use based on available info
-        let url = '/api/pipeline/check-alignment-status/';
-        if (demandId) {
-            url += `?demand_id=${demandId}`;
-        } else {
-            url += `?fastq_name=${fastqName}`;
-        }
-
-        // Fetch updated status
-        fetch(url, {
-            method: 'GET',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    this.showToastNotification(`Status updated: ${data.job_status || 'Unknown'}`, 'success');
-
-                    // Refresh queue data to show updated status
-                    this.fetchQueueData();
-                } else {
-                    this.showToastNotification(`Error: ${data.message}`, 'danger');
-                }
-            })
-            .catch(error => {
-                console.error('Error refreshing status:', error);
-                this.showToastNotification('Error refreshing sample status', 'danger');
-            });
-    }
-
-    // Add the bulkAddSamples method for efficient bulk operations
-    bulkAddSamples(samples) {
-        if (!samples || !samples.length) return;
-
-        // Create a map of existing samples for faster lookups
-        const existingSamplesMap = new Map();
-        this.selectedSamples.forEach(sample => {
-            existingSamplesMap.set(sample.fastq_name, true);
-        });
-
-        // Add only non-duplicate samples
-        let newSamplesCount = 0;
-        samples.forEach(sample => {
-            if (!existingSamplesMap.has(sample.fastq_name)) {
-                this.selectedSamples.push(sample);
-                newSamplesCount++;
-            }
-        });
-
-        // Only save if we actually added new samples
-        if (newSamplesCount > 0) {
-            // Debounce the save operation for better performance
-            this._debouncedSave();
-        }
-
-        return newSamplesCount;
-    }
-
-    // Private method for debounced saving
-    _debouncedSave() {
-        // Clear any pending save operation
-        if (this._saveTimeout) {
-            clearTimeout(this._saveTimeout);
-        }
-
-        // Schedule a new save operation
-        this._saveTimeout = setTimeout(() => {
-            this.saveSamples();
-            this._saveTimeout = null;
-        }, 300); // Wait 300ms to batch multiple operations
-    }
 }
 
 // Initialize and export
 const pipelineLocalData = new PipelineLocalData();
 window.pipelineLocalData = pipelineLocalData;
-console.log('Testing pipeline-local-data.js loading...');
