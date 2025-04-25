@@ -3,9 +3,6 @@
  * Handles local storage of selected samples and rebuilding the pipeline table
  */
 
-// Add immediate debugging to see if script is loaded
-console.log('pipeline-local-data.js is being loaded');
-
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -111,16 +108,10 @@ class PipelineLocalData {
     }
 
     loadSamples() {
-        console.group('Sample Loading');
-        console.time('Total Sample Loading');
-
         try {
             // Load primary storage
             const storedData = localStorage.getItem(this.storageKey);
             let primarySamples = storedData ? JSON.parse(storedData) : [];
-            if (storedData) {
-                console.log('Primary samples count:', primarySamples.length);
-            }
 
             // Load and merge legacy storage if it exists
             const legacyData = localStorage.getItem(this.legacyStorageKey);
@@ -159,9 +150,6 @@ class PipelineLocalData {
             console.error('Sample loading error:', error);
             this.selectedSamples = [];
         }
-
-        console.timeEnd('Total Sample Loading');
-        console.groupEnd();
     }
 
     // Convert legacy samples to current format
@@ -283,7 +271,6 @@ class PipelineLocalData {
         this.setupSelectionListeners();
         this.setupPaginationListeners();
         this.setupModalHandlers();
-        this.setupToastHandlers();
         this.setupActionButtons();
 
         // Rebuild the table initially
@@ -296,6 +283,10 @@ class PipelineLocalData {
             if (event.target.matches('.sample-select')) {
                 this.updateSelectedSamples();
                 this.updateSubmitButtonState();
+
+                // Show toast for sample selection
+                const count = document.querySelectorAll('.sample-select:checked').length;
+                this.showToastNotification(`${count} sample${count !== 1 ? 's' : ''} selected`, 'info', 750);
             }
         });
 
@@ -304,6 +295,12 @@ class PipelineLocalData {
         if (selectAllCheckbox) {
             selectAllCheckbox.addEventListener('change', (event) => {
                 this.handleSelectAllChange(event);
+
+                // Show toast notification only when selecting all
+                if (event.target.checked) {
+                    const count = document.querySelectorAll('.sample-select').length;
+                    this.showToastNotification(`Selecting all ${count} samples...`, 'info', 750);
+                }
             });
         }
     }
@@ -437,33 +434,6 @@ class PipelineLocalData {
                 document.body.style.removeProperty('padding-right');
                 document.body.style.removeProperty('overflow');
             });
-        });
-    }
-
-    setupToastHandlers() {
-        // Handle select all checkbox
-        const selectAllCheckbox = document.getElementById('select-all-samples');
-        if (selectAllCheckbox) {
-            selectAllCheckbox.addEventListener('change', (event) => {
-                this.handleSelectAllChange(event);
-                // Show toast notification only when selecting all
-                if (event.target.checked) {
-                    const count = document.querySelectorAll('.sample-select').length;
-                    this.showToastNotification(`Selecting all ${count} samples...`, 'info', 750);
-                }
-            });
-        }
-
-        // Handle individual sample selection
-        document.addEventListener('change', (event) => {
-            if (event.target.matches('.sample-select')) {
-                this.updateSelectedSamples();
-                this.updateSubmitButtonState();
-
-                // Show toast for sample selection
-                const count = document.querySelectorAll('.sample-select:checked').length;
-                this.showToastNotification(`${count} sample${count !== 1 ? 's' : ''} selected`, 'info', 750);
-            }
         });
     }
 
@@ -610,19 +580,8 @@ class PipelineLocalData {
         const selectedSamples = document.querySelectorAll('.sample-select:checked');
         const isDisabled = selectedSamples.length === 0;
 
-        console.log('Submit button state update:', {
-            selectedCount: selectedSamples.length,
-            isDisabled: isDisabled,
-            submitButtonFound: !!submitButton,
-            actionSubmitButtonFound: !!actionSubmitButton
-        });
-
-        if (submitButton) {
-            submitButton.disabled = isDisabled;
-        }
-        if (actionSubmitButton) {
-            actionSubmitButton.disabled = isDisabled;
-        }
+        if (submitButton) submitButton.disabled = isDisabled;
+        if (actionSubmitButton) actionSubmitButton.disabled = isDisabled;
     }
 
     clearStoredData() {
@@ -728,13 +687,13 @@ class PipelineLocalData {
         const row = document.createElement('tr');
         row.setAttribute('data-fastq', sample.fastq_name || '');
 
-        const ingestStatus = this.formatStatus(sample.ingest_status);
-        const alignmentStatus = this.formatStatus(sample.alignment_status);
-        const postqcStatus = this.formatStatus(sample.postqc_status);
-
-        const ingestBadge = statusBadgeCache[ingestStatus] || this.formatStatusWithBadge(sample.ingest_status);
-        const alignmentBadge = statusBadgeCache[alignmentStatus] || this.formatStatusWithBadge(sample.alignment_status);
-        const postqcBadge = statusBadgeCache[postqcStatus] || this.formatStatusWithBadge(sample.postqc_status);
+        // Get badge HTML from cache or create it
+        const ingestBadge = statusBadgeCache[this.formatStatus(sample.ingest_status)] ||
+            this.formatStatusWithBadge(sample.ingest_status);
+        const alignmentBadge = statusBadgeCache[this.formatStatus(sample.alignment_status)] ||
+            this.formatStatusWithBadge(sample.alignment_status);
+        const postqcBadge = statusBadgeCache[this.formatStatus(sample.postqc_status)] ||
+            this.formatStatusWithBadge(sample.postqc_status);
 
         row.innerHTML = `
             <td><input type="checkbox" class="sample-select"></td>
@@ -852,6 +811,46 @@ class PipelineLocalData {
         });
     }
 
+    formatStatusWithBadge(status) {
+        // Format the status text
+        let formattedStatus = 'Not Started';
+
+        if (status) {
+            status = status.toLowerCase().trim();
+
+            if (['—', '-', 'na', '', 'not completed'].includes(status)) {
+                formattedStatus = 'Not Started';
+            } else if (['completed', 'complete'].includes(status)) {
+                formattedStatus = 'Completed';
+            } else if (status.includes('in progress') || status === 'running') {
+                formattedStatus = 'In Progress';
+            } else if (status.includes('pending') || status === 'submitted' || status === 'queued') {
+                formattedStatus = 'Pending';
+            } else if (status.includes('error') || status.includes('fail') || status.includes('killed')) {
+                formattedStatus = status.charAt(0).toUpperCase() + status.slice(1);
+            } else {
+                formattedStatus = status.charAt(0).toUpperCase() + status.slice(1);
+            }
+        }
+
+        // Determine badge class
+        let badgeClass = 'bg-secondary';
+        switch (formattedStatus.toLowerCase()) {
+            case 'completed': badgeClass = 'bg-success'; break;
+            case 'in progress': badgeClass = 'bg-warning'; break;
+            case 'pending':
+            case 'submitted':
+            case 'queued': badgeClass = 'bg-info'; break;
+            case 'not started': badgeClass = 'bg-secondary'; break;
+            case 'error':
+            case 'failed':
+            case 'killed': badgeClass = 'bg-danger'; break;
+        }
+
+        return `<span class="badge ${badgeClass}">${formattedStatus}</span>`;
+    }
+
+    // Keep a separate formatStatus method that returns just the text for use in logic
     formatStatus(status) {
         if (!status || status === '—' || status === '-' || status === 'NA' ||
             status.trim() === '' || status.toLowerCase().trim() === 'not completed') {
@@ -870,35 +869,6 @@ class PipelineLocalData {
         }
 
         return status.charAt(0).toUpperCase() + status.slice(1);
-    }
-
-    formatStatusWithBadge(status) {
-        const formattedStatus = this.formatStatus(status);
-        let badgeClass = 'bg-secondary';
-
-        switch (formattedStatus.toLowerCase()) {
-            case 'completed':
-                badgeClass = 'bg-success';
-                break;
-            case 'in progress':
-                badgeClass = 'bg-warning';
-                break;
-            case 'pending':
-            case 'submitted':
-            case 'queued':
-                badgeClass = 'bg-info';
-                break;
-            case 'not started':
-                badgeClass = 'bg-secondary';
-                break;
-            case 'error':
-            case 'failed':
-            case 'killed':
-                badgeClass = 'bg-danger';
-                break;
-        }
-
-        return `<span class="badge ${badgeClass}">${formattedStatus}</span>`;
     }
 
     handleSampleSubmission(event) {
@@ -1029,32 +999,27 @@ class PipelineLocalData {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: JSON.stringify({
-                samples,
-                force_submit: forceSubmit
-            })
+            body: JSON.stringify({ samples, force_submit: forceSubmit })
         })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success' || data.status === 'warning') {
-                    // Remove successfully submitted samples
+                    // Handle successfully submitted samples
                     if (data.submitted_samples && Array.isArray(data.submitted_samples)) {
                         this.removeSubmittedSamples(data.submitted_samples);
                     }
 
+                    // Show success/warning notification
                     this.showToastNotification(
                         data.message,
                         data.status === 'warning' ? 'warning' : 'success',
                         5000
                     );
 
-                    // Redirect if no samples remain
+                    // Redirect to jobs page or rebuild table
                     if (this.selectedSamples.length === 0) {
-                        setTimeout(() => {
-                            window.location.href = '/pipeline/jobs/';
-                        }, 2000);
+                        setTimeout(() => window.location.href = '/pipeline/jobs/', 2000);
                     } else {
-                        // Rebuild the table with remaining samples
                         this.rebuildSamplesTable();
                         this.updateSubmitButtonState();
                     }
@@ -1086,19 +1051,15 @@ class PipelineLocalData {
     }
 
     determineWorkflow(batchName) {
-        if (!batchName) {
-            return 'RTX';  // Default to RTX if no batch name
-        }
+        if (!batchName) return 'RTX';
 
         const batchNameUpper = batchName.toUpperCase();
 
         if (batchNameUpper.startsWith('MTX') || batchNameUpper.includes('ATX')) {
             return 'MTX';
-        } else if (batchNameUpper.startsWith('RTX')) {
-            return 'RTX';
-        } else {
-            return 'RTX';  // Default to RTX for unrecognized patterns
         }
+
+        return 'RTX'; // Default for RTX prefix or any unrecognized pattern
     }
 
     handleSelectAllChange(event) {
