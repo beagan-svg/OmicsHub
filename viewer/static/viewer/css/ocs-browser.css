@@ -1,0 +1,915 @@
+/* ==========================================================================
+   OCS Database - Main CSS
+   
+   This is the main CSS file that imports all other CSS files.
+   ========================================================================== */
+
+/* Base Styles */
+@import url('base/variables.css');
+
+/* ==========================================================================
+   OCS Database - Card Components
+   
+   Styles for cards throughout the application
+   ========================================================================== */
+
+/* Basic card */
+.card {
+    background-color: var(--card-bg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-normal);
+    border: none;
+    margin-bottom: var(--spacing-md);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+/* Card header */
+.card-header {
+    background-color: transparent;
+    border-bottom: 1px solid var(--border-color);
+    padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.card-header h5 {
+    font-weight: 500;
+    color: var(--google-gray);
+    margin-bottom: 0;
+}
+
+/* Card body */
+.card-body {
+    padding: var(--spacing-lg);
+}
+
+/* Card footer */
+.card-footer {
+    background-color: transparent;
+    border-top: 1px solid var(--border-color);
+    padding: var(--spacing-md) var(--spacing-lg);
+}
+
+/* Card variations */
+.card-primary {
+    border-top: 4px solid var(--primary-color);
+}
+
+.card-secondary {
+    border-top: 4px solid var(--secondary-color);
+}
+
+.card-success {
+    border-top: 4px solid var(--success-color);
+}
+
+.card-warning {
+    border-top: 4px solid var(--warning-color);
+}
+
+.card-danger {
+    border-top: 4px solid var(--danger-color);
+}
+
+/* Card with left border */
+.card-border-left {
+    border-left: 4px solid var(--border-color);
+    border-top: none;
+}
+
+.card-border-left.card-primary {
+    border-left-color: var(--primary-color);
+}
+
+.card-border-left.card-secondary {
+    border-left-color: var(--secondary-color);
+}
+
+.card-border-left.card-success {
+    border-left-color: var(--success-color);
+}
+
+.card-border-left.card-warning {
+    border-left-color: var(--warning-color);
+}
+
+.card-border-left.card-danger {
+    border-left-color: var(--danger-color);
+}
+
+/* Card groups */
+.card-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.card-group .card {
+    flex: 1 0 300px;
+}
+
+/* Card actions */
+.card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+}
+
+/* Card content layout */
+.card-content {
+    margin-bottom: var(--spacing-md);
+}
+
+.card-title {
+    font-weight: 500;
+    margin-bottom: var(--spacing-sm);
+}
+
+.card-subtitle {
+    color: var(--google-gray);
+    margin-bottom: var(--spacing-md);
+}
+
+/* Card with icon */
+.card-with-icon {
+    display: flex;
+    align-items: flex-start;
+}
+
+.card-icon {
+    font-size: 24px;
+    color: var(--primary-color);
+    margin-right: var(--spacing-md);
+}
+
+.card-with-icon .card-content {
+    flex: 1;
+}
+
+/* Card stats */
+.card-stat {
+    text-align: center;
+    padding: var(--spacing-md);
+}
+
+.card-stat-value {
+    font-size: 32px;
+    font-weight: 500;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-xs);
+}
+
+.card-stat-label {
+    color: var(--google-gray);
+    font-size: var(--font-size-sm);
+}
+
+/* ==========================================================================
+   OCS Database - Filter Components
+   
+   Styles for filter components throughout the application
+   ========================================================================== */
+
+/* Original styles from multiselect-filters.css - migrated directly */
+
+/* Multiselect container */
+.multiselect-filter {
+    position: relative;
+    width: 100%;
+}
+
+/* Selected tags display */
+.selected-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    min-height: var(--input-height);
+}
+
+.tag {
+    background-color: var(--table-header-bg);
+    padding: 2px 8px;
+    border-radius: var(--border-radius);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tag-remove {
+    cursor: pointer;
+    color: var(--google-gray);
+    font-size: 12px;
+}
+
+.tag-remove:hover {
+    color: var(--google-red);
+}
+
+/* Input field styling */
+.multiselect-filter input {
+    height: var(--input-height) !important;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--input-border-color);
+    padding: 0.375rem 0.75rem;
+    width: 100%;
+    transition: border-color var(--transition-speed);
+}
+
+.multiselect-filter input:focus {
+    border-color: var(--input-focus-color);
+    box-shadow: var(--input-focus-shadow);
+    outline: none;
+}
+
+/* Dropdown styling */
+.multiselect-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid var(--input-border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.multiselect-option {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color var(--transition-speed);
+}
+
+.multiselect-option:hover {
+    background-color: var(--table-hover-bg);
+}
+
+.multiselect-option.selected {
+    background-color: var(--table-header-bg);
+    font-weight: 500;
+}
+
+/* Advanced Filters Container */
+.advanced-filters-container {
+    background: var(--light-bg);
+    border-radius: var(--radius-md);
+    padding: 24px 20px 16px 20px;
+    margin-bottom: 24px;
+    border: none;
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-normal);
+    width: 100%;
+}
+
+.advanced-filters-container:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+/* Filter Cards */
+.filter-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 16px 20px 16px 16px;
+    box-shadow: var(--shadow-sm);
+    border-left: 4px solid var(--primary-color);
+    transition: all var(--transition-fast);
+    margin: 0px 10px 16px 0px !important;
+}
+
+.filter-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Category-specific styles */
+.filter-card-info {
+    border-left-color: var(--primary-color);
+}
+
+.filter-card-characteristics {
+    border-left-color: var(--secondary-color);
+}
+
+.filter-card-status {
+    border-left-color: var(--success-color);
+}
+
+/* Card state variations */
+.filter-card-focus,
+.filter-card.has-active-filters {
+    border-left-width: 6px;
+    box-shadow: var(--shadow-md);
+    background-color: rgba(255, 255, 255, 0.95);
+}
+
+/* Filter Section Headings */
+.filter-section-heading {
+    font-size: 15px;
+    color: var(--google-gray);
+    font-weight: 600;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    border: none;
+    padding: 0;
+}
+
+.filter-section-heading i {
+    margin-right: 8px;
+    color: var(--primary-color);
+    font-size: 18px;
+}
+
+.filter-card-characteristics .filter-section-heading i {
+    color: var(--secondary-color);
+}
+
+.filter-card-status .filter-section-heading i {
+    color: var(--success-color);
+}
+
+/* Status Filter Options */
+.status-filter-option {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+.status-filter-option::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    background-color: var(--google-light-gray);
+}
+
+.status-option-completed::before {
+    background-color: var(--success-color);
+}
+
+.status-option-not-completed::before {
+    background-color: var(--warning-color);
+}
+
+.status-option-failed::before {
+    background-color: var(--danger-color);
+}
+
+/* Active Filters Display */
+.active-filters-container {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+    border-left: 4px solid var(--primary-color);
+    transition: all var(--transition-fast);
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.filter-heading {
+    font-size: 15px;
+    color: var(--google-gray);
+    font-weight: 600;
+}
+
+/* ==========================================================================
+   OCS Database - Table Components
+   
+   Core styles for table elements throughout the application
+   ========================================================================== */
+
+/* Data table styling */
+.table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.table th {
+    background-color: var(--table-header-bg);
+    color: var(--google-gray);
+    font-weight: 500;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--table-border-color);
+}
+
+.table td {
+    padding: 8px 16px;
+    border-top: none;
+    border-bottom: 1px solid var(--table-border-color);
+    vertical-align: middle;
+}
+
+.table tr:hover {
+    background-color: var(--table-hover-bg);
+}
+
+/* Status badges */
+.status-badge {
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.status-completed {
+    background-color: rgba(52, 168, 83, 0.1);
+    color: #2E7D32;
+}
+
+.status-not-completed {
+    background-color: rgba(95, 99, 104, 0.1);
+    color: #37474F;
+}
+
+.status-in-progress {
+    background-color: rgba(66, 133, 244, 0.1);
+    color: #1565C0;
+}
+
+.status-pending {
+    background-color: rgba(251, 188, 5, 0.1);
+    color: #F57C00;
+}
+
+.status-error {
+    background-color: rgba(234, 67, 53, 0.1);
+    color: #C62828;
+}
+
+/* Table container */
+.table-container {
+    overflow-x: auto;
+    margin-bottom: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Enhanced table styling */
+.table {
+    font-size: var(--font-size-sm);
+    width: 100%;
+    margin-bottom: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Table headers */
+.table thead th {
+    background-color: var(--table-header-bg);
+    color: var(--google-gray);
+    font-weight: 500;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--table-border-color);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* First and last header cells */
+.table thead th:first-child {
+    border-top-left-radius: var(--radius-md);
+}
+
+.table thead th:last-child {
+    border-top-right-radius: var(--radius-md);
+}
+
+/* Table rows */
+.table tbody tr {
+    transition: background-color var(--transition-speed);
+}
+
+.table tbody tr:hover {
+    background-color: var(--table-hover-bg);
+}
+
+/* Striped rows */
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: var(--table-stripe-bg);
+}
+
+/* Table cells */
+.table td {
+    padding: 10px 16px;
+    border-top: none;
+    border-bottom: 1px solid var(--table-border-color);
+    vertical-align: middle;
+}
+
+/* Cell variations */
+.table .numeric {
+    text-align: right;
+}
+
+.table .actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+/* Status badges in tables */
+.table .status-badge {
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    display: inline-block;
+}
+
+.table .status-completed {
+    background-color: rgba(52, 168, 83, 0.1);
+    color: #2E7D32;
+}
+
+.table .status-pending {
+    background-color: rgba(251, 188, 5, 0.1);
+    color: #F57C00;
+}
+
+.table .status-in-progress {
+    background-color: rgba(66, 133, 244, 0.1);
+    color: #1565C0;
+}
+
+.table .status-error {
+    background-color: rgba(234, 67, 53, 0.1);
+    color: #C62828;
+}
+
+.table .status-not-completed {
+    background-color: rgba(95, 99, 104, 0.1);
+    color: #37474F;
+}
+
+/* ==========================================================================
+   OCS Database - Main List Page Styles
+   
+   Styles specific to the main list page with the data table view
+   ========================================================================== */
+
+/* Main container */
+.main-container {
+    padding: 20px;
+}
+
+/* Table filter controls */
+.filter-controls {
+    margin-bottom: 20px;
+}
+
+.filter-row {
+    margin-bottom: 10px;
+}
+
+/* Column toggle dropdown */
+.column-toggle-dropdown .dropdown-menu {
+    padding: 15px;
+    width: 300px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.column-toggle-category {
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.column-toggle-category-title {
+    font-weight: 500;
+    color: #5F6368;
+    margin-bottom: 5px;
+}
+
+.form-check-input:checked {
+    background-color: #4285F4;
+    border-color: #4285F4;
+}
+
+/* Page header section */
+.page-header {
+    margin-bottom: var(--spacing-lg);
+}
+
+.page-header h1 {
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Search and filter section */
+.search-filter-section {
+    margin-bottom: var(--spacing-lg);
+}
+
+/* Search form */
+.search-form {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.search-form .form-control {
+    flex: 1;
+}
+
+/* Pagination */
+.pagination-container {
+    margin-top: var(--spacing-lg);
+    display: flex;
+    justify-content: center;
+}
+
+.pagination .page-link {
+    color: var(--primary-color);
+    border-color: var(--border-color);
+    transition: all var(--transition-speed);
+}
+
+.pagination .page-link:hover {
+    background-color: var(--primary-light);
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+/* Column visibility toggle dropdown */
+.column-toggle-dropdown {
+    margin-left: auto;
+}
+
+.column-toggle-menu {
+    padding: var(--spacing-md);
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.column-toggle-menu .form-check {
+    margin-bottom: var(--spacing-xs);
+}
+
+.column-toggle-category {
+    margin-bottom: var(--spacing-sm);
+    padding-bottom: var(--spacing-xs);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.column-toggle-category-title {
+    font-weight: 500;
+    color: var(--google-gray);
+    margin-bottom: var(--spacing-xs);
+}
+
+/* Main table container */
+.main-table-container {
+    position: relative;
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--primary-light);
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Cell contents */
+.cell-status {
+    text-align: center;
+}
+
+.cell-date {
+    white-space: nowrap;
+}
+
+.cell-fid {
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+/* Empty state */
+.empty-state {
+    padding: var(--spacing-xl);
+    text-align: center;
+    background-color: var(--light-bg);
+    border-radius: var(--radius-md);
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    color: var(--google-light-gray);
+    margin-bottom: var(--spacing-md);
+}
+
+.empty-state-message {
+    color: var(--google-gray);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* ==========================================================================
+   OCS Database - Pipeline Page Styles
+   
+   Styles specific to the pipeline dashboard page
+   ========================================================================== */
+
+/* Pipeline dashboard container */
+.pipeline-container {
+    padding: 20px;
+}
+
+/* Pipeline section */
+.pipeline-section {
+    margin-bottom: 30px;
+}
+
+.pipeline-section h2 {
+    margin-bottom: 20px;
+}
+
+/* Pipeline table */
+.pipeline-table .status-cell {
+    width: 120px;
+    text-align: center;
+}
+
+.pipeline-table .actions-cell {
+    width: 150px;
+    text-align: right;
+}
+
+/* Workflow form */
+.workflow-form {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #e9ecef;
+}
+
+.workflow-form .form-group {
+    margin-bottom: 15px;
+}
+
+.workflow-form .btn-group {
+    margin-top: 15px;
+}
+
+/* Sample section */
+.sample-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.sample-item {
+    padding: 10px 15px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.sample-item:last-child {
+    border-bottom: none;
+}
+
+.sample-item .sample-name {
+    font-weight: 500;
+}
+
+/* Pipeline dashboard container */
+.pipeline-dashboard {
+    background-color: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+    margin-bottom: var(--spacing-xl);
+}
+
+/* Pipeline section headers */
+.pipeline-section-header {
+    font-size: var(--font-size-lg);
+    color: var(--google-gray);
+    font-weight: 500;
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Pipeline cards for configuration */
+.pipeline-config-card {
+    background-color: var(--light-bg);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition-speed);
+}
+
+.pipeline-config-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+/* Pipeline action buttons */
+.pipeline-action-btn {
+    margin-right: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Pipeline status indicators */
+.pipeline-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-weight: 500;
+}
+
+.pipeline-status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.pipeline-status-running .pipeline-status-indicator {
+    background-color: var(--primary-color);
+    animation: pulse 1s infinite;
+}
+
+.pipeline-status-completed .pipeline-status-indicator {
+    background-color: var(--success-color);
+}
+
+.pipeline-status-error .pipeline-status-indicator {
+    background-color: var(--danger-color);
+}
+
+/* Batch information display */
+.batch-info {
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    background-color: var(--light-bg);
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--primary-color);
+}
+
+.batch-info h5 {
+    color: var(--primary-dark);
+    margin-bottom: var(--spacing-sm);
+}
+
+.batch-info p {
+    margin-bottom: var(--spacing-xs);
+    color: var(--google-gray);
+}
+
+.batch-info strong {
+    color: var(--dark-bg);
+}
+
+/* Page-specific Styles */
+
+/* Utilities */

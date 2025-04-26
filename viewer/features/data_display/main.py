@@ -7,7 +7,7 @@ from django.http import HttpResponse
 from django.db.models import Prefetch, Q, QuerySet
 import subprocess
 from viewer.core.models import Main, Metadata, LoadAssociation, Ingest, Alignment, PostQC
-from viewer.filters import MainFilter, DISTINCT_ON_SUPPORTED
+from viewer.features.filters import MainFilter, DISTINCT_ON_SUPPORTED
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
 from django_tables2.config import RequestConfig
@@ -322,7 +322,7 @@ class MainListView(FilterView):
     pagination issues.
     """
     model = Main
-    template_name = 'viewer/ocs_browser.html'
+    template_name = 'viewer/ocs-browser.html'
     filterset_class = MainFilter
     paginate_by = 25
     strict = False  # Allow non-model fields to be used in ordering
