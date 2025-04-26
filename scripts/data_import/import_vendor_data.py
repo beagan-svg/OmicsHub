@@ -56,7 +56,7 @@ setup_django_env()
 
 # Now we can import Django models
 from django.db import transaction
-from viewer.models import Metadata, Main, Alignment, Ingest, PostQC, LoadAssociation
+from viewer.core.models import Metadata, Main, Alignment, Ingest, PostQC, LoadAssociation
 
 def process_csv_file(csv_path: str, source_name: str, dry_run: bool = False) -> Dict[str, int]:
     """

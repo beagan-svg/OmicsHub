@@ -58,7 +58,7 @@ setup_django_env()
 
 # Now we can import Django models
 from django.db import transaction
-from viewer.models import Metadata, Alignment, PostQC, Ingest, LoadAssociation, Main
+from viewer.core.models import Metadata, Alignment, PostQC, Ingest, LoadAssociation, Main
 
 def parse_datetime(datetime_str):
     """

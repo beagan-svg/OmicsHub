@@ -8,7 +8,7 @@ from datetime import datetime
 import time
 from django.conf import settings
 from django.utils import timezone
-from viewer.models import Alignment, PostQC, Metadata, Main
+from viewer.core.models import Alignment, PostQC, Metadata, Main
 
 # Set up logging
 logger = logging.getLogger(__name__)

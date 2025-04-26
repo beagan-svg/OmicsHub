@@ -284,9 +284,11 @@ class PipelineLocalData {
                 this.updateSelectedSamples();
                 this.updateSubmitButtonState();
 
-                // Show toast for sample selection
-                const count = document.querySelectorAll('.sample-select:checked').length;
-                this.showToastNotification(`${count} sample${count !== 1 ? 's' : ''} selected`, 'info', 750);
+                // Show toast only when checking a sample
+                if (event.target.checked) {
+                    const count = document.querySelectorAll('.sample-select:checked').length;
+                    this.showToastNotification(`${count} sample${count !== 1 ? 's' : ''} selected`, 'info', 750);
+                }
             }
         });
 
@@ -463,7 +465,7 @@ class PipelineLocalData {
         if (clearAtacToggle) {
             clearAtacToggle.addEventListener('change', () => {
                 if (clearAtacToggle.checked) {
-                    this.showToastNotification('Clearing ATAC samples...', 'info');
+                    this.showToastNotification('Clearing ATAC samples...', 'info', 1250);
                     this.clearAtacSamples();
                     setTimeout(() => {
                         clearAtacToggle.checked = false;

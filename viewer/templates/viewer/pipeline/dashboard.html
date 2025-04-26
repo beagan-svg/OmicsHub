@@ -1,4 +1,4 @@
-{% extends "viewer/base.html" %}
+{% extends "viewer/header.html" %}
 {% load static %}
 {% load viewer_filters %}
 
@@ -354,6 +354,27 @@
     .command-list .command-item:last-child {
         margin-bottom: 0;
     }
+
+    .command-table {
+        font-family: monospace;
+        font-size: 0.875rem;
+        margin-bottom: 0;
+    }
+
+    .command-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+    }
+
+    .command-table td {
+        vertical-align: top;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .command-table td:first-child {
+        font-weight: 500;
+    }
 </style>
 {% endblock %}
 
@@ -690,77 +711,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Workflow Configuration Modal -->
-<div class="modal fade" id="workflow-config-modal" tabindex="-1" aria-labelledby="workflow-config-modal-label"
-    aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="workflow-config-modal-label">Pipeline Configuration</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="workflow-type" class="form-label">Workflow Type</label>
-                    <select class="form-select" id="workflow-type">
-                        <option value="standard_10x">Standard 10x</option>
-                        <option value="nuclei_10x">Nuclei 10x</option>
-                        <option value="custom">Custom Workflow</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label for="reference-genome" class="form-label">Reference Genome</label>
-                    <select class="form-select" id="reference-genome">
-                        {% for id, name in references.items %}
-                        <option value="{{ id }}">{{ name }}</option>
-                        {% empty %}
-                        <option value="human">human_10x_grch38_genome_star2.7.1a</option>
-                        <option value="mouse">mouse_10x_mm10_genome_star2.7.1a</option>
-                        <option value="armadillo">african-green-monkey_ncbi_vero-who-p1-0_genomefixed_star2.7.1a
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label for="chemistry-version" class="form-label">Chemistry Version</label>
-                    <select class="form-select" id="chemistry-version">
-                        {% for id, name in chemistries.items %}
-                        <option value="{{ id }}">{{ name }}</option>
-                        {% empty %}
-                        <option value="10xV3.1D">SC3Pv3</option>
-                        <option value="10xV4">SC3Pv4</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label for="param-file" class="form-label">Parameter File (Optional)</label>
-                    <input type="text" class="form-control" id="param-file" placeholder="Enter parameter file path">
-                </div>
-                <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" id="override-defaults">
-                    <label class="form-check-label" for="override-defaults">
-                        Override Default Parameters
-                    </label>
-                </div>
-                <div id="advanced-params" class="d-none">
-                    <div class="mb-3">
-                        <label for="cpus" class="form-label">CPUs</label>
-                        <input type="number" class="form-control" id="cpus" value="8">
-                    </div>
-                    <div class="mb-3">
-                        <label for="memory" class="form-label">Memory (GB)</label>
-                        <input type="number" class="form-control" id="memory" value="64">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" id="save-config">Save Configuration</button>
             </div>
         </div>
     </div>
@@ -1106,9 +1056,17 @@
                                 <h6 class="mb-0">Alignment Commands</h6>
                             </div>
                             <div class="card-body">
-                                <div id="final-alignment-commands" class="command-list">
-                                    <!-- Will be populated dynamically -->
-                                </div>
+                                <table class="table table-bordered command-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 200px;">SAMPLE</th>
+                                            <th>COMMAND</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="final-alignment-commands">
+                                        <!-- Will be populated dynamically -->
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -1120,9 +1078,17 @@
                                 <h6 class="mb-0">Post-QC Commands</h6>
                             </div>
                             <div class="card-body">
-                                <div id="final-postqc-commands" class="command-list">
-                                    <!-- Will be populated dynamically -->
-                                </div>
+                                <table class="table table-bordered command-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 200px;">SAMPLE</th>
+                                            <th>COMMAND</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="final-postqc-commands">
+                                        <!-- Will be populated dynamically -->
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -1135,26 +1101,6 @@
         </div>
     </div>
 </div>
-
-<style>
-    .command-list {
-        font-family: monospace;
-        font-size: 0.875rem;
-    }
-
-    .command-list .command-item {
-        background-color: #f8f9fa;
-        padding: 0.75rem;
-        border-radius: 0.375rem;
-        margin-bottom: 0.5rem;
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
-
-    .command-list .command-item:last-child {
-        margin-bottom: 0;
-    }
-</style>
 
 <!-- Process Queue Modal -->
 <div class="modal fade" id="queue-modal" tabindex="-1" aria-labelledby="queue-modal-label" aria-hidden="true">
@@ -1246,646 +1192,20 @@
 
 {% block extra_scripts %}
 <script src="{% static 'viewer/js/pipeline-local-data.js' %}"></script>
+<script src="{% static 'viewer/js/pipeline-final-modal.js' %}"></script>
 <script src="{% static 'viewer/js/pipeline-submit-modal.js' %}"></script>
 <script>
-    // Debug: Check localStorage on page load
     document.addEventListener('DOMContentLoaded', function () {
+        // Debug: Check localStorage on page load
         const legacyStorageData = localStorage.getItem('selectedSamplesForPipeline');
         const primaryStorageData = localStorage.getItem('pipelineSelectedSamples');
 
         // Access PipelineLocalData object
         if (window.pipelineLocalData) {
             // Immediately call reinitialize with no delay
-            const initResult = window.pipelineLocalData.reinitialize();
-
-            // If reinitialize didn't work and we have legacy data, try direct approach
-            if (!initResult && legacyStorageData) {
-                try {
-                    const data = JSON.parse(legacyStorageData);
-                    if (data && data.samples && Array.isArray(data.samples)) {
-                        // Create sample table
-                        populateTableManually(data.samples);
-                    }
-                } catch (e) {
-                    console.error('Error processing data manually:', e);
-                }
-            }
+            window.pipelineLocalData.reinitialize();
         } else {
             console.error('PipelineLocalData object not available!');
-        }
-
-        // Function to manually populate the table
-        function populateTableManually(samples) {
-            if (!samples || !samples.length) return;
-
-            const tableBody = document.querySelector('#samples-table tbody');
-            if (!tableBody) return;
-
-            // Clear existing rows
-            tableBody.innerHTML = '';
-
-            // Use document fragment for faster DOM manipulation
-            const fragment = document.createDocumentFragment();
-
-            // Pre-cache badge HTML for common statuses
-            const completedBadge = '<span class="badge bg-success">Completed</span>';
-            const notStartedBadge = '<span class="badge bg-secondary">Not Started</span>';
-
-            // Process samples in batches for better performance
-            const batchSize = 100;
-
-            // Function to process a batch of samples
-            function processBatch(startIdx) {
-                const endIdx = Math.min(startIdx + batchSize, samples.length);
-
-                // Create rows for this batch
-                for (let i = startIdx; i < endIdx; i++) {
-                    const sample = samples[i];
-                    const row = document.createElement('tr');
-
-                    // Field mapping - the ingestStatus field actually contains human-readable organism info
-                    // and the organism field contains the sample ID
-                    const sampleName = sample.name || sample.id || '';
-                    const loadName = sample.loadName || '';
-                    const batchName = sample.batchName || '';
-                    const organism = sample.ingestStatus || 'Unknown'; // Organism is in ingestStatus field!
-                    const libraryPrep = sample.libraryPrep || 'Unknown';
-
-                    // Use dataset instead of setAttribute for better performance
-                    row.dataset.fastq = sampleName;
-
-                    // Use innerHTML once with template literal for better performance
-                    row.innerHTML = `
-                        <td><input type="checkbox" class="sample-select" checked></td>
-                        <td>${sampleName}</td>
-                        <td>${sample.studySet || ''}</td>
-                        <td>${loadName}</td>
-                        <td>${batchName}</td>
-                        <td>${organism}</td>
-                        <td>${libraryPrep}</td>
-                        <td>${completedBadge}</td>
-                        <td>${notStartedBadge}</td>
-                        <td>${notStartedBadge}</td>
-                    `;
-
-                    fragment.appendChild(row);
-                }
-
-                // If we're done with all batches
-                if (endIdx >= samples.length) {
-                    // Commit all changes to DOM at once
-                    tableBody.appendChild(fragment);
-
-                    // Update UI elements asynchronously after DOM update
-                    setTimeout(() => {
-                        // Enable submit button
-                        const submitBtn = document.getElementById('submit-selected');
-                        if (submitBtn) {
-                            submitBtn.disabled = false;
-                        }
-
-                        // Update selected count
-                        const selectedCount = document.getElementById('selected-count');
-                        if (selectedCount) {
-                            selectedCount.textContent = `${samples.length} sample${samples.length !== 1 ? 's' : ''} selected`;
-                        }
-
-                        // Store samples in pipelineLocalData efficiently
-                        if (window.pipelineLocalData) {
-                            // Format samples for storage
-                            const formattedSamples = samples.map(sample => ({
-                                fastq_name: sample.name || sample.id || '',
-                                study_set: sample.studySet || '',
-                                load_name: sample.loadName || '',
-                                batch_name_from_vendor: sample.batchName || '',
-                                organism_common_name: sample.ingestStatus || 'Unknown', // Field mapping correction
-                                library_prep: sample.libraryPrep || 'Unknown',
-                                ingest_status: 'Completed',
-                                alignment_status: 'Not Started',
-                                postqc_status: 'Not Started'
-                            }));
-
-                            // Bulk save samples
-                            window.pipelineLocalData.bulkAddSamples(formattedSamples);
-                        }
-                    }, 0);
-                } else {
-                    // Process next batch asynchronously to avoid blocking UI
-                    setTimeout(() => processBatch(endIdx), 0);
-                }
-            }
-
-            // Start processing the first batch
-            processBatch(0);
-        }
-
-        // Set up submit button click handler
-        const submitBtn = document.getElementById('submit-action-btn');
-        if (submitBtn) {
-            submitBtn.addEventListener('click', function () {
-                const submitModal = new bootstrap.Modal(document.getElementById('submit-modal'));
-                submitModal.show();
-            });
-        }
-    });
-
-    document.addEventListener('DOMContentLoaded', function () {
-        // Show/hide advanced parameters based on override checkbox
-        const overrideCheckbox = document.getElementById('override-defaults');
-        const advancedParams = document.getElementById('advanced-params');
-
-        if (overrideCheckbox && advancedParams) {
-            overrideCheckbox.addEventListener('change', function () {
-                if (this.checked) {
-                    advancedParams.classList.remove('d-none');
-                } else {
-                    advancedParams.classList.add('d-none');
-                }
-            });
-        }
-
-        // Save configuration
-        const saveConfigBtn = document.getElementById('save-config');
-        if (saveConfigBtn) {
-            saveConfigBtn.addEventListener('click', function () {
-                const configModal = bootstrap.Modal.getInstance(document.getElementById('workflow-config-modal'));
-                configModal.hide();
-
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-success alert-dismissible fade show';
-                alertDiv.setAttribute('role', 'alert');
-                alertDiv.innerHTML = `
-                    <i class="bi bi-check-circle-fill me-2"></i>
-                    Pipeline configuration saved successfully.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
-
-                // Insert alert before the first card
-                const firstCard = document.querySelector('.card');
-                if (firstCard && firstCard.parentNode) {
-                    firstCard.parentNode.insertBefore(alertDiv, firstCard);
-
-                    // Auto-dismiss after 3 seconds
-                    setTimeout(() => {
-                        try {
-                            const bsAlert = new bootstrap.Alert(alertDiv);
-                            bsAlert.close();
-                        } catch (err) {
-                            // Fallback
-                            if (alertDiv.parentNode) {
-                                alertDiv.parentNode.removeChild(alertDiv);
-                            }
-                        }
-                    }, 3000);
-                }
-            });
-        }
-
-        // Clear selection button - Fixed implementation
-        const clearSelectionBtn = document.getElementById('clear-selection');
-        if (clearSelectionBtn) {
-            console.log('Dashboard setup: Clear selection button found');
-            // Note: The event listener is now attached directly in pipeline-local-data.js
-            // No need to add another event listener here
-        } else {
-            console.error('Clear selection button not found');
-        }
-
-        // Load more samples button
-        const loadMoreBtn = document.getElementById('load-more-samples');
-        if (loadMoreBtn) {
-            loadMoreBtn.addEventListener('click', function () {
-                // In a real implementation, this would make an AJAX call to load more samples
-                // For demo purposes, we'll just add a notification
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-info alert-dismissible fade show';
-                alertDiv.setAttribute('role', 'alert');
-                alertDiv.innerHTML = `
-                    <i class="bi bi-info-circle-fill me-2"></i>
-                    Loading more samples...
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
-
-                // Insert alert
-                const container = document.querySelector('.container-fluid');
-                if (container) {
-                    container.insertBefore(alertDiv, container.firstChild);
-
-                    // Auto-dismiss after 2 seconds
-                    setTimeout(() => {
-                        alertDiv.remove();
-                    }, 2000);
-                }
-            });
-        }
-
-        // Add workflow config button event listener
-        document.addEventListener('DOMContentLoaded', function () {
-            const workflowConfigBtn = document.getElementById('show-workflow-config');
-            if (workflowConfigBtn) {
-                workflowConfigBtn.addEventListener('click', function () {
-                    const configModal = new bootstrap.Modal(document.getElementById('workflow-config-modal'));
-                    configModal.show();
-                });
-            }
-        });
-
-        // Show submit modal
-        const submitSelectedBtn = document.getElementById('submit-selected');
-        if (submitSelectedBtn) {
-            submitSelectedBtn.addEventListener('click', function () {
-                const selectedRows = document.querySelectorAll('.sample-select:checked');
-                const sampleList = document.getElementById('submit-sample-list');
-
-                // Clear previous list
-                sampleList.innerHTML = '';
-
-                // Add selected samples to the list
-                selectedRows.forEach(checkbox => {
-                    const row = checkbox.closest('tr');
-                    const fastqName = row.querySelector('td:nth-child(2)').textContent;
-                    const batchName = row.querySelector('td:nth-child(3)').textContent;
-
-                    const li = document.createElement('li');
-                    li.innerHTML = `<strong>${fastqName}</strong> (${batchName})`;
-                    sampleList.appendChild(li);
-                });
-
-                const submitModal = new bootstrap.Modal(document.getElementById('submit-modal'));
-                submitModal.show();
-            });
-        }
-
-        // Update selected count
-        function updateSelectedCount() {
-            const selectedCount = document.getElementById('selected-count');
-            if (selectedCount) {
-                const count = document.querySelectorAll('.sample-select:checked').length;
-                selectedCount.textContent = `${count} sample${count !== 1 ? 's' : ''} selected`;
-            }
-        }
-
-        // Initialize selected count
-        updateSelectedCount();
-
-        // Add event listeners to checkboxes for count update
-        document.querySelectorAll('.sample-select').forEach(checkbox => {
-            checkbox.addEventListener('change', updateSelectedCount);
-        });
-
-        // Add event listener to select all checkbox for count update
-        const selectAllCheckbox = document.getElementById('select-all-samples');
-        if (selectAllCheckbox) {
-            // Remove any existing event listeners to prevent duplication
-            const newSelectAllCheckbox = selectAllCheckbox.cloneNode(true);
-            selectAllCheckbox.parentNode.replaceChild(newSelectAllCheckbox, selectAllCheckbox);
-
-            // Add our single event listener
-            newSelectAllCheckbox.addEventListener('change', function () {
-                // Update count
-                updateSelectedCount();
-
-                // Call the PipelineLocalData handler for the backend logic
-                // But prevent it from showing its own notification
-                if (window.pipelineLocalData) {
-                    window.pipelineLocalData.handleSelectAllChange({ target: this });
-                }
-
-                // Show toast notification only when selecting all
-                if (this.checked) {
-                    const count = document.querySelectorAll('.sample-select').length;
-                    showToggleToast(`Selecting all ${count} samples...`, 'bi-stars', 750);
-                }
-            });
-        }
-
-        // Toggle switch handlers for action buttons
-
-        // Submit Button
-        const submitActionBtn = document.getElementById('submit-action-btn');
-        if (submitActionBtn) {
-            submitActionBtn.addEventListener('click', function () {
-                // Show toast notification
-                showToggleToast('Submitting selected samples...', 'bi-stars');
-
-                // Trigger the original button click
-                document.getElementById('submit-selected').click();
-            });
-
-            // Sync the button state with the hidden button
-            function syncSubmitButtonState() {
-                const originalBtn = document.getElementById('submit-selected');
-                if (originalBtn && submitActionBtn) {
-                    submitActionBtn.disabled = originalBtn.disabled;
-                }
-            }
-
-            // Set up observer to watch for changes to the original button
-            const submitBtnObserver = new MutationObserver(syncSubmitButtonState);
-            const originalBtn = document.getElementById('submit-selected');
-            if (originalBtn) {
-                submitBtnObserver.observe(originalBtn, { attributes: true });
-                // Initial sync
-                syncSubmitButtonState();
-            }
-
-            // Also listen for changes to selected samples
-            document.addEventListener('change', function (event) {
-                if (event.target.matches('.sample-select')) {
-                    // Slight delay to let other handlers run first
-                    setTimeout(syncSubmitButtonState, 50);
-                }
-            });
-        }
-
-        // Configure Toggle
-        const configureToggle = document.getElementById('configure-toggle');
-        if (configureToggle) {
-            configureToggle.addEventListener('change', function () {
-                if (this.checked) {
-                    // Show toast notification
-                    showToggleToast('Opening configuration panel...', 'bi-stars');
-
-                    // Trigger the original button click after a short delay
-                    setTimeout(() => {
-                        document.getElementById('show-workflow-config').click();
-
-                        // Reset toggle after action completes
-                        this.checked = false;
-                    }, 500);
-                }
-            });
-        }
-
-        // Clear Selection Toggle
-        const clearToggle = document.getElementById('clear-toggle');
-        if (clearToggle) {
-            clearToggle.addEventListener('change', function () {
-                if (this.checked) {
-                    // Show toast notification
-                    showToggleToast('Clearing selections...', 'bi-stars');
-
-                    // Trigger the original button click after a short delay
-                    setTimeout(() => {
-                        document.getElementById('clear-selection').click();
-
-                        // Reset toggle after action completes
-                        this.checked = false;
-                    }, 500);
-                }
-            });
-        }
-
-        // Clear ATAC Toggle
-        const clearAtacToggle = document.getElementById('clear-atac-toggle');
-        if (clearAtacToggle) {
-            clearAtacToggle.addEventListener('change', function () {
-                if (this.checked) {
-                    // Show toast notification
-                    showToggleToast('Clearing ATAC samples...', 'bi-stars');
-
-                    // Perform ATAC clear after a short delay
-                    setTimeout(() => {
-                        clearAtacSamples();
-
-                        // Reset toggle after action completes
-                        this.checked = false;
-                    }, 500);
-                }
-            });
-        }
-
-        // Function to clear ATAC samples (batch name starting with ATX)
-        function clearAtacSamples() {
-            // Get all rows in the table for visible UI updates
-            const tableBody = document.querySelector('#samples-table tbody');
-            if (!tableBody) return;
-
-            // Track removed samples for reporting
-            let visibleRemoved = 0;
-            let totalRemoved = 0;
-
-            // First, filter all ATAC samples from PipelineLocalData
-            if (window.pipelineLocalData && window.pipelineLocalData.selectedSamples) {
-                const originalLength = window.pipelineLocalData.selectedSamples.length;
-
-                // Filter out samples with batch name starting with ATX
-                window.pipelineLocalData.selectedSamples = window.pipelineLocalData.selectedSamples.filter(sample => {
-                    const batchName = sample.batch_name_from_vendor || '';
-                    const isAtacSample = batchName.toUpperCase().startsWith('ATX');
-
-                    if (isAtacSample) {
-                        totalRemoved++;
-                    }
-
-                    return !isAtacSample;
-                });
-
-                // Calculate how many samples were removed
-                totalRemoved = originalLength - window.pipelineLocalData.selectedSamples.length;
-
-                // Save the updated samples to localStorage
-                window.pipelineLocalData.saveSamples();
-            }
-
-            // Then, update the visible UI by removing matching rows from the current page
-            const rows = tableBody.querySelectorAll('tr');
-            rows.forEach(row => {
-                // Skip empty state row
-                if (row.querySelector('td[colspan="10"]')) return;
-
-                // Check batch name column (5th column, index 4)
-                const batchNameCell = row.querySelector('td:nth-child(5)');
-                if (batchNameCell) {
-                    const batchName = batchNameCell.textContent.trim();
-                    if (batchName.toUpperCase().startsWith('ATX')) {
-                        // Remove row from visible table
-                        row.remove();
-                        visibleRemoved++;
-                    }
-                }
-            });
-
-            // Update UI state based on results
-            if (window.pipelineLocalData) {
-                // Update submit button state
-                window.pipelineLocalData.updateSubmitButtonState();
-
-                // Update selected count
-                const selectedCount = document.getElementById('selected-count');
-                if (selectedCount) {
-                    const remainingCount = window.pipelineLocalData.selectedSamples.length;
-                    selectedCount.textContent = `${remainingCount} sample${remainingCount !== 1 ? 's' : ''} selected`;
-                }
-
-                // Update the pagination info to reflect the new total count
-                const remainingCount = window.pipelineLocalData.selectedSamples.length;
-                const currentPage = parseInt(document.querySelector('.current-page')?.textContent) || 1;
-                const itemsPerPage = parseInt(document.getElementById('rowsPerPageDropdown')?.textContent) || 25;
-                const startIndex = Math.min(((currentPage - 1) * itemsPerPage) + 1, remainingCount);
-                const endIndex = Math.min(startIndex + itemsPerPage - 1, remainingCount);
-
-                // Update pagination info text
-                const paginationInfo = document.querySelector('.pagination-info');
-                if (paginationInfo) {
-                    if (remainingCount > 0) {
-                        paginationInfo.textContent = `Results ${startIndex}-${endIndex} of ${remainingCount}`;
-                    } else {
-                        paginationInfo.textContent = 'Results 0-0 of 0';
-                    }
-                }
-
-                // Update total pages
-                const totalPages = Math.ceil(remainingCount / itemsPerPage);
-                const totalPagesSpan = document.querySelector('.total-pages');
-                if (totalPagesSpan) {
-                    totalPagesSpan.textContent = totalPages || 0;
-                }
-
-                // Also update the goto page input max value
-                const gotoPageInput = document.getElementById('gotoPage');
-                if (gotoPageInput) {
-                    gotoPageInput.max = totalPages || 1;
-                    // If current page is beyond total pages, adjust it
-                    if (currentPage > totalPages) {
-                        gotoPageInput.value = totalPages || 1;
-                    }
-                }
-
-                // Check if table is now empty (all visible samples were removed)
-                if (tableBody.querySelectorAll('tr').length === 0) {
-                    // Show empty state
-                    const emptyRow = document.createElement('tr');
-                    emptyRow.innerHTML = `
-                        <td colspan="10" class="text-center py-5">
-                            <div class="d-flex flex-column align-items-center">
-                                <div class="mb-3">
-                                    <i class="bi bi-x-circle" style="font-size: 2rem;"></i>
-                                </div>
-                                <p class="text-muted mb-4">No samples selected. Use the Sample Browser to select samples.</p>
-                                <a href="/" class="btn btn-primary">
-                                    <i class="bi bi-table me-2"></i>GO TO SAMPLE BROWSER
-                                </a>
-                            </div>
-                        </td>
-                    `;
-                    tableBody.appendChild(emptyRow);
-
-                    // Disable pagination buttons
-                    const paginationButtons = document.querySelectorAll('.pagination-navigation a');
-                    paginationButtons.forEach(btn => {
-                        btn.classList.add('disabled');
-                        btn.setAttribute('aria-disabled', 'true');
-                    });
-
-                    // Reset and disable goto page input
-                    if (gotoPageInput) {
-                        gotoPageInput.value = 0;
-                        gotoPageInput.disabled = true;
-                    }
-                } else {
-                    // Update pagination buttons state based on current page and total pages
-                    const firstAndPrevButtons = document.querySelectorAll('[title="First page"], [title="Previous page"]');
-                    firstAndPrevButtons.forEach(btn => {
-                        if (currentPage <= 1) {
-                            btn.classList.add('disabled');
-                            btn.setAttribute('aria-disabled', 'true');
-                        } else {
-                            btn.classList.remove('disabled');
-                            btn.setAttribute('aria-disabled', 'false');
-                        }
-                    });
-
-                    const nextAndLastButtons = document.querySelectorAll('[title="Next page"], [title="Last page"]');
-                    nextAndLastButtons.forEach(btn => {
-                        if (currentPage >= totalPages) {
-                            btn.classList.add('disabled');
-                            btn.setAttribute('aria-disabled', 'true');
-                        } else {
-                            btn.classList.remove('disabled');
-                            btn.setAttribute('aria-disabled', 'false');
-                        }
-                    });
-                }
-
-                // Show success message with total removal count
-                if (totalRemoved > 0) {
-                    let message = `Removed ${totalRemoved} ATAC sample${totalRemoved !== 1 ? 's' : ''}`;
-                    if (visibleRemoved < totalRemoved) {
-                        message += ` (${visibleRemoved} from current page)`;
-                    }
-                    showToggleToast(message, 'bi-stars');
-                } else {
-                    // No ATAC samples found
-                    showToggleToast('No ATAC samples found to remove', 'bi-stars');
-                }
-            } else {
-                // Fallback if PipelineLocalData is not available
-                if (visibleRemoved > 0) {
-                    showToggleToast(`Removed ${visibleRemoved} ATAC samples from current page`, 'bi-stars');
-                } else {
-                    showToggleToast('No ATAC samples found to remove', 'bi-stars');
-                }
-            }
-        }
-
-        // Function to show toast notifications for toggle actions
-        function showToggleToast(message, iconClass, duration = 2000) {
-            // Remove any existing toasts to prevent duplicates
-            const existingToasts = document.querySelectorAll('.toggle-toast, .toast');
-            existingToasts.forEach(toast => {
-                try {
-                    // If it's a Bootstrap toast, hide it properly
-                    if (toast.classList.contains('toast')) {
-                        const bsToast = bootstrap.Toast.getInstance(toast);
-                        if (bsToast) bsToast.hide();
-                    }
-                    // For other toasts or if bootstrap hide fails, remove directly
-                    if (toast.parentNode) {
-                        toast.parentNode.removeChild(toast);
-                    }
-                } catch (e) {
-                    console.error('Error removing existing toast:', e);
-                }
-            });
-
-            // Create new toast
-            const toast = document.createElement('div');
-            toast.className = 'toggle-toast';
-            // Add clear-selection class if the message is about clearing selections
-            if (message.includes('Clearing selections')) {
-                toast.classList.add('clear-selection');
-            }
-            toast.setAttribute('role', 'alert');
-            toast.setAttribute('aria-live', 'assertive');
-
-            // Use consistent HTML structure and always use the stars icon
-            toast.innerHTML = `
-                <div class="toggle-toast-icon">
-                    <i class="bi bi-stars"></i>
-                </div>
-                <div class="toggle-toast-message">${message}</div>
-            `;
-
-            // Add to document
-            document.body.appendChild(toast);
-
-            // Remove after delay
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translate(-50%, 20px)';
-                setTimeout(() => {
-                    if (toast.parentNode) {
-                        toast.parentNode.removeChild(toast);
-                    }
-                }, 300);
-            }, duration);
-
-            // Also ensure the local data's toast container is clear
-            const toastContainer = document.getElementById('toast-container');
-            if (toastContainer) {
-                toastContainer.innerHTML = '';
-            }
         }
     });
 </script>
