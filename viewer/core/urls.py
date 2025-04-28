@@ -12,7 +12,7 @@ from viewer.features.failed_jobs.failed_jobs import FailedJobsView
 app_name = 'viewer'
 
 urlpatterns = [
-    path('', MainListView.as_view(), name='main_list'),
+    path('', MainListView.as_view(), name='ocs-browser'),
     path('api/metadata/<str:fastq_name>/<str:field_name>/', metadata_field_view, name='metadata_field'),
     
     # Pipeline URLs

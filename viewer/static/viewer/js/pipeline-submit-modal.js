@@ -1733,84 +1733,108 @@ class PipelineSubmitModal {
 
     handleSubmission() {
         console.log('handleSubmission started');
-
-        // Save the current state before transitioning to final modal
         this.saveState();
 
         // Collect all commands
-        const commands = {
-            alignment: [],
-            postQC: []
-        };
+        const commands = [];
+        const autoToggle = this.autoProceedToggle.checked;
 
-        // Get alignment commands
+        // First, create a map of samples that should have auto-toggle enabled
+        const autoToggleSamples = new Map();
+
+        // Process alignment commands first to determine which samples should auto-proceed
         const alignmentBatchGroups = this.alignmentBatches.querySelectorAll('.batch-group');
-        console.log('Found alignment batch groups:', alignmentBatchGroups.length);
-
-        alignmentBatchGroups.forEach((batchGroup, groupIndex) => {
+        alignmentBatchGroups.forEach(batchGroup => {
+            const batchName = batchGroup.dataset.batchName || '';
             const cells = batchGroup.querySelectorAll('tr[data-sample]');
-            cells.forEach((row, index) => {
-                const sample = row.dataset.sample;
+            cells.forEach(row => {
+                const sampleId = row.dataset.sample;
                 let command = row.querySelector('.command-cell code')?.textContent?.trim();
-
                 if (!command) {
                     const commandInput = row.querySelector('.command-edit-form textarea[name="command"]');
                     if (commandInput) {
                         command = commandInput.value.trim();
                     }
                 }
+                if (command && sampleId) {
+                    let sample = [...this.alignmentSamples, ...this.incompleteSamples].find(s => s.fastq_name === sampleId);
+                    if (!sample) sample = { batch_name_from_vendor: '', workflow: '', fastq_name: sampleId, alignment_status: '' };
+                    const workflow = sample.workflow || this.determineWorkflow(sample);
+                    // Detect if this is a post-QC command
+                    const isPostQC = /\bpostalign\b|\bpostqc\b/.test(command);
 
-                if (command && sample) {
-                    commands.alignment.push({
-                        sampleId: sample,
-                        command: command
+                    // Set autoToggle based on alignment status and auto-proceed toggle
+                    const shouldAutoToggle = autoToggle && sample.alignment_status &&
+                        sample.alignment_status.trim().toLowerCase() !== 'completed';
+
+                    if (shouldAutoToggle) {
+                        autoToggleSamples.set(sampleId, true);
+                    }
+
+                    commands.push({
+                        fastq_name: sample.fastq_name,
+                        command,
+                        alignment: !isPostQC,
+                        postqc: isPostQC,
+                        autoToggle: shouldAutoToggle,
+                        batch_name_from_vendor: sample.batch_name_from_vendor || '',
+                        workflow: workflow ? workflow.toLowerCase() : ''
                     });
                 }
             });
         });
 
-        // Get post-QC commands
+        // Post-QC commands
         const postQCBatchGroups = this.postQCBatches.querySelectorAll('.batch-group');
-        postQCBatchGroups.forEach((batchGroup, groupIndex) => {
+        postQCBatchGroups.forEach(batchGroup => {
+            const batchName = batchGroup.dataset.batchName || '';
             const cells = batchGroup.querySelectorAll('tr[data-sample]');
-            cells.forEach((row, index) => {
-                const sample = row.dataset.sample;
+            cells.forEach(row => {
+                const sampleId = row.dataset.sample;
                 let command = row.querySelector('.command-cell code')?.textContent?.trim();
-
                 if (!command) {
                     const commandInput = row.querySelector('.command-edit-form textarea[name="command"]');
                     if (commandInput) {
                         command = commandInput.value.trim();
                     }
                 }
-
                 if (!command) {
                     const generatedCommand = row.querySelector('.generated-command')?.textContent?.trim();
                     if (generatedCommand) {
                         command = generatedCommand;
                     }
                 }
+                if (command && sampleId) {
+                    let sample = this.postQCSamples.find(s => s.fastq_name === sampleId);
+                    if (!sample) sample = { batch_name_from_vendor: '', workflow: '', fastq_name: sampleId };
+                    const workflow = sample.workflow || this.determineWorkflow(sample);
 
-                if (command && sample) {
-                    commands.postQC.push({
-                        sampleId: sample,
-                        command: command
+                    // Use the autoToggleSamples map to determine if this sample should auto-proceed
+                    const shouldAutoToggle = autoToggleSamples.has(sampleId);
+
+                    commands.push({
+                        fastq_name: sample.fastq_name,
+                        command,
+                        alignment: false,
+                        postqc: true,
+                        autoToggle: shouldAutoToggle,
+                        batch_name_from_vendor: sample.batch_name_from_vendor || '',
+                        workflow: workflow ? workflow.toLowerCase() : ''
                     });
                 }
             });
         });
 
+        // Log the new storage data structure
+        console.log('Storage Data Structure:', { commands });
+
         // Hide the submit modal
         const modalInstance = bootstrap.Modal.getInstance(this.modal);
         if (modalInstance) {
             modalInstance.hide();
-
-            // Show the final commands modal immediately to reduce transition time
             setTimeout(() => {
                 if (window.pipelineFinalModal) {
-                    window.pipelineFinalModal.show(commands);
-
-                    // Add event listener to final modal to handle close/cancel
+                    window.pipelineFinalModal.show({ commands });
                     const finalModal = document.querySelector('.final-modal');
                     if (finalModal) {
                         const closeButtons = finalModal.querySelectorAll('.btn-close, .btn-cancel');
@@ -1822,14 +1846,11 @@ class PipelineSubmitModal {
                         });
                     }
                 }
-            }, 50); // Reduced from 300ms to 50ms
-
+            }, 50);
             return;
         }
-
-        // Fallback if modal instance not found
         if (window.pipelineFinalModal) {
-            window.pipelineFinalModal.show(commands);
+            window.pipelineFinalModal.show({ commands });
         }
     }
 

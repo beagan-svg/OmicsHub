@@ -451,7 +451,7 @@ class PipelineLocalData {
         if (clearToggle) {
             clearToggle.addEventListener('change', () => {
                 if (clearToggle.checked) {
-                    this.showToastNotification('Clearing selections...', 'info');
+                    this.showToastNotification('Clearing selections...', 'info', 1000);
                     this.clearStoredData();
                     setTimeout(() => {
                         clearToggle.checked = false;

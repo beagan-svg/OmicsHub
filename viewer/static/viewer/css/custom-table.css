@@ -1,0 +1,202 @@
+/* ==========================================================================
+   Custom Table Styles
+   ========================================================================== */
+
+/* Base Variables */
+:root {
+    --table-border-color: #dee2e6;
+    --table-header-bg: #f8f9fa;
+    --table-hover-bg: #f8f9fa;
+    --table-cell-padding: 0.75rem;
+    --table-border-radius: 8px;
+    --border-radius: 8px;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --transition-speed: 0.2s;
+}
+
+/* ==========================================================================
+   Table Container
+   ========================================================================== */
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ==========================================================================
+   Base Table Styles
+   ========================================================================== */
+
+.custom-table {
+    width: 100%;
+    margin-bottom: 0;
+    background-color: #fff;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* ==========================================================================
+   Table Header
+   ========================================================================== */
+
+.custom-table thead th {
+    background-color: var(--table-header-bg);
+    border-bottom: 2px solid var(--table-border-color);
+    padding: var(--table-cell-padding);
+    font-weight: 600;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+/* ==========================================================================
+   Table Body
+   ========================================================================== */
+
+.custom-table tbody tr {
+    transition: background-color var(--transition-speed);
+}
+
+.custom-table tbody tr:hover {
+    background-color: var(--table-hover-bg);
+}
+
+.custom-table tbody td {
+    padding: var(--table-cell-padding);
+    border-bottom: 1px solid var(--table-border-color);
+    vertical-align: middle;
+}
+
+/* ==========================================================================
+   Table Footer
+   ========================================================================== */
+
+.custom-table tfoot {
+    background-color: var(--table-header-bg);
+    font-weight: 600;
+}
+
+.custom-table tfoot td {
+    padding: var(--table-cell-padding);
+    border-top: 2px solid var(--table-border-color);
+}
+
+/* ==========================================================================
+   Special Columns
+   ========================================================================== */
+
+/* Fixed Width Columns */
+.fixed-width-column {
+    width: 120px;
+    min-width: 120px;
+    max-width: 120px;
+}
+
+/* Status Column */
+.status-column {
+    width: 100px;
+    text-align: center;
+}
+
+/* Action Column */
+.action-column {
+    width: 80px;
+    text-align: center;
+}
+
+/* ==========================================================================
+   Responsive Adjustments
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .table-container {
+        margin: 0 -15px;
+        border-radius: 0;
+    }
+
+    .custom-table {
+        font-size: 0.9rem;
+    }
+
+    .custom-table td,
+    .custom-table th {
+        padding: 0.5rem;
+    }
+}
+
+/* Remove vertical lines from tables */
+.table {
+    border-collapse: collapse;
+    border: none;
+}
+
+.table th,
+.table td {
+    border-left: none !important;
+    border-right: none !important;
+}
+
+/* Optional: Add horizontal lines only */
+.table thead th {
+    border-bottom: 2px solid #dee2e6;
+    border-top: none;
+}
+
+.table tbody td {
+    border-top: 1px solid #dee2e6;
+    border-bottom: none;
+}
+
+/* Ensure proper cell padding */
+.table th,
+.table td {
+    padding: 0.75rem;
+}
+
+/* Hover effect for rows */
+.table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* ==========================================================================
+   Custom Table Styles - Specific Extensions
+   ========================================================================== */
+
+/* ==========================================================================
+   Special Table Types
+   ========================================================================== */
+
+/* Specific styling for sample browser table */
+#sample-table,
+#samples-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#sample-table th,
+#sample-table td,
+#samples-table th,
+#samples-table td {
+    border-left: 0 !important;
+    border-right: 0 !important;
+}
+
+/* Remove any potential grid or cell borders */
+.table-bordered {
+    border: none;
+}
+
+.table-bordered th,
+.table-bordered td {
+    border: none;
+    border-top: 1px solid var(--table-border-color);
+}
+
+.table-bordered thead th {
+    border-bottom: 2px solid var(--table-border-color);
+    border-top: none;
+}

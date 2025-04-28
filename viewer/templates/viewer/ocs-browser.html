@@ -9,6 +9,7 @@
 <link rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@x.x.x/dist/select2-bootstrap4.min.css" />
 <link rel="stylesheet" href="{% static 'viewer/css/ocs-browser.css' %}" />
+<link rel="stylesheet" href="{% static 'viewer/css/filter.css' %}" />
 <style>
     .selection-column {
         width: 40px;
@@ -86,7 +87,7 @@
         <div class="col-12">
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Sample Browser</h5>
+                    <h5 class="mb-0 text-white">Sample Browser</h5>
                     <span class="badge bg-light text-dark">{{ current_page_count }} of {{ page_obj.paginator.count }}
                         samples</span>
                 </div>
