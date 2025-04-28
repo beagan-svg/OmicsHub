@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from django.core.paginator import Paginator
 from django.utils import timezone
-from viewer.core.models import Main, Metadata, LoadAssociation, Alignment, PostQC, SampleQueue
+from viewer.core.models import Main, Metadata, LoadAssociation, Alignment, PostQC, QueueJobs
 from viewer.utils.pipeline_utils import (
     load_pipeline_config, 
     count_running_jobs, 
@@ -612,11 +612,21 @@ class PipelineApiView:
             return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
         
         try:
+            # Update running jobs
             results = update_all_running_jobs()
+            
+            # Get fresh job counts
+            job_counts = count_running_jobs()
+            
+            # Store in cache for this user
+            user_id = getattr(request.user, 'id', 'anonymous')
+            cache.set(f'job_counts_{user_id}', job_counts, timeout=JOB_DATA_CACHE_TIMEOUT)
+            
             return JsonResponse({
                 'status': 'success',
                 'message': f'Updated {len(results)} jobs',
-                'results': results
+                'results': results,
+                'job_counts': job_counts
             })
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
@@ -733,7 +743,7 @@ def submit_samples(request):
                 
                 # Create or update queue entry
                 with transaction.atomic():
-                    queue_entry, created = SampleQueue.objects.get_or_create(
+                    queue_entry, created = QueueJobs.objects.get_or_create(
                         fastq_name=sample_name,
                         queue_type='alignment',
                         defaults={

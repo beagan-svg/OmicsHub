@@ -23,6 +23,29 @@ class JobMonitor {
     constructor() {
         console.log('Initializing Job Monitor...');
         this.initializeEventListeners();
+
+        // Initialize automatic data fetching
+        this.autoRefreshInterval = null;
+        this.autoRefreshTime = 30000; // 30 seconds
+
+        // Set progress bar width dynamically
+        this.setProgressBarWidth();
+    }
+
+    /**
+     * Sets the width of the progress bar based on the job_counts.total value
+     */
+    setProgressBarWidth() {
+        // Find the progress bar element
+        const progressBar = document.querySelector('.job-count-progress');
+        if (progressBar) {
+            // Get the value from the aria-valuenow attribute
+            const value = progressBar.getAttribute('aria-valuenow');
+            // Set the width directly using style
+            if (value !== null) {
+                progressBar.style.width = `${value}%`;
+            }
+        }
     }
 
     initializeEventListeners() {
@@ -33,30 +56,57 @@ class JobMonitor {
                 refreshJobsBtn.addEventListener('click', () => this.refreshJobs());
             }
 
-            // Set up view queue button
-            const viewQueueBtn = document.getElementById('view-queue-btn');
-            if (viewQueueBtn) {
-                viewQueueBtn.addEventListener('click', () => this.showQueueModal());
-            }
-
-            // Set up refresh queue button
-            const refreshQueueBtn = document.getElementById('refresh-queue');
-            if (refreshQueueBtn) {
-                refreshQueueBtn.addEventListener('click', () => this.fetchQueueData());
+            // Set up update all jobs button
+            const updateAllJobsBtn = document.getElementById('updateAllJobsBtn');
+            if (updateAllJobsBtn) {
+                updateAllJobsBtn.addEventListener('click', () => this.refreshJobs());
             }
 
             // Set up auto-refresh toggle
             const autoRefreshToggle = document.getElementById('autoRefreshToggle');
             if (autoRefreshToggle) {
-                let refreshInterval;
-                autoRefreshToggle.addEventListener('change', function () {
-                    if (this.checked) {
-                        refreshInterval = setInterval(() => jobMonitor.refreshJobs(), 30000);
+                autoRefreshToggle.addEventListener('change', () => {
+                    if (autoRefreshToggle.checked) {
+                        this.startAutoRefresh();
+                        this.showToastNotification('Auto-refresh enabled - updating every 30 seconds', 'info');
                     } else {
-                        clearInterval(refreshInterval);
+                        this.stopAutoRefresh();
+                        this.showToastNotification('Auto-refresh disabled', 'info');
                     }
                 });
             }
+
+            // Set up stop job confirmation
+            const confirmStopBtn = document.getElementById('confirmStopBtn');
+            if (confirmStopBtn) {
+                confirmStopBtn.addEventListener('click', () => {
+                    const demandId = confirmStopBtn.getAttribute('data-demand-id');
+                    if (demandId) {
+                        this.stopJob(demandId);
+                    }
+                });
+            }
+
+            // Set up check status buttons
+            document.addEventListener('click', (e) => {
+                // Check status button click
+                if (e.target.closest('.check-status-btn')) {
+                    const button = e.target.closest('.check-status-btn');
+                    const demandId = button.getAttribute('data-demand-id');
+                    if (demandId) {
+                        this.checkJobStatus(demandId);
+                    }
+                }
+
+                // Stop job button click
+                if (e.target.closest('.stop-job-btn')) {
+                    const button = e.target.closest('.stop-job-btn');
+                    const demandId = button.getAttribute('data-demand-id');
+                    if (demandId) {
+                        this.showStopJobConfirmation(demandId);
+                    }
+                }
+            });
 
             // Add modal cleanup handlers
             document.querySelectorAll('.modal').forEach(modalEl => {
@@ -71,7 +121,61 @@ class JobMonitor {
                     document.body.style.removeProperty('overflow');
                 });
             });
+
+            // Call setProgressBarWidth after DOM is fully loaded
+            this.setProgressBarWidth();
         });
+    }
+
+    /**
+     * Start auto-refresh interval
+     */
+    startAutoRefresh() {
+        this.stopAutoRefresh();
+        this.autoRefreshInterval = setInterval(() => {
+            this.refreshJobs();
+        }, this.autoRefreshTime);
+    }
+
+    /**
+     * Stop auto-refresh interval
+     */
+    stopAutoRefresh() {
+        if (this.autoRefreshInterval) {
+            clearInterval(this.autoRefreshInterval);
+            this.autoRefreshInterval = null;
+        }
+    }
+
+    /**
+     * Update the job statistics display
+     */
+    updateJobStatistics(jobCounts) {
+        // Update alignment jobs count
+        const alignCountElement = document.querySelector('.text-center h2:first-of-type');
+        if (alignCountElement) {
+            alignCountElement.textContent = jobCounts.align_count;
+        }
+
+        // Update post-QC jobs count
+        const postAlignCountElement = document.querySelector('.text-center h2:last-of-type');
+        if (postAlignCountElement) {
+            postAlignCountElement.textContent = jobCounts.post_align_count;
+        }
+
+        // Update total jobs count
+        const totalCountElement = document.querySelector('.text-center h3');
+        if (totalCountElement) {
+            totalCountElement.textContent = jobCounts.total;
+        }
+
+        // Update progress bar
+        const progressBar = document.querySelector('.job-count-progress');
+        if (progressBar) {
+            progressBar.style.width = `${jobCounts.total}%`;
+            progressBar.setAttribute('aria-valuenow', jobCounts.total);
+            progressBar.textContent = `${jobCounts.total}%`;
+        }
     }
 
     /**
@@ -79,340 +183,270 @@ class JobMonitor {
      */
     refreshJobs() {
         const refreshBtn = document.getElementById('refreshJobsBtn');
+        const updateAllBtn = document.getElementById('updateAllJobsBtn');
+
+        // Disable both buttons and show spinners while refreshing
         if (refreshBtn) {
-            // Disable button and show spinner while refreshing
             refreshBtn.disabled = true;
             refreshBtn.querySelector('.refresh-icon').classList.add('d-none');
             refreshBtn.querySelector('.refresh-spinner').classList.remove('d-none');
         }
 
-        fetch('/pipeline/api/update_all_jobs/', {
+        if (updateAllBtn) {
+            updateAllBtn.disabled = true;
+            updateAllBtn.querySelector('.refresh-icon').classList.add('d-none');
+            updateAllBtn.querySelector('.refresh-spinner').classList.remove('d-none');
+        }
+
+        // Show toast notification that update is in progress
+        this.showToastNotification('Updating job statuses...', 'info', 2000);
+
+        // First update all jobs
+        fetch('/api/pipeline/update_all_jobs/', {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken'),
                 'Content-Type': 'application/json'
             }
         })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.status === 'success') {
-                    this.showToastNotification('Jobs refreshed successfully', 'success');
-
-                    // Reload page to show updated job statuses
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
-                } else {
-                    this.showToastNotification(`Error: ${data.message || 'Failed to refresh jobs'}`, 'danger');
-
-                    // Re-enable button on error
-                    if (refreshBtn) {
-                        refreshBtn.disabled = false;
-                        refreshBtn.querySelector('.refresh-icon').classList.remove('d-none');
-                        refreshBtn.querySelector('.refresh-spinner').classList.add('d-none');
+                    // Update job statistics with the new counts
+                    if (data.job_counts) {
+                        this.updateJobStatistics(data.job_counts);
                     }
+
+                    // Now fetch the updated job data
+                    return fetch('/api/pipeline/get-job-data/', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                } else {
+                    throw new Error(data.message || 'Failed to update jobs');
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    // Update the running jobs table
+                    this.updateRunningJobsTable(data.running_jobs);
+                    // Update the completed jobs table
+                    this.updateCompletedJobsTable(data.completed_jobs);
+
+                    this.showToastNotification('Jobs refreshed successfully', 'success');
+                } else {
+                    throw new Error(data.message || 'Failed to fetch updated job data');
                 }
             })
             .catch(error => {
                 console.error('Error updating jobs:', error);
-                this.showToastNotification('Network error while refreshing jobs', 'danger');
-
-                // Re-enable button on error
-                if (refreshBtn) {
-                    refreshBtn.disabled = false;
-                    refreshBtn.querySelector('.refresh-icon').classList.remove('d-none');
-                    refreshBtn.querySelector('.refresh-spinner').classList.add('d-none');
-                }
-            });
-    }
-
-    /**
-     * Shows the queue modal and populates it with data
-     */
-    showQueueModal() {
-        // Fetch and display queue data
-        this.fetchQueueData();
-
-        // Show the modal
-        const queueModal = new bootstrap.Modal(document.getElementById('queue-modal'));
-        queueModal.show();
-    }
-
-    /**
-     * Fetches queue data from the API
-     */
-    fetchQueueData() {
-        // Show loading indicators
-        document.getElementById('alignment-queue-body').innerHTML = '<tr><td colspan="7" class="text-center">Loading queue data...</td></tr>';
-        document.getElementById('postqc-queue-body').innerHTML = '<tr><td colspan="7" class="text-center">Loading queue data...</td></tr>';
-
-        // Fetch data from API
-        fetch('/api/pipeline/get-queue-data/', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    // Update alignment queue
-                    this.displayQueueData(
-                        data.alignment_queue,
-                        'alignment-queue-body',
-                        'alignment-count'
-                    );
-
-                    // Update post-QC queue
-                    this.displayQueueData(
-                        data.postqc_queue,
-                        'postqc-queue-body',
-                        'postqc-count'
-                    );
-                } else {
-                    this.showToastNotification(`Error fetching queue data: ${data.message}`, 'danger');
-                }
+                this.showToastNotification('Error refreshing jobs: ' + error.message, 'danger');
             })
-            .catch(error => {
-                console.error('Error fetching queue data:', error);
-                this.showToastNotification('Error fetching queue data from server', 'danger');
+            .finally(() => {
+                // Reset button states
+                this.resetButtonStates(refreshBtn, updateAllBtn);
             });
     }
 
     /**
-     * Displays queue data in the specified table body
+     * Update the running jobs table
      */
-    displayQueueData(queueItems, tableBodyId, countId) {
-        const tableBody = document.getElementById(tableBodyId);
-        const countBadge = document.getElementById(countId);
-
+    updateRunningJobsTable(runningJobs) {
+        const tableBody = document.querySelector('#running-jobs-table tbody');
         if (!tableBody) return;
 
-        // Update count badge
-        if (countBadge) {
-            countBadge.textContent = queueItems.length;
-        }
-
-        // Clear table
-        tableBody.innerHTML = '';
-
-        if (queueItems.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No items in queue</td></tr>';
+        if (runningJobs.length === 0) {
+            // Show no jobs message
+            const container = document.querySelector('#running-jobs-table').parentElement.parentElement;
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    No jobs are currently running.
+                </div>
+            `;
             return;
         }
 
-        // Add rows for each queue item
-        queueItems.forEach(item => {
-            // Parse metadata if available
-            let metadata = {};
-            if (item.metadata) {
-                try {
-                    metadata = JSON.parse(item.metadata);
-                } catch (e) {
-                    console.error('Error parsing metadata JSON:', e);
-                }
-            }
+        // Update running jobs count badge
+        const runningJobsBadge = document.querySelector('.card-header .badge');
+        if (runningJobsBadge) {
+            runningJobsBadge.textContent = runningJobs.length;
+        }
 
-            // Create badge based on status
-            let statusBadge = '';
-            switch (item.status) {
-                case 'pending':
-                    statusBadge = '<span class="badge bg-secondary">Pending</span>';
-                    break;
-                case 'submitted':
-                    statusBadge = '<span class="badge bg-info">Submitted</span>';
-                    break;
-                case 'running':
-                    statusBadge = '<span class="badge bg-warning">Running</span>';
-                    break;
-                case 'completed':
-                    statusBadge = '<span class="badge bg-success">Completed</span>';
-                    break;
-                case 'failed':
-                    statusBadge = '<span class="badge bg-danger">Failed</span>';
-                    break;
-                default:
-                    statusBadge = `<span class="badge bg-secondary">${item.status}</span>`;
-            }
+        // Clear existing rows
+        tableBody.innerHTML = '';
 
-            // Format dates
-            const addedTime = new Date(item.added_time).toLocaleString();
-            const startTime = item.start_time ? new Date(item.start_time).toLocaleString() : '-';
-
-            // Create row
+        // Add new rows
+        runningJobs.forEach(job => {
             const row = document.createElement('tr');
+            row.className = 'running-job';
+            row.setAttribute('data-demand-id', job.demand_id);
+
             row.innerHTML = `
-                <td>${item.fastq_name}</td>
-                <td><span class="badge ${item.workflow === 'MTX' ? 'bg-info' : 'bg-primary'}">${item.workflow}</span></td>
-                <td>${statusBadge}</td>
-                <td>${item.demand_id || '-'}</td>
-                <td>${addedTime}</td>
-                <td>${startTime}</td>
+                <td>${job.fastq_name}</td>
+                <td><span class="text-monospace">${job.demand_id}</span></td>
                 <td>
-                    <div class="btn-group btn-group-sm">
-                        <button type="button" class="btn btn-outline-info btn-sm view-details-btn" 
-                                data-fastq="${item.fastq_name}" data-bs-toggle="tooltip" title="View Details">
-                            <i class="bi bi-info-circle"></i>
-                        </button>
-                        <button type="button" class="btn btn-outline-primary btn-sm refresh-status-btn"
-                                data-fastq="${item.fastq_name}" data-demand-id="${item.demand_id || ''}" data-bs-toggle="tooltip" title="Refresh Status">
-                            <i class="bi bi-arrow-repeat"></i>
-                        </button>
-                    </div>
+                    <span class="badge workflow-badge ${job.workflow === 'MTX' ? 'badge-mtx' : 'bg-primary'}">
+                        ${job.workflow}
+                    </span>
+                </td>
+                <td>${job.organism}</td>
+                <td>${job.batch}</td>
+                <td>${new Date(job.start_time).toLocaleString()}</td>
+                <td class="job-status">
+                    ${this.getStatusBadgeHTML(job.status)}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary check-status-btn" data-demand-id="${job.demand_id}">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger stop-job-btn" data-demand-id="${job.demand_id}">
+                        <i class="bi bi-stop-fill"></i>
+                    </button>
                 </td>
             `;
+
             tableBody.appendChild(row);
-
-            // Add event listeners for the buttons
-            const viewDetailsBtn = row.querySelector('.view-details-btn');
-            if (viewDetailsBtn) {
-                viewDetailsBtn.addEventListener('click', () => {
-                    this.showSampleDetails(item, metadata);
-                });
-            }
-
-            const refreshStatusBtn = row.querySelector('.refresh-status-btn');
-            if (refreshStatusBtn) {
-                refreshStatusBtn.addEventListener('click', () => {
-                    this.refreshSampleStatus(item.fastq_name, item.demand_id);
-                });
-            }
         });
 
-        // Initialize tooltips
-        const tooltips = [].slice.call(tableBody.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltips.map(function (tooltipNode) {
-            return new bootstrap.Tooltip(tooltipNode);
-        });
+        // Reattach event listeners
+        this.attachJobActionListeners();
     }
 
     /**
-     * Shows sample details in a modal
+     * Update the completed jobs table
      */
-    showSampleDetails(item, metadata) {
-        // Create modal for displaying sample details
-        const modalId = 'sample-details-modal';
-        let detailsModal = document.getElementById(modalId);
+    updateCompletedJobsTable(completedJobs) {
+        const tableBody = document.querySelector('#completed-jobs-table tbody');
+        if (!tableBody) return;
 
-        // Remove existing modal if present
-        if (detailsModal) {
-            document.body.removeChild(detailsModal);
-        }
-
-        // Determine workflow from batch name
-        const workflow = item.workflow || this.determineWorkflow(metadata.batch_name_from_vendor || '');
-
-        // Format the command for display with line breaks
-        let formattedCommand = '';
-        if (item.command) {
-            formattedCommand = item.command.replace(/\n/g, '<br>');
-        }
-
-        // Create details modal
-        detailsModal = document.createElement('div');
-        detailsModal.id = modalId;
-        detailsModal.className = 'modal fade';
-        detailsModal.setAttribute('tabindex', '-1');
-        detailsModal.setAttribute('aria-hidden', 'true');
-
-        detailsModal.innerHTML = `
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Sample Details: ${item.fastq_name}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <h6>Status Information</h6>
-                                <table class="table table-sm table-bordered">
-                                    <tr>
-                                        <th>Workflow:</th>
-                                        <td><span class="badge ${workflow === 'MTX' ? 'bg-info' : 'bg-primary'}">${workflow}</span></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Status:</th>
-                                        <td>${item.status || 'Unknown'}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Demand ID:</th>
-                                        <td>${item.demand_id || 'Not yet assigned'}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Added:</th>
-                                        <td>${new Date(item.added_time).toLocaleString()}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Started:</th>
-                                        <td>${item.start_time ? new Date(item.start_time).toLocaleString() : 'Not started'}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                            <div class="col-md-6">
-                                <h6>Sample Metadata</h6>
-                                <table class="table table-sm table-bordered">
-                                    <tr>
-                                        <th>FASTQ Name:</th>
-                                        <td>${metadata.fastq_name || item.fastq_name}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Organism:</th>
-                                        <td>${metadata.organism_common_name || 'Unknown'}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Batch:</th>
-                                        <td>${metadata.batch_name_from_vendor || 'Unknown'}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Load Name:</th>
-                                        <td>${metadata.load_name || 'Unknown'}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Library Prep Method:</th>
-                                        <td>${metadata.library_prep_method || 'Unknown'}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
-                        
-                        <h6>Command</h6>
-                        <div class="border rounded p-2 bg-light">
-                            <pre class="mb-0"><code>${formattedCommand || 'Command not available'}</code></pre>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
+        if (completedJobs.length === 0) {
+            // Show no jobs message
+            const container = document.querySelector('#completed-jobs-table').parentElement.parentElement;
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    No jobs have been submitted and processed through this application yet. Once you submit jobs,
+                    they will appear here after completion.
                 </div>
-            </div>
-        `;
+            `;
+            return;
+        }
 
-        document.body.appendChild(detailsModal);
+        // Update completed jobs count badge
+        const completedJobsBadge = document.querySelector('.card-header .badge');
+        if (completedJobsBadge) {
+            completedJobsBadge.textContent = completedJobs.length;
+        }
 
-        // Initialize and show Bootstrap modal
-        const bsModal = new bootstrap.Modal(detailsModal);
-        bsModal.show();
+        // Clear existing rows
+        tableBody.innerHTML = '';
+
+        // Add new rows
+        completedJobs.forEach(job => {
+            const row = document.createElement('tr');
+            row.setAttribute('data-demand-id', job.demand_id);
+            row.className = job.status === 'FAILED' ? 'table-danger' :
+                job.status === 'ABORTED' ? 'table-secondary' : '';
+
+            row.innerHTML = `
+                <td>${job.fastq_name}</td>
+                <td><span class="text-monospace">${job.demand_id}</span></td>
+                <td>
+                    <span class="badge workflow-badge ${job.workflow === 'MTX' ? 'badge-mtx' : 'bg-primary'}">
+                        ${job.workflow}
+                    </span>
+                </td>
+                <td>${new Date(job.start_time).toLocaleString()}</td>
+                <td>${job.end_time ? new Date(job.end_time).toLocaleString() : ''}</td>
+                <td>${job.duration}</td>
+                <td class="job-status">
+                    ${this.getStatusBadgeHTML(job.status)}
+                </td>
+            `;
+
+            tableBody.appendChild(row);
+        });
     }
 
     /**
-     * Refreshes the status of a specific sample
+     * Helper method to reset button states
      */
-    refreshSampleStatus(fastqName, demandId) {
-        // Show toast notification
-        this.showToastNotification(`Refreshing status for ${fastqName}...`, 'info');
-
-        // Determine which endpoint to use based on available info
-        let url = '/api/pipeline/check-alignment-status/';
-        if (demandId) {
-            url += `?demand_id=${demandId}`;
-        } else {
-            url += `?fastq_name=${fastqName}`;
+    resetButtonStates(refreshBtn, updateAllBtn) {
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.querySelector('.refresh-icon').classList.remove('d-none');
+            refreshBtn.querySelector('.refresh-spinner').classList.add('d-none');
         }
 
-        // Fetch updated status
-        fetch(url, {
+        if (updateAllBtn) {
+            updateAllBtn.disabled = false;
+            updateAllBtn.querySelector('.refresh-icon').classList.remove('d-none');
+            updateAllBtn.querySelector('.refresh-spinner').classList.add('d-none');
+        }
+    }
+
+    /**
+     * Helper method to get status badge HTML
+     */
+    getStatusBadgeHTML(status) {
+        const statusMap = {
+            'SUBMITTED': ['info', 'Submitted'],
+            'IN_PROGRESS': ['primary', 'Running'],
+            'COMPLETED': ['success', 'Completed'],
+            'FAILED': ['danger', 'Failed'],
+            'ABORTED': ['secondary', 'Aborted']
+        };
+
+        const [type, label] = statusMap[status] || ['secondary', status];
+        return `<span class="badge bg-${type} status-badge">${label}</span>`;
+    }
+
+    /**
+     * Reattach event listeners for job action buttons
+     */
+    attachJobActionListeners() {
+        // Attach check status button listeners
+        document.querySelectorAll('.check-status-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const demandId = btn.getAttribute('data-demand-id');
+                if (demandId) {
+                    this.checkJobStatus(demandId);
+                }
+            });
+        });
+
+        // Attach stop job button listeners
+        document.querySelectorAll('.stop-job-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const demandId = btn.getAttribute('data-demand-id');
+                if (demandId) {
+                    this.showStopJobConfirmation(demandId);
+                }
+            });
+        });
+    }
+
+    /**
+     * Check status of a specific job
+     */
+    checkJobStatus(demandId) {
+        this.showToastNotification(`Checking status for demand ID: ${demandId}`, 'info');
+
+        fetch(`/api/pipeline/check-alignment-status/?demand_id=${demandId}`, {
             method: 'GET',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken')
@@ -421,36 +455,156 @@ class JobMonitor {
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    this.showToastNotification(`Status updated: ${data.job_status || 'Unknown'}`, 'success');
+                    // Show status in the status update modal
+                    const modalBody = document.querySelector('#statusUpdateModal .job-status-details');
+                    if (modalBody) {
+                        modalBody.innerHTML = `
+                            <div class="alert alert-${this.getAlertClass(data.job_status)} mb-3">
+                                <strong>Current Status:</strong> ${data.job_status}
+                            </div>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>FASTQ Name:</th>
+                                    <td>${data.fastq_name || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <th>Demand ID:</th>
+                                    <td>${demandId}</td>
+                                </tr>
+                                <tr>
+                                    <th>Start Time:</th>
+                                    <td>${data.start_time || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <th>End Time:</th>
+                                    <td>${data.end_time || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <th>Duration:</th>
+                                    <td>${data.duration || 'N/A'}</td>
+                                </tr>
+                            </table>
+                        `;
 
-                    // Refresh queue data to show updated status
-                    this.fetchQueueData();
+                        // Show the modal
+                        const statusModal = new bootstrap.Modal(document.getElementById('statusUpdateModal'));
+                        statusModal.show();
+                    }
+
+                    // Update job status in the table
+                    const statusCell = document.querySelector(`tr[data-demand-id="${demandId}"] .job-status`);
+                    if (statusCell) {
+                        statusCell.innerHTML = this.getStatusBadgeHTML(data.job_status);
+                    }
+
+                    this.showToastNotification(`Status updated: ${data.job_status}`, 'success');
                 } else {
                     this.showToastNotification(`Error: ${data.message}`, 'danger');
                 }
             })
             .catch(error => {
-                console.error('Error refreshing status:', error);
-                this.showToastNotification('Error refreshing sample status', 'danger');
+                console.error('Error checking job status:', error);
+                this.showToastNotification('Network error while checking job status', 'danger');
             });
     }
 
     /**
-     * Determines workflow type based on batch name
+     * Show stop job confirmation modal
      */
-    determineWorkflow(batchName) {
-        if (!batchName) {
-            return 'RTX';  // Default to RTX if no batch name
-        }
+    showStopJobConfirmation(demandId) {
+        const jobRow = document.querySelector(`tr[data-demand-id="${demandId}"]`);
+        if (jobRow) {
+            const fastqName = jobRow.cells[0].textContent.trim();
+            const workflow = jobRow.cells[2].textContent.trim();
 
-        const batchNameUpper = batchName.toUpperCase();
+            const jobInfo = document.querySelector('#confirmStopModal .job-info');
+            if (jobInfo) {
+                jobInfo.innerHTML = `
+                    <div class="alert alert-secondary">
+                        <strong>FASTQ Name:</strong> ${fastqName}<br>
+                        <strong>Workflow:</strong> ${workflow}<br>
+                        <strong>Demand ID:</strong> ${demandId}
+                    </div>
+                `;
+            }
 
-        if (batchNameUpper.startsWith('MTX') || batchNameUpper.includes('ATX')) {
-            return 'MTX';
-        } else if (batchNameUpper.startsWith('RTX')) {
-            return 'RTX';
+            // Set demand ID on confirm button
+            const confirmBtn = document.getElementById('confirmStopBtn');
+            if (confirmBtn) {
+                confirmBtn.setAttribute('data-demand-id', demandId);
+            }
+
+            // Show the modal
+            const confirmModal = new bootstrap.Modal(document.getElementById('confirmStopModal'));
+            confirmModal.show();
         } else {
-            return 'RTX';  // Default to RTX for unrecognized patterns
+            this.showToastNotification('Could not find job information', 'danger');
+        }
+    }
+
+    /**
+     * Stop a running job
+     */
+    stopJob(demandId) {
+        this.showToastNotification(`Stopping job with demand ID: ${demandId}`, 'warning');
+
+        fetch('/api/pipeline/stop-alignment/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ demand_id: demandId })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    this.showToastNotification('Job stopped successfully', 'success');
+
+                    // Update job status in the table
+                    const statusCell = document.querySelector(`tr[data-demand-id="${demandId}"] .job-status`);
+                    if (statusCell) {
+                        statusCell.innerHTML = '<span class="badge bg-secondary status-badge">Aborted</span>';
+                    }
+
+                    // Hide the modal
+                    const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmStopModal'));
+                    if (confirmModal) {
+                        confirmModal.hide();
+                    }
+
+                    // Reload page after a short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    this.showToastNotification(`Error: ${data.message}`, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error stopping job:', error);
+                this.showToastNotification('Network error while stopping job', 'danger');
+            });
+    }
+
+    /**
+     * Get alert class for status
+     */
+    getAlertClass(status) {
+        switch (status.toUpperCase()) {
+            case 'COMPLETED':
+                return 'success';
+            case 'RUNNING':
+            case 'IN_PROGRESS':
+                return 'primary';
+            case 'SUBMITTED':
+                return 'info';
+            case 'FAILED':
+                return 'danger';
+            case 'ABORTED':
+                return 'secondary';
+            default:
+                return 'secondary';
         }
     }
 

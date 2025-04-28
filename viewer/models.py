@@ -16,5 +16,5 @@ from viewer.core.models import (
     Alignment, 
     PostQC, 
     Ingest,
-    SampleQueue
+    QueueJobs
 ) 

@@ -116,13 +116,72 @@ class UserPreferences(models.Model):
     class Meta:
         db_table = 'user_preferences'
 
-class SampleQueue(models.Model):
-    """Model for storing samples in processing queue"""
-    QUEUE_TYPES = [
-        ('alignment', 'Alignment Queue'),
-        ('postqc', 'Post-QC Queue')
+class QueueJobs(models.Model):
+    STATUS_CHOICES = [
+        ('Ready', 'Ready'),
+        ('Running', 'Running'),
+        ('Completed', 'Completed'),
+        ('Failed', 'Failed'),
+        ('Cancelled', 'Cancelled')
     ]
+
+    fastq_name = models.CharField(max_length=255, primary_key=True)
+    alignment_command = models.TextField(null=True, blank=True)
+    postqc_command = models.TextField(null=True, blank=True)
+    time = models.DateTimeField(default=timezone.now)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Ready')
     
+    class Meta:
+        db_table = 'queue_jobs'
+        ordering = ['-time']
+    
+    def __str__(self):
+        return self.fastq_name
+
+class InProgressSamples(models.Model):
+    fastq_name = models.CharField(max_length=255, primary_key=True)
+    alignment_command = models.TextField(null=True, blank=True)
+    postqc_command = models.TextField(null=True, blank=True)
+    time = models.DateTimeField(default=timezone.now)
+    alignment_attempts = models.IntegerField(default=0)
+    postqc_attempts = models.IntegerField(default=0)
+    alignment_demand_id = models.CharField(max_length=255, null=True, blank=True)
+    postqc_demand_id = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        db_table = 'in_progress_samples'
+        ordering = ['-time']
+
+    def __str__(self):
+        return f"{self.fastq_name} (In Progress at {self.time})"
+
+class RunningJob(models.Model):
+    fastq_name = models.CharField(max_length=255, primary_key=True)
+    alignment_command = models.TextField()
+    postqc_command = models.TextField()
+    time = models.DateTimeField(auto_now_add=True)
+    alignment_attempts = models.IntegerField(default=0)
+    postqc_attempts = models.IntegerField(default=0)
+    alignment_demand_id = models.CharField(max_length=255, null=True, blank=True)
+    postqc_demand_id = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        db_table = 'running_jobs'
+
+class FailedJob(models.Model):
+    fastq_name = models.CharField(max_length=255, primary_key=True)
+    alignment_command = models.TextField()
+    postqc_command = models.TextField()
+    time = models.DateTimeField(auto_now_add=True)
+    alignment_attempts = models.IntegerField(default=0)
+    postqc_attempts = models.IntegerField(default=0)
+    alignment_demand_id = models.CharField(max_length=255, null=True, blank=True)
+    postqc_demand_id = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        db_table = 'failed_jobs'
+
+class CompletedJob(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('submitted', 'Submitted'),
@@ -131,31 +190,17 @@ class SampleQueue(models.Model):
         ('failed', 'Failed'),
         ('cancelled', 'Cancelled')
     ]
-    
-    fastq_name = models.CharField(max_length=255)
-    queue_type = models.CharField(max_length=20, choices=QUEUE_TYPES)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    workflow = models.CharField(max_length=20, null=True, blank=True)
-    command = models.TextField(blank=True)
-    demand_id = models.CharField(max_length=255, null=True, blank=True)
-    metadata = models.JSONField(null=True, blank=True)
-    added_time = models.DateTimeField(default=timezone.now)
-    start_time = models.DateTimeField(null=True, blank=True)
-    
+
+    fastq_name = models.CharField(max_length=255, primary_key=True)
+    alignment_command = models.TextField()
+    postqc_command = models.TextField()
+    time = models.DateTimeField(auto_now_add=True)
+    alignment_attempts = models.IntegerField(default=0)
+    postqc_attempts = models.IntegerField(default=0)
+    alignment_demand_id = models.CharField(max_length=255, null=True, blank=True)
+    postqc_demand_id = models.CharField(max_length=255, null=True, blank=True)
+    alignment_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
+    postqc_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
+
     class Meta:
-        unique_together = ('fastq_name', 'queue_type')
-        ordering = ['added_time']
-    
-    def __str__(self):
-        return f"{self.fastq_name} ({self.queue_type})"
-        
-    @property
-    def metadata_dict(self):
-        """Return the metadata as a dictionary."""
-        if not self.metadata:
-            return {}
-        try:
-            import json
-            return json.loads(self.metadata)
-        except:
-            return {} 
+        db_table = 'completed_jobs' 

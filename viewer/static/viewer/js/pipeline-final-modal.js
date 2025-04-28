@@ -352,6 +352,78 @@ class PipelineFinalModal {
     executeSubmission() {
         this.log('Executing submission with commands', this.commands);
 
+        // Build the requested data structure
+        // 1. Group by fastq_name
+        const alignmentMap = new Map();
+        const postqcMap = new Map();
+        (this.commands || []).forEach(cmd => {
+            if (cmd.alignment) alignmentMap.set(cmd.fastq_name, cmd.command);
+            if (cmd.postqc) postqcMap.set(cmd.fastq_name, cmd.command);
+        });
+        // 2. Union of all fastq_names
+        const allFastqNames = Array.from(new Set([
+            ...alignmentMap.keys(),
+            ...postqcMap.keys()
+        ]));
+        // 3. Build array
+        const now = new Date();
+        const nowStr = now.toLocaleString();
+        const result = allFastqNames.map(fastq_name => {
+            const hasAlignment = alignmentMap.has(fastq_name);
+            const hasPostQC = postqcMap.has(fastq_name);
+            const status = (hasAlignment && hasPostQC) ? 'Pending' : 'Ready';
+
+            return {
+                'Fastq Name': fastq_name,
+                'Alignment Command': alignmentMap.get(fastq_name) || '',
+                'PostQC Command': postqcMap.get(fastq_name) || '',
+                'Current Day and Time': nowStr,
+                'Status': status
+            };
+        });
+        // 4. Print to console
+        console.log('[FinalModal][DEBUG] Submission Data Structure:', result);
+
+        // Send to backend API
+        fetch('/api/queue/import/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCsrfToken()
+            },
+            body: JSON.stringify({ queue: result })
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log('[FinalModal][DEBUG] Queue import response:', data);
+
+                // Only clear samples that were successfully queued
+                if (data.status === 'success' && window.pipelineLocalData) {
+                    // Check if removeSubmittedSamples exists and use it to remove specific samples
+                    if (typeof window.pipelineLocalData.removeSubmittedSamples === 'function') {
+                        window.pipelineLocalData.removeSubmittedSamples(allFastqNames);
+                    } else {
+                        // Fall back to clearing all data if precise removal isn't available
+                        window.pipelineLocalData.clearStoredData();
+                    }
+
+                    // Show success notification if available
+                    if (typeof window.pipelineLocalData.showToastNotification === 'function') {
+                        window.pipelineLocalData.showToastNotification('Samples successfully queued for processing', 'success');
+                    }
+
+                    // Redirect to queue management page
+                    window.location.href = '/pipeline/queue/';
+                }
+            })
+            .catch(error => {
+                console.error('[FinalModal][ERROR] Queue import failed:', error);
+                // Show error notification if available
+                if (window.pipelineLocalData && typeof window.pipelineLocalData.showToastNotification === 'function') {
+                    window.pipelineLocalData.showToastNotification('Failed to queue samples for processing', 'danger');
+                }
+            });
+
         // Hide the modal
         this.hide();
 
@@ -360,6 +432,16 @@ class PipelineFinalModal {
             detail: { commands: this.commands }
         });
         document.dispatchEvent(event);
+    }
+
+    /**
+     * Get the CSRF token from the cookie
+     * @returns {string} CSRF token
+     */
+    getCsrfToken() {
+        const name = 'csrftoken';
+        const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return match ? match[2] : '';
     }
 
     /**

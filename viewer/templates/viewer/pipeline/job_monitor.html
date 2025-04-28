@@ -6,162 +6,31 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'viewer/css/pipeline.css' %}">
-<style>
-    .job-card {
-        transition: all 0.2s ease;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .job-card .card-body {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem;
-    }
-
-    .job-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    .job-card .card-title {
-        margin-top: 0.5rem !important;
-        margin-bottom: 0.5rem;
-        font-size: 1.1rem;
-    }
-
-    .job-card .card-text {
-        margin-bottom: 0.75rem;
-        font-size: 0.9rem;
-        flex-grow: 1;
-        display: flex;
-        align-items: center;
-    }
-
-    .job-card .btn {
-        width: 100%;
-        padding: 0.25rem 0.75rem;
-        font-size: 0.875rem;
-    }
-
-    .job-card i {
-        font-size: 1.5rem !important;
-    }
-
-    /* Actions container and cards spacing */
-    .card-header {
-        padding: 0.75rem 1rem;
-    }
-
-    .card-body {
-        padding: 1rem;
-    }
-
-    .card-body .row {
-        margin: 0.5rem -0.5rem;
-    }
-
-    .card-body .col-md-4 {
-        padding: 0.5rem;
-    }
-
-    /* Job Statistics Card */
-    .card-header h5 {
-        margin-bottom: 0;
-        font-size: 1.1rem;
-    }
-
-    /* Statistics text sizes */
-    .text-center h2 {
-        font-size: 1.75rem;
-        margin-bottom: 0.25rem;
-    }
-
-    .text-center h3 {
-        font-size: 1.5rem;
-        margin-bottom: 0.25rem;
-    }
-
-    .text-center .text-muted {
-        font-size: 0.875rem;
-    }
-
-    .job-status {
-        width: 100px;
-    }
-
-    .status-badge {
-        width: 100%;
-        display: inline-block;
-        text-align: center;
-    }
-
-    .auto-refresh-toggle {
-        cursor: pointer;
-    }
-
-    /* Refresh button styles */
-    #refreshJobsBtn {
-        position: relative;
-        min-width: 120px;
-    }
-
-    #refreshJobsBtn .refresh-spinner,
-    #refreshJobsBtn .refresh-icon {
-        transition: opacity 0.2s ease;
-    }
-
-    #refreshJobsBtn .refresh-spinner {
-        margin-right: 8px;
-    }
-
-    #refreshJobsBtn:disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-    }
-
-    /* Progress indicator styles */
-    #updateProgress {
-        transition: all 0.3s ease;
-    }
-
-    #updateProgress.d-none {
-        display: none !important;
-    }
-
-    /* Progress bar container adjustments */
-    .progress {
-        margin-bottom: 0.25rem;
-    }
-</style>
+<link rel="stylesheet" href="{% static 'viewer/css/job-monitor.css' %}">
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
+    <!-- Header Section -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">Pipeline Job Monitor</h4>
                     <div>
-                        <a href="{% url 'viewer:pipeline_dashboard' %}" class="btn btn-light">
+                        <a href="{% url 'viewer:pipeline_dashboard' %}" class="btn btn-light btn-sm">
                             <i class="bi bi-arrow-left"></i> Back to Dashboard
                         </a>
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
                         <p class="lead mb-0">
-                            Monitor and manage running alignment jobs
+                            Monitor and manage pipeline jobs and queues
                         </p>
                         <div class="d-flex align-items-center">
                             <div class="form-check form-switch me-3">
-                                <input class="form-check-input auto-refresh-toggle" type="checkbox"
-                                    id="autoRefreshToggle">
+                                <input class="form-check-input" type="checkbox" id="autoRefreshToggle">
                                 <label class="form-check-label" for="autoRefreshToggle">Auto Refresh</label>
                             </div>
                             <button class="btn btn-outline-primary" id="refreshJobsBtn">
@@ -171,7 +40,6 @@
                             </button>
                         </div>
                     </div>
-                    <!-- Progress Indicator -->
                     <div id="updateProgress" class="alert alert-info d-none mt-3">
                         <div class="d-flex align-items-center">
                             <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
@@ -183,7 +51,9 @@
         </div>
     </div>
 
+    <!-- Dashboard Overview -->
     <div class="row mb-4">
+        <!-- Statistics Card -->
         <div class="col-md-4 mb-4 mb-md-0">
             <div class="card h-100">
                 <div class="card-header bg-light">
@@ -193,13 +63,13 @@
                     <div class="row">
                         <div class="col-6">
                             <div class="text-center mb-3">
-                                <h2 class="mb-0">{{ job_counts.align_count }}</h2>
+                                <h2 class="mb-0">{{ job_counts.align_count|default:0 }}</h2>
                                 <small class="text-muted">Alignment Jobs</small>
                             </div>
                         </div>
                         <div class="col-6">
                             <div class="text-center mb-3">
-                                <h2 class="mb-0">{{ job_counts.post_align_count }}</h2>
+                                <h2 class="mb-0">{{ job_counts.post_align_count|default:0 }}</h2>
                                 <small class="text-muted">Post-QC Jobs</small>
                             </div>
                         </div>
@@ -207,13 +77,14 @@
                     <div class="row">
                         <div class="col-12">
                             <div class="text-center mb-3">
-                                <h3 class="mb-0">{{ job_counts.total }}</h3>
+                                <h3 class="mb-0">{{ job_counts.total|default:0 }}</h3>
                                 <small class="text-muted">Total Running Jobs</small>
                             </div>
-                            <div class="progress" style="height: 10px;">
-                                <div class="progress-bar bg-primary" role="progressbar"
-                                    style="width: {{ job_counts.total }}%;" aria-valuenow="{{ job_counts.total }}"
-                                    aria-valuemin="0" aria-valuemax="100">{{ job_counts.total }}%</div>
+                            <div class="progress">
+                                <div class="progress-bar bg-primary job-count-progress" role="progressbar"
+                                    aria-valuenow="{% if job_counts.total %}{{ job_counts.total }}{% else %}0{% endif %}"
+                                    aria-valuemin="0" aria-valuemax="100">
+                                    {% if job_counts.total %}{{ job_counts.total }}{% else %}0{% endif %}%</div>
                             </div>
                             <div class="d-flex justify-content-between mt-1">
                                 <small class="text-muted">0</small>
@@ -224,6 +95,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- Action Cards -->
         <div class="col-md-8">
             <div class="card h-100">
                 <div class="card-header bg-light">
@@ -232,34 +105,35 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <div class="card job-card">
+                            <div class="card action-card">
                                 <div class="card-body text-center">
-                                    <i class="bi bi-arrow-clockwise text-primary" style="font-size: 2rem;"></i>
-                                    <h5 class="card-title mt-2">Update All Jobs</h5>
-                                    <p class="card-text text-muted">Get the latest status of all running jobs</p>
-                                    <button class="btn btn-sm btn-primary" id="updateAllJobsBtn">Update Now</button>
+                                    <i class="bi bi-list-check text-info"></i>
+                                    <h5 class="card-title">View Queue</h5>
+                                    <p class="card-text">Manage submission queue</p>
+                                    <a href="{% url 'viewer:queue_management' %}" class="btn btn-sm btn-info">View
+                                        Queue</a>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <div class="card job-card">
+                            <div class="card action-card">
                                 <div class="card-body text-center">
-                                    <i class="bi bi-exclamation-triangle text-warning" style="font-size: 2rem;"></i>
-                                    <h5 class="card-title mt-2">View Failed Jobs</h5>
-                                    <p class="card-text text-muted">Check jobs that need attention</p>
+                                    <i class="bi bi-exclamation-triangle text-warning"></i>
+                                    <h5 class="card-title">Failed Jobs</h5>
+                                    <p class="card-text">View failed job details</p>
                                     <a href="{% url 'viewer:failed_jobs' %}" class="btn btn-sm btn-warning">View
                                         Failed</a>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <div class="card job-card">
+                            <div class="card action-card">
                                 <div class="card-body text-center">
-                                    <i class="bi bi-plus-circle text-success" style="font-size: 2rem;"></i>
-                                    <h5 class="card-title mt-2">New Submission</h5>
-                                    <p class="card-text text-muted">Submit new samples for processing</p>
-                                    <a href="{% url 'viewer:pipeline_dashboard' %}" class="btn btn-sm btn-success">Go to
-                                        Dashboard</a>
+                                    <i class="bi bi-plus-circle text-success"></i>
+                                    <h5 class="card-title">New Submission</h5>
+                                    <p class="card-text">Submit new samples</p>
+                                    <a href="{% url 'viewer:pipeline_dashboard' %}"
+                                        class="btn btn-sm btn-success">Dashboard</a>
                                 </div>
                             </div>
                         </div>
@@ -269,19 +143,26 @@
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-12 mb-4">
+    <!-- Running Jobs Card -->
+    <div class="row mb-4">
+        <div class="col-12">
             <div class="card">
-                <div class="card-header bg-light">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="bi bi-hourglass-split text-primary me-2"></i> Running Jobs
-                        <span class="badge bg-primary ms-2">{{ running_jobs|length }}</span>
+                        <i class="bi bi-hourglass-split me-2"></i> Running Jobs
+                        <span class="badge bg-light text-primary ms-2">{{ running_jobs|length }}</span>
                     </h5>
+                    <button class="btn btn-sm btn-light rounded-circle update-jobs-btn" id="updateAllJobsBtn"
+                        title="Update All Jobs">
+                        <i class="bi bi-arrow-repeat refresh-icon"></i>
+                        <span class="spinner-border spinner-border-sm d-none refresh-spinner" role="status"
+                            aria-hidden="true"></span>
+                    </button>
                 </div>
                 <div class="card-body">
                     {% if running_jobs %}
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped" id="running-jobs-table">
+                        <table class="table table-hover" id="running-jobs-table">
                             <thead>
                                 <tr>
                                     <th>FASTQ Name</th>
@@ -301,7 +182,12 @@
                                     <td>
                                         <span class="text-monospace">{{ job.demand_id }}</span>
                                     </td>
-                                    <td>{{ job.workflow }}</td>
+                                    <td>
+                                        <span
+                                            class="badge workflow-badge {% if job.workflow == 'MTX' %}badge-mtx{% else %}bg-primary{% endif %}">
+                                            {{ job.workflow }}
+                                        </span>
+                                    </td>
                                     <td>{{ job.organism }}</td>
                                     <td>{{ job.batch }}</td>
                                     <td>{{ job.start_time|date:"Y-m-d H:i:s" }}</td>
@@ -344,13 +230,16 @@
                 </div>
             </div>
         </div>
+    </div>
 
+    <!-- Completed Jobs Card -->
+    <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header bg-light">
+                <div class="card-header bg-success text-white">
                     <h5 class="mb-0">
-                        <i class="bi bi-check2-circle text-success me-2"></i> Recently Completed Jobs
-                        <span class="badge bg-success ms-2">{{ completed_jobs|length }}</span>
+                        <i class="bi bi-check2-circle me-2"></i> Recently Completed Jobs
+                        <span class="badge bg-light text-success ms-2">{{ completed_jobs|length }}</span>
                     </h5>
                 </div>
                 <div class="card-body">
@@ -376,7 +265,12 @@
                                     <td>
                                         <span class="text-monospace">{{ job.demand_id }}</span>
                                     </td>
-                                    <td>{{ job.workflow }}</td>
+                                    <td>
+                                        <span
+                                            class="badge workflow-badge {% if job.workflow == 'MTX' %}badge-mtx{% else %}bg-primary{% endif %}">
+                                            {{ job.workflow }}
+                                        </span>
+                                    </td>
                                     <td>{{ job.start_time }}</td>
                                     <td>{{ job.end_time }}</td>
                                     <td>{{ job.duration }}</td>

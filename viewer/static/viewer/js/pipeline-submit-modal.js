@@ -1859,21 +1859,13 @@ class PipelineSubmitModal {
         this.confirmButton.disabled = true;
         this.confirmButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
 
-        // Simulate API call (replace with actual API call)
+        // Reset button state after a short delay
         setTimeout(() => {
-            // Show success notification
-            if (window.pipelineLocalData && typeof window.pipelineLocalData.showToastNotification === 'function') {
-                window.pipelineLocalData.showToastNotification('Samples submitted successfully', 'success');
-            }
-
             // Reset button state
             this.confirmButton.disabled = false;
             this.confirmButton.innerHTML = 'Confirm and Submit';
 
-            // Clear selected samples
-            if (window.pipelineLocalData) {
-                window.pipelineLocalData.clearSelectedSamples();
-            }
+            // Note: Sample clearing is now handled by the final modal after API confirmation
         }, 1000);
     }
 

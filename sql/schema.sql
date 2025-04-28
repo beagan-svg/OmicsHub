@@ -77,6 +77,26 @@ CREATE TABLE main
     FOREIGN KEY (fastq_name) REFERENCES load_association(fastq_name) ON DELETE CASCADE
 );
 
+-- Table: queue
+CREATE TABLE queue (
+    fastq_name VARCHAR(255) PRIMARY KEY,
+    alignment_command TEXT,
+    postqc_command TEXT,
+    time TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Table: in_progress_samples
+CREATE TABLE in_progress_samples (
+    fastq_name VARCHAR(255) PRIMARY KEY,
+    alignment_command TEXT,
+    postqc_command TEXT,
+    time TIMESTAMPTZ DEFAULT NOW(),
+    alignment_attempts INT DEFAULT 0,
+    postqc_attempts INT DEFAULT 0,
+    alignment_demand_id VARCHAR(255),
+    postqc_demand_id VARCHAR(255)
+);
+
 -- Indexing metadata fields that might be frequently queried
 CREATE INDEX idx_metadata_status_id ON alignment(status_id);
 CREATE INDEX idx_metadata_organism_name ON metadata(organism_name);

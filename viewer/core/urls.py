@@ -6,8 +6,9 @@ from viewer.features.pipeline.pipeline import (
     PipelineApiView, 
     submit_samples
 )
-from viewer.features.job_monitoring.job_monitor import JobMonitorView
+from viewer.features.job_monitoring.job_monitor import JobMonitorView, QueueManagementView
 from viewer.features.failed_jobs.failed_jobs import FailedJobsView
+from .views import import_queue, get_queue_data, remove_queue_item, remove_multiple_queue_items, clear_queue, process_queue
 
 app_name = 'viewer'
 
@@ -18,6 +19,7 @@ urlpatterns = [
     # Pipeline URLs
     path('pipeline/', PipelineDashboardView.as_view(), name='pipeline_dashboard'),
     path('pipeline/jobs/', JobMonitorView.as_view(), name='job_monitor'),
+    path('pipeline/queue/', QueueManagementView.as_view(), name='queue_management'),
     path('pipeline/failed/', FailedJobsView.as_view(), name='failed_jobs'),
     
     # Pipeline API endpoints
@@ -30,4 +32,12 @@ urlpatterns = [
     path('api/pipeline/get-job-data/', PipelineApiView.get_job_data, name='get_job_data'),
     path('api/pipeline/get-queue-data/', PipelineApiView.get_queue_data, name='api_get_queue_data'),
     path('api/pipeline/submit-samples/', submit_samples, name='submit_samples'),
+    
+    # Queue API endpoints
+    path('api/queue/import/', import_queue, name='import_queue'),
+    path('api/queue/get_data/', get_queue_data, name='get_queue_data'),
+    path('api/queue/remove/', remove_queue_item, name='remove_queue_item'),
+    path('api/queue/remove_multiple/', remove_multiple_queue_items, name='remove_multiple_queue_items'),
+    path('api/queue/clear/', clear_queue, name='clear_queue'),
+    path('api/queue/process/', process_queue, name='process_queue'),
 ] 
