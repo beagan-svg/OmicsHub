@@ -183,12 +183,9 @@ class FailedJob(models.Model):
 
 class CompletedJob(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('submitted', 'Submitted'),
-        ('running', 'Running'),
-        ('completed', 'Completed'),
-        ('failed', 'Failed'),
-        ('cancelled', 'Cancelled')
+        ('Completed', 'Completed'),
+        ('Failed', 'Failed'),
+        ('Cancelled', 'Cancelled')
     ]
 
     fastq_name = models.CharField(max_length=255, primary_key=True)
@@ -199,8 +196,12 @@ class CompletedJob(models.Model):
     postqc_attempts = models.IntegerField(default=0)
     alignment_demand_id = models.CharField(max_length=255, null=True, blank=True)
     postqc_demand_id = models.CharField(max_length=255, null=True, blank=True)
-    alignment_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
-    postqc_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
+    alignment_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Completed')
+    postqc_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Completed')
+    alignment_start_time = models.DateTimeField(null=True, blank=True)
+    alignment_end_time = models.DateTimeField(null=True, blank=True)
+    postqc_start_time = models.DateTimeField(null=True, blank=True)
+    postqc_end_time = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'completed_jobs' 

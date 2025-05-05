@@ -1,6 +1,7 @@
 from django.views.generic import TemplateView
 from django.http import JsonResponse
 from django.core.cache import cache
+from django.db import connection
 from viewer.utils.pipeline_utils import count_running_jobs, update_all_running_jobs
 from viewer.models import Alignment
 
@@ -40,23 +41,40 @@ class JobMonitorView(TemplateView):
         # Get actual running job counts from OCS
         job_counts = count_running_jobs()
         
-        # Get running jobs from OCS status
-        running_jobs = []
-        # We'll populate this from database but filter by demand IDs from OCS later
-        alignments = Alignment.objects.filter(
-            status_id__in=['SUBMITTED', 'IN_PROGRESS']
-        ).select_related('fastq_name')
+        # Get running jobs directly from running_jobs table
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    fastq_name,
+                    alignment_command,
+                    postqc_command,
+                    alignment_attempts,
+                    postqc_attempts,
+                    alignment_demand_id,
+                    postqc_demand_id,
+                    time
+                FROM running_jobs
+                ORDER BY time DESC;
+            """)
+            columns = [col[0] for col in cursor.description]
+            running_jobs = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
-        for alignment in alignments:
-            running_jobs.append({
-                'fastq_name': alignment.fastq_name_id,
-                'demand_id': alignment.demand_id,
-                'status': alignment.status_id,
-                'start_time': alignment.start_time,
-                'organism': alignment.fastq_name.organism_common_name,
-                'batch': alignment.fastq_name.batch_name_from_vendor,
-                'workflow': 'MTX' if 'MTX' in alignment.fastq_name.batch_name_from_vendor else 'RTX'
-            })
+        # Format running jobs for display
+        running_jobs_formatted = []
+        for job in running_jobs:
+            # Choose command and related fields based on which command exists
+            command = job['alignment_command'] if job['alignment_command'] else job['postqc_command']
+            attempts = job['alignment_attempts'] if job['alignment_command'] else job['postqc_attempts']
+            demand_id = job['alignment_demand_id'] if job['alignment_command'] else job['postqc_demand_id']
+            
+            if command:  # Only include jobs that have a command
+                running_jobs_formatted.append({
+                    'fastq_name': job['fastq_name'],
+                    'command': command,
+                    'demand_id': demand_id,
+                    'attempts': attempts,
+                    'time': job['time'].isoformat() if job['time'] else None
+                })
         
         # Get completed jobs
         completed_jobs = Alignment.objects.filter(
@@ -80,7 +98,7 @@ class JobMonitorView(TemplateView):
         
         return {
             'job_counts': job_counts,
-            'running_jobs': running_jobs,
+            'running_jobs': running_jobs_formatted,
             'completed_jobs': completed_jobs_data
         }
 

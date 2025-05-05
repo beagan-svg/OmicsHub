@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from django.core.paginator import Paginator
 from django.utils import timezone
-from viewer.core.models import Main, Metadata, LoadAssociation, Alignment, PostQC, QueueJobs
+from viewer.core.models import Main, Metadata, LoadAssociation, Alignment, PostQC, QueueJobs, FailedJob
 from viewer.utils.pipeline_utils import (
     load_pipeline_config, 
     count_running_jobs, 
@@ -36,16 +36,21 @@ from viewer.utils.pipeline_utils import (
     determine_workflow,
     is_ingest_complete,
     create_mtx_alignment_command,
-    create_rtx_alignment_command
+    create_rtx_alignment_command,
+    move_to_completed_jobs,
+    process_job_status_update
 )
 from django.views.decorators.http import require_http_methods
 from django.db import transaction
+import logging
 
 # Cache timeouts in seconds
 PIPELINE_CONFIG_CACHE_TIMEOUT = 3600  # 1 hour
 JOB_DATA_CACHE_TIMEOUT = 300         # 5 minutes
 JOB_UPDATE_LOCK_TIMEOUT = 60         # 1 minute
 JOB_UPDATE_INTERVAL = 600            # 10 minutes
+
+logger = logging.getLogger(__name__)
 
 class PipelineDashboardView(TemplateView):
     """View for the main pipeline dashboard."""
@@ -317,22 +322,177 @@ class FailedJobsView(TemplateView):
         """Get context data for failed jobs view."""
         context = super().get_context_data(**kwargs)
         
-        # Get all failed jobs with retry attempts
-        failed_jobs = Alignment.objects.filter(
-            status_id='FAILED', 
-            retry_count__gte=1
+        # Get jobs from failed_jobs table
+        failed_jobs_from_table = FailedJob.objects.all().order_by('-time')
+        
+        # Get all failed alignment jobs
+        failed_alignments = Alignment.objects.filter(
+            status_id__in=['FAILED', 'ABORTED']
         ).select_related('fastq_name')
         
-        # Format for display
-        context['failed_jobs'] = [{
-            'fastq_name': job.fastq_name_id,
-            'demand_id': job.demand_id,
-            'start_time': job.start_time,
-            'end_time': job.end_time,
-            'retry_count': job.retry_count,
-            'organism': job.fastq_name.organism_common_name,
-            'batch': job.fastq_name.batch_name_from_vendor
-        } for job in failed_jobs]
+        # Get all failed post-QC jobs
+        failed_postqcs = PostQC.objects.filter(
+            status_id__in=['FAILED', 'ABORTED']
+        ).select_related('fastq_name')
+        
+        # Combine all sources of failed jobs
+        all_failed_jobs = []
+        processed_jobs = set()  # Track jobs we've already processed
+        
+        # Process failed_jobs table entries
+        for job in failed_jobs_from_table:
+            job_type = None
+            demand_id = None
+            status = "FAILED"  # Default status
+            command = None
+            
+            if job.alignment_demand_id:
+                job_type = "alignment"
+                demand_id = job.alignment_demand_id
+                command = job.alignment_command
+                attempts = job.alignment_attempts
+            elif job.postqc_demand_id:
+                job_type = "post-QC"
+                demand_id = job.postqc_demand_id
+                command = job.postqc_command
+                attempts = job.postqc_attempts
+            else:
+                # Skip if no demand ID (shouldn't happen, but just in case)
+                continue
+            
+            # Get metadata info if available
+            try:
+                metadata = Metadata.objects.get(fastq_name=job.fastq_name)
+                organism = metadata.organism_common_name
+                batch = metadata.batch_name_from_vendor
+            except Metadata.DoesNotExist:
+                try:
+                    main = Main.objects.get(fastq_name=job.fastq_name)
+                    organism = main.fastq_name.organism_common_name
+                    batch = main.fastq_name.batch_name_from_vendor
+                except Main.DoesNotExist:
+                    organism = "Unknown"
+                    batch = "Unknown"
+            
+            # Get error details if available
+            error_details = ""
+            try:
+                if job_type == "alignment":
+                    alignment = Alignment.objects.get(fastq_name=job.fastq_name)
+                    error_details = f"Status: {alignment.status_id}"
+                else:
+                    postqc = PostQC.objects.get(fastq_name=job.fastq_name)
+                    error_details = getattr(postqc, 'status_details', "") or f"Status: {postqc.status_id}"
+            except (Alignment.DoesNotExist, PostQC.DoesNotExist):
+                pass
+            
+            # Mark as processed
+            job_key = f"{job.fastq_name}:{job_type}"
+            processed_jobs.add(job_key)
+            
+            all_failed_jobs.append({
+                'source': 'failed_jobs_table',  # Explicitly mark as from failed_jobs table
+                'fastq_name': job.fastq_name,
+                'demand_id': demand_id,
+                'job_type': job_type,
+                'status': status,
+                'command': command,
+                'time': job.time,
+                'end_time': job.time,  # Use time as end_time for sorting
+                'attempts': attempts,
+                'organism': organism,
+                'batch': batch,
+                'error_details': error_details,
+                'is_retryable': True
+            })
+        
+        # Process failed alignment jobs
+        for job in failed_alignments:
+            job_key = f"{job.fastq_name_id}:alignment"
+            
+            # Skip if already processed
+            if job_key in processed_jobs:
+                continue
+                
+            processed_jobs.add(job_key)
+            
+            # Get command if available
+            command = ""
+            try:
+                failed_job = FailedJob.objects.get(
+                    fastq_name=job.fastq_name_id, 
+                    alignment_demand_id__isnull=False
+                )
+                command = failed_job.alignment_command
+            except FailedJob.DoesNotExist:
+                pass
+                
+            all_failed_jobs.append({
+                'source': 'alignment_table',  # Explicitly mark as from alignment table
+                'fastq_name': job.fastq_name_id,
+                'demand_id': job.demand_id,
+                'job_type': 'alignment',
+                'status': job.status_id,
+                'command': command,
+                'start_time': job.start_time,
+                'end_time': job.end_time or timezone.now(),  # Use current time if no end time
+                'time': job.end_time or job.start_time or timezone.now(),  # For display
+                'attempts': job.retry_count or 1,
+                'organism': job.fastq_name.organism_common_name,
+                'batch': job.fastq_name.batch_name_from_vendor,
+                'error_details': f"Status: {job.status_id}",
+                'is_retryable': job.status_id != 'PERMANENTLY_FAILED'
+            })
+        
+        # Process failed post-QC jobs
+        for job in failed_postqcs:
+            job_key = f"{job.fastq_name_id}:post-QC"
+            
+            # Skip if already processed
+            if job_key in processed_jobs:
+                continue
+                
+            processed_jobs.add(job_key)
+            
+            # Get command if available
+            command = ""
+            try:
+                failed_job = FailedJob.objects.get(
+                    fastq_name=job.fastq_name_id, 
+                    postqc_demand_id__isnull=False
+                )
+                command = failed_job.postqc_command
+            except FailedJob.DoesNotExist:
+                pass
+                
+            all_failed_jobs.append({
+                'source': 'postqc_table',  # Explicitly mark as from postqc table
+                'fastq_name': job.fastq_name_id,
+                'demand_id': job.demand_id,
+                'job_type': 'post-QC',
+                'status': job.status_id,
+                'command': command,
+                'start_time': job.start_time,
+                'end_time': job.end_time or timezone.now(),  # Use current time if no end time
+                'time': job.end_time or job.start_time or timezone.now(),  # For display
+                'attempts': job.retry_count or 1,
+                'organism': job.fastq_name.organism_common_name,
+                'batch': job.fastq_name.batch_name_from_vendor,
+                'error_details': getattr(job, 'status_details', "") or f"Status: {job.status_id}",
+                'is_retryable': job.status_id != 'PERMANENTLY_FAILED'
+            })
+        
+        # Sort by time (most recent first)
+        all_failed_jobs.sort(key=lambda x: x.get('end_time') or x.get('time') or timezone.now(), reverse=True)
+        
+        # Add URL paths for AJAX calls
+        context['retry_url'] = reverse('viewer:retry_failed_job')
+        context['cancel_url'] = reverse('viewer:cancel_failed_job')
+        
+        context['failed_jobs'] = all_failed_jobs
+        context['failed_job_count'] = len(all_failed_jobs)
+        context['job_types'] = ['alignment', 'post-QC']
+        context['statuses'] = ['FAILED', 'ABORTED', 'PERMANENTLY_FAILED']
         
         return context
 
@@ -409,7 +569,7 @@ class PipelineApiView:
                 
                 # Add delay between submissions (5 minutes)
                 if len(samples_to_submit) > 1 and samples_to_submit.index(sample) < len(samples_to_submit) - 1:
-                    time.sleep(300)  # 5 minutes
+                    time.sleep(300)  # 5 minutes in seconds
             
             # Construct response message
             message = f'Processed {len(samples_to_submit)} samples. {successful} successful, {failed} failed.'
@@ -435,30 +595,33 @@ class PipelineApiView:
     def check_alignment_status(request) -> JsonResponse:
         """Check status of an alignment job."""
         if request.method != 'GET':
+            logger.error('Invalid request method for check_alignment_status: %s', request.method)
             return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
-        
         demand_id = request.GET.get('demand_id', '')
         fastq_name = request.GET.get('fastq_name', '')
-        
+        logger.info(f"Checking alignment status: demand_id={demand_id}, fastq_name={fastq_name}")
         if not demand_id and not fastq_name:
+            logger.error('Neither demand_id nor fastq_name provided for status check')
             return JsonResponse({
                 'status': 'error',
                 'message': 'Either demand_id or fastq_name must be provided'
             }, status=400)
-        
         try:
             if demand_id:
+                logger.info(f"Checking by demand_id: {demand_id}")
                 return PipelineApiView._check_by_demand_id(demand_id)
             else:
+                logger.info(f"Checking by fastq_name: {fastq_name}")
                 return PipelineApiView._check_by_fastq_name(fastq_name)
         except Exception as e:
+            logger.exception(f"Exception in check_alignment_status: {str(e)}")
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     
     @staticmethod
     def _check_by_demand_id(demand_id: str) -> JsonResponse:
-        """Check alignment status by demand ID."""
+        logger.info(f"_check_by_demand_id called with demand_id: {demand_id}")
         result = check_alignment_status(demand_id)
-        
+        logger.debug(f"Status check result for demand_id {demand_id}: {result}")
         if result.get('status') == 'success':
             try:
                 alignment = Alignment.objects.get(demand_id=demand_id)
@@ -467,32 +630,31 @@ class PipelineApiView:
                     result.get('job_status'),
                     update_main=True
                 )
+                logger.info(f"Updated alignment status for demand_id {demand_id} to {result.get('job_status')}")
             except Alignment.DoesNotExist:
-                pass
-        
+                logger.warning(f"No Alignment found for demand_id {demand_id}")
         return JsonResponse(result)
     
     @staticmethod
     def _check_by_fastq_name(fastq_name: str) -> JsonResponse:
-        """Check alignment status by FASTQ name."""
+        logger.info(f"_check_by_fastq_name called with fastq_name: {fastq_name}")
         try:
             alignment = Alignment.objects.get(fastq_name=fastq_name)
-            
             if not alignment.demand_id:
+                logger.error(f"No demand_id found for fastq_name {fastq_name}")
                 return JsonResponse({
                     'status': 'error',
                     'message': f'No demand_id found for {fastq_name}'
                 })
-            
             result = check_alignment_status(alignment.demand_id)
-            
+            logger.debug(f"Status check result for fastq_name {fastq_name}: {result}")
             if result.get('status') == 'success':
                 PipelineApiView._update_alignment_status(
                     alignment,
                     result.get('job_status'),
                     update_main=True
                 )
-            
+                logger.info(f"Updated alignment status for fastq_name {fastq_name} to {result.get('job_status')}")
             return JsonResponse({
                 'status': 'success',
                 'demand_id': alignment.demand_id,
@@ -500,12 +662,15 @@ class PipelineApiView:
                 'start_time': alignment.start_time,
                 'end_time': alignment.end_time
             })
-            
         except Alignment.DoesNotExist:
+            logger.error(f"No alignment record found for fastq_name {fastq_name}")
             return JsonResponse({
                 'status': 'error',
                 'message': f'No alignment record found for {fastq_name}'
             })
+        except Exception as e:
+            logger.exception(f"Exception in _check_by_fastq_name: {str(e)}")
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     
     @staticmethod
     def _update_alignment_status(alignment: Alignment, status: str, update_main: bool = False) -> None:
@@ -530,80 +695,249 @@ class PipelineApiView:
                 pass
     
     @staticmethod
-    def stop_alignment(request) -> JsonResponse:
+    def stop_alignment(request, demand_id=None) -> JsonResponse:
         """Stop a running alignment job."""
         if request.method != 'POST':
+            logger.error('Invalid request method for stop_alignment: %s', request.method)
             return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
         
         try:
-            data = json.loads(request.body)
-            demand_id = data.get('demand_id', '')
+            # Check if demand_id was provided in URL
+            if not demand_id:
+                # If not, try to get it from the request body
+                data = json.loads(request.body)
+                demand_id = data.get('demand_id', '')
+                fastq_name = data.get('fastq_name', '')
+            else:
+                # If demand_id was provided in URL, try to get fastq_name from request body
+                try:
+                    data = json.loads(request.body)
+                    fastq_name = data.get('fastq_name', '')
+                except json.JSONDecodeError:
+                    fastq_name = ''
+            
+            logger.info(f"Stopping job: demand_id={demand_id}, fastq_name={fastq_name}")
             
             if not demand_id:
+                logger.error('No demand_id provided for stop_alignment')
                 return JsonResponse({
                     'status': 'error',
                     'message': 'demand_id must be provided'
                 }, status=400)
             
+            # Check if we can determine the job type (alignment or post-QC)
+            demand_type = 'align'  # Default to align
+            if fastq_name:
+                try:
+                    # Try to find by fastq_name and check which demand_id matches
+                    running_job = RunningJob.objects.get(fastq_name=fastq_name)
+                    if running_job.alignment_demand_id == demand_id:
+                        demand_type = 'align'
+                    elif running_job.postqc_demand_id == demand_id:
+                        demand_type = 'post-align'
+                except RunningJob.DoesNotExist:
+                    pass
+            else:
+                # Try to find by demand_id
+                try:
+                    running_job = RunningJob.objects.get(alignment_demand_id=demand_id)
+                    fastq_name = running_job.fastq_name
+                    demand_type = 'align'
+                except RunningJob.DoesNotExist:
+                    try:
+                        running_job = RunningJob.objects.get(postqc_demand_id=demand_id)
+                        fastq_name = running_job.fastq_name
+                        demand_type = 'post-align'
+                    except RunningJob.DoesNotExist:
+                        pass
+            
+            # Stop the job in the OCS service
+            logger.info(f"Stopping {demand_type} job with demand_id: {demand_id}")
             result = stop_alignment_job(demand_id)
+            logger.info(f"Stop job result: {result}")
             
             if result.get('status') == 'success':
-                try:
-                    alignment = Alignment.objects.get(demand_id=demand_id)
-                    PipelineApiView._update_alignment_status(
-                        alignment,
-                        'ABORTED',
-                        update_main=True
-                    )
-                except Alignment.DoesNotExist:
-                    pass
-            
-            return JsonResponse(result)
+                # Process the job status update
+                update_result = process_job_status_update(demand_id)
+                
+                if update_result.get('status') == 'success':
+                    logger.info(f"Successfully processed job status update after stopping job")
+                    return JsonResponse({
+                        'status': 'success',
+                        'message': f'Successfully stopped job with demand_id {demand_id}',
+                        'demand_id': demand_id,
+                        'demand_type': demand_type,
+                        'fastq_name': fastq_name
+                    })
+                else:
+                    logger.warning(f"Job was stopped but status update failed: {update_result.get('message')}")
+                    # Return success anyway because the job was stopped
+                    return JsonResponse({
+                        'status': 'success',
+                        'warning': 'Job was stopped but status update failed',
+                        'message': f'Successfully stopped job with demand_id {demand_id}',
+                        'demand_id': demand_id,
+                        'demand_type': demand_type,
+                        'fastq_name': fastq_name
+                    })
+            else:
+                logger.error(f"Failed to stop job with demand_id {demand_id}: {result.get('message')}")
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Failed to stop job: {result.get("message", "Unknown error")}',
+                    'demand_id': demand_id
+                }, status=400)
             
         except Exception as e:
+            logger.exception(f"Exception in stop_alignment: {str(e)}")
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    
+    @staticmethod
+    def check_job_status(request, demand_id) -> JsonResponse:
+        """Check status of a specific job by demand ID."""
+        if request.method != 'POST':
+            logger.error('Invalid request method for check_job_status: %s', request.method)
+            return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+        
+        logger.info(f"Checking job status for demand_id: {demand_id}")
+        
+        try:
+            # Use the comprehensive job status update function
+            result = process_job_status_update(demand_id)
+            
+            if result.get('status') == 'success':
+                logger.info(f"Job status update successful: {result}")
+                return JsonResponse({
+                    'status': 'success',
+                    'job_status': result.get('job_status', 'UNKNOWN'),
+                    'demand_type': result.get('demand_type', 'align'),
+                    'demand_id': demand_id,
+                    'message': result.get('message', 'Job status updated successfully')
+                })
+            else:
+                logger.warning(f"Job status update failed: {result}")
+                return JsonResponse({
+                    'status': 'error',
+                    'message': result.get('message', 'Error updating job status'),
+                    'demand_id': demand_id
+                }, status=400)
+                
+        except Exception as e:
+            logger.exception(f"Exception in check_job_status: {str(e)}")
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     
     @staticmethod
     def retry_failed_job(request) -> JsonResponse:
-        """Retry a failed alignment job."""
+        """Retry a failed job (alignment or post-QC)."""
         if request.method != 'POST':
+            logger.error('Invalid request method for retry_failed_job: %s', request.method)
             return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
         
         try:
-            data = json.loads(request.body)
+            # Handle both form data and JSON formats
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+            else:
+                data = request.POST
+                
             fastq_name = data.get('fastq_name', '')
+            job_type = data.get('job_type', 'alignment')  # Default to alignment if not specified
+            
+            logger.info(f"Attempting to retry {job_type} job for {fastq_name}")
             
             if not fastq_name:
+                logger.error("No FASTQ name provided for job retry")
                 return JsonResponse({
                     'status': 'error',
                     'message': 'fastq_name must be provided'
                 }, status=400)
             
+            # Get main record to retrieve necessary metadata
             try:
                 main = Main.objects.select_related('fastq_name').get(fastq_name=fastq_name)
-                load_name = LoadAssociation.objects.filter(
-                    fastq_name=main.fastq_name
-                ).values_list('load_name', flat=True).first() or ''
-                
-                sample_data = {
-                    'fastq_name': fastq_name,
-                    'organism_common_name': main.fastq_name.organism_common_name,
-                    'batch_name_from_vendor': main.fastq_name.batch_name_from_vendor,
-                    'library_prep': main.library_prep_method,
-                    'load_name': load_name
-                }
-                
-                result = submit_sample_for_alignment(sample_data)
-                return JsonResponse(result)
-                
             except Main.DoesNotExist:
+                logger.error(f"No main record found for {fastq_name}")
                 return JsonResponse({
                     'status': 'error',
                     'message': f'No record found for {fastq_name}'
-                })
+                }, status=404)
+                
+            # Get load name
+            load_name = LoadAssociation.objects.filter(
+                fastq_name=main.fastq_name
+            ).values_list('load_name', flat=True).first() or ''
+            
+            if not load_name:
+                logger.warning(f"No load name found for {fastq_name}, proceeding anyway")
+            
+            # Prepare sample data for submission
+            sample_data = {
+                'fastq_name': fastq_name,
+                'organism_common_name': main.fastq_name.organism_common_name,
+                'batch_name_from_vendor': main.fastq_name.batch_name_from_vendor,
+                'library_prep': main.library_prep_method,
+                'load_name': load_name
+            }
+            
+            # Check if we need to retry alignment or post-QC
+            if job_type.lower() == 'alignment':
+                logger.info(f"Submitting alignment job for {fastq_name}")
+                result = submit_sample_for_alignment(sample_data)
+                
+                # If successful, increment retry count
+                if result.get('status') == 'success':
+                    try:
+                        alignment = Alignment.objects.get(fastq_name=fastq_name)
+                        alignment.retry_count += 1
+                        alignment.status_id = 'SUBMITTED'
+                        alignment.start_time = timezone.now()
+                        alignment.end_time = None
+                        alignment.save()
+                        logger.info(f"Updated alignment record for {fastq_name}, retry count: {alignment.retry_count}")
+                        
+                        # Update main table
+                        main.alignment_status = 'Submitted'
+                        main.save()
+                        
+                        # Remove from failed_jobs if present
+                        try:
+                            failed_job = FailedJob.objects.get(fastq_name=fastq_name)
+                            if failed_job.alignment_demand_id:
+                                logger.info(f"Removing job from failed_jobs: {fastq_name}")
+                                failed_job.delete()
+                        except FailedJob.DoesNotExist:
+                            pass
+                    except Alignment.DoesNotExist:
+                        # Create new alignment record if it doesn't exist
+                        alignment = Alignment(
+                            fastq_name=main.fastq_name,
+                            status_id='SUBMITTED',
+                            start_time=timezone.now(),
+                            demand_id=result.get('demand_id', ''),
+                            retry_count=1
+                        )
+                        alignment.save()
+                        logger.info(f"Created new alignment record for {fastq_name}")
+                        
+                        main.alignment_status = 'Submitted'
+                        main.save()
+                else:
+                    # Return error from submit_sample_for_alignment
+                    return JsonResponse(result, status=400)
+            else:
+                # For now, we'll just return an error since post-QC retry is not implemented
+                logger.warning(f"Post-QC job retry not yet implemented for {fastq_name}")
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Post-QC job retry not yet implemented'
+                }, status=400)
+            
+            logger.info(f"Retry job result: {result}")
+            return JsonResponse(result)
                 
         except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+            logger.exception(f"Exception in retry_failed_job: {str(e)}")
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     
     @staticmethod
     def update_all_jobs(request) -> JsonResponse:
@@ -635,39 +969,36 @@ class PipelineApiView:
     def get_job_data(request) -> JsonResponse:
         """Get current job data without reloading the page."""
         if request.method != 'GET':
+            logger.error('Invalid request method for get_job_data: %s', request.method)
             return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
         
         try:
-            # Get user ID for cache
             user_id = getattr(request.user, 'id', 'anonymous')
-            
-            # Try to get from cache first
+            logger.info(f"Fetching job data for user_id: {user_id}")
             cache_key = f'job_monitor_data_{user_id}'
             cached_data = cache.get(cache_key)
-            
             if cached_data:
+                logger.info(f"Returning cached job data for user_id: {user_id}")
+                logger.debug(f"Cached job data: {cached_data}")
                 return JsonResponse({
                     'status': 'success',
                     'job_counts': cached_data['job_counts'],
                     'running_jobs': cached_data['running_jobs'],
                     'completed_jobs': cached_data['completed_jobs']
                 })
-            
-            # If not in cache, get fresh data
+            logger.info(f"No cached data found for user_id: {user_id}, fetching fresh data.")
             view = JobMonitorView()
             fresh_data = view._get_fresh_job_data()
-            
-            # Cache the fresh data
+            logger.debug(f"Fresh job data: {fresh_data}")
             cache.set(cache_key, fresh_data, timeout=JOB_DATA_CACHE_TIMEOUT)
-            
             return JsonResponse({
                 'status': 'success',
                 'job_counts': fresh_data['job_counts'],
                 'running_jobs': fresh_data['running_jobs'],
                 'completed_jobs': fresh_data['completed_jobs']
             })
-            
         except Exception as e:
+            logger.exception(f"Exception in get_job_data: {str(e)}")
             return JsonResponse({
                 'status': 'error',
                 'message': str(e)
@@ -689,6 +1020,150 @@ class PipelineApiView:
             })
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+    @staticmethod
+    def cancel_failed_job(request) -> JsonResponse:
+        """Permanently cancel a failed job by removing it from the failed_jobs table and updating its status."""
+        if request.method != 'POST':
+            logger.error('Invalid request method for cancel_failed_job: %s', request.method)
+            return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+        
+        try:
+            # Handle both form data and JSON formats
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+            else:
+                data = request.POST
+                
+            fastq_name = data.get('fastq_name', '')
+            job_type = data.get('job_type', 'alignment')  # Default to alignment if not specified
+            
+            logger.info(f"Attempting to permanently cancel {job_type} job for {fastq_name}")
+            
+            if not fastq_name:
+                logger.error("No FASTQ name provided for job cancellation")
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'fastq_name must be provided'
+                }, status=400)
+            
+            # First, check if the job is in the failed_jobs table
+            try:
+                failed_job = FailedJob.objects.get(fastq_name=fastq_name)
+                
+                # If the job exists, check if it's of the right type
+                if job_type.lower() == 'alignment' and not failed_job.alignment_demand_id:
+                    logger.warning(f"Failed job for {fastq_name} is not an alignment job")
+                elif job_type.lower() != 'alignment' and not failed_job.postqc_demand_id:
+                    logger.warning(f"Failed job for {fastq_name} is not a post-QC job")
+                
+                # Delete the failed job record
+                failed_job.delete()
+                logger.info(f"Removed job from failed_jobs: {fastq_name}")
+                
+                # Update the status in the corresponding table
+                if job_type.lower() == 'alignment':
+                    try:
+                        alignment = Alignment.objects.get(fastq_name=fastq_name)
+                        alignment.status_id = 'PERMANENTLY_FAILED'
+                        alignment.save()
+                        
+                        # Also update main table
+                        try:
+                            main = Main.objects.get(fastq_name=fastq_name)
+                            main.alignment_status = 'Permanently Failed'
+                            main.save()
+                        except Main.DoesNotExist:
+                            logger.warning(f"No main record found for {fastq_name}")
+                    except Alignment.DoesNotExist:
+                        logger.warning(f"No alignment record found for {fastq_name}")
+                else:
+                    try:
+                        postqc = PostQC.objects.get(fastq_name=fastq_name)
+                        postqc.status_id = 'PERMANENTLY_FAILED'
+                        postqc.save()
+                        
+                        # Also update main table
+                        try:
+                            main = Main.objects.get(fastq_name=fastq_name)
+                            main.postqc_status = 'Permanently Failed'
+                            main.save()
+                        except Main.DoesNotExist:
+                            logger.warning(f"No main record found for {fastq_name}")
+                    except PostQC.DoesNotExist:
+                        logger.warning(f"No postqc record found for {fastq_name}")
+                
+                return JsonResponse({
+                    'status': 'success',
+                    'message': f'Job for {fastq_name} has been permanently cancelled'
+                })
+            except FailedJob.DoesNotExist:
+                # If not in failed_jobs, check if it's in the alignment or postqc table
+                if job_type.lower() == 'alignment':
+                    try:
+                        alignment = Alignment.objects.get(fastq_name=fastq_name)
+                        if alignment.status_id in ['FAILED', 'ABORTED']:
+                            alignment.status_id = 'PERMANENTLY_FAILED'
+                            alignment.save()
+                            
+                            # Also update main table
+                            try:
+                                main = Main.objects.get(fastq_name=fastq_name)
+                                main.alignment_status = 'Permanently Failed'
+                                main.save()
+                            except Main.DoesNotExist:
+                                logger.warning(f"No main record found for {fastq_name}")
+                                
+                            return JsonResponse({
+                                'status': 'success',
+                                'message': f'Alignment job for {fastq_name} has been permanently cancelled'
+                            })
+                        else:
+                            logger.warning(f"Alignment job for {fastq_name} is not in a failed state")
+                            return JsonResponse({
+                                'status': 'error',
+                                'message': f'Alignment job for {fastq_name} is not in a failed state'
+                            }, status=400)
+                    except Alignment.DoesNotExist:
+                        logger.error(f"No alignment record found for {fastq_name}")
+                        return JsonResponse({
+                            'status': 'error',
+                            'message': f'No alignment record found for {fastq_name}'
+                        }, status=404)
+                else:
+                    try:
+                        postqc = PostQC.objects.get(fastq_name=fastq_name)
+                        if postqc.status_id in ['FAILED', 'ABORTED']:
+                            postqc.status_id = 'PERMANENTLY_FAILED'
+                            postqc.save()
+                            
+                            # Also update main table
+                            try:
+                                main = Main.objects.get(fastq_name=fastq_name)
+                                main.postqc_status = 'Permanently Failed'
+                                main.save()
+                            except Main.DoesNotExist:
+                                logger.warning(f"No main record found for {fastq_name}")
+                                
+                            return JsonResponse({
+                                'status': 'success',
+                                'message': f'Post-QC job for {fastq_name} has been permanently cancelled'
+                            })
+                        else:
+                            logger.warning(f"Post-QC job for {fastq_name} is not in a failed state")
+                            return JsonResponse({
+                                'status': 'error',
+                                'message': f'Post-QC job for {fastq_name} is not in a failed state'
+                            }, status=400)
+                    except PostQC.DoesNotExist:
+                        logger.error(f"No post-QC record found for {fastq_name}")
+                        return JsonResponse({
+                            'status': 'error',
+                            'message': f'No post-QC record found for {fastq_name}'
+                        }, status=404)
+        except Exception as e:
+            logger.exception(f"Exception in cancel_failed_job: {str(e)}")
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 @require_http_methods(["POST"])
 def submit_samples(request):

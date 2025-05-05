@@ -1,6 +1,7 @@
 {% extends "viewer/header.html" %}
 {% load static %}
 {% load viewer_filters %}
+{% load i18n %}
 
 {% block title %}Failed Pipeline Jobs{% endblock %}
 
@@ -25,6 +26,221 @@
         display: inline-block;
         text-align: center;
     }
+
+    .failed-job-row {
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .failed-job-row:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+
+    .failed-job-row.highlight {
+        background-color: rgba(255, 193, 7, 0.2);
+    }
+
+    .command-code {
+        max-height: 100px;
+        overflow-y: auto;
+        font-size: 0.8rem;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+
+    .filter-controls {
+        background-color: #f8f9fa;
+        border-radius: 0.25rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .job-detail-card {
+        display: none;
+        margin-top: 1rem;
+    }
+
+    .job-type-alignment {
+        border-left: 4px solid #007bff;
+    }
+
+    .job-type-post-qc {
+        border-left: 4px solid #6f42c1;
+    }
+
+    .retry-count-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
+        vertical-align: middle;
+    }
+
+    .btn-icon {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background-color: transparent;
+        color: #6c757d;
+        transition: all 0.2s;
+    }
+
+    .btn-icon:hover:not(:disabled) {
+        background-color: rgba(0, 123, 255, 0.1);
+        color: #007bff;
+    }
+
+    .btn-icon:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .form-check-input {
+        cursor: pointer;
+    }
+
+    #failed-jobs-table th,
+    #failed-jobs-table td {
+        vertical-align: middle;
+    }
+
+    #failed-jobs-table th {
+        color: #6c757d;
+        font-weight: 500;
+        font-size: 0.85rem;
+        background-color: #f8f9fa;
+        border-top: none;
+    }
+
+    #failed-jobs-table th:nth-child(2) {
+        text-transform: uppercase;
+    }
+
+    #failed-jobs-table td:nth-child(2) {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .card-header {
+        padding: 0.75rem 1.25rem;
+    }
+
+    .card {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        border: none;
+        margin-bottom: 1.5rem;
+    }
+
+    .btn-group .btn-outline-primary {
+        border-color: #dee2e6;
+        color: #444;
+    }
+
+    .btn-group .btn-outline-primary:hover {
+        background-color: rgba(0, 123, 255, 0.1);
+        color: #007bff;
+    }
+
+    .btn-check:checked+.btn-outline-primary {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .btn-group {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+    }
+
+    /* Modern Toggle Switch */
+    .toggle-switch {
+        position: relative;
+        width: 96px;
+        user-select: none;
+        font-family: 'Inter', 'Segoe UI', 'Roboto', Arial, sans-serif;
+    }
+
+    .toggle-switch-checkbox {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .toggle-switch-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-radius: 999px;
+        background: #DC3545;
+        height: 28px;
+        width: 96px;
+        margin: 0;
+        padding: 0;
+        cursor: pointer;
+        position: relative;
+        font-size: 1rem;
+        font-weight: 500;
+        color: #fff;
+        transition: background 0.2s;
+    }
+
+    .toggle-label-local,
+    .toggle-label-all {
+        flex: 1 1 0;
+        text-align: center;
+        z-index: 2;
+        transition: color 0.2s, font-weight 0.2s, opacity 0.2s;
+        padding: 0;
+        line-height: 28px;
+        font-size: 0.85rem;
+        letter-spacing: 0.01em;
+        color: #fff;
+        opacity: 0.85;
+        font-weight: 500;
+    }
+
+    .toggle-switch-label:after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 44px;
+        height: 24px;
+        background: #fff;
+        border-radius: 999px;
+        transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    }
+
+    .toggle-switch-checkbox:checked+.toggle-switch-label:after {
+        transform: translateX(48px);
+    }
+
+    .toggle-switch-checkbox:not(:checked)+.toggle-switch-label .toggle-label-local {
+        color: #DC3545;
+        font-weight: 700;
+        opacity: 1;
+    }
+
+    .toggle-switch-checkbox:checked+.toggle-switch-label .toggle-label-all {
+        color: #DC3545;
+        font-weight: 700;
+        opacity: 1;
+    }
+
+    .toggle-switch-checkbox:not(:checked)+.toggle-switch-label .toggle-label-all {
+        color: #fff;
+        opacity: 0.85;
+        font-weight: 500;
+    }
+
+    .toggle-switch-checkbox:checked+.toggle-switch-label .toggle-label-local {
+        color: #fff;
+        opacity: 0.85;
+        font-weight: 500;
+    }
 </style>
 {% endblock %}
 
@@ -47,11 +263,46 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <p class="lead mb-0">
-                            Jobs that have failed and need attention.
+                            Failed jobs that require attention. Use the filters below to find specific jobs.
                         </p>
-                        <button class="btn btn-outline-primary" id="refreshBtn">
-                            <i class="bi bi-arrow-clockwise"></i> Refresh
-                        </button>
+                    </div>
+
+                    <!-- Filter Controls -->
+                    <div class="filter-controls">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="jobTypeFilter" class="form-label">Job Type</label>
+                                    <select class="form-select form-select-sm" id="jobTypeFilter">
+                                        <option value="all">All Types</option>
+                                        <option value="alignment">Alignment</option>
+                                        <option value="post-QC">Post-QC</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="statusFilter" class="form-label">Status</label>
+                                    <select class="form-select form-select-sm" id="statusFilter">
+                                        <option value="all">All Statuses</option>
+                                        <option value="FAILED">Failed</option>
+                                        <option value="ABORTED">Aborted</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="searchFilter" class="form-label">Search</label>
+                                    <input type="text" class="form-control form-control-sm" id="searchFilter"
+                                        placeholder="Search by FASTQ name, organism...">
+                                </div>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button class="btn btn-sm btn-primary w-100" id="applyFilters">
+                                    <i class="bi bi-funnel-fill me-1"></i> Apply Filters
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -61,11 +312,31 @@
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">
-                        <i class="bi bi-exclamation-triangle text-danger me-2"></i> Failed Jobs
-                        <span class="badge bg-danger ms-2">{{ failed_jobs|length }}</span>
+                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 d-flex align-items-center">
+                        <i class="bi bi-exclamation-triangle me-2"></i> Failed Jobs
+                        <span class="badge bg-white text-danger ms-2" id="failedJobsCount">{{ failed_job_count }}</span>
                     </h5>
+                    <div class="d-flex align-items-center">
+                        <div class="toggle-switch-wrapper me-3 d-flex align-items-center">
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="sourceToggle" class="toggle-switch-checkbox">
+                                <label for="sourceToggle" class="toggle-switch-label">
+                                    <span class="toggle-label-local">Local</span>
+                                    <span class="toggle-label-all">All</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="d-flex">
+                            <button class="btn btn-sm btn-light me-2" id="refreshBtn">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                            <button class="btn btn-sm btn-light" id="deleteSelectedBtn" {{
+                                failed_job_count==0|yesno:"disabled," }}>
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     {% if failed_jobs %}
@@ -73,39 +344,137 @@
                         <table class="table table-hover" id="failed-jobs-table">
                             <thead>
                                 <tr>
-                                    <th>FASTQ Name</th>
+                                    <th>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="selectAllJobs">
+                                        </div>
+                                    </th>
+                                    <th>FASTQ NAME</th>
                                     <th>Demand ID</th>
+                                    <th>Job Type</th>
+                                    <th>Status</th>
                                     <th>Organism</th>
                                     <th>Batch</th>
-                                    <th>Start Time</th>
-                                    <th>End Time</th>
-                                    <th>Retry Count</th>
+                                    <th>Time</th>
+                                    <th>Attempts</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for job in failed_jobs %}
-                                <tr data-fastq="{{ job.fastq_name }}" data-demand-id="{{ job.demand_id }}">
-                                    <td>{{ job.fastq_name }}</td>
+                                <tr class="failed-job-row {% if job.job_type == 'alignment' %}job-type-alignment{% else %}job-type-post-qc{% endif %}"
+                                    data-fastq="{{ job.fastq_name }}" data-job-type="{{ job.job_type }}"
+                                    data-demand-id="{{ job.demand_id }}" data-status="{{ job.status }}"
+                                    data-source="{{ job.source }}">
+                                    <td>
+                                        <div class="form-check">
+                                            <input class="form-check-input job-checkbox" type="checkbox"
+                                                value="{{ job.fastq_name }}" data-job-type="{{ job.job_type }}">
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {{ job.fastq_name }}
+                                    </td>
                                     <td>
                                         <span class="text-monospace">{{ job.demand_id }}</span>
                                     </td>
-                                    <td>{{ job.organism }}</td>
-                                    <td>{{ job.batch }}</td>
-                                    <td>{{ job.start_time|date:"Y-m-d H:i:s" }}</td>
-                                    <td>{{ job.end_time|date:"Y-m-d H:i:s" }}</td>
                                     <td>
-                                        <span class="badge bg-warning">{{ job.retry_count }}</span>
+                                        {% if job.job_type == 'alignment' %}
+                                        <span class="badge bg-primary">Alignment</span>
+                                        {% else %}
+                                        <span class="badge bg-success">Post-QC</span>
+                                        {% endif %}
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-success retry-btn"
-                                            data-fastq="{{ job.fastq_name }}">
-                                            <i class="bi bi-arrow-repeat"></i> Retry
+                                        {% if job.status == 'FAILED' %}
+                                        <span class="badge bg-danger">Failed</span>
+                                        {% elif job.status == 'ABORTED' %}
+                                        <span class="badge bg-warning text-dark">Aborted</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ job.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ job.organism }}</td>
+                                    <td>{{ job.batch }}</td>
+                                    <td>
+                                        {% if job.time %}
+                                        {{ job.time|date:"Y-m-d H:i:s" }}
+                                        {% elif job.end_time %}
+                                        {{ job.end_time|date:"Y-m-d H:i:s" }}
+                                        {% else %}
+                                        N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary retry-count-badge">
+                                            {{ job.attempts }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-icon retry-btn" data-fastq="{{ job.fastq_name }}"
+                                            data-job-type="{{ job.job_type }}" {{ not job.is_retryable|yesno:"disabled,"
+                                            }}>
+                                            <i class="bi bi-arrow-repeat"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-danger cancel-btn"
-                                            data-fastq="{{ job.fastq_name }}">
-                                            <i class="bi bi-x-circle"></i> Cancel
-                                        </button>
+                                    </td>
+                                </tr>
+                                <tr class="job-detail-row" id="job-detail-{{ job.fastq_name|slugify }}">
+                                    <td colspan="10" class="p-0">
+                                        <div class="job-detail-card card m-2">
+                                            <div class="card-body">
+                                                <h6 class="card-title">Job Details</h6>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <dl class="row mb-0">
+                                                            <dt class="col-sm-4">FASTQ Name:</dt>
+                                                            <dd class="col-sm-8">{{ job.fastq_name }}</dd>
+
+                                                            <dt class="col-sm-4">Demand ID:</dt>
+                                                            <dd class="col-sm-8">
+                                                                <span class="text-monospace">{{ job.demand_id }}</span>
+                                                            </dd>
+
+                                                            <dt class="col-sm-4">Job Type:</dt>
+                                                            <dd class="col-sm-8">{{ job.job_type }}</dd>
+
+                                                            <dt class="col-sm-4">Status:</dt>
+                                                            <dd class="col-sm-8">{{ job.status }}</dd>
+                                                        </dl>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <dl class="row mb-0">
+                                                            <dt class="col-sm-4">Organism:</dt>
+                                                            <dd class="col-sm-8">{{ job.organism }}</dd>
+
+                                                            <dt class="col-sm-4">Batch:</dt>
+                                                            <dd class="col-sm-8">{{ job.batch }}</dd>
+
+                                                            <dt class="col-sm-4">Attempts:</dt>
+                                                            <dd class="col-sm-8">{{ job.attempts }}</dd>
+
+                                                            <dt class="col-sm-4">Source:</dt>
+                                                            <dd class="col-sm-8">{{ job.source }}</dd>
+                                                        </dl>
+                                                    </div>
+                                                </div>
+                                                {% if job.command %}
+                                                <div class="mt-3">
+                                                    <h6 class="card-subtitle mb-2">Command</h6>
+                                                    <div class="command-code bg-light p-2 rounded">
+                                                        <code>{{ job.command }}</code>
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+                                                {% if job.error_details %}
+                                                <div class="mt-3">
+                                                    <h6 class="card-subtitle mb-2">Error Details</h6>
+                                                    <div class="alert alert-danger">
+                                                        {{ job.error_details }}
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -129,263 +498,512 @@
     aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="confirmRetryModalLabel">Confirm Retry</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="confirmRetryModalLabel">
+                    <i class="bi bi-arrow-repeat me-2"></i>
+                    Confirm Retry
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p>Are you sure you want to retry this job?</p>
                 <div class="job-info mb-3">
                     <!-- Will be populated by JavaScript -->
                 </div>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    <strong>Note:</strong> Retrying will submit a new job to the queue and increase the retry counter.
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" id="confirmRetryBtn">Retry Job</button>
+                <button type="button" class="btn btn-success" id="confirmRetryBtn">
+                    <i class="bi bi-arrow-repeat me-1"></i> Retry Job
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Confirm Cancel Modal -->
-<div class="modal fade" id="confirmCancelModal" tabindex="-1" aria-labelledby="confirmCancelModalLabel"
+<!-- Confirm Delete Modal -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel"
     aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="confirmCancelModalLabel">Confirm Cancel</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmDeleteModalLabel">
+                    <i class="bi bi-trash me-2"></i>
+                    Confirm Delete
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to cancel this failed job?</p>
-                <p class="text-danger">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <strong>Warning:</strong> Cancelling will mark this job as permanently failed and it will be removed
-                    from the retry queue.
-                </p>
+                <p>Are you sure you want to permanently delete this failed job?</p>
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Warning:</strong> Deleting will mark this job as permanently failed and it will be removed
+                    from the failed jobs list. This action cannot be undone.
+                </div>
                 <div class="job-info mb-3">
                     <!-- Will be populated by JavaScript -->
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Go Back</button>
-                <button type="button" class="btn btn-danger" id="confirmCancelBtn">Cancel Job</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="bi bi-trash me-1"></i> Delete Job
+                </button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Confirm Cancel All Modal -->
+<div class="modal fade" id="confirmCancelAllModal" tabindex="-1" aria-labelledby="confirmCancelAllModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmCancelAllModalLabel">
+                    <i class="bi bi-trash me-2"></i>
+                    Confirm Delete
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to permanently delete the selected failed jobs?</p>
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Warning:</strong> This will delete <span id="cancelAllCount">0</span> jobs. This action
+                    cannot be undone.
+                </div>
+                <p>Jobs to be deleted:</p>
+                <div class="cancel-all-job-list mb-3 bg-light p-2 rounded" style="max-height: 200px; overflow-y: auto;">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Go Back</button>
+                <button type="button" class="btn btn-danger" id="confirmCancelAllBtn">
+                    <i class="bi bi-trash me-1"></i> Delete Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Retry All Modal -->
+<div class="modal fade" id="confirmRetryAllModal" tabindex="-1" aria-labelledby="confirmRetryAllModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="confirmRetryAllModalLabel">
+                    <i class="bi bi-arrow-repeat me-2"></i>
+                    Confirm Retry All
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to retry all displayed failed jobs?</p>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    <strong>Note:</strong> This will retry <span id="retryAllCount">0</span> jobs. Each job will be
+                    submitted to the queue separately.
+                </div>
+                <p>Jobs to be retried:</p>
+                <div class="retry-all-job-list mb-3 bg-light p-2 rounded" style="max-height: 200px; overflow-y: auto;">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmRetryAllBtn">
+                    <i class="bi bi-arrow-repeat me-1"></i> Retry All Jobs
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
+    $(document).ready(function () {
+        // Toggle job details on clicking the job row
+        $('#failed-jobs-table tbody tr.failed-job-row').on('click', function (e) {
+            // Skip if clicking on checkbox or action buttons
+            if ($(e.target).is('input[type="checkbox"]') ||
+                $(e.target).closest('button').length ||
+                $(e.target).closest('td:last-child').length) {
+                return;
+            }
+
+            const fastqName = $(this).data('fastq');
+            const detailRow = $(`#job-detail-${fastqName.toString().replace(/[^a-z0-9]/gi, '-')}`);
+
+            // Close all other open details
+            $('.job-detail-card').not(detailRow.find('.job-detail-card')).slideUp();
+
+            // Toggle this detail
+            detailRow.find('.job-detail-card').slideToggle();
+
+            // Highlight the selected row
+            $('.failed-job-row').removeClass('highlight');
+            $(this).addClass('highlight');
+        });
+
+        // Select All Checkbox
+        $('#selectAllJobs').on('change', function () {
+            const isChecked = $(this).prop('checked');
+            $('.job-checkbox:visible').prop('checked', isChecked);
+            updateDeleteButtonState();
+        });
+
+        // Individual checkboxes
+        $('.job-checkbox').on('change', function () {
+            updateSelectAllCheckbox();
+            updateDeleteButtonState();
+        });
+
+        // Delete Selected Button
+        $('#deleteSelectedBtn').on('click', function () {
+            const selectedJobs = getSelectedJobs();
+
+            if (selectedJobs.length === 0) {
+                showAlert('warning', '<i class="bi bi-exclamation-triangle-fill me-2"></i> No jobs selected');
+                return;
+            }
+
+            // Populate confirmation modal
+            $('#cancelAllCount').text(selectedJobs.length);
+
+            let jobListHtml = '';
+            selectedJobs.forEach(job => {
+                jobListHtml += `<div><i class="bi bi-dot"></i> ${job.fastqName} (${job.jobType})</div>`;
+            });
+            $('.cancel-all-job-list').html(jobListHtml);
+
+            // Store data for the confirm button
+            $('#confirmCancelAllBtn').data('jobs', selectedJobs);
+
+            // Show modal
+            $('#confirmCancelAllModal').modal('show');
+        });
+
         // Refresh button
-        const refreshBtn = document.getElementById('refreshBtn');
-        refreshBtn.addEventListener('click', function () {
-            window.location.reload();
+        $('#refreshBtn').on('click', function () {
+            // Show loading state
+            $(this).prop('disabled', true);
+            $(this).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+
+            // Reload the page
+            location.reload();
         });
 
-        // Retry buttons
-        const retryBtns = document.querySelectorAll('.retry-btn');
-        retryBtns.forEach(btn => {
-            btn.addEventListener('click', function () {
-                const fastqName = this.getAttribute('data-fastq');
-                const row = this.closest('tr');
+        // Handle retry button
+        $('.retry-btn').on('click', function () {
+            const fastqName = $(this).data('fastq');
+            const jobType = $(this).data('job-type');
 
-                // Populate confirm modal
-                const jobInfo = document.querySelector('#confirmRetryModal .job-info');
-                jobInfo.innerHTML = `
-                    <div class="alert alert-info">
-                        <strong>FASTQ Name:</strong> ${fastqName}
-                    </div>
-                `;
-
-                // Set fastq name on confirm button
-                document.getElementById('confirmRetryBtn').setAttribute('data-fastq', fastqName);
-
-                // Show modal
-                const modal = new bootstrap.Modal(document.getElementById('confirmRetryModal'));
-                modal.show();
-            });
-        });
-
-        // Cancel buttons
-        const cancelBtns = document.querySelectorAll('.cancel-btn');
-        cancelBtns.forEach(btn => {
-            btn.addEventListener('click', function () {
-                const fastqName = this.getAttribute('data-fastq');
-                const row = this.closest('tr');
-
-                // Populate confirm modal
-                const jobInfo = document.querySelector('#confirmCancelModal .job-info');
-                jobInfo.innerHTML = `
-                    <div class="alert alert-info">
-                        <strong>FASTQ Name:</strong> ${fastqName}
-                    </div>
-                `;
-
-                // Set fastq name on confirm button
-                document.getElementById('confirmCancelBtn').setAttribute('data-fastq', fastqName);
-
-                // Show modal
-                const modal = new bootstrap.Modal(document.getElementById('confirmCancelModal'));
-                modal.show();
-            });
-        });
-
-        // Confirm retry button
-        const confirmRetryBtn = document.getElementById('confirmRetryBtn');
-        confirmRetryBtn.addEventListener('click', function () {
-            const fastqName = this.getAttribute('data-fastq');
-            retryJob(fastqName);
-
-            // Hide modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('confirmRetryModal'));
-            modal.hide();
-        });
-
-        // Confirm cancel button
-        const confirmCancelBtn = document.getElementById('confirmCancelBtn');
-        confirmCancelBtn.addEventListener('click', function () {
-            const fastqName = this.getAttribute('data-fastq');
-            cancelJob(fastqName);
-
-            // Hide modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('confirmCancelModal'));
-            modal.hide();
-        });
-
-        // Function to retry a job
-        function retryJob(fastqName) {
-            fetch('/api/pipeline/retry-job/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken()
-                },
-                body: JSON.stringify({ fastq_name: fastqName })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        showToast('Job submitted for retry', 'success');
-
-                        // Remove from the failed jobs table
-                        const row = document.querySelector(`tr[data-fastq="${fastqName}"]`);
-                        if (row) {
-                            row.classList.add('table-success');
-
-                            // Fade out and remove after animation
-                            setTimeout(() => {
-                                row.style.transition = 'opacity 0.5s';
-                                row.style.opacity = '0';
-
-                                setTimeout(() => {
-                                    row.remove();
-
-                                    // Check if table is empty
-                                    const tbody = document.querySelector('#failed-jobs-table tbody');
-                                    if (tbody && tbody.children.length === 0) {
-                                        const tableContainer = document.querySelector('.table-responsive');
-                                        tableContainer.innerHTML = `
-                                        <div class="alert alert-success">
-                                            <i class="bi bi-check-circle-fill me-2"></i>
-                                            No failed jobs found. All jobs are running smoothly!
-                                        </div>
-                                    `;
-                                    }
-                                }, 500);
-                            }, 1000);
-                        }
-                    } else {
-                        showToast(`Error: ${data.message}`, 'danger');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showToast('Error retrying job', 'danger');
-                });
-        }
-
-        // Function to cancel a job
-        function cancelJob(fastqName) {
-            // Here we would typically call an API to mark the job as permanently failed
-            // For now, we'll just remove it from the UI
-
-            const row = document.querySelector(`tr[data-fastq="${fastqName}"]`);
-            if (row) {
-                row.classList.add('table-secondary');
-
-                // Fade out and remove after animation
-                setTimeout(() => {
-                    row.style.transition = 'opacity 0.5s';
-                    row.style.opacity = '0';
-
-                    setTimeout(() => {
-                        row.remove();
-
-                        // Check if table is empty
-                        const tbody = document.querySelector('#failed-jobs-table tbody');
-                        if (tbody && tbody.children.length === 0) {
-                            const tableContainer = document.querySelector('.table-responsive');
-                            tableContainer.innerHTML = `
-                                <div class="alert alert-success">
-                                    <i class="bi bi-check-circle-fill me-2"></i>
-                                    No failed jobs found. All jobs are running smoothly!
-                                </div>
-                            `;
-                        }
-
-                        showToast('Job cancelled successfully', 'info');
-                    }, 500);
-                }, 1000);
-            }
-        }
-
-        // Helper function to get CSRF token
-        function getCSRFToken() {
-            const cookieValue = document.cookie
-                .split('; ')
-                .find(row => row.startsWith('csrftoken='))
-                ?.split('=')[1];
-            return cookieValue;
-        }
-
-        // Toast notification function
-        function showToast(message, type = 'success') {
-            // Create toast container if it doesn't exist
-            let toastContainer = document.getElementById('toast-container');
-            if (!toastContainer) {
-                toastContainer = document.createElement('div');
-                toastContainer.id = 'toast-container';
-                toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
-                toastContainer.style.zIndex = '5';
-                document.body.appendChild(toastContainer);
-            }
-
-            // Create the toast element
-            const toastId = 'toast-' + Date.now();
-            const toastHTML = `
-                <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-                    <div class="d-flex">
-                        <div class="toast-body">${message}</div>
-                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            // Populate modal
+            $('#confirmRetryModal .job-info').html(`
+                <div class="card">
+                    <div class="card-body">
+                        <strong>FASTQ Name:</strong> ${fastqName}<br>
+                        <strong>Job Type:</strong> ${jobType}
                     </div>
                 </div>
-            `;
+            `);
 
-            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+            // Store data for the confirm button
+            $('#confirmRetryBtn').data('fastq', fastqName);
+            $('#confirmRetryBtn').data('job-type', jobType);
 
-            // Initialize and show the toast
-            const toastElement = document.getElementById(toastId);
-            const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
-            toast.show();
+            // Show modal
+            $('#confirmRetryModal').modal('show');
+        });
 
-            // Remove the toast element after it's hidden
-            toastElement.addEventListener('hidden.bs.toast', function () {
-                toastElement.remove();
+        // Confirm retry action
+        $('#confirmRetryBtn').on('click', function () {
+            const fastqName = $(this).data('fastq');
+            const jobType = $(this).data('job-type');
+
+            // Show loading state
+            $(this).prop('disabled', true);
+            $(this).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Retrying...');
+
+            // Make API call to retry job
+            $.ajax({
+                url: '{% url "viewer:retry_failed_job" %}',
+                type: 'POST',
+                data: JSON.stringify({
+                    fastq_name: fastqName,
+                    job_type: jobType
+                }),
+                contentType: 'application/json',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                success: function (response) {
+                    if (response.status === 'success') {
+                        // Show success alert
+                        showAlert('success', `<i class="bi bi-check-circle-fill me-2"></i> ${response.message || 'Job retry initiated successfully!'}`);
+
+                        // Remove job from table or update its status
+                        $(`tr[data-fastq="${fastqName}"][data-job-type="${jobType}"]`).fadeOut(function () {
+                            $(this).next('.job-detail-row').remove();
+                            $(this).remove();
+                            updateJobCounts();
+                            updateSelectAllCheckbox();
+                            updateDeleteButtonState();
+                        });
+
+                        // Close modal
+                        $('#confirmRetryModal').modal('hide');
+                    } else {
+                        // Show error alert
+                        showAlert('danger', `<i class="bi bi-exclamation-triangle-fill me-2"></i> ${response.message || 'Failed to retry job.'}`);
+                    }
+                },
+                error: function (xhr) {
+                    // Show error alert
+                    let errorMsg = 'An error occurred while retrying the job.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    showAlert('danger', `<i class="bi bi-exclamation-triangle-fill me-2"></i> ${errorMsg}`);
+                },
+                complete: function () {
+                    // Reset button state
+                    $('#confirmRetryBtn').prop('disabled', false);
+                    $('#confirmRetryBtn').html('<i class="bi bi-arrow-repeat me-1"></i> Retry Job');
+                }
             });
+        });
+
+        // Confirm cancel all action
+        $('#confirmCancelAllBtn').on('click', function () {
+            const jobs = $(this).data('jobs');
+            if (!jobs || jobs.length === 0) return;
+
+            // Show loading state
+            $(this).prop('disabled', true);
+            $(this).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...');
+
+            let successCount = 0;
+            let failCount = 0;
+            let processedCount = 0;
+            const totalCount = jobs.length;
+
+            // Process jobs sequentially to avoid overwhelming the server
+            function processNextJob(index) {
+                if (index >= jobs.length) {
+                    // All jobs processed
+                    $('#confirmCancelAllModal').modal('hide');
+
+                    // Reset button state
+                    $('#confirmCancelAllBtn').prop('disabled', false);
+                    $('#confirmCancelAllBtn').html('<i class="bi bi-trash me-1"></i> Delete Selected');
+
+                    // Show summary message
+                    if (successCount === totalCount) {
+                        showAlert('success', `<i class="bi bi-check-circle-fill me-2"></i> Successfully deleted all ${successCount} jobs`);
+                    } else {
+                        showAlert('warning', `<i class="bi bi-exclamation-triangle-fill me-2"></i> Deleted ${successCount} jobs, ${failCount} failed`);
+                    }
+
+                    // Refresh job counts
+                    updateJobCounts();
+                    updateSelectAllCheckbox();
+                    updateDeleteButtonState();
+                    return;
+                }
+
+                const job = jobs[index];
+
+                // Make API call to delete job
+                $.ajax({
+                    url: '{% url "viewer:cancel_failed_job" %}',
+                    type: 'POST',
+                    data: JSON.stringify({
+                        fastq_name: job.fastqName,
+                        job_type: job.jobType
+                    }),
+                    contentType: 'application/json',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    success: function (response) {
+                        if (response.status === 'success') {
+                            successCount++;
+                            // Remove job from table
+                            $(`tr[data-fastq="${job.fastqName}"][data-job-type="${job.jobType}"]`).fadeOut(function () {
+                                $(this).next('.job-detail-row').remove();
+                                $(this).remove();
+                            });
+                        } else {
+                            failCount++;
+                        }
+                    },
+                    error: function () {
+                        failCount++;
+                    },
+                    complete: function () {
+                        processedCount++;
+
+                        // Update progress in modal
+                        const progressPercentage = Math.round((processedCount / totalCount) * 100);
+                        $('#confirmCancelAllBtn').html(`<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting... (${progressPercentage}%)`);
+
+                        // Process next job
+                        processNextJob(index + 1);
+                    }
+                });
+            }
+
+            // Start processing the first job
+            processNextJob(0);
+        });
+
+        // Function to show alerts
+        function showAlert(type, message) {
+            // Create alert element
+            const alertEl = $(`<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`);
+
+            // Insert at the top of the page
+            $('.container-fluid').prepend(alertEl);
+
+            // Auto dismiss after 5 seconds
+            setTimeout(function () {
+                alertEl.alert('close');
+            }, 5000);
         }
+
+        // Filter functionality
+        $('#applyFilters').on('click', function () {
+            const jobType = $('#jobTypeFilter').val();
+            const status = $('#statusFilter').val();
+            const searchTerm = $('#searchFilter').val().toLowerCase();
+
+            // Toggle is checked for "All", unchecked for "Local"
+            // But we need showLocalOnly to be true when Local is selected (toggle unchecked)
+            // and false when All is selected (toggle checked)
+            const showLocalOnly = !$('#sourceToggle').is(':checked');
+
+            console.log('Filter applied - Local only:', showLocalOnly, 'Toggle checked:', $('#sourceToggle').is(':checked'));
+
+            // Filter jobs based on criteria
+            $('#failed-jobs-table tbody tr.failed-job-row').each(function () {
+                const $row = $(this);
+                const rowJobType = $row.data('job-type');
+                const rowStatus = $row.data('status');
+                const rowFastq = $row.data('fastq').toLowerCase();
+                const rowSource = $row.data('source') || '';
+                const rowText = $row.text().toLowerCase();
+
+                console.log('Row:', rowFastq, 'Source:', rowSource);
+
+                // Check if row matches basic filters
+                const matchesJobType = jobType === 'all' || rowJobType === jobType;
+                const matchesStatus = status === 'all' || rowStatus === status;
+                const matchesSearch = searchTerm === '' || rowFastq.includes(searchTerm) || rowText.includes(searchTerm);
+
+                // Source filter: Show or hide based on Local/All toggle
+                let shouldShow = matchesJobType && matchesStatus && matchesSearch;
+
+                // If Local is selected (showLocalOnly is true), only show failed_jobs_table items
+                if (showLocalOnly && rowSource !== 'failed_jobs_table') {
+                    shouldShow = false;
+                }
+
+                console.log('  Should show:', shouldShow, 'Source filter active:', showLocalOnly);
+
+                // Show/hide row based on filter match
+                if (shouldShow) {
+                    $row.show();
+                    // Also show corresponding detail row if it was previously visible
+                    const detailCard = $row.next('.job-detail-row').find('.job-detail-card');
+                    if (detailCard.is(':visible')) {
+                        $row.next('.job-detail-row').show();
+                    }
+                } else {
+                    $row.hide();
+                    $row.next('.job-detail-row').hide();
+                }
+            });
+
+            // Update visible job count and other UI elements
+            updateJobCounts();
+            updateSelectAllCheckbox();
+            updateDeleteButtonState();
+        });
+
+        // Source toggle change event
+        $('#sourceToggle').on('change', function () {
+            // Trigger the filter when source toggle changes
+            $('#applyFilters').click();
+        });
+
+        // Update job counts based on visible rows
+        function updateJobCounts() {
+            const visibleCount = $('#failed-jobs-table tbody tr.failed-job-row:visible').length;
+            $('#failedJobsCount').text(visibleCount);
+
+            // Enable/disable delete button based on count
+            $('#deleteSelectedBtn').prop('disabled', visibleCount === 0);
+        }
+
+        // Helper function to get selected jobs
+        function getSelectedJobs() {
+            return $('.job-checkbox:checked').map(function () {
+                return {
+                    fastqName: $(this).val(),
+                    jobType: $(this).data('job-type')
+                };
+            }).get();
+        }
+
+        // Update Select All checkbox state
+        function updateSelectAllCheckbox() {
+            const totalVisible = $('.job-checkbox:visible').length;
+            const totalChecked = $('.job-checkbox:visible:checked').length;
+
+            if (totalVisible === 0) {
+                $('#selectAllJobs').prop('checked', false);
+                $('#selectAllJobs').prop('indeterminate', false);
+            } else if (totalChecked === 0) {
+                $('#selectAllJobs').prop('checked', false);
+                $('#selectAllJobs').prop('indeterminate', false);
+            } else if (totalChecked === totalVisible) {
+                $('#selectAllJobs').prop('checked', true);
+                $('#selectAllJobs').prop('indeterminate', false);
+            } else {
+                $('#selectAllJobs').prop('indeterminate', true);
+            }
+        }
+
+        // Update Delete button state
+        function updateDeleteButtonState() {
+            const hasSelected = $('.job-checkbox:checked').length > 0;
+            $('#deleteSelectedBtn').prop('disabled', !hasSelected);
+        }
+
+        // Initialize
+        updateJobCounts();
+        updateSelectAllCheckbox();
+        updateDeleteButtonState();
+
+        // Apply initial filtering
+        $('#applyFilters').click();
     });
 </script>
 {% endblock %}

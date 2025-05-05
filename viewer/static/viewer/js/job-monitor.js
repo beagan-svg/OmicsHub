@@ -22,7 +22,36 @@ function getCookie(name) {
 class JobMonitor {
     constructor() {
         console.log('Initializing Job Monitor...');
+
+        // Add initial data logging
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM Content Loaded - Getting initial running jobs data');
+            const runningJobsTable = document.querySelector('#running-jobs-table tbody');
+            if (runningJobsTable) {
+                const rows = runningJobsTable.querySelectorAll('tr');
+                const initialJobs = [];
+
+                rows.forEach(row => {
+                    if (!row.querySelector('.alert-info')) {  // Skip the "no jobs" message row
+                        const job = {
+                            fastq_name: row.cells[0].textContent.trim(),
+                            command: row.cells[1].querySelector('code').textContent.trim(),
+                            demand_id: row.cells[2].querySelector('.text-monospace').textContent.trim(),
+                            attempts: row.cells[3].textContent.trim(),
+                            time: row.cells[4].textContent.trim()
+                        };
+                        initialJobs.push(job);
+                    }
+                });
+
+                console.log('Initial running jobs data:', initialJobs);
+            } else {
+                console.log('Running jobs table not found during initialization');
+            }
+        });
+
         this.initializeEventListeners();
+        this.updateJobsInProgress = false;
 
         // Initialize automatic data fetching
         this.autoRefreshInterval = null;
@@ -30,6 +59,9 @@ class JobMonitor {
 
         // Set progress bar width dynamically
         this.setProgressBarWidth();
+
+        // Initialize copy-to-clipboard for Demand IDs
+        this.initializeCopyToClipboard();
     }
 
     /**
@@ -50,6 +82,8 @@ class JobMonitor {
 
     initializeEventListeners() {
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('Initializing event listeners for job monitor...');
+
             // Set up refresh jobs button
             const refreshJobsBtn = document.getElementById('refreshJobsBtn');
             if (refreshJobsBtn) {
@@ -59,7 +93,7 @@ class JobMonitor {
             // Set up update all jobs button
             const updateAllJobsBtn = document.getElementById('updateAllJobsBtn');
             if (updateAllJobsBtn) {
-                updateAllJobsBtn.addEventListener('click', () => this.refreshJobs());
+                updateAllJobsBtn.addEventListener('click', () => this.refreshJobs(true));
             }
 
             // Set up auto-refresh toggle
@@ -79,33 +113,42 @@ class JobMonitor {
             // Set up stop job confirmation
             const confirmStopBtn = document.getElementById('confirmStopBtn');
             if (confirmStopBtn) {
+                console.log('Found confirm stop button:', confirmStopBtn);
                 confirmStopBtn.addEventListener('click', () => {
                     const demandId = confirmStopBtn.getAttribute('data-demand-id');
+                    console.log('Confirm stop button clicked with demand ID:', demandId);
                     if (demandId) {
                         this.stopJob(demandId);
+                    } else {
+                        console.error('No demand ID found on confirm stop button');
                     }
                 });
+            } else {
+                console.warn('Confirm stop button not found in DOM');
             }
 
             // Set up check status buttons
-            document.addEventListener('click', (e) => {
-                // Check status button click
-                if (e.target.closest('.check-status-btn')) {
-                    const button = e.target.closest('.check-status-btn');
-                    const demandId = button.getAttribute('data-demand-id');
-                    if (demandId) {
-                        this.checkJobStatus(demandId);
-                    }
-                }
+            document.querySelectorAll('.check-status-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const demandId = e.currentTarget.dataset.demandId;
+                    this.checkJobStatus(demandId);
+                });
+            });
 
-                // Stop job button click
-                if (e.target.closest('.stop-job-btn')) {
-                    const button = e.target.closest('.stop-job-btn');
-                    const demandId = button.getAttribute('data-demand-id');
-                    if (demandId) {
-                        this.showStopJobConfirmation(demandId);
+            // Stop job buttons
+            const stopButtons = document.querySelectorAll('.stop-job-btn');
+            console.log('Found stop job buttons:', stopButtons.length);
+            stopButtons.forEach(button => {
+                console.log('Setting up stop button listener for:', button);
+                button.addEventListener('click', (e) => {
+                    const demandId = e.currentTarget.dataset.demandId;
+                    console.log('Stop button clicked with demand ID:', demandId);
+                    if (!demandId) {
+                        console.error('No demand ID found on stop button');
+                        return;
                     }
-                }
+                    this.showStopJobConfirmation(demandId);
+                });
             });
 
             // Add modal cleanup handlers
@@ -124,6 +167,87 @@ class JobMonitor {
 
             // Call setProgressBarWidth after DOM is fully loaded
             this.setProgressBarWidth();
+
+            // Initialize copy to clipboard after DOM is loaded
+            this.initializeCopyToClipboard();
+
+            // Perform initial refresh to get fresh data
+            console.log('Performing initial data refresh...');
+            setTimeout(() => {
+                this.refreshJobs(false);
+            }, 100);
+        });
+    }
+
+    /**
+     * Initialize copy to clipboard functionality for Demand IDs
+     */
+    initializeCopyToClipboard() {
+        document.querySelectorAll('.demand-id-cell').forEach(cell => {
+            // Add ripple effect
+            cell.addEventListener('mousedown', function (e) {
+                const x = e.pageX - this.getBoundingClientRect().left;
+                const y = e.pageY - this.getBoundingClientRect().top;
+
+                const rippleElement = document.createElement('div');
+                rippleElement.classList.add('ripple');
+                rippleElement.style.top = y + 'px';
+                rippleElement.style.left = x + 'px';
+
+                this.appendChild(rippleElement);
+
+                setTimeout(() => {
+                    rippleElement.remove();
+                }, 600);
+            });
+
+            // Add click to copy 
+            cell.addEventListener('click', function (e) {
+                const demandId = this.textContent.trim();
+                if (demandId) {
+                    navigator.clipboard.writeText(demandId)
+                        .then(() => {
+                            // Add copied class for visual feedback
+                            this.classList.add('copied');
+
+                            // Show toast notification
+                            const toast = document.createElement('div');
+                            toast.className = 'material-toast';
+                            toast.innerHTML = `
+                                <div class="material-toast-icon">
+                                    <i class="bi bi-clipboard-check"></i>
+                                </div>
+                                <div class="material-toast-message">
+                                    Demand ID copied to clipboard
+                                </div>
+                            `;
+
+                            document.body.appendChild(toast);
+
+                            // Show toast with slight delay for better animation
+                            setTimeout(() => {
+                                toast.classList.add('show');
+                            }, 10);
+
+                            // Remove toast after delay
+                            setTimeout(() => {
+                                toast.classList.remove('show');
+                                setTimeout(() => {
+                                    toast.remove();
+                                }, 300);
+                            }, 2500);
+
+                            // Remove copied class after animation
+                            setTimeout(() => {
+                                this.classList.remove('copied');
+                            }, 1500);
+                        })
+                        .catch(err => {
+                            console.error('Failed to copy:', err);
+                            this.showToastNotification('Failed to copy to clipboard', 'error');
+                        });
+                }
+            });
         });
     }
 
@@ -133,7 +257,7 @@ class JobMonitor {
     startAutoRefresh() {
         this.stopAutoRefresh();
         this.autoRefreshInterval = setInterval(() => {
-            this.refreshJobs();
+            this.refreshJobs(false);
         }, this.autoRefreshTime);
     }
 
@@ -151,542 +275,543 @@ class JobMonitor {
      * Update the job statistics display
      */
     updateJobStatistics(jobCounts) {
+        console.group('Job Statistics Update');
+        console.log('Received job counts:', jobCounts);
+
         // Update alignment jobs count
-        const alignCountElement = document.querySelector('.text-center h2:first-of-type');
+        const alignCountElement = document.querySelector('.row .col-6:first-child .text-center h2');
         if (alignCountElement) {
-            alignCountElement.textContent = jobCounts.align_count;
+            const oldCount = alignCountElement.textContent;
+            alignCountElement.textContent = jobCounts.align_count || 0;
+            console.log('Alignment count:', {
+                old: oldCount,
+                new: jobCounts.align_count || 0,
+                element: alignCountElement
+            });
+        } else {
+            console.warn('Alignment count element not found');
         }
 
         // Update post-QC jobs count
-        const postAlignCountElement = document.querySelector('.text-center h2:last-of-type');
+        const postAlignCountElement = document.querySelector('.row .col-6:last-child .text-center h2');
         if (postAlignCountElement) {
-            postAlignCountElement.textContent = jobCounts.post_align_count;
+            const oldCount = postAlignCountElement.textContent;
+            postAlignCountElement.textContent = jobCounts.post_align_count || 0;
+            console.log('Post-align count:', {
+                old: oldCount,
+                new: jobCounts.post_align_count || 0,
+                element: postAlignCountElement
+            });
+        } else {
+            console.warn('Post-align count element not found');
         }
 
         // Update total jobs count
-        const totalCountElement = document.querySelector('.text-center h3');
+        const totalCountElement = document.querySelector('.row .col-12 .text-center h3');
         if (totalCountElement) {
-            totalCountElement.textContent = jobCounts.total;
+            const oldTotal = totalCountElement.textContent;
+            const total = jobCounts.total || 0;
+            totalCountElement.textContent = total;
+            console.log('Total count:', {
+                old: oldTotal,
+                new: total,
+                element: totalCountElement
+            });
+        } else {
+            console.warn('Total count element not found');
         }
 
         // Update progress bar
         const progressBar = document.querySelector('.job-count-progress');
         if (progressBar) {
-            progressBar.style.width = `${jobCounts.total}%`;
-            progressBar.setAttribute('aria-valuenow', jobCounts.total);
-            progressBar.textContent = `${jobCounts.total}%`;
+            const oldWidth = progressBar.style.width;
+            const total = jobCounts.total || 0;
+            progressBar.style.width = `${total}%`;
+            progressBar.setAttribute('aria-valuenow', total);
+            progressBar.textContent = `${total}%`;
+            console.log('Progress bar update:', {
+                old: oldWidth,
+                new: `${total}%`,
+                element: progressBar
+            });
+        } else {
+            console.warn('Progress bar element not found');
         }
+
+        console.groupEnd();
     }
 
     /**
      * Refreshes all job statuses
+     * @param {boolean} showSuccessToast - Whether to show the success toast notification
      */
-    refreshJobs() {
-        const refreshBtn = document.getElementById('refreshJobsBtn');
-        const updateAllBtn = document.getElementById('updateAllJobsBtn');
+    async refreshJobs(showSuccessToast = false) {
+        if (this.updateJobsInProgress) return;
+        this.updateJobsInProgress = true;
 
-        // Disable both buttons and show spinners while refreshing
-        if (refreshBtn) {
-            refreshBtn.disabled = true;
-            refreshBtn.querySelector('.refresh-icon').classList.add('d-none');
-            refreshBtn.querySelector('.refresh-spinner').classList.remove('d-none');
-        }
+        const refreshBtn = document.getElementById('updateAllJobsBtn');
+        const icon = refreshBtn.querySelector('.refresh-icon');
+        const spinner = refreshBtn.querySelector('.refresh-spinner');
 
-        if (updateAllBtn) {
-            updateAllBtn.disabled = true;
-            updateAllBtn.querySelector('.refresh-icon').classList.add('d-none');
-            updateAllBtn.querySelector('.refresh-spinner').classList.remove('d-none');
-        }
+        icon.classList.add('d-none');
+        spinner.classList.remove('d-none');
 
-        // Show toast notification that update is in progress
-        this.showToastNotification('Updating job statuses...', 'info', 2000);
-
-        // First update all jobs
-        fetch('/api/pipeline/update_all_jobs/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json'
-            }
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Server responded with status: ${response.status}`);
+        try {
+            console.log('Fetching fresh job data...');
+            const response = await fetch('/api/pipeline/get-job-data/', {
+                method: 'GET',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
                 }
-                return response.json();
-            })
-            .then(data => {
-                if (data.status === 'success') {
-                    // Update job statistics with the new counts
-                    if (data.job_counts) {
-                        this.updateJobStatistics(data.job_counts);
-                    }
-
-                    // Now fetch the updated job data
-                    return fetch('/api/pipeline/get-job-data/', {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                } else {
-                    throw new Error(data.message || 'Failed to update jobs');
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Server responded with status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.status === 'success') {
-                    // Update the running jobs table
-                    this.updateRunningJobsTable(data.running_jobs);
-                    // Update the completed jobs table
-                    this.updateCompletedJobsTable(data.completed_jobs);
-
-                    this.showToastNotification('Jobs refreshed successfully', 'success');
-                } else {
-                    throw new Error(data.message || 'Failed to fetch updated job data');
-                }
-            })
-            .catch(error => {
-                console.error('Error updating jobs:', error);
-                this.showToastNotification('Error refreshing jobs: ' + error.message, 'danger');
-            })
-            .finally(() => {
-                // Reset button states
-                this.resetButtonStates(refreshBtn, updateAllBtn);
             });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            const data = await response.json();
+            console.log('Received job data from server:', data);
+
+            if (data.running_jobs) {
+                console.log(`Found ${data.running_jobs.length} running jobs`);
+                this.updateRunningJobsTable(data.running_jobs);
+            } else {
+                console.warn('No running_jobs data in response:', data);
+            }
+
+            if (data.job_counts) {
+                console.log('Updating job counts:', data.job_counts);
+                this.updateJobStatistics(data.job_counts);
+            }
+
+            // Only show success toast if explicitly requested
+            if (showSuccessToast) {
+                this.showToastNotification('Jobs updated successfully', 'success');
+            }
+
+        } catch (error) {
+            console.error('Error updating jobs:', error);
+            this.showToastNotification('Error updating jobs', 'error');
+        } finally {
+            icon.classList.remove('d-none');
+            spinner.classList.add('d-none');
+            this.updateJobsInProgress = false;
+        }
     }
 
     /**
-     * Update the running jobs table
+     * Updates the running jobs table with the provided jobs data
+     * @param {Array} jobs - Array of job objects from running_jobs table
      */
-    updateRunningJobsTable(runningJobs) {
+    updateRunningJobsTable(jobs) {
+        console.log('Updating running jobs table with data:', jobs);
         const tableBody = document.querySelector('#running-jobs-table tbody');
-        if (!tableBody) return;
-
-        if (runningJobs.length === 0) {
-            // Show no jobs message
-            const container = document.querySelector('#running-jobs-table').parentElement.parentElement;
-            container.innerHTML = `
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle-fill me-2"></i>
-                    No jobs are currently running.
-                </div>
-            `;
+        if (!tableBody) {
+            console.error('Could not find running jobs table body');
             return;
-        }
-
-        // Update running jobs count badge
-        const runningJobsBadge = document.querySelector('.card-header .badge');
-        if (runningJobsBadge) {
-            runningJobsBadge.textContent = runningJobs.length;
         }
 
         // Clear existing rows
         tableBody.innerHTML = '';
 
-        // Add new rows
-        runningJobs.forEach(job => {
+        if (!jobs || jobs.length === 0) {
+            console.log('No running jobs to display');
+            const noJobsRow = document.createElement('tr');
+            noJobsRow.innerHTML = `
+                <td colspan="6" class="text-center">
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        No jobs are currently running.
+                    </div>
+                </td>
+            `;
+            tableBody.appendChild(noJobsRow);
+            return;
+        }
+
+        jobs.forEach(job => {
+            console.log('Processing job:', job);
+
+            // The data already has the selected command and demand_id
+            const command = job.command;
+            const attempts = job.attempts;
+            const demandId = job.demand_id;
+
+            console.log('Using values:', {
+                command: command,
+                attempts: attempts,
+                demandId: demandId
+            });
+
+            if (!command) {
+                console.warn('Job has no command:', job);
+                return;
+            }
+
             const row = document.createElement('tr');
             row.className = 'running-job';
-            row.setAttribute('data-demand-id', job.demand_id);
+            row.dataset.demandId = demandId;
 
             row.innerHTML = `
                 <td>${job.fastq_name}</td>
-                <td><span class="text-monospace">${job.demand_id}</span></td>
                 <td>
-                    <span class="badge workflow-badge ${job.workflow === 'MTX' ? 'badge-mtx' : 'bg-primary'}">
-                        ${job.workflow}
-                    </span>
+                    <div class="text-wrap" style="max-width: 500px;">
+                        <code class="small">${command}</code>
+                    </div>
                 </td>
-                <td>${job.organism}</td>
-                <td>${job.batch}</td>
-                <td>${new Date(job.start_time).toLocaleString()}</td>
-                <td class="job-status">
-                    ${this.getStatusBadgeHTML(job.status)}
+                <td class="demand-id-cell">
+                    <span class="text-monospace">${demandId}</span>
                 </td>
+                <td>${attempts}</td>
+                <td>${this.formatDate(job.time)}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary check-status-btn" data-demand-id="${job.demand_id}">
+                    <button class="btn btn-sm btn-outline-primary check-status-btn" data-demand-id="${demandId}">
                         <i class="bi bi-arrow-clockwise"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger stop-job-btn" data-demand-id="${job.demand_id}">
+                    <button class="btn btn-sm btn-outline-danger stop-job-btn" data-demand-id="${demandId}">
                         <i class="bi bi-stop-fill"></i>
                     </button>
                 </td>
             `;
 
-            tableBody.appendChild(row);
-        });
+            // Add event listeners for the new row's buttons
+            const checkStatusBtn = row.querySelector('.check-status-btn');
+            if (checkStatusBtn) {
+                checkStatusBtn.addEventListener('click', () => this.checkJobStatus(demandId));
+            }
 
-        // Reattach event listeners
-        this.attachJobActionListeners();
-    }
-
-    /**
-     * Update the completed jobs table
-     */
-    updateCompletedJobsTable(completedJobs) {
-        const tableBody = document.querySelector('#completed-jobs-table tbody');
-        if (!tableBody) return;
-
-        if (completedJobs.length === 0) {
-            // Show no jobs message
-            const container = document.querySelector('#completed-jobs-table').parentElement.parentElement;
-            container.innerHTML = `
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle-fill me-2"></i>
-                    No jobs have been submitted and processed through this application yet. Once you submit jobs,
-                    they will appear here after completion.
-                </div>
-            `;
-            return;
-        }
-
-        // Update completed jobs count badge
-        const completedJobsBadge = document.querySelector('.card-header .badge');
-        if (completedJobsBadge) {
-            completedJobsBadge.textContent = completedJobs.length;
-        }
-
-        // Clear existing rows
-        tableBody.innerHTML = '';
-
-        // Add new rows
-        completedJobs.forEach(job => {
-            const row = document.createElement('tr');
-            row.setAttribute('data-demand-id', job.demand_id);
-            row.className = job.status === 'FAILED' ? 'table-danger' :
-                job.status === 'ABORTED' ? 'table-secondary' : '';
-
-            row.innerHTML = `
-                <td>${job.fastq_name}</td>
-                <td><span class="text-monospace">${job.demand_id}</span></td>
-                <td>
-                    <span class="badge workflow-badge ${job.workflow === 'MTX' ? 'badge-mtx' : 'bg-primary'}">
-                        ${job.workflow}
-                    </span>
-                </td>
-                <td>${new Date(job.start_time).toLocaleString()}</td>
-                <td>${job.end_time ? new Date(job.end_time).toLocaleString() : ''}</td>
-                <td>${job.duration}</td>
-                <td class="job-status">
-                    ${this.getStatusBadgeHTML(job.status)}
-                </td>
-            `;
+            const stopJobBtn = row.querySelector('.stop-job-btn');
+            if (stopJobBtn) {
+                stopJobBtn.addEventListener('click', () => this.showStopJobConfirmation(demandId));
+            }
 
             tableBody.appendChild(row);
         });
+
+        // Reinitialize copy-to-clipboard functionality after updating table
+        this.initializeCopyToClipboard();
+
+        console.log('Finished updating running jobs table');
     }
 
-    /**
-     * Helper method to reset button states
-     */
-    resetButtonStates(refreshBtn, updateAllBtn) {
-        if (refreshBtn) {
-            refreshBtn.disabled = false;
-            refreshBtn.querySelector('.refresh-icon').classList.remove('d-none');
-            refreshBtn.querySelector('.refresh-spinner').classList.add('d-none');
-        }
+    formatDate(dateString) {
+        if (!dateString) return 'N/A';
 
-        if (updateAllBtn) {
-            updateAllBtn.disabled = false;
-            updateAllBtn.querySelector('.refresh-icon').classList.remove('d-none');
-            updateAllBtn.querySelector('.refresh-spinner').classList.add('d-none');
-        }
-    }
-
-    /**
-     * Helper method to get status badge HTML
-     */
-    getStatusBadgeHTML(status) {
-        const statusMap = {
-            'SUBMITTED': ['info', 'Submitted'],
-            'IN_PROGRESS': ['primary', 'Running'],
-            'COMPLETED': ['success', 'Completed'],
-            'FAILED': ['danger', 'Failed'],
-            'ABORTED': ['secondary', 'Aborted']
-        };
-
-        const [type, label] = statusMap[status] || ['secondary', status];
-        return `<span class="badge bg-${type} status-badge">${label}</span>`;
-    }
-
-    /**
-     * Reattach event listeners for job action buttons
-     */
-    attachJobActionListeners() {
-        // Attach check status button listeners
-        document.querySelectorAll('.check-status-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const demandId = btn.getAttribute('data-demand-id');
-                if (demandId) {
-                    this.checkJobStatus(demandId);
-                }
-            });
-        });
-
-        // Attach stop job button listeners
-        document.querySelectorAll('.stop-job-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const demandId = btn.getAttribute('data-demand-id');
-                if (demandId) {
-                    this.showStopJobConfirmation(demandId);
-                }
-            });
+        const date = new Date(dateString);
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
         });
     }
 
     /**
      * Check status of a specific job
      */
-    checkJobStatus(demandId) {
-        this.showToastNotification(`Checking status for demand ID: ${demandId}`, 'info');
+    async checkJobStatus(demandId) {
+        console.log(`Checking job status for demand ID: ${demandId}`);
 
-        fetch(`/api/pipeline/check-alignment-status/?demand_id=${demandId}`, {
-            method: 'GET',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
+        if (!demandId) {
+            console.error('No demand ID provided for job status check');
+            this.showToastNotification('Missing demand ID for job status check', 'error');
+            return;
+        }
+
+        try {
+            const jobRow = document.querySelector(`tr[data-demand-id="${demandId}"]`);
+            if (!jobRow) {
+                console.warn(`No job row found for demand ID: ${demandId}`);
+                // Continue anyway as the job might exist in the database but not in the UI
+            } else {
+                console.log(`Found job row for demand ID: ${demandId}`, jobRow);
             }
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    // Show status in the status update modal
-                    const modalBody = document.querySelector('#statusUpdateModal .job-status-details');
-                    if (modalBody) {
-                        modalBody.innerHTML = `
-                            <div class="alert alert-${this.getAlertClass(data.job_status)} mb-3">
-                                <strong>Current Status:</strong> ${data.job_status}
-                            </div>
-                            <table class="table table-sm">
-                                <tr>
-                                    <th>FASTQ Name:</th>
-                                    <td>${data.fastq_name || 'N/A'}</td>
-                                </tr>
-                                <tr>
-                                    <th>Demand ID:</th>
-                                    <td>${demandId}</td>
-                                </tr>
-                                <tr>
-                                    <th>Start Time:</th>
-                                    <td>${data.start_time || 'N/A'}</td>
-                                </tr>
-                                <tr>
-                                    <th>End Time:</th>
-                                    <td>${data.end_time || 'N/A'}</td>
-                                </tr>
-                                <tr>
-                                    <th>Duration:</th>
-                                    <td>${data.duration || 'N/A'}</td>
-                                </tr>
-                            </table>
-                        `;
 
-                        // Show the modal
-                        const statusModal = new bootstrap.Modal(document.getElementById('statusUpdateModal'));
-                        statusModal.show();
-                    }
-
-                    // Update job status in the table
-                    const statusCell = document.querySelector(`tr[data-demand-id="${demandId}"] .job-status`);
-                    if (statusCell) {
-                        statusCell.innerHTML = this.getStatusBadgeHTML(data.job_status);
-                    }
-
-                    this.showToastNotification(`Status updated: ${data.job_status}`, 'success');
-                } else {
-                    this.showToastNotification(`Error: ${data.message}`, 'danger');
+            // Show loading state on the button
+            const statusButton = document.querySelector(`.check-status-btn[data-demand-id="${demandId}"]`);
+            if (statusButton) {
+                const icon = statusButton.querySelector('i');
+                if (icon) {
+                    icon.className = 'spinner-border spinner-border-sm';
                 }
-            })
-            .catch(error => {
-                console.error('Error checking job status:', error);
-                this.showToastNotification('Network error while checking job status', 'danger');
+                statusButton.disabled = true;
+            }
+
+            console.log(`Sending status check request for demand ID: ${demandId}`);
+            const response = await fetch(`/api/pipeline/check-job-status/${demandId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                }
             });
+
+            console.log(`Received response status: ${response.status}`);
+            if (!response.ok) {
+                throw new Error(`Network response error: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            console.log(`Job status data:`, data);
+
+            // Reset button state
+            if (statusButton) {
+                const icon = statusButton.querySelector('i');
+                if (icon) {
+                    icon.className = 'bi bi-arrow-clockwise';
+                }
+                statusButton.disabled = false;
+            }
+
+            if (data.status === 'success') {
+                const status = data.job_status || 'UNKNOWN';
+                const demandType = data.demand_type || 'align';
+                console.log(`Job status: ${status}, type: ${demandType}`);
+
+                // Show a different message based on job status
+                if (status === 'COMPLETED') {
+                    this.showToastNotification(`${demandType === 'align' ? 'Alignment' : 'Post-QC'} job completed successfully`, 'success');
+                } else if (status === 'FAILED') {
+                    this.showToastNotification(`${demandType === 'align' ? 'Alignment' : 'Post-QC'} job failed`, 'error');
+                } else if (status === 'ABORTED') {
+                    this.showToastNotification(`${demandType === 'align' ? 'Alignment' : 'Post-QC'} job was aborted`, 'warning');
+                } else {
+                    this.showToastNotification(`${demandType === 'align' ? 'Alignment' : 'Post-QC'} job status: ${status}`, 'info');
+                }
+
+                // If job is complete, refresh to update the tables
+                if (['COMPLETED', 'FAILED', 'ABORTED'].includes(status)) {
+                    console.log('Job is complete, refreshing job lists');
+                    await this.refreshJobs();
+                }
+            } else {
+                console.error('Error in job status check:', data.message);
+                this.showToastNotification(`Error checking job status: ${data.message}`, 'error');
+            }
+
+        } catch (error) {
+            console.error('Error checking job status:', error);
+            this.showToastNotification(`Error checking job status: ${error.message}`, 'error');
+
+            // Reset any loading buttons
+            const statusButton = document.querySelector(`.check-status-btn[data-demand-id="${demandId}"]`);
+            if (statusButton) {
+                const icon = statusButton.querySelector('i');
+                if (icon) {
+                    icon.className = 'bi bi-arrow-clockwise';
+                }
+                statusButton.disabled = false;
+            }
+        }
     }
 
     /**
      * Show stop job confirmation modal
      */
     showStopJobConfirmation(demandId) {
+        console.log('Showing stop job confirmation for demand ID:', demandId);
+
         const jobRow = document.querySelector(`tr[data-demand-id="${demandId}"]`);
-        if (jobRow) {
-            const fastqName = jobRow.cells[0].textContent.trim();
-            const workflow = jobRow.cells[2].textContent.trim();
-
-            const jobInfo = document.querySelector('#confirmStopModal .job-info');
-            if (jobInfo) {
-                jobInfo.innerHTML = `
-                    <div class="alert alert-secondary">
-                        <strong>FASTQ Name:</strong> ${fastqName}<br>
-                        <strong>Workflow:</strong> ${workflow}<br>
-                        <strong>Demand ID:</strong> ${demandId}
-                    </div>
-                `;
-            }
-
-            // Set demand ID on confirm button
-            const confirmBtn = document.getElementById('confirmStopBtn');
-            if (confirmBtn) {
-                confirmBtn.setAttribute('data-demand-id', demandId);
-            }
-
-            // Show the modal
-            const confirmModal = new bootstrap.Modal(document.getElementById('confirmStopModal'));
-            confirmModal.show();
-        } else {
-            this.showToastNotification('Could not find job information', 'danger');
+        if (!jobRow) {
+            console.error('Job row not found for demand ID:', demandId);
+            this.showToastNotification('Job not found in the table.', 'error');
+            return;
         }
+
+        console.log('Found job row:', jobRow);
+        // Get FASTQ name from the first cell
+        const fastqName = jobRow.cells[0]?.textContent.trim() || '[Unknown]';
+        // Get command from the second cell (index 1) which contains the command
+        const commandCell = jobRow.cells[1];
+        if (!commandCell) {
+            console.error('Command cell not found in job row');
+            this.showToastNotification('Could not find job command.', 'error');
+            return;
+        }
+        const commandElement = commandCell.querySelector('code');
+        if (!commandElement) {
+            console.error('Command code element not found in cell');
+            this.showToastNotification('Could not find job command.', 'error');
+            return;
+        }
+        const command = commandElement.textContent;
+        console.log('Job command:', command);
+
+        // Construct the abort command for display
+        const abortCommand = `ocs core gwo demand stop --demand-id ${demandId}`;
+        console.log('Abort command:', abortCommand);
+
+        const jobInfo = document.querySelector('#confirmStopModal .job-info');
+        if (!jobInfo) {
+            console.error('Job info element not found in modal');
+            return;
+        }
+
+        jobInfo.innerHTML = `
+            <div class="alert alert-warning">
+                <p class="mb-2">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Warning:</strong> This action will abort the following job and cannot be undone.
+                </p>
+                <div class="mb-2"><strong>FASTQ Name:</strong> <span class="text-monospace">${fastqName}</span></div>
+                <div class="mb-2"><strong>Abort Command:</strong>
+                    <div class="bg-light p-2 rounded"><code class="text-wrap">${abortCommand}</code></div>
+                        </div>
+                <div><strong>Original Job Command:</strong>
+                    <div class="bg-light p-2 rounded"><code class="text-wrap">${command}</code></div>
+                </div>
+            </div>
+        `;
+
+        const confirmBtn = document.getElementById('confirmStopBtn');
+        if (!confirmBtn) {
+            console.error('Confirm stop button not found in modal');
+            return;
+        }
+
+        confirmBtn.setAttribute('data-demand-id', demandId);
+        console.log('Set demand ID on confirm button:', demandId);
+
+        const modal = new bootstrap.Modal(document.getElementById('confirmStopModal'));
+        modal.show();
+        console.log('Stop job confirmation modal shown');
     }
 
     /**
      * Stop a running job
      */
-    stopJob(demandId) {
-        this.showToastNotification(`Stopping job with demand ID: ${demandId}`, 'warning');
+    async stopJob(demandId) {
+        console.log('Attempting to stop job with demand ID:', demandId);
 
-        fetch('/api/pipeline/stop-alignment/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ demand_id: demandId })
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    this.showToastNotification('Job stopped successfully', 'success');
+        try {
+            const jobRow = document.querySelector(`tr[data-demand-id="${demandId}"]`);
+            if (!jobRow) {
+                console.error('Job row not found for demand ID:', demandId);
+                this.showToastNotification('Job not found in the table.', 'error');
+                return;
+            }
 
-                    // Update job status in the table
-                    const statusCell = document.querySelector(`tr[data-demand-id="${demandId}"] .job-status`);
-                    if (statusCell) {
-                        statusCell.innerHTML = '<span class="badge bg-secondary status-badge">Aborted</span>';
-                    }
+            // Get fastq name from the first cell
+            const fastqName = jobRow.cells[0].textContent.trim();
+            console.log('Found FASTQ name:', fastqName);
 
-                    // Hide the modal
-                    const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmStopModal'));
-                    if (confirmModal) {
-                        confirmModal.hide();
-                    }
+            // Get job type (based on command in second cell)
+            let jobType = 'alignment';
+            const command = jobRow.cells[1].querySelector('code').textContent.trim();
+            if (command.includes('post-align')) {
+                jobType = 'post-QC';
+            }
+            console.log('Job type determined as:', jobType);
 
-                    // Reload page after a short delay
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 2000);
-                } else {
-                    this.showToastNotification(`Error: ${data.message}`, 'danger');
+            // Show loading state on the button
+            const stopButton = jobRow.querySelector('.stop-job-btn');
+            if (stopButton) {
+                const icon = stopButton.querySelector('i');
+                if (icon) {
+                    icon.className = 'spinner-border spinner-border-sm';
                 }
-            })
-            .catch(error => {
-                console.error('Error stopping job:', error);
-                this.showToastNotification('Network error while stopping job', 'danger');
-            });
-    }
+                stopButton.disabled = true;
+            }
 
-    /**
-     * Get alert class for status
-     */
-    getAlertClass(status) {
-        switch (status.toUpperCase()) {
-            case 'COMPLETED':
-                return 'success';
-            case 'RUNNING':
-            case 'IN_PROGRESS':
-                return 'primary';
-            case 'SUBMITTED':
-                return 'info';
-            case 'FAILED':
-                return 'danger';
-            case 'ABORTED':
-                return 'secondary';
-            default:
-                return 'secondary';
+            console.log('Sending stop job request to server...');
+            const response = await fetch(`/api/pipeline/stop-job/${demandId}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ fastq_name: fastqName })
+            });
+
+            console.log('Received response:', response.status);
+            const data = await response.json();
+            console.log('Response data:', data);
+
+            // Reset button state
+            if (stopButton) {
+                const icon = stopButton.querySelector('i');
+                if (icon) {
+                    icon.className = 'bi bi-stop-fill';
+                }
+                stopButton.disabled = false;
+            }
+
+            if (response.ok) {
+                console.log('Job stopped successfully');
+                this.showToastNotification(`${jobType} job for ${fastqName} has been aborted`, 'success');
+
+                // If there was a warning but still successful
+                if (data.warning) {
+                    console.warn('Warning when stopping job:', data.warning);
+                    this.showToastNotification(`Warning: ${data.warning}`, 'warning');
+                }
+
+                // Remove the row and refresh data
+                jobRow.remove();
+                await this.refreshJobs();
+            } else {
+                console.error('Failed to stop job:', data.message);
+                this.showToastNotification(`Failed to abort ${jobType} job: ${data.message}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error stopping job:', error);
+            this.showToastNotification(`Error stopping job: ${error.message}`, 'error');
+
+            // Reset any loading buttons
+            const stopButton = document.querySelector(`.stop-job-btn[data-demand-id="${demandId}"]`);
+            if (stopButton) {
+                const icon = stopButton.querySelector('i');
+                if (icon) {
+                    icon.className = 'bi bi-stop-fill';
+                }
+                stopButton.disabled = false;
+            }
         }
     }
 
     /**
      * Shows a toast notification
      */
-    showToastNotification(message, type = 'success', duration = 3000) {
-        // Remove any existing toasts to prevent duplicates
-        const existingToasts = document.querySelectorAll('.toast');
-        existingToasts.forEach(toast => {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
-            }
-        });
-
+    showToastNotification(message, type = 'info', duration = 3000) {
         // Create toast container if it doesn't exist
         let toastContainer = document.getElementById('toast-container');
         if (!toastContainer) {
             toastContainer = document.createElement('div');
             toastContainer.id = 'toast-container';
-            toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
-            toastContainer.style.zIndex = '11'; // Above most content
+            toastContainer.className = 'position-fixed bottom-0 start-50 translate-middle-x mb-4';
+            toastContainer.style.zIndex = '1100';
+            toastContainer.style.left = '50%';
+            toastContainer.style.transform = 'translateX(-50%)';
+            toastContainer.style.width = 'auto';
+            toastContainer.style.textAlign = 'center';
             document.body.appendChild(toastContainer);
         }
 
-        // Set background color based on type
-        let bgColor;
-        let icon;
-        switch (type) {
-            case 'success':
-                bgColor = '#28a745';
-                icon = 'bi-check-circle-fill';
-                break;
-            case 'warning':
-                bgColor = '#ffc107';
-                icon = 'bi-exclamation-triangle-fill';
-                break;
-            case 'danger':
-                bgColor = '#dc3545';
-                icon = 'bi-x-circle-fill';
-                break;
-            case 'info':
-            default:
-                bgColor = '#17a2b8';
-                icon = 'bi-info-circle-fill';
-                break;
-        }
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center border-0 ${type === 'error' ? 'bg-danger' : type === 'success' ? 'bg-success' : 'bg-info'} text-white`;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        toast.style.minWidth = '250px';
+        toast.style.margin = '0 auto';
 
-        // Create the toast element
-        const toastDiv = document.createElement('div');
-        toastDiv.className = 'toast align-items-center text-white border-0';
-        toastDiv.style.backgroundColor = bgColor;
-        toastDiv.setAttribute('role', 'alert');
-        toastDiv.setAttribute('aria-live', 'assertive');
-        toastDiv.setAttribute('aria-atomic', 'true');
-
-        // Set inner HTML for toast
-        toastDiv.innerHTML = `
+        toast.innerHTML = `
             <div class="d-flex">
                 <div class="toast-body">
-                    <i class="bi ${icon} me-2"></i>
                     ${message}
                 </div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         `;
 
-        // Add to container
-        toastContainer.appendChild(toastDiv);
-
-        // Initialize and show toast
-        const bsToast = new bootstrap.Toast(toastDiv, {
-            delay: duration,
-            animation: true
-        });
+        toastContainer.appendChild(toast);
+        const bsToast = new bootstrap.Toast(toast, { delay: duration });
         bsToast.show();
 
-        // Remove after hiding
-        toastDiv.addEventListener('hidden.bs.toast', () => {
-            if (toastDiv.parentNode) {
-                toastDiv.parentNode.removeChild(toastDiv);
-            }
+        toast.addEventListener('hidden.bs.toast', () => {
+            toast.remove();
         });
     }
 }
