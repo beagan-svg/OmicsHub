@@ -41,51 +41,63 @@ def template_utils(request):
             params[key] = value
         return params.urlencode()
     
-    # Create pagination URL utility for Django templates
-    class PaginationUrlHelper:
-        def first_page(self):
-            """URL for first page"""
-            return self._get_url(1)
-            
-        def prev_page(self, current_page):
-            """URL for previous page"""
-            try:
-                current = int(current_page)
-            except (TypeError, ValueError):
-                current = 1
-            return self._get_url(max(1, current - 1))
-            
-        def next_page(self, current_page, total_pages):
-            """URL for next page"""
-            try:
-                current = int(current_page)
-                total = int(total_pages)
-            except (TypeError, ValueError):
-                return self._get_url(1)
-            return self._get_url(min(total, current + 1))
-            
-        def last_page(self, total_pages):
-            """URL for last page"""
-            try:
-                total = int(total_pages)
-            except (TypeError, ValueError):
-                total = 1
-            return self._get_url(total)
-            
-        def _get_url(self, page_number):
-            """Internal method to generate URL for the given page number"""
-            params = request.GET.copy()
-            params['page'] = str(page_number)
-            return f"?{params.urlencode()}"
+    # Utility for creating pagination URLs
+    def create_page_url(page_number):
+        """Create a URL for the given page number, preserving other query parameters."""
+        params = request.GET.copy()
+        params['page'] = str(page_number)
+        return f"?{params.urlencode()}"
+        
+    # Default pagination URLs for common actions
+    # These don't take parameters to ensure they work in Django templates
+    def first_page_url():
+        """URL for the first page."""
+        return create_page_url(1)
+        
+    def previous_page_url():
+        """URL for the previous page based on the current request."""
+        current_page = int(request.GET.get('page', '1'))
+        return create_page_url(max(1, current_page - 1))
+        
+    def next_page_url():
+        """URL for the next page based on the current request."""
+        current_page = int(request.GET.get('page', '1'))
+        # This doesn't have max page information - best effort
+        return create_page_url(current_page + 1)
+        
+    def last_page_url():
+        """
+        URL for the last page.
+        
+        Note: This won't work correctly in Django templates since we can't pass
+        the total page count as a parameter. It's included here for completeness.
+        """
+        # Default to page 1 if we can't determine the last page
+        return create_page_url(1)
     
-    # Create per-page URL utility for Django templates
-    class PerPageUrlHelper:
-        def get_url(self, per_page):
-            """Generate URL for changing rows per page."""
-            params = request.GET.copy()
-            params['per_page'] = str(per_page)
-            params['page'] = '1'  # Reset to first page when changing per_page
-            return f"?{params.urlencode()}"
+    # Utility for per-page changes that works without parameters
+    def per_page_url_10():
+        """URL for 10 rows per page."""
+        return _create_per_page_url(10)
+        
+    def per_page_url_25():
+        """URL for 25 rows per page."""
+        return _create_per_page_url(25)
+        
+    def per_page_url_50():
+        """URL for 50 rows per page."""
+        return _create_per_page_url(50)
+        
+    def per_page_url_100():
+        """URL for 100 rows per page."""
+        return _create_per_page_url(100)
+    
+    def _create_per_page_url(per_page):
+        """Create a URL for changing rows per page."""
+        params = request.GET.copy()
+        params['per_page'] = str(per_page)
+        params['page'] = '1'  # Reset to first page
+        return f"?{params.urlencode()}"
     
     return {
         'utils': {
@@ -105,9 +117,17 @@ def template_utils(request):
             # Function to replace URL parameters
             'param_replace': param_replace,
             
-            # Helper classes for pagination URLs that work better with Django templates
-            'pagination_url': PaginationUrlHelper(),
-            'per_page_url': PerPageUrlHelper(),
+            # Pagination URL helpers that work in Django templates
+            'first_page_url': first_page_url,
+            'previous_page_url': previous_page_url,
+            'next_page_url': next_page_url,
+            'last_page_url': last_page_url,
+            
+            # Per-page URL helpers
+            'per_page_url_10': per_page_url_10,
+            'per_page_url_25': per_page_url_25,
+            'per_page_url_50': per_page_url_50,
+            'per_page_url_100': per_page_url_100,
             
             # Function to convert a Python object to JSON
             'jsonify': lambda obj: mark_safe(json.dumps(obj)),
