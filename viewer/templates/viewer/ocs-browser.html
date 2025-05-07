@@ -733,12 +733,12 @@
                             {% with has_prev=page_obj.has_previous has_next=page_obj.has_next %}
                             <!-- First page button -->
                             {% if has_prev %}
-                            <a href="{{ utils.pagination_url 1 }}" class="btn btn-sm btn-outline-secondary page-nav"
-                                title="First page">
+                            <a href="{{ utils.pagination_url.first_page }}"
+                                class="btn btn-sm btn-outline-secondary page-nav" title="First page">
                                 <i class="bi bi-chevron-double-left"></i>
                             </a>
                             <!-- Previous page button -->
-                            <a href="{{ utils.pagination_url page_obj.previous_page_number }}"
+                            <a href="{{ utils.pagination_url.prev_page page_obj.number }}"
                                 class="btn btn-sm btn-outline-secondary page-nav ms-1" title="Previous page">
                                 <i class="bi bi-chevron-left"></i>
                             </a>
@@ -762,12 +762,12 @@
 
                             <!-- Next page button -->
                             {% if has_next %}
-                            <a href="{{ utils.pagination_url page_obj.next_page_number }}"
+                            <a href="{{ utils.pagination_url.next_page page_obj.number page_obj.paginator.num_pages }}"
                                 class="btn btn-sm btn-outline-secondary page-nav me-1" title="Next page">
                                 <i class="bi bi-chevron-right"></i>
                             </a>
                             <!-- Last page button -->
-                            <a href="{{ utils.pagination_url page_obj.paginator.num_pages }}"
+                            <a href="{{ utils.pagination_url.last_page page_obj.paginator.num_pages }}"
                                 class="btn btn-sm btn-outline-secondary page-nav" title="Last page">
                                 <i class="bi bi-chevron-double-right"></i>
                             </a>
@@ -799,7 +799,7 @@
                                         {% for option in per_page_options.split ',' %}
                                         <li>
                                             <a class="dropdown-item{% if current_per_page == option|add:0 %} active{% endif %}"
-                                                href="{{ utils.per_page_url option 1 }}">
+                                                href="{{ utils.per_page_url.get_url option }}">
                                                 {{ option }}
                                             </a>
                                         </li>
