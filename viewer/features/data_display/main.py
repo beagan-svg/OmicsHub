@@ -454,16 +454,23 @@ class MainListView(FilterView):
             else:
                 context['current_page_count'] = self.paginate_by
                 
-            # Explicitly add pagination data to context
+            # Add essential pagination data to context
             context['paginator_count'] = page_obj.paginator.count
             context['page_start_index'] = page_obj.start_index()
             context['page_end_index'] = page_obj.end_index()
+            context['page_number'] = page_obj.number
+            context['total_pages'] = page_obj.paginator.num_pages
+            
+            # Pre-computed string for pagination info display
             context['pagination_info'] = f"Showing {page_obj.start_index()} to {page_obj.end_index()} of {page_obj.paginator.count} samples"
         else:
+            # Default values when no pagination is present
             context['current_page_count'] = 0
             context['paginator_count'] = 0
             context['page_start_index'] = 0
             context['page_end_index'] = 0
+            context['page_number'] = 1
+            context['total_pages'] = 1
             context['pagination_info'] = "No items to display"
 
     def _add_table_context(self, context: Dict[str, Any]) -> None:
