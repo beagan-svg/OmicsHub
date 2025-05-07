@@ -41,6 +41,60 @@ def template_utils(request):
             params[key] = value
         return params.urlencode()
     
+    # Helper function to create pagination URLs
+    def pagination_url(page=1, exclude_keys=None):
+        """
+        Generate URL for pagination with current GET parameters.
+        
+        Args:
+            page: The page number to set in the URL
+            exclude_keys: List of keys to exclude from URL parameters
+            
+        Returns:
+            String: URL with query parameters
+        """
+        if exclude_keys is None:
+            exclude_keys = ['page', 'csrfmiddlewaretoken']
+        elif isinstance(exclude_keys, str):
+            exclude_keys = [exclude_keys, 'csrfmiddlewaretoken']
+            
+        params = []
+        
+        # Add regular GET parameters
+        for key, value in request.GET.items():
+            if key not in exclude_keys and value:
+                params.append(f"{key}={value}")
+                
+        # Add page parameter
+        params.append(f"page={page}")
+        
+        return "?" + "&".join(params)
+    
+    # Helper function for per page URLs
+    def per_page_url(per_page, page=1):
+        """
+        Generate URL for changing rows per page.
+        
+        Args:
+            per_page: Number of rows per page
+            page: Page number to navigate to (default 1)
+            
+        Returns:
+            String: URL with query parameters
+        """
+        params = []
+        
+        # Add all GET parameters except page and per_page
+        for key, value in request.GET.items():
+            if key not in ['page', 'per_page', 'csrfmiddlewaretoken'] and value:
+                params.append(f"{key}={value}")
+        
+        # Add per_page and page parameters
+        params.append(f"per_page={per_page}")
+        params.append(f"page={page}")
+        
+        return "?" + "&".join(params)
+    
     return {
         'utils': {
             # Function to get item from dictionary
@@ -58,6 +112,12 @@ def template_utils(request):
             
             # Function to replace URL parameters
             'param_replace': param_replace,
+            
+            # Function to generate pagination URLs
+            'pagination_url': pagination_url,
+            
+            # Function to generate per page URLs
+            'per_page_url': per_page_url,
             
             # Function to convert a Python object to JSON
             'jsonify': lambda obj: mark_safe(json.dumps(obj)),

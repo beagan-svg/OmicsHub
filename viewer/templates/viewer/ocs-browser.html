@@ -730,12 +730,15 @@
                     <!-- Pagination controls -->
                     <div class="d-flex justify-content-between align-items-center mt-3">
                         <div class="pagination-navigation">
-                            {% if page_obj.has_previous %}
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page=1"
-                                class="btn btn-sm btn-outline-secondary page-nav" title="First page">
+                            {% with has_prev=page_obj.has_previous has_next=page_obj.has_next %}
+                            <!-- First page button -->
+                            {% if has_prev %}
+                            <a href="{{ utils.pagination_url 1 }}" class="btn btn-sm btn-outline-secondary page-nav"
+                                title="First page">
                                 <i class="bi bi-chevron-double-left"></i>
                             </a>
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
+                            <!-- Previous page button -->
+                            <a href="{{ utils.pagination_url page_obj.previous_page_number }}"
                                 class="btn btn-sm btn-outline-secondary page-nav ms-1" title="Previous page">
                                 <i class="bi bi-chevron-left"></i>
                             </a>
@@ -750,18 +753,21 @@
                             </button>
                             {% endif %}
 
+                            <!-- Page indicator -->
                             <span class="page-indicator mx-2">
                                 <span class="current-page">{{ page_obj.number }}</span>
                                 <span class="text-muted">/</span>
                                 <span class="total-pages">{{ page_obj.paginator.num_pages }}</span>
                             </span>
 
-                            {% if page_obj.has_next %}
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
+                            <!-- Next page button -->
+                            {% if has_next %}
+                            <a href="{{ utils.pagination_url page_obj.next_page_number }}"
                                 class="btn btn-sm btn-outline-secondary page-nav me-1" title="Next page">
                                 <i class="bi bi-chevron-right"></i>
                             </a>
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{% if '&' in key or key|last == ']' %}{% else %}{{ key }}={{ value }}&{% endif %}{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}"
+                            <!-- Last page button -->
+                            <a href="{{ utils.pagination_url page_obj.paginator.num_pages }}"
                                 class="btn btn-sm btn-outline-secondary page-nav" title="Last page">
                                 <i class="bi bi-chevron-double-right"></i>
                             </a>
@@ -775,6 +781,7 @@
                                 <i class="bi bi-chevron-double-right"></i>
                             </button>
                             {% endif %}
+                            {% endwith %}
                         </div>
 
                         <div class="d-flex align-items-center">
@@ -786,33 +793,19 @@
                                         id="rowsPerPageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                                         {{ current_per_page }}
                                     </button>
+                                    {% with per_page_options="10,25,50,100" %}
                                     <ul class="dropdown-menu dropdown-menu-end pagination-dropdown"
                                         aria-labelledby="rowsPerPageDropdown">
+                                        {% for option in per_page_options.split ',' %}
                                         <li>
-                                            <a class="dropdown-item{% if current_per_page == 10 %} active{% endif %}"
-                                                href="?{% for key, value in request.GET.items %}{% if key != 'page' and key != 'per_page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'per_page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}per_page=10&page=1">
-                                                10
+                                            <a class="dropdown-item{% if current_per_page == option|add:0 %} active{% endif %}"
+                                                href="{{ utils.per_page_url option 1 }}">
+                                                {{ option }}
                                             </a>
                                         </li>
-                                        <li>
-                                            <a class="dropdown-item{% if current_per_page == 25 %} active{% endif %}"
-                                                href="?{% for key, value in request.GET.items %}{% if key != 'page' and key != 'per_page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'per_page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}per_page=25&page=1">
-                                                25
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item{% if current_per_page == 50 %} active{% endif %}"
-                                                href="?{% for key, value in request.GET.items %}{% if key != 'page' and key != 'per_page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'per_page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}per_page=50&page=1">
-                                                50
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item{% if current_per_page == 100 %} active{% endif %}"
-                                                href="?{% for key, value in request.GET.items %}{% if key != 'page' and key != 'per_page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for key, values in request.GET.lists %}{% if key != 'page' and key != 'per_page' and key != 'csrfmiddlewaretoken' %}{% for value in values %}{{ key }}={{ value }}&{% endfor %}{% endif %}{% endfor %}per_page=100&page=1">
-                                                100
-                                            </a>
-                                        </li>
+                                        {% endfor %}
                                     </ul>
+                                    {% endwith %}
                                 </div>
                             </div>
 
@@ -822,14 +815,6 @@
                                     {% for key, value in request.GET.items %}
                                     {% if key != 'page' and value %}
                                     <input type="hidden" name="{{ key }}" value="{{ value }}">
-                                    {% endif %}
-                                    {% endfor %}
-
-                                    {% for key, values in request.GET.lists %}
-                                    {% if key != 'page' and key != 'csrfmiddlewaretoken' %}
-                                    {% for value in values %}
-                                    <input type="hidden" name="{{ key }}" value="{{ value }}">
-                                    {% endfor %}
                                     {% endif %}
                                     {% endfor %}
 
@@ -843,7 +828,7 @@
                                 </form>
                             </div>
 
-                            <!-- Using the pre-computed pagination_info from the view -->
+                            <!-- Pagination info (from main.py) -->
                             <span class="text-muted pagination-info">
                                 {{ pagination_info }}
                             </span>
