@@ -1,3 +1,12 @@
+# Define pagination constants at the top of the file
+PAGINATION = {
+    'PAGE_PARAM': 'page',
+    'PER_PAGE_PARAM': 'per_page',
+    'DEFAULT_PAGE': 1,
+    'DEFAULT_PER_PAGE': 25,
+    'PER_PAGE_OPTIONS': [10, 25, 50, 100]
+}
+
 from typing import Dict, Any, List, Optional, Union
 from django.shortcuts import render
 from django_tables2 import SingleTableView, tables
@@ -337,8 +346,8 @@ class MainListView(FilterView):
         Returns:
             int: Number of items per page
         """
-        per_page = self.request.GET.get('per_page')
-        if per_page in ['10', '25', '50', '100']:
+        per_page = self.request.GET.get(PAGINATION['PER_PAGE_PARAM'])
+        if per_page in [str(option) for option in PAGINATION['PER_PAGE_OPTIONS']]:
             return int(per_page)
         return self.paginate_by
 
@@ -444,34 +453,54 @@ class MainListView(FilterView):
         return context
 
     def _add_pagination_context(self, context: Dict[str, Any]) -> None:
-        """Add pagination-related context."""
+        """
+        Add pagination-related context.
+        
+        This method adds pagination information to the template context.
+        It also saves pagination parameters that can be accessed by JavaScript.
+        """
+        # Add pagination constants to context for JavaScript access
+        context['pagination_config'] = PAGINATION
+        
+        # Get current per-page setting
         context['current_per_page'] = self.get_paginate_by(None)
         
         if context.get('page_obj'):
             page_obj = context['page_obj']
+            # Store page_obj on the request for the context processor to access
+            if hasattr(self, 'request'):
+                self.request._current_page_obj = page_obj
+                
             if page_obj.number == page_obj.paginator.num_pages:
                 context['current_page_count'] = len(page_obj.object_list)
             else:
                 context['current_page_count'] = self.paginate_by
                 
-            # Add essential pagination data to context
+            # Explicitly add pagination data to context
             context['paginator_count'] = page_obj.paginator.count
             context['page_start_index'] = page_obj.start_index()
             context['page_end_index'] = page_obj.end_index()
-            context['page_number'] = page_obj.number
-            context['total_pages'] = page_obj.paginator.num_pages
             
-            # Pre-computed string for pagination info display
-            context['pagination_info'] = f"Showing {page_obj.start_index()} to {page_obj.end_index()} of {page_obj.paginator.count} samples"
+            # Add data-attributes compatible values for JavaScript
+            context['pagination_state'] = {
+                'current_page': page_obj.number,
+                'total_pages': page_obj.paginator.num_pages,
+                'per_page': context['current_per_page'],
+                'total_items': page_obj.paginator.count,
+            }
         else:
-            # Default values when no pagination is present
             context['current_page_count'] = 0
             context['paginator_count'] = 0
             context['page_start_index'] = 0
             context['page_end_index'] = 0
-            context['page_number'] = 1
-            context['total_pages'] = 1
-            context['pagination_info'] = "No items to display"
+            
+            # Empty pagination state
+            context['pagination_state'] = {
+                'current_page': 1,
+                'total_pages': 1,
+                'per_page': context['current_per_page'],
+                'total_items': 0,
+            }
 
     def _add_table_context(self, context: Dict[str, Any]) -> None:
         """Add table-related context."""

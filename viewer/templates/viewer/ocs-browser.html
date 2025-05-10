@@ -728,27 +728,33 @@
                     </div>
 
                     <!-- Pagination controls -->
-                    <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div class="d-flex justify-content-between align-items-center mt-3"
+                        data-pagination-current-page="{{ pagination_state.current_page }}"
+                        data-pagination-total-pages="{{ pagination_state.total_pages }}"
+                        data-pagination-per-page="{{ pagination_state.per_page }}"
+                        data-pagination-total-items="{{ pagination_state.total_items }}">
                         <div class="pagination-navigation">
                             {% with has_prev=page_obj.has_previous has_next=page_obj.has_next %}
                             <!-- First page button -->
                             {% if has_prev %}
                             <a href="{{ utils.first_page_url }}" class="btn btn-sm btn-outline-secondary page-nav"
-                                title="First page">
+                                title="First page" data-pagination-action="first" data-pagination-page="1">
                                 <i class="bi bi-chevron-double-left"></i>
                             </a>
                             <!-- Previous page button -->
                             <a href="{{ utils.previous_page_url }}"
-                                class="btn btn-sm btn-outline-secondary page-nav ms-1" title="Previous page">
+                                class="btn btn-sm btn-outline-secondary page-nav ms-1" title="Previous page"
+                                data-pagination-action="prev"
+                                data-pagination-page="{{ page_obj.previous_page_number }}">
                                 <i class="bi bi-chevron-left"></i>
                             </a>
                             {% else %}
                             <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
-                                title="First page">
+                                title="First page" data-pagination-action="first" data-pagination-page="1">
                                 <i class="bi bi-chevron-double-left"></i>
                             </button>
                             <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled ms-1"
-                                title="Previous page">
+                                title="Previous page" data-pagination-action="prev" data-pagination-page="1">
                                 <i class="bi bi-chevron-left"></i>
                             </button>
                             {% endif %}
@@ -763,21 +769,25 @@
                             <!-- Next page button -->
                             {% if has_next %}
                             <a href="{{ utils.next_page_url }}" class="btn btn-sm btn-outline-secondary page-nav me-1"
-                                title="Next page">
+                                title="Next page" data-pagination-action="next"
+                                data-pagination-page="{{ page_obj.next_page_number }}">
                                 <i class="bi bi-chevron-right"></i>
                             </a>
                             <!-- Last page button -->
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}"
-                                class="btn btn-sm btn-outline-secondary page-nav" title="Last page">
+                            <a href="{{ utils.last_page_url }}" class="btn btn-sm btn-outline-secondary page-nav"
+                                title="Last page" data-pagination-action="last"
+                                data-pagination-page="{{ page_obj.paginator.num_pages }}">
                                 <i class="bi bi-chevron-double-right"></i>
                             </a>
                             {% else %}
                             <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled me-1"
-                                title="Next page">
+                                title="Next page" data-pagination-action="next"
+                                data-pagination-page="{{ pagination_state.current_page }}">
                                 <i class="bi bi-chevron-right"></i>
                             </button>
                             <button disabled class="btn btn-sm btn-outline-secondary page-nav disabled"
-                                title="Last page">
+                                title="Last page" data-pagination-action="last"
+                                data-pagination-page="{{ pagination_state.total_pages }}">
                                 <i class="bi bi-chevron-double-right"></i>
                             </button>
                             {% endif %}
@@ -790,42 +800,28 @@
                                 <label for="rowsPerPageDropdown" class="text-muted me-2 mb-0">Rows per page:</label>
                                 <div class="dropdown">
                                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-3" type="button"
-                                        id="rowsPerPageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                        id="rowsPerPageDropdown" data-bs-toggle="dropdown" aria-expanded="false"
+                                        data-current-per-page="{{ current_per_page }}">
                                         {{ current_per_page }}
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end pagination-dropdown"
                                         aria-labelledby="rowsPerPageDropdown">
+                                        {% for option in pagination_config.PER_PAGE_OPTIONS %}
                                         <li>
-                                            <a class="dropdown-item{% if current_per_page == 10 %} active{% endif %}"
-                                                href="{{ utils.per_page_url_10 }}">
-                                                10
+                                            <a class="dropdown-item{% if current_per_page == option %} active{% endif %}"
+                                                href="?{% for key, value in request.GET.items %}{% if key != 'per_page' and key != 'page' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}per_page={{ option }}&page=1"
+                                                data-pagination-action="per-page" data-per-page="{{ option }}">
+                                                {{ option }}
                                             </a>
                                         </li>
-                                        <li>
-                                            <a class="dropdown-item{% if current_per_page == 25 %} active{% endif %}"
-                                                href="{{ utils.per_page_url_25 }}">
-                                                25
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item{% if current_per_page == 50 %} active{% endif %}"
-                                                href="{{ utils.per_page_url_50 }}">
-                                                50
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item{% if current_per_page == 100 %} active{% endif %}"
-                                                href="{{ utils.per_page_url_100 }}">
-                                                100
-                                            </a>
-                                        </li>
+                                        {% endfor %}
                                     </ul>
                                 </div>
                             </div>
 
                             <!-- Go to page input -->
                             <div class="goto-page d-flex align-items-center me-3">
-                                <form id="gotoPageForm" class="d-flex align-items-center">
+                                <form id="gotoPageForm" class="d-flex align-items-center" data-pagination-action="goto">
                                     {% for key, value in request.GET.items %}
                                     {% if key != 'page' and value %}
                                     <input type="hidden" name="{{ key }}" value="{{ value }}">
@@ -835,16 +831,20 @@
                                     <label for="gotoPage" class="text-muted me-2 mb-0">Go to:</label>
                                     <input type="number" id="gotoPage" name="page"
                                         class="form-control form-control-sm goto-page-input" min="1"
-                                        max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary ms-1 goto-btn">
+                                        max="{{ pagination_state.total_pages }}"
+                                        value="{{ pagination_state.current_page }}"
+                                        data-current-page="{{ pagination_state.current_page }}"
+                                        data-total-pages="{{ pagination_state.total_pages }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary ms-1 goto-btn"
+                                        data-pagination-submit="goto">
                                         <i class="bi bi-arrow-right"></i>
                                     </button>
                                 </form>
                             </div>
 
-                            <!-- Pagination info (from main.py) -->
+                            <!-- Pagination info (from context processor) -->
                             <span class="text-muted pagination-info">
-                                {{ pagination_info }}
+                                {{ utils.pagination_info }}
                             </span>
                         </div>
                     </div>

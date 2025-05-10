@@ -19,20 +19,6 @@ def template_utils(request):
         if view_obj and hasattr(view_obj, 'get_context_data'):
             logger.debug(f"View has get_context_data method")
     
-    # Define a debug function to log pagination info
-    def debug_pagination_info(page_obj):
-        if page_obj:
-            logger.debug(f"Page object: {page_obj}")
-            logger.debug(f"Page start index: {page_obj.start_index()}")
-            logger.debug(f"Page end index: {page_obj.end_index()}")
-            if hasattr(page_obj, 'paginator'):
-                logger.debug(f"Paginator count: {page_obj.paginator.count}")
-            else:
-                logger.debug("Page object has no paginator attribute")
-        else:
-            logger.debug("Page object is None")
-        return ""
-    
     # Helper function to replace URL parameters
     def param_replace(**kwargs):
         """Replace or add URL parameters."""
@@ -67,11 +53,17 @@ def template_utils(request):
         
     def last_page_url():
         """
-        URL for the last page.
+        URL for the last page based on available context information.
         
-        Note: This won't work correctly in Django templates since we can't pass
-        the total page count as a parameter. It's included here for completeness.
+        Retrieves the total page count from the request's _current_page_obj
+        if available.
         """
+        # Try to get the page count from the stored page object on the request
+        if hasattr(request, '_current_page_obj'):
+            page_obj = request._current_page_obj
+            if hasattr(page_obj, 'paginator') and hasattr(page_obj.paginator, 'num_pages'):
+                return create_page_url(page_obj.paginator.num_pages)
+                
         # Default to page 1 if we can't determine the last page
         return create_page_url(1)
     
@@ -99,6 +91,15 @@ def template_utils(request):
         params['page'] = '1'  # Reset to first page
         return f"?{params.urlencode()}"
     
+    # Function to get pagination info for the current page
+    def pagination_info():
+        """Get pagination info string for the current page."""
+        # Try to get page_obj from the request context
+        if hasattr(request, '_current_page_obj'):
+            page_obj = request._current_page_obj
+            return f"Showing {page_obj.start_index()} to {page_obj.end_index()} of {page_obj.paginator.count} samples"
+        return "No items to display"
+    
     return {
         'utils': {
             # Function to get item from dictionary
@@ -110,9 +111,8 @@ def template_utils(request):
             # Function to check if a value is selected
             'is_selected': lambda value, options_list: 'selected' if value in (options_list or []) else '',
             
-            # Function to get pagination info - changed to use string template instead of f-string
-            'pagination_info': lambda page_obj: "Results {}-{} of {}".format(
-                page_obj.start_index(), page_obj.end_index(), page_obj.paginator.count),
+            # Function to get pagination info - no parameters needed
+            'pagination_info': pagination_info,
             
             # Function to replace URL parameters
             'param_replace': param_replace,
@@ -127,12 +127,6 @@ def template_utils(request):
             'per_page_url_10': per_page_url_10,
             'per_page_url_25': per_page_url_25,
             'per_page_url_50': per_page_url_50,
-            'per_page_url_100': per_page_url_100,
-            
-            # Function to convert a Python object to JSON
-            'jsonify': lambda obj: mark_safe(json.dumps(obj)),
-            
-            # Debug function
-            'debug_pagination': debug_pagination_info
+            'per_page_url_100': per_page_url_100
         }
     } 
