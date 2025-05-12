@@ -726,13 +726,15 @@
                             </table>
                         </form>
                     </div>
+                </div>
 
-                    <!-- Pagination controls -->
-                    <div class="d-flex justify-content-between align-items-center mt-3"
-                        data-pagination-current-page="{{ pagination_state.current_page }}"
-                        data-pagination-total-pages="{{ pagination_state.total_pages }}"
-                        data-pagination-per-page="{{ pagination_state.per_page }}"
-                        data-pagination-total-items="{{ pagination_state.total_items }}">
+                <!-- Pagination controls in card footer -->
+                <div class="card-footer bg-light py-3"
+                    data-pagination-current-page="{{ pagination_state.current_page }}"
+                    data-pagination-total-pages="{{ pagination_state.total_pages }}"
+                    data-pagination-per-page="{{ pagination_state.per_page }}"
+                    data-pagination-total-items="{{ pagination_state.total_items }}">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div class="pagination-navigation">
                             {% with has_prev=page_obj.has_previous has_next=page_obj.has_next %}
                             <!-- First page button -->
@@ -799,9 +801,10 @@
                             <div class="pagination-control d-flex align-items-center me-3">
                                 <label for="rowsPerPageDropdown" class="text-muted me-2 mb-0">Rows per page:</label>
                                 <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-3" type="button"
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
                                         id="rowsPerPageDropdown" data-bs-toggle="dropdown" aria-expanded="false"
-                                        data-current-per-page="{{ current_per_page }}">
+                                        data-current-per-page="{{ current_per_page }}"
+                                        style="min-width: 60px; text-align: center;">
                                         {{ current_per_page }}
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end pagination-dropdown"
@@ -834,17 +837,19 @@
                                         max="{{ pagination_state.total_pages }}"
                                         value="{{ pagination_state.current_page }}"
                                         data-current-page="{{ pagination_state.current_page }}"
-                                        data-total-pages="{{ pagination_state.total_pages }}">
+                                        data-total-pages="{{ pagination_state.total_pages }}"
+                                        style="width: 60px; text-align: center;">
                                     <button type="submit" class="btn btn-sm btn-outline-secondary ms-1 goto-btn"
-                                        data-pagination-submit="goto">
+                                        data-pagination-submit="goto"
+                                        style="width: 36px; height: 31px; padding: 0; display: flex; align-items: center; justify-content: center;">
                                         <i class="bi bi-arrow-right"></i>
                                     </button>
                                 </form>
                             </div>
 
-                            <!-- Pagination info (from context processor) -->
+                            <!-- Pagination info -->
                             <span class="text-muted pagination-info">
-                                {{ utils.pagination_info }}
+                                Results {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
                             </span>
                         </div>
                     </div>
@@ -1331,6 +1336,7 @@
 
     .pagination-info {
         font-size: 0.875rem;
+        white-space: nowrap;
     }
 
     /* Pagination navigation */
@@ -1383,11 +1389,12 @@
     }
 
     .goto-page-input {
-        width: 50px;
+        width: 60px;
         text-align: center;
         padding-left: 0.5rem;
         padding-right: 0.5rem;
         border-color: #dee2e6;
+        height: 31px;
     }
 
     .goto-page-input:focus {
@@ -1395,18 +1402,8 @@
         box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.1);
     }
 
-    .goto-page-input::-webkit-inner-spin-button,
-    .goto-page-input::-webkit-outer-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-
-    .goto-page-input[type=number] {
-        -moz-appearance: textfield;
-    }
-
     .goto-btn {
-        width: 30px;
+        width: 36px;
         height: 31px;
         padding: 0;
         display: flex;
@@ -1420,19 +1417,24 @@
         border-color: #ced4da;
     }
 
+    /* Card footer styling for pagination */
+    .card-footer.bg-light {
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
     /* Responsive adjustments */
     @media (max-width: 768px) {
         .pagination-navigation {
             flex-wrap: wrap;
         }
 
-        .d-flex.justify-content-between.align-items-center.mt-3 {
+        .card-footer .d-flex.justify-content-between.align-items-center {
             flex-direction: column;
             align-items: flex-start !important;
             gap: 1rem;
         }
 
-        .d-flex.align-items-center {
+        .card-footer .d-flex.align-items-center {
             flex-wrap: wrap;
             gap: 0.75rem;
         }
