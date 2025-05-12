@@ -36,12 +36,16 @@ class QueueManager {
         // Initialize countdown timer
         this.countdownInterval = null;
         this.nextProcessTime = null;
+        this.pausedTimeRemaining = null; // Store remaining time when paused
 
         // Initialize queue data management
         this.queue = [];
 
         // For tracking last auto-processing time
         this.lastAutoProcessTime = null;
+
+        // Load settings from localStorage if available
+        this.loadSettings();
 
         // Fetch queue data on load
         this.fetchQueueData();
@@ -89,6 +93,70 @@ class QueueManager {
                 });
             }
 
+            // Set up auto-refresh time slider
+            const autoRefreshTimeSlider = document.getElementById('autoRefreshTime');
+            if (autoRefreshTimeSlider) {
+                autoRefreshTimeSlider.addEventListener('input', (e) => {
+                    const seconds = parseInt(e.target.value);
+                    const autoRefreshTimeLabel = document.getElementById('autoRefreshTimeLabel');
+                    if (autoRefreshTimeLabel) {
+                        autoRefreshTimeLabel.textContent = `${seconds} seconds`;
+                    }
+                });
+
+                autoRefreshTimeSlider.addEventListener('change', (e) => {
+                    const seconds = parseInt(e.target.value);
+                    this.autoRefreshTime = seconds * 1000;
+
+                    // Restart auto-refresh with new time if it's active
+                    if (this.autoRefreshInterval) {
+                        this.stopAutoRefresh();
+                        this.startAutoRefresh();
+                    }
+
+                    // Save settings
+                    this.saveSettings();
+
+                    this.showToastNotification(`Auto-refresh interval set to ${seconds} seconds`, 'info');
+                    console.log(`Auto-refresh interval updated to ${seconds} seconds (${this.autoRefreshTime}ms)`);
+                });
+            }
+
+            // Set up auto-process time slider
+            const autoProcessTimeSlider = document.getElementById('autoProcessTime');
+            if (autoProcessTimeSlider) {
+                autoProcessTimeSlider.addEventListener('input', (e) => {
+                    const minutes = parseInt(e.target.value);
+                    const autoProcessTimeLabel = document.getElementById('autoProcessTimeLabel');
+                    if (autoProcessTimeLabel) {
+                        autoProcessTimeLabel.textContent = `${minutes} minutes`;
+                    }
+                });
+
+                autoProcessTimeSlider.addEventListener('change', (e) => {
+                    const minutes = parseInt(e.target.value);
+                    this.autoProcessTime = minutes * 60000;
+
+                    // Update next process time based on new interval
+                    if (this.lastAutoProcessTime) {
+                        this.nextProcessTime = new Date(this.lastAutoProcessTime.getTime() + this.autoProcessTime);
+                        this.updateCountdown();
+                    }
+
+                    // Restart auto-processing with new time
+                    if (this.autoProcessInterval) {
+                        this.stopAutoProcessing();
+                        this.startAutoProcessing();
+                    }
+
+                    // Save settings
+                    this.saveSettings();
+
+                    this.showToastNotification(`Auto-processing interval set to ${minutes} minutes`, 'info');
+                    console.log(`Auto-processing interval updated to ${minutes} minutes (${this.autoProcessTime}ms)`);
+                });
+            }
+
             // Set up pause/resume queue button
             const pauseQueueBtn = document.getElementById('pause-queue-btn');
             if (pauseQueueBtn) {
@@ -128,7 +196,7 @@ class QueueManager {
             if (processQueueBtn) {
                 processQueueBtn.addEventListener('click', () => {
                     this.processQueue();
-                    this.resetCountdown(); // Reset countdown after manual processing
+                    // Timer will be reset in processQueue() if jobs are processed
                 });
             }
 
@@ -166,6 +234,70 @@ class QueueManager {
     }
 
     /**
+     * Load settings from localStorage
+     */
+    loadSettings() {
+        // Load auto-refresh time
+        const savedAutoRefreshTime = localStorage.getItem('queueAutoRefreshTime');
+        if (savedAutoRefreshTime) {
+            const seconds = parseInt(savedAutoRefreshTime);
+            if (!isNaN(seconds) && seconds >= 5 && seconds <= 60) {
+                this.autoRefreshTime = seconds * 1000;
+                console.log(`Loaded auto-refresh time from localStorage: ${seconds} seconds`);
+
+                // Update slider value
+                const autoRefreshSlider = document.getElementById('autoRefreshTime');
+                if (autoRefreshSlider) {
+                    autoRefreshSlider.value = seconds;
+                }
+
+                // Update label
+                const autoRefreshLabel = document.getElementById('autoRefreshTimeLabel');
+                if (autoRefreshLabel) {
+                    autoRefreshLabel.textContent = `${seconds} seconds`;
+                }
+            }
+        }
+
+        // Load auto-process time
+        const savedAutoProcessTime = localStorage.getItem('queueAutoProcessTime');
+        if (savedAutoProcessTime) {
+            const minutes = parseInt(savedAutoProcessTime);
+            if (!isNaN(minutes) && minutes >= 1 && minutes <= 10) {
+                this.autoProcessTime = minutes * 60000;
+                console.log(`Loaded auto-process time from localStorage: ${minutes} minutes`);
+
+                // Update slider value
+                const autoProcessSlider = document.getElementById('autoProcessTime');
+                if (autoProcessSlider) {
+                    autoProcessSlider.value = minutes;
+                }
+
+                // Update label
+                const autoProcessLabel = document.getElementById('autoProcessTimeLabel');
+                if (autoProcessLabel) {
+                    autoProcessLabel.textContent = `${minutes} minutes`;
+                }
+            }
+        }
+    }
+
+    /**
+     * Save settings to localStorage
+     */
+    saveSettings() {
+        // Save auto-refresh time (in seconds)
+        const autoRefreshSeconds = this.autoRefreshTime / 1000;
+        localStorage.setItem('queueAutoRefreshTime', autoRefreshSeconds.toString());
+
+        // Save auto-process time (in minutes)
+        const autoProcessMinutes = this.autoProcessTime / 60000;
+        localStorage.setItem('queueAutoProcessTime', autoProcessMinutes.toString());
+
+        console.log(`Settings saved: Auto-refresh: ${autoRefreshSeconds}s, Auto-process: ${autoProcessMinutes}m`);
+    }
+
+    /**
      * Toggle queue pause/resume state
      */
     toggleQueuePause() {
@@ -195,7 +327,12 @@ class QueueManager {
                 this.autoProcessInterval = null;
             }
 
-            // Stop countdown but keep tracking time
+            // Save remaining time when paused
+            const now = new Date();
+            this.pausedTimeRemaining = this.nextProcessTime - now;
+            console.log(`Paused with ${Math.floor(this.pausedTimeRemaining / 1000)} seconds remaining`);
+
+            // Stop countdown
             if (this.countdownInterval) {
                 clearInterval(this.countdownInterval);
                 this.countdownInterval = null;
@@ -214,9 +351,15 @@ class QueueManager {
             this.showToastNotification('Queue processing resumed', 'success');
             console.log('Queue processing resumed - Auto-processing enabled');
 
-            // Reset countdown and restart auto-processing
-            this.resetCountdown();
-            // Explicitly restart the countdown timer
+            // Restore the countdown from where it was paused
+            if (this.pausedTimeRemaining) {
+                const now = new Date();
+                this.nextProcessTime = new Date(now.getTime() + this.pausedTimeRemaining);
+                console.log(`Resumed with timer set to ${Math.floor(this.pausedTimeRemaining / 1000)} seconds`);
+                this.pausedTimeRemaining = null;
+            }
+
+            // Start the countdown and auto-processing
             this.startCountdown();
             this.startAutoProcessing();
         }
@@ -326,10 +469,21 @@ class QueueManager {
         if (minutesElem && secondsElem) {
             // Show paused status
             if (this.queuePaused) {
-                minutesElem.textContent = '--';
-                secondsElem.textContent = '--';
-                minutesElem.style.color = '#6c757d'; // Gray out when paused
-                secondsElem.style.color = '#6c757d';
+                // If paused, show the paused time remaining instead of dashes
+                if (this.pausedTimeRemaining) {
+                    const pausedMinutes = Math.floor(this.pausedTimeRemaining / (1000 * 60));
+                    const pausedSeconds = Math.floor((this.pausedTimeRemaining % (1000 * 60)) / 1000);
+
+                    minutesElem.textContent = pausedMinutes.toString().padStart(2, '0');
+                    secondsElem.textContent = pausedSeconds.toString().padStart(2, '0');
+                    minutesElem.style.color = '#6c757d'; // Gray out when paused
+                    secondsElem.style.color = '#6c757d';
+                } else {
+                    minutesElem.textContent = '--';
+                    secondsElem.textContent = '--';
+                    minutesElem.style.color = '#6c757d';
+                    secondsElem.style.color = '#6c757d';
+                }
                 return;
             }
 
@@ -359,6 +513,8 @@ class QueueManager {
     resetCountdown() {
         this.lastAutoProcessTime = new Date();
         this.nextProcessTime = new Date(this.lastAutoProcessTime.getTime() + this.autoProcessTime);
+        // Clear any saved paused time
+        this.pausedTimeRemaining = null;
         this.updateCountdown();
         // Start the countdown interval if it's not running
         if (!this.countdownInterval) {
@@ -1216,9 +1372,16 @@ class QueueManager {
                     this.showToastNotification(`Successfully processed ${data.processed_count || 0} items from queue`, 'success');
                     this.fetchQueueData(); // Refresh the data
 
-                    // Make sure the countdown is reset and restarted after processing
-                    this.resetCountdown();
-                    this.startCountdown();
+                    // If jobs were actually processed (count > 0), reset the countdown timer
+                    if (data.processed_count > 0) {
+                        console.log('Jobs were processed, resetting the countdown timer');
+                        this.resetCountdown();
+                    } else {
+                        // Otherwise just ensure the countdown is running
+                        if (!this.countdownInterval) {
+                            this.startCountdown();
+                        }
+                    }
                 } else {
                     console.error('[QueueDebug] Manual queue processing error:', data.message);
                     console.error('[QueueCommand] Process queue failed:', data.message);
@@ -1332,7 +1495,10 @@ class QueueManager {
             console.log(`[QueueDebug] Auto-processing cycle triggered at ${now.toLocaleTimeString()}`);
             this.lastAutoProcessTime = now;
             this.processReadyItems();
-            this.resetCountdown(); // Reset countdown after processing
+            // Reset nextProcessTime for the next auto-processing cycle
+            this.nextProcessTime = new Date(now.getTime() + this.autoProcessTime);
+            // Update the countdown display without restarting the timer
+            this.updateCountdown();
         }, this.autoProcessTime); // Run every 3 minutes
 
         console.log(`Queue auto-processing ${this.queuePaused ? 'initialized but paused' : 'started'} - configured for every 3 minutes (${this.autoProcessTime}ms)`);
