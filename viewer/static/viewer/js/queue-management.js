@@ -28,11 +28,32 @@ class QueueManager {
         this.autoRefreshInterval = null;
         this.autoRefreshTime = 30000; // 30 seconds
 
+        // Initialize auto processing
+        this.autoProcessInterval = null;
+        this.autoProcessTime = 180000; // 3 minutes
+        this.queuePaused = false; // Queue processing status
+
+        // Initialize countdown timer
+        this.countdownInterval = null;
+        this.nextProcessTime = null;
+
         // Initialize queue data management
         this.queue = [];
 
+        // For tracking last auto-processing time
+        this.lastAutoProcessTime = null;
+
         // Fetch queue data on load
         this.fetchQueueData();
+
+        // Start auto-processing of Ready queue items every 3 minutes
+        this.startAutoProcessing();
+
+        // Start countdown timer
+        this.initializeCountdown();
+
+        // Log status to verify initialization
+        console.log('Queue Manager initialized - Auto-processing setup complete');
     }
 
     initializeEventListeners() {
@@ -68,6 +89,24 @@ class QueueManager {
                 });
             }
 
+            // Set up pause/resume queue button
+            const pauseQueueBtn = document.getElementById('pause-queue-btn');
+            if (pauseQueueBtn) {
+                pauseQueueBtn.addEventListener('click', () => this.toggleQueuePause());
+            }
+
+            // Set up reset countdown button
+            const refreshCountdownBtn = document.getElementById('refresh-countdown-btn');
+            if (refreshCountdownBtn) {
+                refreshCountdownBtn.addEventListener('click', () => {
+                    this.resetCountdown();
+                    refreshCountdownBtn.classList.add('pulse-animation');
+                    setTimeout(() => {
+                        refreshCountdownBtn.classList.remove('pulse-animation');
+                    }, 2000);
+                });
+            }
+
             // Set up clear queue button
             const clearQueueBtn = document.getElementById('clear-queue-btn');
             if (clearQueueBtn) {
@@ -87,7 +126,10 @@ class QueueManager {
             // Set up process queue button
             const processQueueBtn = document.getElementById('process-queue-btn');
             if (processQueueBtn) {
-                processQueueBtn.addEventListener('click', () => this.processQueue());
+                processQueueBtn.addEventListener('click', () => {
+                    this.processQueue();
+                    this.resetCountdown(); // Reset countdown after manual processing
+                });
             }
 
             // Set up select all checkboxes
@@ -124,6 +166,88 @@ class QueueManager {
     }
 
     /**
+     * Toggle queue pause/resume state
+     */
+    toggleQueuePause() {
+        this.queuePaused = !this.queuePaused;
+        const pauseQueueBtn = document.getElementById('pause-queue-btn');
+        const queueStatusBadge = document.getElementById('queue-status-badge');
+
+        if (this.queuePaused) {
+            // Queue is now paused
+            if (pauseQueueBtn) {
+                pauseQueueBtn.innerHTML = '<i class="bi bi-play-fill me-1"></i> Resume Queue';
+                pauseQueueBtn.classList.remove('btn-warning');
+                pauseQueueBtn.classList.add('btn-success');
+            }
+
+            if (queueStatusBadge) {
+                queueStatusBadge.textContent = 'Paused';
+                queueStatusBadge.className = 'badge bg-warning';
+            }
+
+            this.showToastNotification('Queue processing paused', 'warning');
+            console.log('Queue processing paused - Auto-processing disabled');
+
+            // Stop the auto-processing interval
+            if (this.autoProcessInterval) {
+                clearInterval(this.autoProcessInterval);
+                this.autoProcessInterval = null;
+            }
+
+            // Stop countdown but keep tracking time
+            if (this.countdownInterval) {
+                clearInterval(this.countdownInterval);
+                this.countdownInterval = null;
+            }
+        } else {
+            // Queue is now resumed
+            if (pauseQueueBtn) {
+                pauseQueueBtn.innerHTML = '<i class="bi bi-pause-fill me-1"></i> Pause Queue';
+                pauseQueueBtn.classList.remove('btn-success');
+                pauseQueueBtn.classList.add('btn-warning');
+            }
+
+            // Update status badge based on queue content
+            this.updateQueueStatusBadge();
+
+            this.showToastNotification('Queue processing resumed', 'success');
+            console.log('Queue processing resumed - Auto-processing enabled');
+
+            // Reset countdown and restart auto-processing
+            this.resetCountdown();
+            // Explicitly restart the countdown timer
+            this.startCountdown();
+            this.startAutoProcessing();
+        }
+    }
+
+    /**
+     * Update queue status badge based on current queue state
+     */
+    updateQueueStatusBadge() {
+        const queueStatusBadge = document.getElementById('queue-status-badge');
+        if (!queueStatusBadge) return;
+
+        if (this.queuePaused) {
+            queueStatusBadge.textContent = 'Paused';
+            queueStatusBadge.className = 'badge bg-warning';
+            return;
+        }
+
+        if (this.queue.filter(item => item.status === 'Ready').length > 0) {
+            queueStatusBadge.textContent = 'Ready to Process';
+            queueStatusBadge.className = 'badge bg-success';
+        } else if (this.queue.length === 0) {
+            queueStatusBadge.textContent = 'Empty';
+            queueStatusBadge.className = 'badge bg-secondary';
+        } else {
+            queueStatusBadge.textContent = 'Pending';
+            queueStatusBadge.className = 'badge bg-info';
+        }
+    }
+
+    /**
      * Start auto-refresh interval
      */
     startAutoRefresh() {
@@ -140,6 +264,171 @@ class QueueManager {
         if (this.autoRefreshInterval) {
             clearInterval(this.autoRefreshInterval);
             this.autoRefreshInterval = null;
+        }
+    }
+
+    /**
+     * Initialize countdown timer for next auto-processing
+     */
+    initializeCountdown() {
+        // Initialize nextProcessTime
+        if (!this.lastAutoProcessTime) {
+            this.lastAutoProcessTime = new Date();
+        }
+        this.nextProcessTime = new Date(this.lastAutoProcessTime.getTime() + this.autoProcessTime);
+
+        // Start the countdown
+        this.startCountdown();
+
+        // Update the next job info
+        this.updateNextJobInfo();
+    }
+
+    /**
+     * Start the countdown timer
+     */
+    startCountdown() {
+        // Clear existing interval
+        if (this.countdownInterval) {
+            clearInterval(this.countdownInterval);
+        }
+
+        // Update countdown immediately
+        this.updateCountdown();
+
+        // Set interval to update countdown every second
+        this.countdownInterval = setInterval(() => {
+            this.updateCountdown();
+        }, 1000);
+    }
+
+    /**
+     * Update the countdown display
+     */
+    updateCountdown() {
+        const now = new Date();
+        const timeRemaining = this.nextProcessTime - now;
+
+        if (timeRemaining <= 0) {
+            // Reset the countdown if time has expired
+            this.resetCountdown();
+            return;
+        }
+
+        // Calculate minutes and seconds
+        const minutes = Math.floor(timeRemaining / (1000 * 60));
+        const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+
+        // Update the UI
+        const minutesElem = document.getElementById('countdown-minutes');
+        const secondsElem = document.getElementById('countdown-seconds');
+
+        if (minutesElem && secondsElem) {
+            // Show paused status
+            if (this.queuePaused) {
+                minutesElem.textContent = '--';
+                secondsElem.textContent = '--';
+                minutesElem.style.color = '#6c757d'; // Gray out when paused
+                secondsElem.style.color = '#6c757d';
+                return;
+            }
+
+            minutesElem.textContent = minutes.toString().padStart(2, '0');
+            secondsElem.textContent = seconds.toString().padStart(2, '0');
+
+            // Change color when getting close to processing
+            if (minutes === 0 && seconds <= 30) {
+                minutesElem.style.color = '#dc3545'; // Red for urgency
+                secondsElem.style.color = '#dc3545';
+            } else if (minutes === 0) {
+                minutesElem.style.color = '#fd7e14'; // Orange for approaching
+                secondsElem.style.color = '#fd7e14';
+            } else {
+                minutesElem.style.color = '#1e88e5'; // Default blue
+                secondsElem.style.color = '#1e88e5';
+            }
+        }
+
+        // Update queue status badge
+        this.updateQueueStatusBadge();
+    }
+
+    /**
+     * Reset the countdown timer
+     */
+    resetCountdown() {
+        this.lastAutoProcessTime = new Date();
+        this.nextProcessTime = new Date(this.lastAutoProcessTime.getTime() + this.autoProcessTime);
+        this.updateCountdown();
+        // Start the countdown interval if it's not running
+        if (!this.countdownInterval) {
+            this.startCountdown();
+        }
+
+        const minutes = this.autoProcessTime / 60000;
+        console.log(`Countdown reset. Next processing at ${this.nextProcessTime.toLocaleTimeString()} (in ${minutes} minute${minutes !== 1 ? 's' : ''})`);
+    }
+
+    /**
+     * Update the next job information
+     */
+    updateNextJobInfo() {
+        // Find the next job to be processed (first Ready status job)
+        const nextJob = this.queue.find(item => item.status === 'Ready');
+
+        // Get elements
+        const nextJobName = document.getElementById('next-job-name');
+        const nextJobCommand = document.getElementById('next-job-command');
+        const nextJobBadge = document.getElementById('next-job-badge');
+        const nextJobType = document.getElementById('next-job-type');
+        const nextJobContainer = document.getElementById('next-job-container');
+        const queueTotalJobs = document.getElementById('queue-total-jobs');
+
+        // Update total jobs count
+        if (queueTotalJobs) {
+            queueTotalJobs.textContent = this.queue.length;
+        }
+
+        if (!nextJob) {
+            // No Ready jobs in queue
+            if (nextJobContainer) {
+                // Always show "No Ready jobs" message when there are no Ready jobs
+                nextJobName.textContent = 'No Ready jobs';
+                nextJobCommand.textContent = 'Waiting for jobs with Ready status';
+                nextJobBadge.textContent = 'None';
+                nextJobBadge.className = 'badge bg-secondary mb-2';
+                nextJobType.textContent = 'N/A';
+                nextJobType.className = 'badge bg-secondary mb-2';
+
+                // Add context about the current queue state
+                if (this.queue.length === 0) {
+                    nextJobCommand.textContent = 'Queue is empty. Add jobs to process.';
+                } else if (this.queue.some(item => item.status === 'PENDING')) {
+                    const pendingCount = this.queue.filter(item => item.status === 'PENDING').length;
+                    nextJobCommand.textContent = `${pendingCount} pending job(s) waiting for alignment to complete`;
+                } else if (this.queue.some(item => item.status === 'FAILED')) {
+                    const failedCount = this.queue.filter(item => item.status === 'FAILED').length;
+                    nextJobCommand.textContent = `${failedCount} failed job(s) need to be reset to Ready status`;
+                } else if (this.queuePaused) {
+                    nextJobCommand.textContent = 'Queue is paused. Resume to process jobs.';
+                }
+            }
+            return;
+        }
+
+        // Update UI with next job information
+        if (nextJobName && nextJobCommand && nextJobBadge && nextJobType) {
+            nextJobName.textContent = nextJob.fastq_name;
+            nextJobCommand.textContent = nextJob.command || 'N/A';
+            nextJobBadge.textContent = nextJob.status;
+            nextJobBadge.className = 'badge bg-info mb-2';
+
+            // Use command_source field to determine job type
+            const isAlignment = nextJob.command_source === 'alignment_command';
+            nextJobType.textContent = isAlignment ? 'Alignment' : 'Post-QC';
+            nextJobType.className = `badge ${isAlignment ? 'bg-primary' : 'bg-success'} mb-2`;
+
+            console.log(`Next job type determined as ${isAlignment ? 'Alignment' : 'Post-QC'} based on command_source: ${nextJob.command_source}`);
         }
     }
 
@@ -174,7 +463,21 @@ class QueueManager {
                 `;
             }
 
-            console.log('Starting fetchQueueData...');
+            console.log('===== QUEUE MANAGEMENT: FETCHING QUEUE DATA =====');
+            console.debug('[QueueDebug] Fetching queue data from server');
+
+            // Add logging to track pending jobs before fetch
+            console.log('[QueueDebug][Auto-Proceed] Checking for PENDING jobs before fetch');
+            const pendingJobs = this.queue.filter(item => item.status === 'PENDING');
+            if (pendingJobs.length > 0) {
+                console.log(`[QueueDebug][Auto-Proceed] Found ${pendingJobs.length} PENDING jobs before fetch:`);
+                pendingJobs.forEach(job => {
+                    console.log(`[QueueDebug][Auto-Proceed] PENDING Job: ${job.fastq_name}`);
+                });
+            } else {
+                console.log('[QueueDebug][Auto-Proceed] No PENDING jobs found before fetch');
+            }
+
             const response = await fetch('/api/queue/get_data/?nocache=' + new Date().getTime(), {
                 method: 'GET',
                 headers: {
@@ -185,10 +488,11 @@ class QueueManager {
                 }
             });
             console.log('Response received:', response);
+            console.debug('[QueueDebug] Queue data response status:', response.status);
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('Error response details:', {
+                console.error('[QueueDebug] Error response details:', {
                     status: response.status,
                     statusText: response.statusText,
                     headers: Object.fromEntries(response.headers.entries()),
@@ -203,9 +507,117 @@ class QueueManager {
                 totalEntries: data.total_entries
             });
 
+            // Log a more detailed breakdown of the unified queue
+            if (data.unified_queue && data.unified_queue.length > 0) {
+                console.log('===== QUEUE MANAGEMENT: UNIFIED QUEUE ANALYSIS =====');
+                console.log(`Total queue entries: ${data.unified_queue.length}`);
+
+                // Count entries by status
+                const statusCounts = {};
+                data.unified_queue.forEach(item => {
+                    const status = item.status || 'Unknown';
+                    statusCounts[status] = (statusCounts[status] || 0) + 1;
+                });
+                console.log('Status counts:', statusCounts);
+
+                // Show a few sample entries
+                console.log('Sample queue entries:');
+                const sampleEntries = data.unified_queue.slice(0, Math.min(5, data.unified_queue.length));
+                sampleEntries.forEach((entry, index) => {
+                    console.log(`Entry ${index + 1}:`);
+                    console.log(`  Fastq Name: ${entry.fastq_name}`);
+                    console.log(`  Command: ${(entry.command || '').substring(0, 50)}...`);
+                    console.log(`  Status: ${entry.status}`);
+                    console.log(`  Time: ${entry.time}`);
+                });
+
+                console.log('===== QUEUE MANAGEMENT: DISPLAY PREVIEW =====');
+                console.log('How entries will appear in the table:');
+                sampleEntries.forEach((entry, index) => {
+                    let statusBadgeClass = 'bg-secondary';
+                    switch (entry.status) {
+                        case 'Ready':
+                            statusBadgeClass = 'bg-info';
+                            break;
+                        case 'PENDING':
+                            statusBadgeClass = 'bg-warning';
+                            break;
+                        case 'Submitted':
+                            statusBadgeClass = 'bg-primary';
+                            break;
+                        case 'IN_PROGRESS':
+                            statusBadgeClass = 'bg-warning';
+                            break;
+                        case 'COMPLETED':
+                            statusBadgeClass = 'bg-success';
+                            break;
+                        case 'FAILED':
+                            statusBadgeClass = 'bg-danger';
+                            break;
+                        default:
+                            statusBadgeClass = 'bg-secondary';
+                    }
+
+                    console.log(`Entry ${index + 1}:`);
+                    console.log(`  Fastq: ${entry.fastq_name}`);
+                    console.log(`  Command: ${(entry.command || '').substring(0, 30)}...`);
+                    console.log(`  Status Badge: <span class="badge ${statusBadgeClass}">${entry.status}</span>`);
+                });
+            }
+
+            console.debug('[QueueDebug] Queue items by status:', this.countQueueItemsByStatus(data.unified_queue || []));
+
             if (data.status === 'error') {
-                console.error('Server returned error:', data.message);
+                console.error('[QueueDebug] Server returned error:', data.message);
                 throw new Error(data.message);
+            }
+
+            // Check for auto-proceed status changes
+            if (pendingJobs.length > 0) {
+                console.log('===== AUTO-PROCEED STATUS CHANGE DETECTION =====');
+                console.log('[QueueDebug][Auto-Proceed] Step 1: Checking for status changes after fetch');
+                const afterPendingJobs = data.unified_queue.filter(item => item.status === 'PENDING');
+
+                console.log(`[QueueDebug][Auto-Proceed] Step 2: Found ${pendingJobs.length} PENDING jobs before fetch`);
+                console.log(`[QueueDebug][Auto-Proceed] Step 3: Found ${afterPendingJobs.length} PENDING jobs after fetch`);
+
+                // Find jobs that changed from PENDING to another status (should be Ready)
+                const nowReadyJobs = pendingJobs.filter(
+                    beforeJob => !afterPendingJobs.some(afterJob =>
+                        afterJob.fastq_name === beforeJob.fastq_name && afterJob.status === 'PENDING'
+                    )
+                );
+
+                if (nowReadyJobs.length > 0) {
+                    console.log(`[QueueDebug][Auto-Proceed] Step 4: Found ${nowReadyJobs.length} jobs that changed from PENDING to Ready:`);
+                    nowReadyJobs.forEach(job => {
+                        // Find the current status of this job in the updated queue
+                        const updatedJob = data.unified_queue.find(item => item.fastq_name === job.fastq_name);
+                        const newStatus = updatedJob ? updatedJob.status : 'Unknown';
+
+                        console.log(`[QueueDebug][Auto-Proceed] Step 5: Job ${job.fastq_name} status changed: PENDING → ${newStatus}`);
+                        console.log(`[QueueDebug][Auto-Proceed] Step 6: Command: ${job.command?.substring(0, 100) || 'N/A'}`);
+
+                        // Show a notification for each job that was auto-proceeded
+                        this.showToastNotification(
+                            `Auto-proceed activated: ${job.fastq_name} is now Ready for processing`,
+                            'info',
+                            3000
+                        );
+                    });
+
+                    console.log('[QueueDebug][Auto-Proceed] Step 7: These Ready jobs will be picked up by the next auto-processing cycle');
+
+                    // Log when the next auto-processing will occur
+                    if (this.lastAutoProcessTime) {
+                        const nextProcessTime = new Date(this.lastAutoProcessTime.getTime() + this.autoProcessTime);
+                        console.log(`[QueueDebug][Auto-Proceed] Step 8: Next auto-processing cycle at ${nextProcessTime.toLocaleTimeString()}`);
+                    }
+                } else {
+                    console.log('[QueueDebug][Auto-Proceed] No PENDING jobs changed status during this refresh');
+                }
+
+                console.log('===== END AUTO-PROCEED STATUS DETECTION =====');
             }
 
             // Store queue data
@@ -218,9 +630,12 @@ class QueueManager {
             // Render the queue table
             this.renderQueueTable(this.queue, 'queue-body');
 
+            // Update next job info
+            this.updateNextJobInfo();
+
             return data;
         } catch (error) {
-            console.error('Error in fetchQueueData:', {
+            console.error('[QueueDebug] Error in fetchQueueData:', {
                 name: error.name,
                 message: error.message,
                 stack: error.stack
@@ -275,7 +690,6 @@ class QueueManager {
 
         // Add rows for each queue item
         queueItems.forEach((item, index) => {
-            console.log(`Processing item ${index}:`, item);
             const row = document.createElement('tr');
             row.dataset.queueId = item.fastq_name;
 
@@ -286,21 +700,47 @@ class QueueManager {
             let commandDisplay = '';
             if (item.command) {
                 commandDisplay = item.command;
+
+                // Store command source for type detection
+                if (!item.command_source) {
+                    // Add command_source field if it doesn't exist
+                    if (item.alignment_command && item.command === item.alignment_command) {
+                        item.command_source = 'alignment_command';
+                    } else if (item.postqc_command && item.command === item.postqc_command) {
+                        item.command_source = 'postqc_command';
+                    } else {
+                        // Determine based on command content as fallback
+                        item.command_source = item.command.includes('post-align') ? 'postqc_command' : 'alignment_command';
+                    }
+                    console.log(`Added command_source: ${item.command_source} for ${item.fastq_name}`);
+                }
             } else {
                 commandDisplay = 'N/A';
             }
 
-            // Determine status badge style (no mapping, just color for three statuses)
+            // Determine status badge style based on status
             let statusBadgeClass = 'bg-secondary';
             switch (item.status) {
                 case 'Ready':
                     statusBadgeClass = 'bg-info';
                     break;
-                case 'Pending':
+                case 'PENDING':
                     statusBadgeClass = 'bg-warning';
                     break;
-                case 'Failed':
+                case 'Submitted':
+                    statusBadgeClass = 'bg-primary';
+                    break;
+                case 'IN_PROGRESS':
+                    statusBadgeClass = 'bg-warning';
+                    break;
+                case 'COMPLETED':
+                    statusBadgeClass = 'bg-success';
+                    break;
+                case 'FAILED':
                     statusBadgeClass = 'bg-danger';
+                    break;
+                case 'ABORTED':
+                    statusBadgeClass = 'bg-secondary';
                     break;
                 default:
                     statusBadgeClass = 'bg-secondary';
@@ -315,13 +755,226 @@ class QueueManager {
                     </div>
                 </td>
                 <td>${item.fastq_name}</td>
-                <td class="command-cell" style="white-space: pre-wrap; word-wrap: break-word;">${commandDisplay}</td>
-                <td><span class="badge ${statusBadgeClass}">${item.status}</span></td>
+                <td class="command-cell" contenteditable="true" data-fastq="${item.fastq_name}">${commandDisplay}</td>
+                <td>
+                    <span class="badge ${statusBadgeClass} status-badge" 
+                          data-fastq="${item.fastq_name}" 
+                          data-status="${item.status}"
+                          data-id="${item.id || ''}"
+                          data-command-source="${item.command_source || ''}"
+                          role="button">
+                        ${item.status}
+                    </span>
+                </td>
                 <td>${time}</td>
             `;
 
             tableBody.appendChild(row);
         });
+
+        // Add event listeners for status badges and command editing
+        this.addTableEventListeners();
+    }
+
+    /**
+     * Add event listeners to the table elements
+     */
+    addTableEventListeners() {
+        // Add click event for status badges (only FAILED ones are editable)
+        document.querySelectorAll('.status-badge').forEach(badge => {
+            badge.addEventListener('click', (e) => {
+                const fastqName = e.target.dataset.fastq;
+                const currentStatus = e.target.dataset.status;
+                // Get the job ID from the data attribute
+                const jobId = e.target.dataset.id;
+
+                // Only allow changing FAILED status back to Ready
+                if (currentStatus === 'FAILED') {
+                    if (confirm(`Change status of ${fastqName} back to Ready?`)) {
+                        this.updateQueueItemStatus(fastqName, 'Ready', jobId);
+                    }
+                }
+            });
+        });
+
+        // Add blur event for command cells to save on edit
+        document.querySelectorAll('.command-cell').forEach(cell => {
+            // Store original content to avoid unnecessary updates
+            cell.dataset.originalContent = cell.textContent;
+
+            cell.addEventListener('blur', (e) => {
+                const fastqName = e.target.dataset.fastq;
+                const newCommand = e.target.textContent;
+                const originalContent = e.target.dataset.originalContent || '';
+
+                // Get the job ID from the closest status badge
+                const row = e.target.closest('tr');
+                const statusBadge = row ? row.querySelector('.status-badge') : null;
+                const jobId = statusBadge ? statusBadge.dataset.id : null;
+
+                // Only update if content has changed to avoid unnecessary API calls
+                if (newCommand !== originalContent) {
+                    console.log(`[QueueDebug] Command changed for ${fastqName}, updating in database`);
+                    // Update command in database with job ID
+                    this.updateQueueItemCommand(fastqName, newCommand, jobId);
+                    // Update original content
+                    e.target.dataset.originalContent = newCommand;
+                } else {
+                    console.log(`[QueueDebug] Command unchanged for ${fastqName}, skipping update`);
+                }
+            });
+
+            // Prevent Enter key from adding newlines (commit changes instead)
+            cell.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.target.blur();
+                }
+            });
+        });
+    }
+
+    /**
+     * Update queue item status
+     */
+    updateQueueItemStatus(fastqName, newStatus, jobId) {
+        this.showToastNotification(`Updating status for ${fastqName}...`, 'info');
+
+        console.log(`[QueueDebug] Attempting to update status for job ID ${jobId} (${fastqName}) to ${newStatus}`);
+
+        // Log the request being sent
+        const requestBody = JSON.stringify({
+            fastq_name: fastqName,
+            status: newStatus,
+            job_id: jobId // Include the job ID to identify the specific job
+        });
+        console.debug(`[QueueDebug] Request body: ${requestBody}`);
+
+        fetch('/api/queue/update_status/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            },
+            body: requestBody
+        })
+            .then(response => {
+                console.debug(`[QueueDebug] Update status response code: ${response.status}`);
+                if (!response.ok) {
+                    // If response is not OK, capture the error message
+                    return response.text().then(text => {
+                        console.error(`[QueueDebug] Update status error response: ${text}`);
+                        throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.debug(`[QueueDebug] Update status response data:`, data);
+                if (data.status === 'success') {
+                    this.showToastNotification(`Status updated to ${newStatus}`, 'success');
+
+                    // If we're changing to Ready status, show an additional message
+                    if (newStatus === 'Ready') {
+                        this.showToastNotification(`Job resubmitted and will be processed in next cycle`, 'info', 4000);
+                    }
+
+                    this.fetchQueueData(); // Refresh the data
+                } else {
+                    this.showToastNotification(`Error: ${data.message}`, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('[QueueDebug] Error updating status:', error);
+
+                // Provide a more helpful error message
+                let errorMessage = error.message;
+                if (error.message.includes('400')) {
+                    errorMessage = 'Invalid status update. Check the server logs for details.';
+                } else if (error.message.includes('404')) {
+                    errorMessage = `Queue item "${fastqName}" not found. It may have been deleted.`;
+                } else if (error.message.includes('500')) {
+                    errorMessage = 'Server error. Please try again or contact an administrator.';
+                }
+
+                this.showToastNotification(`Error updating status: ${errorMessage}`, 'danger');
+            });
+    }
+
+    /**
+     * Update queue item command
+     */
+    updateQueueItemCommand(fastqName, newCommand, jobId) {
+        this.showToastNotification(`Updating command for ${fastqName}...`, 'info');
+
+        console.log(`[QueueDebug] Attempting to update command for ${fastqName}`);
+        console.log(`[QueueDebug] New command (truncated): ${newCommand.substring(0, 100)}...`);
+
+        // Get the job ID from the closest status badge if not provided
+        if (!jobId) {
+            const statusBadge = document.querySelector(`.status-badge[data-fastq="${fastqName}"]`);
+            if (statusBadge) {
+                jobId = statusBadge.dataset.id;
+                console.log(`[QueueDebug] Found job ID from DOM: ${jobId}`);
+            }
+        }
+
+        // Log the request being sent
+        const requestBody = JSON.stringify({
+            fastq_name: fastqName,
+            command: newCommand,
+            job_id: jobId || '' // Include job ID if available
+        });
+        console.debug(`[QueueDebug] Request body (truncated): 
+            fastq_name: ${fastqName}, 
+            command length: ${newCommand.length},
+            job_id: ${jobId || 'not provided'}`);
+
+        fetch('/api/queue/update_command/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            },
+            body: requestBody
+        })
+            .then(response => {
+                console.debug(`[QueueDebug] Update command response code: ${response.status}`);
+                if (!response.ok) {
+                    // If response is not OK, capture the error message
+                    return response.text().then(text => {
+                        console.error(`[QueueDebug] Update command error response: ${text}`);
+                        throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.debug(`[QueueDebug] Update command response data:`, data);
+                if (data.status === 'success') {
+                    this.showToastNotification('Command updated successfully', 'success');
+
+                    // Only refresh the data if specifically requested - command updates don't need immediate refresh
+                    // this.fetchQueueData();
+                } else {
+                    this.showToastNotification(`Error: ${data.message}`, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('[QueueDebug] Error updating command:', error);
+
+                // Provide a more helpful error message
+                let errorMessage = error.message;
+                if (error.message.includes('400')) {
+                    errorMessage = 'Invalid command update. Check the server logs for details.';
+                } else if (error.message.includes('404')) {
+                    errorMessage = `Queue item "${fastqName}" not found. It may have been deleted.`;
+                } else if (error.message.includes('500')) {
+                    errorMessage = 'Server error. Please try again or contact an administrator.';
+                }
+
+                this.showToastNotification(`Error updating command: ${errorMessage}`, 'danger');
+            });
     }
 
     /**
@@ -512,7 +1165,16 @@ class QueueManager {
      * Process next items in the queue
      */
     processQueue() {
+        // Check if queue is paused
+        if (this.queuePaused) {
+            this.showToastNotification('Queue is paused. Resume queue to process items.', 'warning');
+            console.log('Process queue requested while queue is paused - operation cancelled');
+            return;
+        }
+
         this.showToastNotification('Processing queue...', 'info');
+        console.debug('[QueueDebug] Manual queue processing initiated');
+        console.log('===== QUEUE MANAGEMENT: PROCESS QUEUE STARTED =====');
 
         fetch('/api/queue/process/', {
             method: 'POST',
@@ -523,20 +1185,49 @@ class QueueManager {
         })
             .then(response => {
                 if (!response.ok) {
+                    console.error('[QueueDebug] Manual queue processing HTTP error:', response.status, response.statusText);
+                    console.error('[QueueCommand] Process queue request failed with status:', response.status);
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 return response.json();
             })
             .then(data => {
                 if (data.status === 'success') {
+                    console.debug(`[QueueDebug] Manual queue processing results: ${data.processed_count} submitted, ${data.failed_count} failed`);
+                    console.log('===== QUEUE MANAGEMENT: PROCESS RESULTS =====');
+                    console.log(`Processed: ${data.processed_count} items, Failed: ${data.failed_count} items`);
+
+                    // Log processed jobs
+                    if (data.processed_jobs && data.processed_jobs.length > 0) {
+                        console.log('===== QUEUE MANAGEMENT: SUCCESSFULLY PROCESSED JOBS =====');
+                        data.processed_jobs.forEach((job, index) => {
+                            console.log(`Job ${index + 1}: ${job.fastq_name} (${job.command_type}) - Demand ID: ${job.demand_id}`);
+                        });
+                    }
+
+                    // Log failed jobs
+                    if (data.failed_jobs && data.failed_jobs.length > 0) {
+                        console.log('===== QUEUE MANAGEMENT: FAILED JOBS =====');
+                        data.failed_jobs.forEach((job, index) => {
+                            console.log(`Job ${index + 1}: ${job.fastq_name} - Reason: ${job.reason}`);
+                        });
+                    }
+
                     this.showToastNotification(`Successfully processed ${data.processed_count || 0} items from queue`, 'success');
                     this.fetchQueueData(); // Refresh the data
+
+                    // Make sure the countdown is reset and restarted after processing
+                    this.resetCountdown();
+                    this.startCountdown();
                 } else {
+                    console.error('[QueueDebug] Manual queue processing error:', data.message);
+                    console.error('[QueueCommand] Process queue failed:', data.message);
                     this.showToastNotification(`Error: ${data.message || 'Failed to process queue'}`, 'danger');
                 }
             })
             .catch(error => {
-                console.error('Error processing queue:', error);
+                console.error('[QueueDebug] Error in manual queue processing:', error);
+                console.error('[QueueCommand] Process queue exception:', error.message);
                 this.showToastNotification(`Error processing queue: ${error.message}`, 'danger');
             });
     }
@@ -619,6 +1310,223 @@ class QueueManager {
                 toastDiv.parentNode.removeChild(toastDiv);
             }
         });
+    }
+
+    /**
+     * Start auto-processing of Ready queue items
+     */
+    startAutoProcessing() {
+        if (this.autoProcessInterval) {
+            clearInterval(this.autoProcessInterval);
+            this.autoProcessInterval = null;
+            console.log('Cleared existing auto-processing interval');
+        }
+
+        this.autoProcessInterval = setInterval(() => {
+            if (this.queuePaused) {
+                console.log(`[QueueDebug] Auto-processing cycle skipped because queue is paused`);
+                return;
+            }
+
+            const now = new Date();
+            console.log(`[QueueDebug] Auto-processing cycle triggered at ${now.toLocaleTimeString()}`);
+            this.lastAutoProcessTime = now;
+            this.processReadyItems();
+            this.resetCountdown(); // Reset countdown after processing
+        }, this.autoProcessTime); // Run every 3 minutes
+
+        console.log(`Queue auto-processing ${this.queuePaused ? 'initialized but paused' : 'started'} - configured for every 3 minutes (${this.autoProcessTime}ms)`);
+
+        // Immediately run first processing to avoid waiting for the first interval
+        if (!this.queuePaused) {
+            console.log('[QueueDebug] Running initial queue processing');
+            this.processReadyItems();
+        } else {
+            console.log('[QueueDebug] Initial queue processing skipped - queue is paused');
+
+            // Update UI to show paused status
+            const pauseQueueBtn = document.getElementById('pause-queue-btn');
+            if (pauseQueueBtn) {
+                pauseQueueBtn.innerHTML = '<i class="bi bi-play-fill me-1"></i> Resume Queue';
+                pauseQueueBtn.classList.remove('btn-warning');
+                pauseQueueBtn.classList.add('btn-success');
+            }
+
+            const queueStatusBadge = document.getElementById('queue-status-badge');
+            if (queueStatusBadge) {
+                queueStatusBadge.textContent = 'Paused';
+                queueStatusBadge.className = 'badge bg-warning';
+            }
+        }
+    }
+
+    /**
+     * Stop auto-processing
+     */
+    stopAutoProcessing() {
+        if (this.autoProcessInterval) {
+            clearInterval(this.autoProcessInterval);
+            this.autoProcessInterval = null;
+            console.log('Auto-processing stopped');
+        }
+    }
+
+    /**
+     * Process only Ready queue items
+     */
+    processReadyItems() {
+        // Skip processing if queue is paused
+        if (this.queuePaused) {
+            console.log(`Auto-processing cycle skipped: Queue is currently paused`);
+            return;
+        }
+
+        const currentTime = new Date().toLocaleTimeString();
+        console.log(`Auto-processing Ready items in queue at ${currentTime}...`);
+        console.debug('[QueueDebug] Beginning queue processing cycle');
+
+        // Add visual indicator that processing is happening
+        const processQueueBtn = document.getElementById('process-queue-btn');
+        if (processQueueBtn) {
+            processQueueBtn.classList.add('pulse-animation');
+            setTimeout(() => {
+                processQueueBtn.classList.remove('pulse-animation');
+            }, 2000);
+        }
+
+        // Log any pending jobs before processing starts
+        const pendingJobs = this.queue.filter(item => item.status === 'PENDING');
+        if (pendingJobs.length > 0) {
+            console.log(`[QueueDebug][Auto-Proceed] Found ${pendingJobs.length} PENDING jobs waiting for alignment completion:`);
+            pendingJobs.forEach(job => {
+                console.log(`[QueueDebug][Auto-Proceed] PENDING Job: ${job.fastq_name} - Command: ${job.command?.substring(0, 30)}...`);
+            });
+        }
+
+        fetch('/api/queue/process/?auto=true', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            },
+            body: JSON.stringify({
+                auto_process: true
+            })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    console.error('[QueueDebug] Queue processing HTTP error:', response.status, response.statusText);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    console.debug(`[QueueDebug] Queue processing results: ${data.processed_count} submitted, ${data.failed_count} failed`);
+
+                    // Only update UI and show notifications if there were actually items processed
+                    if (data.processed_count > 0 || data.failed_count > 0) {
+                        console.log(`Auto-processed: ${data.processed_count} submitted, ${data.failed_count} failed`);
+
+                        // Show toast notification for visibility
+                        this.showToastNotification(`Auto-processed ${data.processed_count} jobs (${data.failed_count} failed)`, 'info', 2000);
+
+                        // Check if any processed jobs were previously PENDING (auto-proceed)
+                        if (data.processed_jobs && data.processed_jobs.length > 0) {
+                            const autoProcessedJobs = data.processed_jobs.filter(job =>
+                                pendingJobs.some(pending => pending.fastq_name === job.fastq_name)
+                            );
+
+                            if (autoProcessedJobs.length > 0) {
+                                console.log('===== AUTO-PROCEED JOB PROCESSING =====');
+                                console.log(`[QueueDebug][Auto-Proceed] Step 1: Found ${autoProcessedJobs.length} auto-proceed jobs that were successfully processed`);
+
+                                autoProcessedJobs.forEach((job, index) => {
+                                    console.log(`[QueueDebug][Auto-Proceed] Step 2.${index + 1}: Job ${job.fastq_name} was submitted for processing`);
+                                    console.log(`[QueueDebug][Auto-Proceed]   - Command type: ${job.command_type}`);
+                                    console.log(`[QueueDebug][Auto-Proceed]   - Demand ID: ${job.demand_id}`);
+
+                                    // Find the original job that was auto-proceeded
+                                    const originalJob = pendingJobs.find(pending => pending.fastq_name === job.fastq_name);
+                                    if (originalJob) {
+                                        console.log(`[QueueDebug][Auto-Proceed]   - Original status: PENDING (auto-proceeded to Ready)`);
+                                    }
+
+                                    this.showToastNotification(
+                                        `Auto-proceed job ${job.fastq_name} successfully submitted!`,
+                                        'success',
+                                        4000
+                                    );
+                                });
+
+                                console.log(`[QueueDebug][Auto-Proceed] Step 3: All auto-proceed jobs have been submitted to OCS`);
+                                console.log(`[QueueDebug][Auto-Proceed] Step 4: These jobs will now show in running jobs table`);
+                                console.log('===== END AUTO-PROCEED JOB PROCESSING =====');
+                            }
+                        }
+
+                        // Refresh the data
+                        this.fetchQueueData();
+
+                        // Add a more detailed log for the jobs that were processed
+                        if (data.processed_jobs && data.processed_jobs.length > 0) {
+                            console.debug('[QueueDebug] Successfully processed jobs:', data.processed_jobs);
+                        }
+
+                        // Log failed job details if available
+                        if (data.failed_jobs && data.failed_jobs.length > 0) {
+                            console.warn('[QueueDebug] Failed jobs:', data.failed_jobs);
+                        }
+                    } else {
+                        console.debug('[QueueDebug] No jobs were processed in this cycle');
+                    }
+                } else {
+                    console.error('[QueueDebug] Queue processing error:', data.message);
+                    this.showToastNotification(`Auto-processing error: ${data.message}`, 'error', 3000);
+                }
+            })
+            .catch(error => {
+                console.error('[QueueDebug] Error in auto-processing:', error);
+                // Show a notification for errors so they're more visible
+                this.showToastNotification(`Auto-processing error: ${error.message}`, 'error', 3000);
+            })
+            .finally(() => {
+                // Skip scheduling next processing if paused
+                if (this.queuePaused) {
+                    console.log('[QueueDebug] Queue is paused - not scheduling next auto-processing');
+                    return;
+                }
+
+                // Log the next scheduled processing time
+                const nextTime = new Date(Date.now() + this.autoProcessTime);
+                console.debug(`[QueueDebug] Next auto-processing scheduled for ${nextTime.toLocaleTimeString()}`);
+
+                // Update last auto-processing time
+                this.lastAutoProcessTime = new Date();
+
+                // Verify the interval is still active
+                if (!this.autoProcessInterval) {
+                    console.warn('[QueueDebug] Auto-processing interval is no longer active! Restarting...');
+                    this.startAutoProcessing();
+                }
+            });
+    }
+
+    /**
+     * Helper method to count queue items by status for debugging
+     * @param {Array} queueItems - The queue items to count
+     * @returns {Object} Object with counts by status
+     */
+    countQueueItemsByStatus(queueItems) {
+        const counts = {};
+        queueItems.forEach(item => {
+            const status = item.status || 'Unknown';
+            counts[status] = (counts[status] || 0) + 1;
+        });
+        return counts;
     }
 }
 
