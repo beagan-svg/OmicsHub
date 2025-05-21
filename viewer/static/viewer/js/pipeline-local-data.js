@@ -19,13 +19,182 @@ function getCookie(name) {
 }
 
 class PipelineLocalData {
+    // ============================
+    // Initialization Methods
+    // ============================
+
     constructor() {
         this.storageKey = 'pipelineSelectedSamples';
-        this.legacyStorageKey = 'selectedSamplesForPipeline';
         this.selectedSamples = [];
         this.itemsPerPage = 25;
         this.currentPage = 1;
         this.init();
+    }
+
+    init() {
+        // Initialize data and UI
+        this.loadSamples();
+        this.initializePagination();
+
+        // Set up event listeners when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this._initializeAfterDOM());
+        } else {
+            this._initializeAfterDOM();
+        }
+    }
+
+    _initializeAfterDOM() {
+        this.setupEventListeners();
+        this.reinitialize();
+    }
+
+    // Simplified reinitialize method
+    reinitialize() {
+        try {
+            // Try to load from localStorage
+            const storedData = localStorage.getItem(this.storageKey);
+            if (storedData) {
+                this.selectedSamples = JSON.parse(storedData);
+
+                // Rebuild the table with the loaded samples
+                this.rebuildSamplesTable();
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error reinitializing pipeline data:', error);
+            return false;
+        }
+    }
+
+    initializePagination() {
+        const dropdownBtn = document.getElementById('rowsPerPageDropdown');
+        if (dropdownBtn) {
+            this.itemsPerPage = parseInt(dropdownBtn.textContent.trim()) || 25;
+        }
+
+        const currentPageSpan = document.querySelector('.current-page');
+        if (currentPageSpan) {
+            this.currentPage = parseInt(currentPageSpan.textContent.trim()) || 1;
+        }
+    }
+
+    // ============================
+    // Data Storage and Retrieval
+    // ============================
+
+    // Load samples from localStorage
+    loadSamples() {
+        try {
+            // Load from standardized storage
+            const storedData = localStorage.getItem(this.storageKey);
+            this.selectedSamples = storedData ? JSON.parse(storedData) : [];
+        } catch (error) {
+            console.error('Sample loading error:', error);
+            this.selectedSamples = [];
+        }
+    }
+
+    saveSamples() {
+        try {
+            const currentData = localStorage.getItem(this.storageKey);
+            const newData = JSON.stringify(this.selectedSamples);
+
+            if (!currentData || currentData !== newData) {
+                localStorage.setItem(this.storageKey, newData);
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+            if (error.name === 'QuotaExceededError' || error.code === 22) {
+                this._handleStorageFullError();
+            }
+        }
+    }
+
+    // Handle localStorage quota exceeded errors
+    _handleStorageFullError() {
+        try {
+            // Reduce the data by keeping only essential fields
+            // Ensure we keep the same field names as the rest of the application
+            const minimalSamples = this.selectedSamples.map(sample => ({
+                fastq_name: sample.fastq_name,
+                study_set: sample.study_set,
+                load_name: sample.load_name,
+                batch_name_from_vendor: sample.batch_name_from_vendor,
+                organism_common_name: sample.organism_common_name,
+                ingest_status: sample.ingest_status,
+            }));
+
+            // Try to save the minimal data
+            localStorage.setItem(this.storageKey, JSON.stringify(minimalSamples));
+
+            // Show warning to user
+            this.showToastNotification(
+                'Warning: Storage limit reached. Some sample data may be truncated.',
+                'warning',
+                5000
+            );
+        } catch (error) {
+            console.error('Failed to save even minimal data:', error);
+            this.showToastNotification(
+                'Error: Unable to save selected samples due to browser storage limits.',
+                'danger',
+                5000
+            );
+        }
+    }
+
+    clearStoredData() {
+        try {
+            const tableBody = document.querySelector('#samples-table tbody');
+            if (!tableBody) return false;
+
+            // Get selected samples
+            const selectedCheckboxes = tableBody.querySelectorAll('.sample-select:checked');
+            const selectedFastqNames = new Set();
+
+            // Collect fastq names of selected samples
+            selectedCheckboxes.forEach(checkbox => {
+                const row = checkbox.closest('tr');
+                if (row) {
+                    const fastqName = row.querySelector('td:nth-child(2)').textContent.trim();
+                    selectedFastqNames.add(fastqName);
+                }
+            });
+
+            // Filter out the selected samples from storage using consistent field name
+            this.selectedSamples = this.selectedSamples.filter(sample =>
+                !selectedFastqNames.has(sample.fastq_name)
+            );
+
+            // Save to localStorage
+            this.saveSamples();
+
+            // Rebuild the table
+            this.rebuildSamplesTable();
+
+            // Update UI state
+            const selectAllCheckbox = document.getElementById('select-all-samples');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+            }
+
+            const selectedCount = document.getElementById('selected-count');
+            if (selectedCount) {
+                selectedCount.textContent = '0 samples selected';
+            }
+
+            const submitBtn = document.getElementById('submit-selected');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Error clearing selected samples:', error);
+            return false;
+        }
     }
 
     // Create a reusable function to show bottom toast notifications
@@ -89,182 +258,9 @@ class PipelineLocalData {
         }
     }
 
-    init() {
-        // Initialize data and UI
-        this.loadSamples();
-        this.initializePagination();
-
-        // Set up event listeners when DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => this._initializeAfterDOM());
-        } else {
-            this._initializeAfterDOM();
-        }
-    }
-
-    _initializeAfterDOM() {
-        this.setupEventListeners();
-        this.reinitialize();
-    }
-
-    loadSamples() {
-        try {
-            // Load primary storage
-            const storedData = localStorage.getItem(this.storageKey);
-            let primarySamples = storedData ? JSON.parse(storedData) : [];
-
-            // Load and merge legacy storage if it exists
-            const legacyData = localStorage.getItem(this.legacyStorageKey);
-            if (legacyData) {
-                try {
-                    const parsedData = JSON.parse(legacyData);
-
-                    // Process legacy data to match current format
-                    let legacySamples = [];
-                    if (Array.isArray(parsedData)) {
-                        legacySamples = this._convertLegacySamples(parsedData);
-                    } else if (parsedData?.samples) {
-                        legacySamples = this._convertLegacySamples(parsedData.samples);
-                    } else if (parsedData && typeof parsedData === 'object') {
-                        legacySamples = this._convertLegacySamples([parsedData]);
-                    }
-
-                    // Merge samples without duplicates
-                    const existingSamplesMap = new Map(primarySamples.map(s => [s.fastq_name, true]));
-                    this.selectedSamples = [
-                        ...primarySamples,
-                        ...legacySamples.filter(s => !existingSamplesMap.has(s.fastq_name))
-                    ];
-
-                    // Save merged samples and remove legacy data
-                    this.saveSamples();
-                    localStorage.removeItem(this.legacyStorageKey);
-                } catch (parseError) {
-                    console.error('Legacy data parse error:', parseError);
-                    this.selectedSamples = primarySamples;
-                }
-            } else {
-                this.selectedSamples = primarySamples;
-            }
-        } catch (error) {
-            console.error('Sample loading error:', error);
-            this.selectedSamples = [];
-        }
-    }
-
-    // Convert legacy samples to current format
-    _convertLegacySamples(samples) {
-        return samples.map(sample => ({
-            fastq_name: sample.fastq_name || sample.name || sample.id || '',
-            study_set: sample.study_set || sample.studySet || '',
-            load_name: sample.load_name || sample.loadName || '',
-            batch_name_from_vendor: sample.batch_name_from_vendor || sample.batchName || '',
-            organism_common_name: sample.organism_common_name || sample.organism || sample.ingestStatus || 'Unknown',
-            library_prep_method: sample.library_prep_method || sample.libraryPrep || '',
-            ingest_status: sample.ingest_status || 'Completed',
-            alignment_status: sample.alignment_status || 'Not Started',
-            postqc_status: sample.postqc_status || 'Not Started',
-        }));
-    }
-
-    // Simplified reinitialize method
-    reinitialize() {
-        try {
-            // Try to load from localStorage
-            const storedData = localStorage.getItem(this.storageKey);
-            if (storedData) {
-                this.selectedSamples = JSON.parse(storedData);
-
-                // Rebuild the table with the loaded samples
-                this.rebuildSamplesTable();
-                return true;
-            }
-
-            // Try legacy storage if primary storage is empty
-            const legacyData = localStorage.getItem(this.legacyStorageKey);
-            if (legacyData) {
-                try {
-                    const parsedData = JSON.parse(legacyData);
-                    if (parsedData && parsedData.samples && Array.isArray(parsedData.samples)) {
-                        this.selectedSamples = this._convertLegacySamples(parsedData.samples);
-                        this.saveSamples();
-                        localStorage.removeItem(this.legacyStorageKey);
-                        this.rebuildSamplesTable();
-                        return true;
-                    }
-                } catch (e) {
-                    console.error('Error processing legacy data:', e);
-                }
-            }
-
-            return false;
-        } catch (error) {
-            console.error('Error reinitializing pipeline data:', error);
-            return false;
-        }
-    }
-
-    saveSamples() {
-        try {
-            const currentData = localStorage.getItem(this.storageKey);
-            const newData = JSON.stringify(this.selectedSamples);
-
-            if (!currentData || currentData !== newData) {
-                localStorage.setItem(this.storageKey, newData);
-            }
-        } catch (error) {
-            console.error('Save error:', error);
-            if (error.name === 'QuotaExceededError' || error.code === 22) {
-                this._handleStorageFullError();
-            }
-        }
-    }
-
-    // Handle localStorage quota exceeded errors
-    _handleStorageFullError() {
-        try {
-            // Attempt to clear any legacy data
-            localStorage.removeItem(this.legacyStorageKey);
-
-            // Reduce the data by keeping only essential fields
-            const minimalSamples = this.selectedSamples.map(sample => ({
-                fastq_name: sample.fastq_name,
-                study_set: sample.study_set,
-                load_name: sample.load_name,
-                batch_name_from_vendor: sample.batch_name_from_vendor,
-                ingest_status: sample.ingest_status
-            }));
-
-            // Try to save the minimal data
-            localStorage.setItem(this.storageKey, JSON.stringify(minimalSamples));
-
-            // Show warning to user
-            this.showToastNotification(
-                'Warning: Storage limit reached. Some sample data may be truncated.',
-                'warning',
-                5000
-            );
-        } catch (error) {
-            console.error('Failed to save even minimal data:', error);
-            this.showToastNotification(
-                'Error: Unable to save selected samples due to browser storage limits.',
-                'danger',
-                5000
-            );
-        }
-    }
-
-    initializePagination() {
-        const dropdownBtn = document.getElementById('rowsPerPageDropdown');
-        if (dropdownBtn) {
-            this.itemsPerPage = parseInt(dropdownBtn.textContent.trim()) || 25;
-        }
-
-        const currentPageSpan = document.querySelector('.current-page');
-        if (currentPageSpan) {
-            this.currentPage = parseInt(currentPageSpan.textContent.trim()) || 1;
-        }
-    }
+    // ============================
+    // UI Event Handling
+    // ============================
 
     setupEventListeners() {
         // Set up main event listeners
@@ -481,39 +477,63 @@ class PipelineLocalData {
         }
     }
 
-    clearAtacSamples() {
-        // Get all rows in the table for visible UI updates
-        const tableBody = document.querySelector('#samples-table tbody');
-        if (!tableBody) return;
+    handleSelectAllChange(event) {
+        const selectAllCheckbox = document.getElementById('select-all-samples');
+        const isChecked = selectAllCheckbox.checked;
 
-        // Track removed samples for reporting
-        let removedCount = 0;
-
-        // Filter out ATAC samples from selectedSamples
-        const originalLength = this.selectedSamples.length;
-        this.selectedSamples = this.selectedSamples.filter(sample => {
-            const isAtac = sample.batch_name_from_vendor &&
-                (sample.batch_name_from_vendor.toUpperCase().startsWith('ATX') ||
-                    sample.batch_name_from_vendor.toUpperCase().includes('ATAC'));
-            if (isAtac) {
-                removedCount++;
-            }
-            return !isAtac;
+        // Toggle all visible checkboxes
+        const checkboxes = document.querySelectorAll('.sample-select');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = isChecked;
         });
 
-        // Save updated samples to localStorage
-        this.saveSamples();
-
-        // Update UI
-        this.rebuildSamplesTable();
-
-        // Show notification
-        if (removedCount > 0) {
-            this.showToastNotification(`Removed ${removedCount} ATAC samples`, 'success');
-        } else {
-            this.showToastNotification('No ATAC samples found to remove', 'info');
+        // Create hidden rows for samples not on current page when checking all
+        if (isChecked) {
+            this.selectedSamples.forEach(sample => {
+                // Find if there's a row for this sample on the current page
+                const existingRow = document.querySelector(`tr[data-fastq="${sample.fastq_name}"]`);
+                if (!existingRow) {
+                    // If the sample isn't on the current page, create a hidden row for it
+                    const hiddenRow = document.createElement('tr');
+                    hiddenRow.style.display = 'none';
+                    hiddenRow.setAttribute('data-fastq', sample.fastq_name);
+                    hiddenRow.innerHTML = `
+                        <td>
+                            <input type="checkbox" class="sample-select" checked>
+                        </td>
+                        <td>${sample.fastq_name}</td>
+                        <td>${sample.study_set}</td>
+                        <td>${sample.load_name}</td>
+                        <td>${sample.batch_name_from_vendor}</td>
+                        <td>${sample.organism_common_name}</td>
+                        <td>${sample.library_prep_method}</td>
+                        <td>${sample.ingest_status}</td>
+                        <td>${sample.alignment_status}</td>
+                        <td>${sample.postqc_status}</td>
+                    `;
+                    document.querySelector('#samples-table tbody').appendChild(hiddenRow);
+                }
+            });
         }
+
+        // Update selected samples and UI
+        this.updateSelectedSamples();
+        this.updateSubmitButtonState();
     }
+
+    updateSubmitButtonState() {
+        const submitButton = document.getElementById('submit-selected');
+        const actionSubmitButton = document.getElementById('submit-action-btn');
+        const selectedSamples = document.querySelectorAll('.sample-select:checked');
+        const isDisabled = selectedSamples.length === 0;
+
+        if (submitButton) submitButton.disabled = isDisabled;
+        if (actionSubmitButton) actionSubmitButton.disabled = isDisabled;
+    }
+
+    // ============================
+    // Sample Data Management
+    // ============================
 
     updateSelectedSamples() {
         const selectedRows = document.querySelectorAll('.sample-select:checked');
@@ -544,6 +564,7 @@ class PipelineLocalData {
             try {
                 const cells = row.querySelectorAll('td');
                 if (cells.length >= 10) {  // Make sure we have all required cells
+                    // Create sample with all fields in our standardized format
                     const sample = {
                         fastq_name: cells[1]?.textContent?.trim() || '',
                         study_set: cells[2]?.textContent?.trim() || '',
@@ -576,67 +597,86 @@ class PipelineLocalData {
         }
     }
 
-    updateSubmitButtonState() {
-        const submitButton = document.getElementById('submit-selected');
-        const actionSubmitButton = document.getElementById('submit-action-btn');
-        const selectedSamples = document.querySelectorAll('.sample-select:checked');
-        const isDisabled = selectedSamples.length === 0;
+    clearAtacSamples() {
+        // Get all rows in the table for visible UI updates
+        const tableBody = document.querySelector('#samples-table tbody');
+        if (!tableBody) return;
 
-        if (submitButton) submitButton.disabled = isDisabled;
-        if (actionSubmitButton) actionSubmitButton.disabled = isDisabled;
-    }
+        // Track removed samples for reporting
+        let removedCount = 0;
 
-    clearStoredData() {
-        try {
-            const tableBody = document.querySelector('#samples-table tbody');
-            if (!tableBody) return false;
+        // Filter out ATAC samples from selectedSamples
+        const originalLength = this.selectedSamples.length;
+        this.selectedSamples = this.selectedSamples.filter(sample => {
+            // Use consistent snake_case field name
+            const sampleBatchName = sample.batch_name_from_vendor;
 
-            // Get selected samples
-            const selectedCheckboxes = tableBody.querySelectorAll('.sample-select:checked');
-            const selectedFastqNames = new Set();
+            // Check if it's an ATAC sample by checking batch name
+            const isAtac = sampleBatchName &&
+                (sampleBatchName.toUpperCase().startsWith('ATX') ||
+                    sampleBatchName.toUpperCase().includes('ATAC'));
 
-            // Collect fastq names of selected samples
-            selectedCheckboxes.forEach(checkbox => {
-                const row = checkbox.closest('tr');
-                if (row) {
-                    const fastqName = row.querySelector('td:nth-child(2)').textContent.trim();
-                    selectedFastqNames.add(fastqName);
-                }
-            });
-
-            // Filter out the selected samples from storage
-            this.selectedSamples = this.selectedSamples.filter(sample =>
-                !selectedFastqNames.has(sample.fastq_name)
-            );
-
-            // Save to localStorage
-            this.saveSamples();
-
-            // Rebuild the table
-            this.rebuildSamplesTable();
-
-            // Update UI state
-            const selectAllCheckbox = document.getElementById('select-all-samples');
-            if (selectAllCheckbox) {
-                selectAllCheckbox.checked = false;
+            if (isAtac) {
+                removedCount++;
             }
+            return !isAtac;
+        });
 
-            const selectedCount = document.getElementById('selected-count');
-            if (selectedCount) {
-                selectedCount.textContent = '0 samples selected';
-            }
+        // Save updated samples to localStorage
+        this.saveSamples();
 
-            const submitBtn = document.getElementById('submit-selected');
-            if (submitBtn) {
-                submitBtn.disabled = true;
-            }
+        // Update UI
+        this.rebuildSamplesTable();
 
-            return true;
-        } catch (error) {
-            console.error('Error clearing selected samples:', error);
-            return false;
+        // Show notification
+        if (removedCount > 0) {
+            this.showToastNotification(`Removed ${removedCount} ATAC samples`, 'success');
+        } else {
+            this.showToastNotification('No ATAC samples found to remove', 'info');
         }
     }
+
+    removeSubmittedSamples(submittedSamples) {
+        const submittedSet = new Set(submittedSamples.map(sample =>
+            typeof sample === 'string' ? sample : sample.fastq_name
+        ));
+
+        this.selectedSamples = this.selectedSamples.filter(sample =>
+            !submittedSet.has(sample.fastq_name)
+        );
+
+        this.saveSamples();
+
+        const selectedCount = document.getElementById('selected-count');
+        if (selectedCount) {
+            selectedCount.textContent = `${this.selectedSamples.length} samples selected`;
+        }
+    }
+
+    /**
+     * Determine appropriate workflow type based on batch name or fastq name
+     * @param {string} batchName - The batch_name_from_vendor field
+     * @param {string} fastqName - The fastq_name field
+     * @returns {string} Workflow type ('MTX' or 'RTX')
+     */
+    determineWorkflow(batchName, fastqName) {
+        // First check batch name if available
+        if (batchName && batchName.trim() !== '') {
+            const batchNameUpper = batchName.toUpperCase();
+            return (batchNameUpper.startsWith('MTX') || batchNameUpper.includes('ATX'))
+                ? 'MTX'
+                : 'RTX';
+        }
+
+        // Fall back to fastq name check
+        return (fastqName && fastqName.toUpperCase().includes('MX'))
+            ? 'MTX'
+            : 'RTX';
+    }
+
+    // ============================
+    // Table Rendering
+    // ============================
 
     rebuildSamplesTable() {
         const tableBody = document.querySelector('#samples-table tbody');
@@ -813,6 +853,10 @@ class PipelineLocalData {
         });
     }
 
+    // ============================
+    // Status Formatting
+    // ============================
+
     formatStatusWithBadge(status) {
         // Format the status text
         let formattedStatus = 'Not Started';
@@ -873,6 +917,10 @@ class PipelineLocalData {
         return status.charAt(0).toUpperCase() + status.slice(1);
     }
 
+    // ============================
+    // Sample Submission
+    // ============================
+
     handleSampleSubmission(event) {
         event.preventDefault();
 
@@ -881,231 +929,22 @@ class PipelineLocalData {
             return;
         }
 
-        // Check for samples with pending ingest
-        const pendingIngest = this.selectedSamples.filter(sample =>
-            sample.ingest_status !== 'Completed'
-        );
-
-        // Populate modal
-        this.populateSubmitModal(pendingIngest);
-
-        // Setup submit handler
-        const confirmSubmitBtn = document.getElementById('confirm-submit');
-        const forceSubmitCheckbox = document.getElementById('include-incomplete-samples');
-
-        if (confirmSubmitBtn) {
-            confirmSubmitBtn.disabled = this.selectedSamples.length === 0;
-            confirmSubmitBtn.onclick = () => {
-                // Get force submit option
-                const forceSubmit = forceSubmitCheckbox && forceSubmitCheckbox.checked;
-
-                // Submit samples
-                this.submitSamplesToAlignment(this.selectedSamples, forceSubmit);
-
-                // Close modal
-                const modal = bootstrap.Modal.getInstance(document.getElementById('submit-modal'));
-                if (modal) modal.hide();
-            };
-        }
-    }
-
-    populateSubmitModal(pendingIngest) {
-        const sampleList = document.getElementById('submit-sample-list');
-        if (sampleList) {
-            sampleList.innerHTML = '';
-
-            // Group samples by ingest status
-            const completedSamples = this.selectedSamples.filter(sample =>
-                sample.ingest_status === 'Completed'
+        // Delegate to PipelineSubmitModal if available
+        if (window.pipelineSubmitModal && typeof window.pipelineSubmitModal.handleSampleSubmissionFromLocalData === 'function') {
+            // Pass the selected samples and pending ingest samples
+            const pendingIngest = this.selectedSamples.filter(sample =>
+                sample.ingest_status !== 'Completed'
             );
 
-            // Add completed samples
-            if (completedSamples.length > 0) {
-                this.addSampleGroupToModal(sampleList, completedSamples, 'Ready for Submission:', 'bg-success', 'Ready');
-            }
-
-            // Add pending ingest samples
-            if (pendingIngest.length > 0) {
-                this.addSampleGroupToModal(sampleList, pendingIngest, 'Not Ready (Ingest Incomplete):', 'bg-warning', 'Pending Ingest');
-
-                // Show warning about pending ingest samples
-                const warningDiv = document.createElement('div');
-                warningDiv.className = 'alert alert-warning mt-3';
-                warningDiv.innerHTML = `
-                    <small>
-                        <i class="bi bi-exclamation-triangle me-2"></i>
-                        ${pendingIngest.length} sample${pendingIngest.length !== 1 ? 's' : ''} have not completed ingest. 
-                        These samples will be skipped unless you force submission.
-                    </small>
-                `;
-                sampleList.appendChild(warningDiv);
-
-                // Show incomplete samples warning
-                const incompleteWarning = document.getElementById('incomplete-samples-warning');
-                if (incompleteWarning) {
-                    incompleteWarning.classList.remove('d-none');
-
-                    // Populate incomplete samples list
-                    const incompleteList = document.getElementById('incomplete-samples-list');
-                    if (incompleteList) {
-                        incompleteList.innerHTML = '';
-                        pendingIngest.slice(0, 5).forEach(sample => {
-                            const li = document.createElement('li');
-                            li.textContent = sample.fastq_name;
-                            incompleteList.appendChild(li);
-                        });
-
-                        if (pendingIngest.length > 5) {
-                            const li = document.createElement('li');
-                            li.textContent = `...and ${pendingIngest.length - 5} more`;
-                            incompleteList.appendChild(li);
-                        }
-                    }
-                }
-            } else {
-                // Hide incomplete samples warning
-                const incompleteWarning = document.getElementById('incomplete-samples-warning');
-                if (incompleteWarning) {
-                    incompleteWarning.classList.add('d-none');
-                }
-            }
+            window.pipelineSubmitModal.handleSampleSubmissionFromLocalData(
+                event,
+                this.selectedSamples,
+                pendingIngest
+            );
+        } else {
+            // Fallback to simple notification if PipelineSubmitModal isn't available
+            this.showToastNotification('Submission modal not available', 'danger');
         }
-    }
-
-    addSampleGroupToModal(container, samples, headerText, badgeClass, badgeText) {
-        const header = document.createElement('h6');
-        header.className = 'mt-3 mb-2';
-        header.innerHTML = headerText;
-        container.appendChild(header);
-
-        samples.forEach(sample => {
-            const li = document.createElement('li');
-            li.className = 'd-flex justify-content-between align-items-center mb-1';
-            li.innerHTML = `
-                <div>
-                    <strong>${sample.fastq_name}</strong>
-                    <span class="ms-2 badge ${badgeClass}">${badgeText}</span>
-                </div>
-                <small class="text-muted">${this.determineWorkflow(sample.batch_name_from_vendor)}</small>
-            `;
-            container.appendChild(li);
-        });
-    }
-
-    submitSamplesToAlignment(samples, forceSubmit = false) {
-        this.showToastNotification('Submitting samples for processing...', 'info', 3000);
-
-        fetch('/api/pipeline/submit-alignment/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({ samples, force_submit: forceSubmit })
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success' || data.status === 'warning') {
-                    // Handle successfully submitted samples
-                    if (data.submitted_samples && Array.isArray(data.submitted_samples)) {
-                        this.removeSubmittedSamples(data.submitted_samples);
-                    }
-
-                    // Show success/warning notification
-                    this.showToastNotification(
-                        data.message,
-                        data.status === 'warning' ? 'warning' : 'success',
-                        5000
-                    );
-
-                    // Redirect to jobs page or rebuild table
-                    if (this.selectedSamples.length === 0) {
-                        setTimeout(() => window.location.href = '/pipeline/jobs/', 2000);
-                    } else {
-                        this.rebuildSamplesTable();
-                        this.updateSubmitButtonState();
-                    }
-                } else {
-                    this.showToastNotification(`Error: ${data.message}`, 'danger', 5000);
-                }
-            })
-            .catch(error => {
-                console.error('Error submitting samples:', error);
-                this.showToastNotification('Error submitting samples for alignment', 'danger', 5000);
-            });
-    }
-
-    removeSubmittedSamples(submittedSamples) {
-        const submittedSet = new Set(submittedSamples.map(sample =>
-            typeof sample === 'string' ? sample : sample.fastq_name
-        ));
-
-        this.selectedSamples = this.selectedSamples.filter(sample =>
-            !submittedSet.has(sample.fastq_name)
-        );
-
-        this.saveSamples();
-
-        const selectedCount = document.getElementById('selected-count');
-        if (selectedCount) {
-            selectedCount.textContent = `${this.selectedSamples.length} samples selected`;
-        }
-    }
-
-    determineWorkflow(batchName) {
-        if (!batchName) return 'RTX';
-
-        const batchNameUpper = batchName.toUpperCase();
-
-        if (batchNameUpper.startsWith('MTX') || batchNameUpper.includes('ATX')) {
-            return 'MTX';
-        }
-
-        return 'RTX'; // Default for RTX prefix or any unrecognized pattern
-    }
-
-    handleSelectAllChange(event) {
-        const selectAllCheckbox = document.getElementById('select-all-samples');
-        const isChecked = selectAllCheckbox.checked;
-
-        // Toggle all visible checkboxes
-        const checkboxes = document.querySelectorAll('.sample-select');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = isChecked;
-        });
-
-        // Create hidden rows for samples not on current page when checking all
-        if (isChecked) {
-            this.selectedSamples.forEach(sample => {
-                // Find if there's a row for this sample on the current page
-                const existingRow = document.querySelector(`tr[data-fastq="${sample.fastq_name}"]`);
-                if (!existingRow) {
-                    // If the sample isn't on the current page, create a hidden row for it
-                    const hiddenRow = document.createElement('tr');
-                    hiddenRow.style.display = 'none';
-                    hiddenRow.setAttribute('data-fastq', sample.fastq_name);
-                    hiddenRow.innerHTML = `
-                        <td>
-                            <input type="checkbox" class="sample-select" checked>
-                        </td>
-                        <td>${sample.fastq_name}</td>
-                        <td>${sample.study_set}</td>
-                        <td>${sample.load_name}</td>
-                        <td>${sample.batch_name_from_vendor}</td>
-                        <td>${sample.organism_common_name}</td>
-                        <td>${sample.library_prep_method}</td>
-                        <td>${sample.ingest_status}</td>
-                        <td>${sample.alignment_status}</td>
-                        <td>${sample.postqc_status}</td>
-                    `;
-                    document.querySelector('#samples-table tbody').appendChild(hiddenRow);
-                }
-            });
-        }
-
-        // Update selected samples and UI
-        this.updateSelectedSamples();
-        this.updateSubmitButtonState();
     }
 }
 

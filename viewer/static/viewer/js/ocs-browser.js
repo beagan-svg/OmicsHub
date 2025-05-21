@@ -1532,6 +1532,7 @@ function initSelectionPanel() {
     // Initialize panel state
     selectionPanel.style.display = 'none';
     window.selectedSamples = window.selectedSamples || [];
+    selectedSamples = window.selectedSamples; // Ensure we're using the same reference
 
     // Initialize from current checkbox state
     initializeFromCheckboxState();
@@ -1594,7 +1595,7 @@ function initSelectionPanel() {
         }
 
         // Update selection panel
-        selectedSamples = [];
+        selectedSamples.length = 0; // Clear array without reassigning
         updateSelectionPanel();
     }
 
@@ -1640,7 +1641,8 @@ function initSelectionPanel() {
      * Handle changes to "Select All" checkbox
      */
     function handleSelectAllChange() {
-        selectedSamples = []; // Reset the selected samples array
+        // Don't reset the array, just clear its contents
+        selectedSamples.length = 0;
 
         document.querySelectorAll('.sample-select').forEach(checkbox => {
             // Skip the select all checkbox itself
@@ -1697,8 +1699,13 @@ function initSelectionPanel() {
             // Process this batch
             for (let i = startIdx; i < endIdx; i++) {
                 const sample = selectedSamples[i];
+                // Check if sample exists and has expected properties
+                if (!sample) {
+                    continue;
+                }
+
                 // Map to pipeline format with essential fields only
-                cleanedSamples.push({
+                const cleanedSample = {
                     fastq_name: sample.fastqName || '',
                     study_set: sample.studySet || '',
                     load_name: sample.loadName || '',
@@ -1708,7 +1715,9 @@ function initSelectionPanel() {
                     ingest_status: sample.ingestStatus || 'Not Started',
                     alignment_status: sample.alignmentStatus || 'Not Started',
                     postqc_status: sample.postqcStatus || 'Not Started'
-                });
+                };
+
+                cleanedSamples.push(cleanedSample);
             }
 
             // Check if we're done
@@ -1729,8 +1738,25 @@ function initSelectionPanel() {
             };
 
             try {
-                // Store the data
-                localStorage.setItem('selectedSamplesForPipeline', JSON.stringify(storageItem));
+                // Verify we have data before saving
+                if (cleanedSamples.length === 0) {
+                    showFeedbackMessage('No samples to send to pipeline', 'warning');
+                    sendToPipelineBtn.disabled = false;
+                    sendToPipelineBtn.innerHTML = 'Send to Pipeline <i class="bi bi-arrow-right"></i>';
+                    return;
+                }
+
+                // Store the data using the standardized key
+                localStorage.setItem('pipelineSelectedSamples', JSON.stringify(cleanedSamples));
+
+                // Verify data was saved correctly
+                const verifyData = localStorage.getItem('pipelineSelectedSamples');
+                if (!verifyData) {
+                    throw new Error('Failed to verify saved data');
+                }
+
+                const verifiedSamples = JSON.parse(verifyData);
+
                 showFeedbackMessage(`${selectedSamples.length} samples sent to Pipeline Dashboard`, 'success');
 
                 // Redirect to pipeline dashboard
@@ -1755,10 +1781,7 @@ function initSelectionPanel() {
             // Try with a reduced sample set
             const reducedSamples = cleanedSamples.slice(0, 1000);
             try {
-                localStorage.setItem('selectedSamplesForPipeline', JSON.stringify({
-                    timestamp: new Date().getTime(),
-                    samples: reducedSamples
-                }));
+                localStorage.setItem('pipelineSelectedSamples', JSON.stringify(reducedSamples));
 
                 showFeedbackMessage(`Storage limit reached. Only first 1000 samples will be processed.`, 'warning');
                 setTimeout(() => {
@@ -1779,12 +1802,18 @@ function initSelectionPanel() {
         const selectionPanel = Utils.getElement('#selection-actions', 'Selection panel');
         const selectionCount = Utils.getElement('#selected-count', 'Selection count');
 
-        if (!selectionPanel || !window.selectedSamples) return;
+        if (!selectionPanel || !selectedSamples) return;
 
         Utils.logDebug('updateSelectionPanel called with', selectedSamples.length);
 
-        // Filter out any invalid entries (missing id)
-        selectedSamples = selectedSamples.filter(sample => sample && sample.id);
+        // Filter out any invalid entries (missing id) - use filter without reassignment
+        const validSamples = selectedSamples.filter(sample => sample && sample.id);
+
+        // If some samples were invalid, replace the array contents
+        if (validSamples.length !== selectedSamples.length) {
+            selectedSamples.length = 0;
+            selectedSamples.push(...validSamples);
+        }
 
         if (selectedSamples.length > 0) {
             selectionPanel.style.display = 'flex';
