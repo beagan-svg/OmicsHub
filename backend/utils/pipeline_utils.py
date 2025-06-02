@@ -8,7 +8,7 @@ from datetime import datetime
 import time
 from django.conf import settings
 from django.utils import timezone
-from backend.core.models import Alignment, PostQC, Metadata, Main, RunningJob, CompletedJob, FailedJob
+from backend.core.models import Alignment, PostQC, Metadata, Main, RunningJob, CompletedJob, FailedJob, QueueJobs
 from django.db import transaction
 
 # Set up logging
@@ -379,7 +379,7 @@ def move_jobs(fastq_name, demand_id, status, demand_type, start_time=None, end_t
     logger.info(f"Moving job {fastq_name} (demand_id: {demand_id}, type: {demand_type}) to appropriate table with status: {status}")
     
     try:
-        from backend.core.models import RunningJob, CompletedJob, FailedJob
+        from backend.core.models import RunningJob, CompletedJob, FailedJob, QueueJobs
         from django.db import transaction
         
         # Find the running job with a single query
@@ -450,6 +450,36 @@ def move_jobs(fastq_name, demand_id, status, demand_type, start_time=None, end_t
                 # Create completed job record
                 completed_job = CompletedJob.objects.create(**completed_job_data)
                 logger.info(f"Created completed job record for {fastq_name} with ID: {completed_job.id}")
+                
+                # AUTO-UPDATE PENDING POST-QC JOBS TO READY
+                # If an alignment job completed successfully, check for pending post-QC jobs
+                if demand_type == 'align' and status == 'COMPLETED':
+                    logger.info(f"Alignment job completed successfully for {fastq_name}, checking for pending post-QC jobs in queue")
+                    try:
+                        # Find queue entries for this fastq_name that have post-QC commands and are pending
+                        pending_postqc_jobs = QueueJobs.objects.filter(
+                            fastq_name=fastq_name,
+                            postqc_command__isnull=False,
+                            postqc_command__gt='',  # Not empty
+                            status__in=['Pending', 'pending', 'PENDING']
+                        )
+                        
+                        updated_count = 0
+                        for queue_job in pending_postqc_jobs:
+                            old_status = queue_job.status
+                            queue_job.status = 'Ready'
+                            queue_job.save()
+                            updated_count += 1
+                            logger.info(f"Updated queue job for {fastq_name}: {old_status} -> Ready (post-QC command ready to process)")
+                        
+                        if updated_count > 0:
+                            logger.info(f"Successfully updated {updated_count} pending post-QC jobs to Ready status for {fastq_name}")
+                        else:
+                            logger.debug(f"No pending post-QC jobs found in queue for {fastq_name}")
+                            
+                    except Exception as queue_update_error:
+                        # Log the error but don't fail the overall job move operation
+                        logger.error(f"Error updating pending post-QC jobs to Ready for {fastq_name}: {queue_update_error}")
             
             # Delete running job record
             logger.debug(f"Deleting running job record for {fastq_name} (ID: {running_job.id})")
