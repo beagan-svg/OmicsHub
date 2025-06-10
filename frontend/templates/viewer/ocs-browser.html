@@ -1,0 +1,1061 @@
+{% extends "viewer/header.html" %}
+{% load static %}
+
+{% block title %}OCS Browser{% endblock %}
+
+{% block body_class %}application-body{% endblock %}
+
+{% block container_start %}
+<div class="container-fluid mt-4">
+    {% endblock %}
+
+    {% block extrahead %}
+    <!-- Modern Font Imports -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Select2 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@x.x.x/dist/select2-bootstrap4.min.css" />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'viewer/css/ocs-browser.css' %}">
+
+    <!-- CSRF Token Meta Tag -->
+    <meta name="csrf-token" content="{{ csrf_token }}">
+
+    <!-- 
+        Column Visibility Defaults:
+        By default, only essential columns are shown on first load for a cleaner interface:
+        - Sample identifiers: fastq_name, study_set, load_name
+        - Core metadata: library_prep_method  
+        - Workflow status: ingest_status, alignment_status, postqc_status
+        
+        Users can show additional columns via the Columns dropdown or use "Show All" toggle.
+        Column preferences are saved in localStorage for subsequent visits.
+    -->
+    {% endblock %}
+
+    {% block content %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-database me-2"></i>
+                        OCS Browser
+                    </h5>
+                    <div class="d-flex align-items-center gap-3 ms-auto">
+                        <!-- Sample count badge -->
+                        <span class="badge">4 of 1,247 samples</span>
+                        <!-- Dark Mode Toggle -->
+                        <button type="button" id="theme-toggle" class="btn btn-outline-light btn-sm"
+                            title="Toggle dark mode">
+                            <i class="bi bi-moon-stars"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <form method="get" id="filter-form">
+                        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+                        <!-- Search row -->
+                        <div class="row mb-4">
+                            <div class="col-lg-7">
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="bi bi-search"></i>
+                                    </span>
+                                    <input type="text" name="search" id="search-input"
+                                        class="form-control form-control-lg"
+                                        placeholder="Search by batch name, load name, organism, library prep method..."
+                                        aria-label="Search">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-search me-1"></i>
+                                        Search
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div
+                                class="col-lg-5 text-end mt-3 mt-lg-0 d-flex align-items-center justify-content-end flex-wrap gap-3">
+                                <!-- Advanced filters toggle button -->
+                                <button type="button" id="toggleAdvancedFilters" class="btn btn-outline-primary me-3">
+                                    <i class="bi bi-funnel me-1"></i>
+                                    Advanced Filters
+                                </button>
+
+                                <!-- Reset Sort Button -->
+                                <button type="button" id="resetSort" class="btn btn-outline-secondary"
+                                    title="Clear table sorting" style="display: none;">
+                                    <i class="bi bi-arrow-down-up me-1"></i>
+                                    Reset Sort
+                                </button>
+
+                                <!-- Column Settings Dropdown -->
+                                <div class="dropdown column-settings-dropdown">
+                                    <button type="button" id="column-settings-toggle" class="btn btn-outline-secondary"
+                                        data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-layout-three-columns me-1"></i>
+                                        Columns
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end column-settings-dropdown-menu">
+                                        <div class="column-categories-container">
+                                            <!-- Sample Information Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-info-circle"></i>Sample Information</h6>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" checked class="column-toggle-checkbox"
+                                                            id="toggleFastqName" data-column="fastq_name">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Fastq Name</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" checked class="column-toggle-checkbox"
+                                                            id="toggleStudySet" data-column="study_set">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Study Set</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" checked class="column-toggle-checkbox"
+                                                            id="toggleLoadName" data-column="load_name">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Load Name</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleBatchName" data-column="batch_name">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Batch Name</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleBatchNameFromVendor"
+                                                            data-column="batch_name_from_vendor">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Batch Name From Vendor</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleSampleId" data-column="sample_id">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Sample ID</label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Sample Characteristics Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-tag"></i>Sample Characteristics</h6>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleOrganism" data-column="organism">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Organism</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleOrganismCommonName"
+                                                            data-column="organism_common_name">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Organism Common Name</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleCellCapture" data-column="cell_capture">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Cell Capture</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleCellPrepType" data-column="cell_prep_type">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Cell Prep Type</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleSequencingVendor" data-column="sequencing_vendor">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Sequencing Vendor</label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Amplification Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-arrow-up-circle"></i>Amplification</h6>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleAmplificationName"
+                                                            data-column="amplification_name">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Amplification</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleAmplificationId" data-column="amplification_id">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Amplification ID</label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Library Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-gear"></i>Library</h6>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" checked class="column-toggle-checkbox"
+                                                            id="toggleLibraryPrepMethod"
+                                                            data-column="library_prep_method">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Library Prep Method</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleLibraryPrepMethodId"
+                                                            data-column="library_prep_method_id">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Library Prep Method ID</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleLibraryPrepName" data-column="library_prep_name">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Library Prep Name</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleAlignmentMethod" data-column="alignment_method">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Alignment Method</label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Processing Status Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-check2-circle"></i>Processing Status</h6>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" checked class="column-toggle-checkbox"
+                                                            id="toggleIngestStatus" data-column="ingest_status">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Ingest Status</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" checked class="column-toggle-checkbox"
+                                                            id="toggleAlignmentStatus" data-column="alignment_status">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Alignment Status</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" checked class="column-toggle-checkbox"
+                                                            id="togglePostqcStatus" data-column="postqc_status">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">PostQC Status</label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Status FID Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-key"></i>Status FID</h6>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleIngestFid" data-column="ingest_fid">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Ingest FID</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleAlignmentFid" data-column="alignment_fid">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Alignment FID</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="togglePostqcFid" data-column="postqc_fid">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">PostQC FID</label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Status Time Category -->
+                                            <div class="column-category">
+                                                <h6><i class="bi bi-clock"></i>Status Times</h6>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleIngestStartTime" data-column="ingest_start_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Ingest Start</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleIngestEndTime" data-column="ingest_end_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Ingest End</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleAlignmentStartTime"
+                                                            data-column="alignment_start_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Alignment Start</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="toggleAlignmentEndTime"
+                                                            data-column="alignment_end_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">Alignment End</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="togglePostqcStartTime" data-column="postqc_start_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">PostQC Start</label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <label class="toggle-switch">
+                                                        <input type="checkbox" class="column-toggle-checkbox"
+                                                            id="togglePostqcEndTime" data-column="postqc_end_time">
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                    <label class="form-check-label">PostQC End</label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Action Buttons -->
+                                        <div
+                                            class="d-flex justify-content-between align-items-center pt-3 border-top column-settings-dropdown-footer">
+                                            <div class="toggle-all-columns d-flex align-items-center">
+                                                <label class="toggle-switch toggle-switch-lg me-2">
+                                                    <input type="checkbox" id="toggleAllColumns">
+                                                    <span class="toggle-slider"></span>
+                                                </label>
+                                                <label class="toggle-label mb-0" for="toggleAllColumns">Show
+                                                    All</label>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                                id="resetColumnDefaults">
+                                                <i class="bi bi-arrow-counterclockwise me-1"></i>
+                                                Reset
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active filters display -->
+                        <div class="active-filters-container mb-4" style="display: none;"></div>
+
+                        <!-- Advanced Filters Section -->
+                        <div id="advancedFilters" class="advanced-filters-container" style="display: none;">
+                            <!-- Sample Information Card -->
+                            <div class="filter-card filter-card-info">
+                                <h6 class="filter-section-heading">
+                                    <i class="bi bi-info-circle"></i>
+                                    Sample Information
+                                </h6>
+
+                                <div class="row g-4">
+                                    <div class="col-md-4">
+                                        <label class="form-label">RTX Batches</label>
+                                        <div class="select-container">
+                                            <select id="batch_rtx" name="batch_rtx" class="form-select filter-select"
+                                                multiple>
+                                                <!-- Options will be populated dynamically by JavaScript -->
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">MTX Batches</label>
+                                        <div class="select-container">
+                                            <select id="batch_mtx" name="batch_mtx" class="form-select filter-select"
+                                                multiple>
+                                                <!-- Options will be populated dynamically by JavaScript -->
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">ATX Batches</label>
+                                        <div class="select-container">
+                                            <select id="batch_atx" name="batch_atx" class="form-select filter-select"
+                                                multiple>
+                                                <!-- Options will be populated dynamically by JavaScript -->
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-4 mt-2">
+                                    <div class="col-md-12">
+                                        <label class="form-label">Study Set</label>
+                                        <div class="select-container">
+                                            <select id="study_set" name="study_set" class="form-select filter-select"
+                                                multiple>
+                                                <!-- Options will be populated dynamically by JavaScript -->
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Sample Characteristics Card -->
+                            <div class="filter-card filter-card-characteristics">
+                                <h6 class="filter-section-heading">
+                                    <i class="bi bi-tag"></i>
+                                    Sample Characteristics
+                                </h6>
+
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Organism Common Name</label>
+                                        <div class="select-container">
+                                            <select id="organism_common_name" name="organism_common_name"
+                                                class="form-select filter-select" multiple>
+                                                <!-- Options will be populated dynamically by JavaScript -->
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Library Prep Method</label>
+                                        <div class="select-container">
+                                            <select id="library_prep_method" name="library_prep_method"
+                                                class="form-select filter-select" multiple>
+                                                <!-- Options will be populated dynamically by JavaScript -->
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Processing Status Card -->
+                            <div class="filter-card filter-card-status">
+                                <h6 class="filter-section-heading">
+                                    <i class="bi bi-check2-circle"></i>
+                                    Processing Status
+                                </h6>
+
+                                <div class="row g-4">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Ingest Status</label>
+                                        <div class="select-container">
+                                            <select id="ingest_status" name="ingest_status"
+                                                class="form-select filter-select" multiple>
+                                                <!-- Options will be populated dynamically by JavaScript -->
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">Alignment Status</label>
+                                        <div class="select-container">
+                                            <select id="alignment_status" name="alignment_status"
+                                                class="form-select filter-select" multiple>
+                                                <!-- Options will be populated dynamically by JavaScript -->
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">PostQC Status</label>
+                                        <div class="select-container">
+                                            <select id="postqc_status" name="postqc_status"
+                                                class="form-select filter-select" multiple>
+                                                <!-- Options will be populated dynamically by JavaScript -->
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="filter-actions d-flex gap-3 pt-4 border-top">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-funnel me-1"></i>
+                                    Apply Filters
+                                </button>
+                                <button type="button" id="resetFilters" class="btn btn-outline-secondary">
+                                    <i class="bi bi-x-circle me-1"></i>
+                                    Clear All
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Main data table -->
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th class="selection-column">
+                                        <input type="checkbox" class="sample-select" id="select-all-samples">
+                                    </th>
+                                    <th class="column-fastq_name sortable" data-sort-field="fastq_name">
+                                        <i class="bi bi-file-earmark-text me-1"></i>
+                                        Fastq Name
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-study_set sortable" data-sort-field="study_set">
+                                        <i class="bi bi-collection me-1"></i>
+                                        Study Set
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-load_name sortable" data-sort-field="load_name">
+                                        <i class="bi bi-box-seam me-1"></i>
+                                        Load Name
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-library_prep_method sortable"
+                                        data-sort-field="library_prep_method">
+                                        <i class="bi bi-gear me-1"></i>
+                                        Library Prep Method
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-organism sortable" style="display: none;"
+                                        data-sort-field="organism">
+                                        <i class="bi bi-virus me-1"></i>
+                                        Organism
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-organism_common_name sortable" style="display: none;"
+                                        data-sort-field="organism_common_name">
+                                        <i class="bi bi-heart-pulse me-1"></i>
+                                        Organism Common Name
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-batch_name sortable" style="display: none;"
+                                        data-sort-field="batch_name">
+                                        <i class="bi bi-layers me-1"></i>
+                                        Batch Name
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-batch_name_from_vendor sortable" style="display: none;"
+                                        data-sort-field="batch_name_from_vendor">
+                                        <i class="bi bi-truck me-1"></i>
+                                        Batch Name From Vendor
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-cell_capture sortable" style="display: none;"
+                                        data-sort-field="cell_capture">
+                                        <i class="bi bi-eye me-1"></i>
+                                        Cell Capture
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-sample_id sortable" style="display: none;"
+                                        data-sort-field="sample_id">
+                                        <i class="bi bi-fingerprint me-1"></i>
+                                        Sample ID
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-amplification_name sortable" style="display: none;"
+                                        data-sort-field="amplification_name">
+                                        <i class="bi bi-arrow-up-circle me-1"></i>
+                                        Amplification
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-amplification_id sortable" style="display: none;"
+                                        data-sort-field="amplification_id">
+                                        <i class="bi bi-hash me-1"></i>
+                                        Amplification ID
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-cell_prep_type sortable" style="display: none;"
+                                        data-sort-field="cell_prep_type">
+                                        <i class="bi bi-app me-1"></i>
+                                        Cell Prep Type
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-sequencing_vendor sortable" style="display: none;"
+                                        data-sort-field="sequencing_vendor">
+                                        <i class="bi bi-building me-1"></i>
+                                        Sequencing Vendor
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-alignment_method sortable" style="display: none;"
+                                        data-sort-field="alignment_method">
+                                        <i class="bi bi-diagram-2 me-1"></i>
+                                        Alignment Method
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-library_prep_method_id sortable" style="display: none;"
+                                        data-sort-field="library_prep_method_id">
+                                        <i class="bi bi-upc me-1"></i>
+                                        Library Prep Method ID
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-library_prep_name sortable" style="display: none;"
+                                        data-sort-field="library_prep_name">
+                                        <i class="bi bi-tags me-1"></i>
+                                        Library Prep Name
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-ingest_status sortable" data-sort-field="ingest_status">
+                                        <i class="bi bi-download me-1"></i>
+                                        Ingest Status
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-ingest_fid sortable" style="display: none;"
+                                        data-sort-field="ingest_fid">
+                                        <i class="bi bi-key me-1"></i>
+                                        Ingest FID
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-ingest_start_time sortable" style="display: none;"
+                                        data-sort-field="ingest_start_time">
+                                        <i class="bi bi-clock me-1"></i>
+                                        Ingest Start
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-ingest_end_time sortable" style="display: none;"
+                                        data-sort-field="ingest_end_time">
+                                        <i class="bi bi-clock-history me-1"></i>
+                                        Ingest End
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-alignment_status sortable" data-sort-field="alignment_status">
+                                        <i class="bi bi-align-start me-1"></i>
+                                        Alignment Status
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-alignment_fid sortable" style="display: none;"
+                                        data-sort-field="alignment_fid">
+                                        <i class="bi bi-key me-1"></i>
+                                        Alignment FID
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-alignment_start_time sortable" style="display: none;"
+                                        data-sort-field="alignment_start_time">
+                                        <i class="bi bi-clock me-1"></i>
+                                        Alignment Start
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-alignment_end_time sortable" style="display: none;"
+                                        data-sort-field="alignment_end_time">
+                                        <i class="bi bi-clock-history me-1"></i>
+                                        Alignment End
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-postqc_status sortable" data-sort-field="postqc_status">
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        PostQC Status
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-postqc_fid sortable" style="display: none;"
+                                        data-sort-field="postqc_fid">
+                                        <i class="bi bi-key me-1"></i>
+                                        PostQC FID
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-postqc_start_time sortable" style="display: none;"
+                                        data-sort-field="postqc_start_time">
+                                        <i class="bi bi-clock me-1"></i>
+                                        PostQC Start
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                    <th class="column-postqc_end_time sortable" style="display: none;"
+                                        data-sort-field="postqc_end_time">
+                                        <i class="bi bi-clock-history me-1"></i>
+                                        PostQC End
+                                        <span class="sort-indicator">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Loading state - will be replaced by AJAX data -->
+                                <tr id="loading-row">
+                                    <td colspan="30" class="text-center py-5">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <div class="spinner-border text-primary mb-3" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <div class="text-muted">
+                                                <i class="bi bi-database me-2"></i>
+                                                Loading sample data...
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Enhanced Pagination controls in card footer -->
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div class="pagination-navigation">
+                            <!-- First page button -->
+                            <button disabled class="btn btn-outline-secondary btn-sm page-nav disabled"
+                                data-pagination-action="first" title="First page">
+                                <i class="bi bi-chevron-double-left"></i>
+                            </button>
+                            <button disabled class="btn btn-outline-secondary btn-sm page-nav disabled ms-1"
+                                data-pagination-action="prev" title="Previous page">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+
+                            <!-- Page indicator -->
+                            <span class="page-indicator mx-3">
+                                Page <span class="current-page">1</span> of <span class="total-pages">50</span>
+                            </span>
+
+                            <!-- Next page button -->
+                            <button class="btn btn-outline-secondary btn-sm page-nav me-1" data-pagination-action="next"
+                                title="Next page">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                            <!-- Last page button -->
+                            <button class="btn btn-outline-secondary btn-sm page-nav" data-pagination-action="last"
+                                title="Last page">
+                                <i class="bi bi-chevron-double-right"></i>
+                            </button>
+                        </div>
+
+                        <div class="d-flex align-items-center flex-wrap gap-3">
+                            <!-- Rows per page selector -->
+                            <div class="pagination-control d-flex align-items-center">
+                                <label class="text-muted me-2 mb-0 small">Show:</label>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                        data-bs-toggle="dropdown">
+                                        25
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" data-pagination-action="per-page"
+                                                data-per-page="10">10</a></li>
+                                        <li><a class="dropdown-item active" href="#" data-pagination-action="per-page"
+                                                data-per-page="25">25</a></li>
+                                        <li><a class="dropdown-item" href="#" data-pagination-action="per-page"
+                                                data-per-page="50">50</a></li>
+                                        <li><a class="dropdown-item" href="#" data-pagination-action="per-page"
+                                                data-per-page="100">100</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Go to page input -->
+                            <div class="goto-page d-flex align-items-center">
+                                <label class="text-muted me-2 mb-0 small">Go to:</label>
+                                <div class="input-group input-group-sm" style="width: 80px;">
+                                    <input type="number" class="form-control goto-page-input text-center" value="1"
+                                        min="1" max="50" id="gotoPage">
+                                    <button type="button" class="btn btn-outline-secondary goto-btn" title="Go to page">
+                                        <i class="bi bi-arrow-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Pagination info -->
+                            <span class="text-muted pagination-info small">
+                                Results 1-25 of 1,247
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modern Selection Actions Panel -->
+    <div id="selection-panel" class="selection-panel" style="display: none;">
+        <!-- Panel Header -->
+        <div class="selection-panel-header">
+            <div class="selection-status">
+                <div class="selection-icon">
+                    <i class="bi bi-check-square-fill"></i>
+                </div>
+                <div class="selection-text">
+                    <div class="selection-count">
+                        <span id="selected-count">0</span> samples selected
+                    </div>
+                    <div class="selection-subtitle">Ready for processing</div>
+                </div>
+            </div>
+            <button type="button" class="close-panel-btn" id="close-selection-panel" title="Close panel">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+
+        <!-- Panel Actions -->
+        <div class="selection-panel-actions">
+            <button type="button" class="pipeline-btn" id="send-to-pipeline-btn">
+                <div class="pipeline-btn-content">
+                    <div class="pipeline-btn-icon">
+                        <i class="bi bi-play-circle-fill"></i>
+                    </div>
+                    <div class="pipeline-btn-text">
+                        <span class="pipeline-btn-title">Send to Pipeline</span>
+                        <span class="pipeline-btn-desc">Process selected samples</span>
+                    </div>
+                </div>
+                <div class="pipeline-btn-arrow">
+                    <i class="bi bi-arrow-right"></i>
+                </div>
+            </button>
+
+            <button type="button" class="clear-btn" id="clear-selection-btn">
+                <i class="bi bi-x-circle"></i>
+                <span>Clear Selection</span>
+            </button>
+        </div>
+
+        <!-- Progress Indicator -->
+        <div class="selection-progress" id="selection-progress" style="display: none;">
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+            <div class="progress-text">Preparing samples for pipeline...</div>
+        </div>
+    </div>
+    {% endblock %}
+
+    {% block container_end %}
+</div>
+{% endblock %}
+
+{% block extrascripts %}
+<!-- Custom AJAX Browser JS -->
+<script src="{% static 'viewer/js/ocs-browser-ajax.js' %}"></script>
+
+<!-- Multi-user enhancements -->
+<script src="{% static 'viewer/js/multi-user-client.js' %}"></script>
+
+<!-- Initialize the application after all dependencies are loaded -->
+<script>
+    // Dark Mode Toggle Functionality
+    const initThemeToggle = () => {
+        const themeToggle = document.getElementById('theme-toggle');
+        const body = document.body;
+
+        // Check for saved theme preference or default to light mode
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        body.setAttribute('data-theme', savedTheme);
+        updateThemeToggleIcon(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = body.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeToggleIcon(newTheme);
+
+            // Add a smooth transition effect
+            body.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+            setTimeout(() => {
+                body.style.transition = '';
+            }, 300);
+        });
+
+        function updateThemeToggleIcon(theme) {
+            const icon = themeToggle.querySelector('i');
+            if (theme === 'dark') {
+                icon.className = 'bi bi-sun';
+                themeToggle.title = 'Switch to light mode';
+            } else {
+                icon.className = 'bi bi-moon-stars';
+                themeToggle.title = 'Switch to dark mode';
+            }
+        }
+    };
+
+    $(document).ready(function () {
+        console.log('[Browser AJAX] Document ready event fired');
+        console.log('[Browser AJAX] jQuery version:', $.fn.jquery);
+        console.log('[Browser AJAX] Select2 available:', typeof $.fn.select2 !== 'undefined');
+
+        // Initialize theme toggle
+        initThemeToggle();
+
+        // Force initialization if it hasn't happened already
+        if (typeof window.BrowserAJAX === 'undefined') {
+            console.log('[Browser AJAX] BrowserAJAX not found, script may not have loaded');
+        } else {
+            console.log('[Browser AJAX] BrowserAJAX object found');
+            // The App.init() should have already been called, but let's check if data loaded
+            setTimeout(function () {
+                console.log('[Browser AJAX] Checking if table has been populated...');
+                const tbody = document.querySelector('table tbody');
+                if (tbody) {
+                    const rows = tbody.querySelectorAll('tr');
+                    console.log('[Browser AJAX] Table has', rows.length, 'rows');
+                    if (rows.length > 0) {
+                        const firstRowText = rows[0].textContent;
+                        console.log('[Browser AJAX] First row contains:', firstRowText.substring(0, 100));
+
+                        // Check if it's still showing sample data
+                        if (firstRowText.includes('Sample_001_R1.fastq.gz')) {
+                            console.log('[Browser AJAX] Still showing static data, forcing reload...');
+                            if (typeof DataManager !== 'undefined' && DataManager.loadData) {
+                                DataManager.loadData();
+                            } else {
+                                console.log('[Browser AJAX] DataManager not accessible, trying alternative approach...');
+                                // Try to trigger a manual API call
+                                fetch('/api/samples/?page=1&per_page=25')
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        console.log('[Browser AJAX] Manual API call successful:', data);
+                                    })
+                                    .catch(error => {
+                                        console.error('[Browser AJAX] Manual API call failed:', error);
+                                    });
+                            }
+                        }
+                    }
+                }
+            }, 2000);
+        }
+    });
+</script>
+{% endblock %}
