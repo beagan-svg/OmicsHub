@@ -44,11 +44,40 @@ import logging
 
 # Cache timeouts in seconds
 PIPELINE_CONFIG_CACHE_TIMEOUT = 3600  # 1 hour
-JOB_DATA_CACHE_TIMEOUT = 300         # 5 minutes
+JOB_DATA_CACHE_TIMEOUT = 60          # 1 minute (reduced from 5 minutes)
+JOB_METADATA_CACHE_TIMEOUT = 300     # 5 minutes for slow-changing metadata
 JOB_UPDATE_LOCK_TIMEOUT = 60         # 1 minute
-JOB_UPDATE_INTERVAL = 600            # 10 minutes
+JOB_UPDATE_INTERVAL = 300            # 5 minutes (reduced from 10 minutes)
 
 logger = logging.getLogger(__name__)
+
+def invalidate_job_monitor_caches():
+    """Invalidate all job monitor caches when job status changes."""
+    try:
+        # Get all cache keys that match the job monitor pattern
+        # Note: This is a simplified approach. In production, you might want
+        # to maintain a list of active user cache keys
+        
+        # Clear the most common cache keys
+        cache_patterns = [
+            'job_monitor_data_*',
+            'job_counts_*'
+        ]
+        
+        # Since Django's cache doesn't support pattern deletion by default,
+        # we'll use a different approach: set a cache version
+        cache_version = cache.get('job_monitor_cache_version', 0) + 1
+        cache.set('job_monitor_cache_version', cache_version, timeout=None)
+        
+        logger.info(f"Invalidated job monitor caches - new version: {cache_version}")
+        
+    except Exception as e:
+        logger.error(f"Error invalidating job monitor caches: {str(e)}")
+
+def get_cache_key_with_version(base_key: str) -> str:
+    """Get cache key with version to support cache invalidation."""
+    version = cache.get('job_monitor_cache_version', 0)
+    return f"{base_key}_v{version}"
 
 class PipelineDashboardView(TemplateView):
     """View for the main pipeline dashboard."""
@@ -143,44 +172,64 @@ class PipelineDashboardView(TemplateView):
             cache.set(counts_cache_key, job_counts, timeout=JOB_DATA_CACHE_TIMEOUT)
         
         # Get running jobs from RunningJob table with efficient querying
-        running_jobs = RunningJob.objects.all().values(
+        running_jobs_data = RunningJob.objects.all().values(
             'fastq_name',
             'alignment_demand_id',
             'postqc_demand_id',
+            'alignment_command',
+            'postqc_command',
             'time',
             'alignment_attempts',
             'postqc_attempts'
         )
         
-        # Format running jobs data
-        running_alignments = {}
-        for job in running_jobs:
+        # Format running jobs
+        running_jobs = []
+        for job in running_jobs_data:
+            # Get metadata for display
+            try:
+                metadata = Metadata.objects.get(fastq_name=job['fastq_name'])
+                organism = metadata.organism_common_name
+                batch = metadata.batch_name_from_vendor
+            except Metadata.DoesNotExist:
+                organism = 'Unknown'
+                batch = 'Unknown'
+            
+            # Add alignment job if exists
             if job['alignment_demand_id']:
-                # Get metadata for display
-                try:
-                    metadata = Metadata.objects.get(fastq_name=job['fastq_name'])
-                    running_alignments[job['fastq_name']] = {
-                        'demand_id': job['alignment_demand_id'],
-                        'status': 'IN_PROGRESS',
-                        'start_time': job['time'],
-                        'organism': metadata.organism_common_name,
-                        'batch': metadata.batch_name_from_vendor,
-                        'attempts': job['alignment_attempts']
-                    }
-                except Metadata.DoesNotExist:
-                    # Fallback to basic info
-                    running_alignments[job['fastq_name']] = {
-                        'demand_id': job['alignment_demand_id'],
-                        'status': 'IN_PROGRESS',
-                        'start_time': job['time'],
-                        'organism': 'Unknown',
-                        'batch': 'Unknown',
-                        'attempts': job['alignment_attempts']
-                    }
+                running_jobs.append({
+                    'fastq_name': job['fastq_name'],
+                    'demand_id': job['alignment_demand_id'],
+                    'command': job['alignment_command'] or '',
+                    'time': job['time'].isoformat() if job['time'] else None,
+                    'status': 'IN_PROGRESS',
+                    'start_time': job['time'],
+                    'organism': organism,
+                    'batch': batch,
+                    'workflow': 'MTX' if 'MTX' in batch else 'RTX',
+                    'job_type': 'alignment',
+                    'attempts': job['alignment_attempts']
+                })
+            
+            # Add post-QC job if exists
+            if job['postqc_demand_id']:
+                running_jobs.append({
+                    'fastq_name': job['fastq_name'],
+                    'demand_id': job['postqc_demand_id'],
+                    'command': job['postqc_command'] or '',
+                    'time': job['time'].isoformat() if job['time'] else None,
+                    'status': 'IN_PROGRESS',
+                    'start_time': job['time'],
+                    'organism': organism,
+                    'batch': batch,
+                    'workflow': 'MTX' if 'MTX' in batch else 'RTX',
+                    'job_type': 'post-QC',
+                    'attempts': job['postqc_attempts']
+                })
         
         return {
             'job_counts': job_counts,
-            'running_alignments': running_alignments
+            'running_jobs': running_jobs
         }
     
     def _trigger_background_update(self) -> None:
@@ -239,14 +288,17 @@ class JobMonitorView(TemplateView):
     
     def _get_cached_job_data(self, user_id: str) -> Dict[str, Any]:
         """Get job data from cache or compute it."""
-        cache_key = f'job_monitor_data_{user_id}'
+        cache_key = get_cache_key_with_version(f'job_monitor_data_{user_id}')
         cached_data = cache.get(cache_key)
         
         if cached_data:
+            # Add cache indicator
+            cached_data['from_cache'] = True
             return cached_data
         
         # Get fresh data if not in cache
         data = self._get_fresh_job_data()
+        data['from_cache'] = False
         cache.set(cache_key, data, timeout=JOB_DATA_CACHE_TIMEOUT)
         return data
     
@@ -260,21 +312,37 @@ class JobMonitorView(TemplateView):
         
         # Format running jobs
         running_jobs = []
+        total_db_jobs = len(running_jobs_data)
+        logger.info(f"Processing {total_db_jobs} jobs from running_jobs table")
+        
+        jobs_with_alignment = 0
+        jobs_with_postqc = 0
+        jobs_with_neither = 0
+        metadata_missing_count = 0
+        
         for job in running_jobs_data:
+            logger.debug(f"Processing job: {job.fastq_name}, alignment_demand_id: {job.alignment_demand_id}, postqc_demand_id: {job.postqc_demand_id}")
+            
             # Get metadata for display
             try:
                 metadata = Metadata.objects.get(fastq_name=job.fastq_name)
                 organism = metadata.organism_common_name
                 batch = metadata.batch_name_from_vendor
             except Metadata.DoesNotExist:
+                metadata_missing_count += 1
+                logger.warning(f"Metadata not found for {job.fastq_name}")
                 organism = 'Unknown'
                 batch = 'Unknown'
             
             # Add alignment job if exists
             if job.alignment_demand_id:
+                jobs_with_alignment += 1
+                logger.debug(f"Adding alignment job for {job.fastq_name} with demand_id {job.alignment_demand_id}")
                 running_jobs.append({
                     'fastq_name': job.fastq_name,
                     'demand_id': job.alignment_demand_id,
+                    'command': job.alignment_command or '',
+                    'time': job.time.isoformat() if job.time else None,
                     'status': 'IN_PROGRESS',
                     'start_time': job.time,
                     'organism': organism,
@@ -286,9 +354,13 @@ class JobMonitorView(TemplateView):
             
             # Add post-QC job if exists
             if job.postqc_demand_id:
+                jobs_with_postqc += 1
+                logger.debug(f"Adding post-QC job for {job.fastq_name} with demand_id {job.postqc_demand_id}")
                 running_jobs.append({
                     'fastq_name': job.fastq_name,
                     'demand_id': job.postqc_demand_id,
+                    'command': job.postqc_command or '',
+                    'time': job.time.isoformat() if job.time else None,
                     'status': 'IN_PROGRESS',
                     'start_time': job.time,
                     'organism': organism,
@@ -297,61 +369,62 @@ class JobMonitorView(TemplateView):
                     'job_type': 'post-QC',
                     'attempts': job.postqc_attempts
                 })
+            
+            # Track jobs with neither demand_id
+            if not job.alignment_demand_id and not job.postqc_demand_id:
+                jobs_with_neither += 1
+                logger.warning(f"Job {job.fastq_name} has no demand_ids - skipping display")
         
-        # Format completed jobs
+        logger.info(f"Job processing summary:")
+        logger.info(f"  Total DB records: {total_db_jobs}")
+        logger.info(f"  Jobs with alignment_demand_id: {jobs_with_alignment}")
+        logger.info(f"  Jobs with postqc_demand_id: {jobs_with_postqc}")
+        logger.info(f"  Jobs with neither demand_id: {jobs_with_neither}")
+        logger.info(f"  Jobs with missing metadata: {metadata_missing_count}")
+        logger.info(f"  Total display entries created: {len(running_jobs)}")
+        
+        # Format completed jobs - SIMPLIFIED: Get raw data efficiently
+        # Get all fastq names first
+        fastq_names = [job.fastq_name for job in completed_jobs_data]
+        
+        # Get all metadata in a single query to avoid N+1
+        metadata_dict = {
+            metadata.fastq_name: metadata 
+            for metadata in Metadata.objects.filter(fastq_name__in=fastq_names)
+        }
+        
+        # Just return raw data, let frontend process everything
         completed_jobs = []
         for job in completed_jobs_data:
-            # Get metadata for display
-            try:
-                metadata = Metadata.objects.get(fastq_name=job.fastq_name)
-                organism = metadata.organism_common_name
-                batch = metadata.batch_name_from_vendor
-            except Metadata.DoesNotExist:
-                organism = 'Unknown'
-                batch = 'Unknown'
+            # Get metadata from our pre-fetched dict
+            metadata = metadata_dict.get(job.fastq_name)
             
-            # Add alignment job if completed
-            if job.alignment_demand_id and job.alignment_status:
-                duration = 0
-                if job.alignment_start_time and job.alignment_end_time:
-                    duration = (job.alignment_end_time - job.alignment_start_time).total_seconds() // 60
-                
-                completed_jobs.append({
-                    'fastq_name': job.fastq_name,
-                    'demand_id': job.alignment_demand_id,
-                    'status': job.alignment_status,
-                    'start_time': job.alignment_start_time,
-                    'end_time': job.alignment_end_time,
-                    'organism': organism,
-                    'batch': batch,
-                    'workflow': 'MTX' if 'MTX' in batch else 'RTX',
-                    'job_type': 'alignment',
-                    'duration': duration,
-                    'attempts': job.alignment_attempts
-                })
+            # Return minimal raw data - no complex calculations
+            job_data = {
+                'fastq_name': job.fastq_name,
+                'alignment_demand_id': job.alignment_demand_id,
+                'alignment_status': job.alignment_status,
+                'alignment_start_time': job.alignment_start_time.isoformat() if job.alignment_start_time else None,
+                'alignment_end_time': job.alignment_end_time.isoformat() if job.alignment_end_time else None,
+                'alignment_attempts': job.alignment_attempts or 0,
+                'alignment_command': job.alignment_command,
+                'postqc_demand_id': job.postqc_demand_id,
+                'postqc_status': job.postqc_status,
+                'postqc_start_time': job.postqc_start_time.isoformat() if job.postqc_start_time else None,
+                'postqc_end_time': job.postqc_end_time.isoformat() if job.postqc_end_time else None,
+                'postqc_attempts': job.postqc_attempts or 0,
+                'postqc_command': job.postqc_command,
+            }
             
-            # Add post-QC job if completed
-            if job.postqc_demand_id and job.postqc_status:
-                duration = 0
-                if job.postqc_start_time and job.postqc_end_time:
-                    duration = (job.postqc_end_time - job.postqc_start_time).total_seconds() // 60
-                
-                completed_jobs.append({
-                    'fastq_name': job.fastq_name,
-                    'demand_id': job.postqc_demand_id,
-                    'status': job.postqc_status,
-                    'start_time': job.postqc_start_time,
-                    'end_time': job.postqc_end_time,
-                    'organism': organism,
-                    'batch': batch,
-                    'workflow': 'MTX' if 'MTX' in batch else 'RTX',
-                    'job_type': 'post-QC',
-                    'duration': duration,
-                    'attempts': job.postqc_attempts
-                })
-        
-        # Sort completed jobs by end time (most recent first)
-        completed_jobs.sort(key=lambda x: x.get('end_time') or timezone.now(), reverse=True)
+            # Add metadata if available
+            if metadata:
+                job_data['organism_common_name'] = metadata.organism_common_name
+                job_data['batch_name_from_vendor'] = metadata.batch_name_from_vendor
+            else:
+                job_data['organism_common_name'] = 'Unknown'
+                job_data['batch_name_from_vendor'] = 'Unknown'
+            
+            completed_jobs.append(job_data)
         
         # Get job counts
         job_counts = count_running_jobs()
@@ -901,16 +974,7 @@ class PipelineApiView:
                 
                 # Invalidate cache for all users when job status changes
                 # This ensures fresh data is returned on next request
-                user_id = getattr(request.user, 'id', 'anonymous')
-                cache_keys_to_delete = [
-                    f'job_monitor_data_{user_id}',
-                    f'job_counts_{user_id}',
-                    'pipeline_config'  # Also invalidate pipeline config cache if needed
-                ]
-                
-                for cache_key in cache_keys_to_delete:
-                    cache.delete(cache_key)
-                    logger.debug(f"Invalidated cache key: {cache_key}")
+                invalidate_job_monitor_caches()
                 
                 return JsonResponse({
                     'status': 'success',
@@ -1109,10 +1173,15 @@ class PipelineApiView:
         try:
             user_id = getattr(request.user, 'id', 'anonymous')
             logger.info(f"Fetching job data for user_id: {user_id}")
+            
+            # Check if force refresh is requested (for "Refresh Now" button)
+            force_refresh = request.GET.get('force_refresh', 'false').lower() == 'true'
+            
             cache_key = f'job_monitor_data_{user_id}'
             cached_data = cache.get(cache_key)
             
-            if cached_data:
+            # Only use cached data if force_refresh is not requested
+            if cached_data and not force_refresh:
                 logger.info(f"Returning cached job data for user_id: {user_id}")
                 logger.debug(f"Cached job data: {cached_data}")
                 return JsonResponse({
@@ -1122,20 +1191,26 @@ class PipelineApiView:
                     'completed_jobs': cached_data['completed_jobs']
                 })
             
-            logger.info(f"No cached data found for user_id: {user_id}, fetching fresh data.")
+            if force_refresh:
+                logger.info(f"Force refresh requested for user_id: {user_id}, fetching fresh data from database.")
+            else:
+                logger.info(f"No cached data found for user_id: {user_id}, fetching fresh data.")
             
             # Get fresh data using the updated method
             view = JobMonitorView()
             fresh_data = view._get_fresh_job_data()
             logger.debug(f"Fresh job data: {fresh_data}")
             
+            # Update cache with fresh data
             cache.set(cache_key, fresh_data, timeout=JOB_DATA_CACHE_TIMEOUT)
             
             return JsonResponse({
                 'status': 'success',
                 'job_counts': fresh_data['job_counts'],
                 'running_jobs': fresh_data['running_jobs'],
-                'completed_jobs': fresh_data['completed_jobs']
+                'completed_jobs': fresh_data['completed_jobs'],
+                'from_cache': False,  # Indicate this is fresh data
+                'force_refresh': force_refresh
             })
         except Exception as e:
             logger.exception(f"Exception in get_job_data: {str(e)}")

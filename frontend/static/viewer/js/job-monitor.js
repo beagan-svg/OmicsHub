@@ -105,9 +105,9 @@ class JobMonitor {
             console.log('Initializing event listeners for job monitor...');
 
             // Set up refresh jobs button
-            const refreshJobsBtn = document.getElementById('refreshJobsBtn');
-            if (refreshJobsBtn) {
-                refreshJobsBtn.addEventListener('click', () => this.refreshJobs());
+            const refreshNowBtn = document.getElementById('refreshNowBtn');
+            if (refreshNowBtn) {
+                refreshNowBtn.addEventListener('click', () => this.refreshNow(true));
             }
 
             // Set up update all jobs button
@@ -171,6 +171,24 @@ class JobMonitor {
                 });
             });
 
+            // Job details buttons
+            const jobDetailsButtons = document.querySelectorAll('.job-details-btn');
+            console.log('Found job details buttons:', jobDetailsButtons.length);
+            jobDetailsButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const fastqName = e.currentTarget.dataset.fastqName;
+                    const alignmentDemandId = e.currentTarget.dataset.alignmentDemandId;
+                    const postqcDemandId = e.currentTarget.dataset.postqcDemandId;
+                    console.log('Job details button clicked for:', fastqName);
+
+                    // Find the row to extract job data
+                    const row = e.currentTarget.closest('tr');
+                    if (row) {
+                        this.extractAndShowJobDetails(row, fastqName, alignmentDemandId, postqcDemandId);
+                    }
+                });
+            });
+
             // Add modal cleanup handlers
             document.querySelectorAll('.modal').forEach(modalEl => {
                 modalEl.addEventListener('hidden.bs.modal', function () {
@@ -194,7 +212,7 @@ class JobMonitor {
             // Perform initial refresh to get fresh data
             console.log('Performing initial data refresh...');
             setTimeout(() => {
-                this.refreshJobs(false);
+                this.refreshDisplay(false);
             }, 100);
         });
     }
@@ -280,14 +298,20 @@ class JobMonitor {
         this.autoRefreshInterval = setInterval(() => {
             this.autoRefreshCycle++;
 
-            // Every 3rd cycle (90 seconds), do a full update with OCS status check
-            // Other cycles just refresh the display
-            if (this.autoRefreshCycle % 3 === 0) {
-                console.log('Auto-refresh: Performing full job status update');
+            // More aggressive refresh strategy for job monitoring:
+            // - Every cycle (30s): Refresh display (may use 1-minute cache)
+            // - Every 2nd cycle (60s): Force fresh data from database
+            // - Every 4th cycle (120s): Full OCS status update
+
+            if (this.autoRefreshCycle % 4 === 0) {
+                console.log('Auto-refresh: Performing full job status update with OCS check');
                 this.updateAllJobs();
+            } else if (this.autoRefreshCycle % 2 === 0) {
+                console.log('Auto-refresh: Forcing fresh data from database');
+                this.refreshNow(false); // Force fresh data
             } else {
-                console.log('Auto-refresh: Refreshing display only');
-                this.refreshJobs(false);
+                console.log('Auto-refresh: Refreshing display (may use cache)');
+                this.refreshDisplay(false); // May use 1-minute cache
             }
         }, this.autoRefreshTime);
     }
@@ -373,26 +397,19 @@ class JobMonitor {
     }
 
     /**
-     * Refreshes all job statuses
+     * Refresh display - can use cached data for performance (used by auto-refresh)
      * @param {boolean} showSuccessToast - Whether to show the success toast notification
      */
-    async refreshJobs(showSuccessToast = false) {
+    async refreshDisplay(showSuccessToast = false) {
         if (this.updateJobsInProgress) return;
         this.updateJobsInProgress = true;
 
-        const refreshBtn = document.getElementById('updateAllJobsBtn');
-        const icon = refreshBtn.querySelector('.refresh-icon');
-        const spinner = refreshBtn.querySelector('.refresh-spinner');
-
-        icon.classList.add('d-none');
-        spinner.classList.remove('d-none');
-
         try {
-            console.log('Fetching fresh job data...');
+            console.log('Fetching job data (may use cache)...');
             const response = await fetch('/api/pipeline/get-job-data/', {
                 method: 'GET',
                 headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-CSRFToken': getCookie('csrftoken')
                 }
             });
 
@@ -402,6 +419,9 @@ class JobMonitor {
 
             const data = await response.json();
             console.log('Received job data from server:', data);
+
+            // Update data source indicator
+            this.updateDataSourceIndicator(data.from_cache || false, false);
 
             if (data.running_jobs) {
                 console.log(`Found ${data.running_jobs.length} running jobs`);
@@ -423,9 +443,90 @@ class JobMonitor {
                 this.updateJobStatistics(data.job_counts);
             }
 
+            // Update header count badges
+            const runningCount = data.running_jobs ? data.running_jobs.length : 0;
+            const completedCount = data.completed_jobs ? data.completed_jobs.length : 0;
+            this.updateHeaderCounts(runningCount, completedCount);
+
             // Only show success toast if explicitly requested
             if (showSuccessToast) {
-                this.showToastNotification('Jobs updated successfully', 'success');
+                this.showToastNotification('Display refreshed!', 'success');
+            }
+
+        } catch (error) {
+            console.error('Error refreshing display:', error);
+            if (showSuccessToast) { // Only show error toast if user initiated the action
+                this.showToastNotification('Error refreshing display', 'error');
+            }
+        } finally {
+            this.updateJobsInProgress = false;
+        }
+    }
+
+    /**
+     * Force refresh - bypasses all caches (used by "Refresh Now" button)
+     * @param {boolean} showSuccessToast - Whether to show the success toast notification
+     */
+    async refreshNow(showSuccessToast = false) {
+        if (this.updateJobsInProgress) return;
+        this.updateJobsInProgress = true;
+
+        const refreshBtn = document.getElementById('refreshNowBtn');
+        const icon = refreshBtn.querySelector('.refresh-icon');
+        const spinner = refreshBtn.querySelector('.refresh-spinner');
+
+        icon.classList.add('d-none');
+        spinner.classList.remove('d-none');
+
+        try {
+            console.log('Fetching fresh job data (bypassing cache)...');
+            const response = await fetch('/api/pipeline/get-job-data/?force_refresh=true', {
+                method: 'GET',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Cache-Control': 'no-cache', // Also prevent browser caching
+                    'Pragma': 'no-cache'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            const data = await response.json();
+            console.log('Received fresh job data from server (bypassed cache):', data);
+
+            // Update data source indicator
+            this.updateDataSourceIndicator(false, false); // Always fresh from database
+
+            if (data.running_jobs) {
+                console.log(`Found ${data.running_jobs.length} running jobs`);
+                this.updateRunningJobsTable(data.running_jobs);
+            } else {
+                console.warn('No running_jobs data in response:', data);
+            }
+
+            // Update completed jobs table if data is available
+            if (data.completed_jobs) {
+                console.log(`Found ${data.completed_jobs.length} completed jobs`);
+                this.updateCompletedJobsTable(data.completed_jobs);
+            } else {
+                console.warn('No completed_jobs data in response:', data);
+            }
+
+            if (data.job_counts) {
+                console.log('Updating job counts:', data.job_counts);
+                this.updateJobStatistics(data.job_counts);
+            }
+
+            // Update header count badges
+            const runningCount = data.running_jobs ? data.running_jobs.length : 0;
+            const completedCount = data.completed_jobs ? data.completed_jobs.length : 0;
+            this.updateHeaderCounts(runningCount, completedCount);
+
+            // Only show success toast if explicitly requested
+            if (showSuccessToast) {
+                this.showToastNotification('Page refreshed with latest data!', 'success');
             }
 
         } catch (error) {
@@ -472,6 +573,33 @@ class JobMonitor {
         this.renderTable('completed');
 
         console.log('Finished updating completed jobs table');
+    }
+
+    /**
+     * Update header count badges for running and completed jobs
+     * @param {number} runningCount - Number of running jobs
+     * @param {number} completedCount - Number of completed jobs
+     */
+    updateHeaderCounts(runningCount, completedCount) {
+        console.log(`Updating header counts: Running=${runningCount}, Completed=${completedCount}`);
+
+        // Update running jobs header badge
+        const runningJobsBadge = document.querySelector('.card-header .badge.bg-light.text-primary');
+        if (runningJobsBadge) {
+            runningJobsBadge.textContent = runningCount || 0;
+            console.log('Updated running jobs header badge');
+        } else {
+            console.warn('Running jobs header badge not found');
+        }
+
+        // Update completed jobs header badge
+        const completedJobsBadge = document.querySelector('.card-header .badge.bg-light.text-success');
+        if (completedJobsBadge) {
+            completedJobsBadge.textContent = completedCount || 0;
+            console.log('Updated completed jobs header badge');
+        } else {
+            console.warn('Completed jobs header badge not found');
+        }
     }
 
     formatDate(dateString) {
@@ -542,7 +670,7 @@ class JobMonitor {
                 console.log(`Job status: ${status}, type: ${demandType}`);
 
                 // Show a different message based on job status
-                if (status === 'COMPLETED') {
+                if (status === 'COMPLETED' || status === 'Completed') {
                     this.showToastNotification(`${demandType === 'align' ? 'Alignment' : 'Post-QC'} job completed successfully`, 'success');
                 } else if (status === 'FAILED') {
                     this.showToastNotification(`${demandType === 'align' ? 'Alignment' : 'Post-QC'} job failed`, 'error');
@@ -556,13 +684,13 @@ class JobMonitor {
                 if (['COMPLETED', 'FAILED', 'ABORTED'].includes(status)) {
                     console.log('Job is complete, refreshing job data to reflect changes');
 
-                    // Don't manually remove the row - let refreshJobs handle the table update
+                    // Don't manually remove the row - let refreshNow handle the table update
                     // This prevents race conditions where we remove the job but then it gets re-added
                     // from stale cached data
 
                     // Immediately refresh data to get the updated job lists
                     // The backend should have moved the job from running to completed/failed
-                    await this.refreshJobs();
+                    await this.refreshNow();
                 }
             } else {
                 console.error('Error in job status check:', data.message);
@@ -727,7 +855,7 @@ class JobMonitor {
 
                 // Remove the row and refresh data
                 jobRow.remove();
-                await this.refreshJobs();
+                await this.refreshNow();
             } else {
                 console.error('Failed to stop job:', data.message);
                 this.showToastNotification(`Failed to abort ${jobType} job: ${data.message}`, 'error');
@@ -975,7 +1103,11 @@ class JobMonitor {
         const endItem = Math.min(pagination.currentPage * pagination.perPage, pagination.totalItems);
         const paginationInfo = document.getElementById(`${tableType}-pagination-info`);
         if (paginationInfo) {
-            paginationInfo.textContent = `Results ${startItem}-${endItem} of ${pagination.totalItems}`;
+            if (pagination.totalItems === 0) {
+                paginationInfo.textContent = `No results to display`;
+            } else {
+                paginationInfo.textContent = `Results ${startItem}-${endItem} of ${pagination.totalItems}`;
+            }
         }
     }
 
@@ -1015,16 +1147,62 @@ class JobMonitor {
             const completedJobs = [];
 
             rows.forEach(row => {
-                if (!row.querySelector('.alert-info')) {  // Skip the "no jobs" message row
+                if (!row.querySelector('.alert-info')) {
+                    let workflow = '';
+                    const workflowBadge = row.cells[1]?.querySelector('.workflow-badge');
+                    if (workflowBadge) {
+                        workflow = workflowBadge.textContent.trim();
+                    }
+
+                    // Extract alignment demand ID
+                    const alignmentDemandCell = row.cells[2];
+                    let alignmentDemandId = '';
+                    if (alignmentDemandCell && !alignmentDemandCell.textContent.includes('-')) {
+                        const demandSpan = alignmentDemandCell.querySelector('.text-monospace');
+                        if (demandSpan) {
+                            alignmentDemandId = demandSpan.textContent.trim();
+                        }
+                    }
+
+                    // Extract alignment status
+                    let alignmentStatus = '';
+                    const alignmentStatusCell = row.cells[3];
+                    if (alignmentStatusCell) {
+                        const statusBadge = alignmentStatusCell.querySelector('.badge');
+                        if (statusBadge) {
+                            alignmentStatus = statusBadge.textContent.trim();
+                        }
+                    }
+
+                    // Extract post-QC demand ID
+                    const postqcDemandCell = row.cells[4];
+                    let postqcDemandId = '';
+                    if (postqcDemandCell && !postqcDemandCell.textContent.includes('-')) {
+                        const demandSpan = postqcDemandCell.querySelector('.text-monospace');
+                        if (demandSpan) {
+                            postqcDemandId = demandSpan.textContent.trim();
+                        }
+                    }
+
+                    // Extract post-QC status
+                    let postqcStatus = 'Not Started';
+                    const postqcStatusCell = row.cells[5];
+                    if (postqcStatusCell) {
+                        const statusBadge = postqcStatusCell.querySelector('.badge');
+                        if (statusBadge) {
+                            postqcStatus = statusBadge.textContent.trim();
+                        }
+                    }
+
                     const job = {
                         fastq_name: row.cells[0].textContent.trim(),
-                        demand_id: row.cells[1].querySelector('.text-monospace')?.textContent.trim() || '',
-                        workflow: row.cells[2].querySelector('.workflow-badge')?.textContent.trim() || '',
-                        start_time: row.cells[3].textContent.trim(),
-                        end_time: row.cells[4].textContent.trim(),
-                        duration: row.cells[5].textContent.trim(),
-                        status: row.cells[6].querySelector('.status-badge')?.textContent.trim() || '',
-                        statusClass: row.className
+                        workflow: workflow,
+                        alignment_demand_id: alignmentDemandId,
+                        alignment_status: alignmentStatus,
+                        postqc_demand_id: postqcDemandId,
+                        postqc_status: postqcStatus,
+                        total_duration: row.cells[6]?.textContent.trim() || '0',
+                        latest_update: row.cells[7]?.textContent.trim() || 'N/A'
                     };
                     completedJobs.push(job);
                 }
@@ -1139,7 +1317,7 @@ class JobMonitor {
         if (jobs.length === 0) {
             const noJobsRow = document.createElement('tr');
             noJobsRow.innerHTML = `
-                <td colspan="7" class="text-center">
+                <td colspan="9" class="text-center">
                     <div class="alert alert-info mb-0">
                         <i class="bi bi-info-circle-fill me-2"></i>
                         No completed jobs found.
@@ -1150,49 +1328,176 @@ class JobMonitor {
             return;
         }
 
-        jobs.forEach(job => {
-            const row = document.createElement('tr');
-            row.dataset.demandId = job.demand_id;
-            row.className = job.statusClass || '';
-
-            // Determine status badge class and icon
-            let statusBadgeClass = 'bg-secondary';
-            let statusIcon = 'bi-circle';
-
-            if (job.status && job.status.toLowerCase().includes('completed')) {
-                statusBadgeClass = 'bg-success';
-                statusIcon = 'bi-check-circle';
-            } else if (job.status && job.status.toLowerCase().includes('failed')) {
-                statusBadgeClass = 'bg-danger';
-                statusIcon = 'bi-x-circle';
-            } else if (job.status && job.status.toLowerCase().includes('aborted')) {
-                statusBadgeClass = 'bg-secondary';
-                statusIcon = 'bi-stop-circle';
+        // Process jobs: add calculated fields and sort by latest update
+        const processedJobs = jobs.map(job => {
+            // Determine workflow from batch name
+            let workflow = 'RTX'; // default
+            const batch = job.batch_name_from_vendor || '';
+            if (batch.includes('MTX')) {
+                workflow = 'MTX';
             }
 
-            // Format times properly
-            const formattedStartTime = job.start_time ? this.formatDate(job.start_time) : 'N/A';
-            const formattedEndTime = job.end_time ? this.formatDate(job.end_time) : 'N/A';
+            // Calculate total duration in minutes
+            let totalDuration = 0;
+            if (job.alignment_start_time && job.alignment_end_time) {
+                const alignStart = new Date(job.alignment_start_time);
+                const alignEnd = new Date(job.alignment_end_time);
+                totalDuration += (alignEnd - alignStart) / (1000 * 60); // convert to minutes
+            }
+            if (job.postqc_start_time && job.postqc_end_time) {
+                const postStart = new Date(job.postqc_start_time);
+                const postEnd = new Date(job.postqc_end_time);
+                totalDuration += (postEnd - postStart) / (1000 * 60); // convert to minutes
+            }
+            totalDuration = Math.round(totalDuration);
+
+            // Determine latest update time
+            let latestUpdate = null;
+            const times = [job.alignment_end_time, job.postqc_end_time, job.alignment_start_time, job.postqc_start_time].filter(t => t);
+            if (times.length > 0) {
+                latestUpdate = times.sort((a, b) => new Date(b) - new Date(a))[0];
+            }
+
+            return {
+                ...job,
+                workflow: workflow,
+                total_duration: totalDuration,
+                latest_update: latestUpdate
+            };
+        });
+
+        // Sort by latest update time (most recent first)
+        processedJobs.sort((a, b) => {
+            const timeA = a.latest_update || '-';
+            const timeB = b.latest_update || '-';
+            return new Date(timeB) - new Date(timeA);
+        });
+
+        processedJobs.forEach(job => {
+            const row = document.createElement('tr');
+            row.dataset.alignmentDemandId = job.alignment_demand_id || '';
+            row.dataset.postqcDemandId = job.postqc_demand_id || '';
+
+            // Create alignment status badge
+            let alignmentStatusHtml = '';
+            const alignmentStatus = job.alignment_status || 'Not Started';
+            if (alignmentStatus === 'COMPLETED' || alignmentStatus === 'Completed') {
+                const alignmentEndTime = job.alignment_end_time ? this.formatDate(job.alignment_end_time) : '';
+                alignmentStatusHtml = `
+                    <span class="badge bg-success" title="Alignment completed at ${alignmentEndTime}">
+                        <i class="bi bi-check-circle-fill me-1"></i>Completed
+                    </span>
+                `;
+            } else if (alignmentStatus === 'FAILED') {
+                alignmentStatusHtml = `
+                    <span class="badge bg-danger" title="Alignment failed">
+                        <i class="bi bi-x-circle-fill me-1"></i>Failed
+                    </span>
+                `;
+            } else if (alignmentStatus === 'ABORTED') {
+                alignmentStatusHtml = `
+                    <span class="badge bg-secondary" title="Alignment aborted">
+                        <i class="bi bi-stop-circle-fill me-1"></i>Aborted
+                    </span>
+                `;
+            } else if (alignmentStatus && alignmentStatus !== 'Not Started') {
+                alignmentStatusHtml = `
+                    <span class="badge bg-warning text-dark" title="Alignment status: ${alignmentStatus}">
+                        <i class="bi bi-clock-fill me-1"></i>${alignmentStatus}
+                    </span>
+                `;
+            } else {
+                alignmentStatusHtml = `
+                    <span class="badge bg-light text-muted" title="Alignment not started">
+                        <i class="bi bi-circle me-1"></i>Not Started
+                    </span>
+                `;
+            }
+
+            // Create post-QC status badge
+            let postqcStatusHtml = '';
+            const postqcStatus = job.postqc_status || 'Not Started';
+            if (postqcStatus === 'COMPLETED' || postqcStatus === 'Completed') {
+                const postqcEndTime = job.postqc_end_time ? this.formatDate(job.postqc_end_time) : '';
+                postqcStatusHtml = `
+                    <span class="badge bg-success" title="Post-QC completed at ${postqcEndTime}">
+                        <i class="bi bi-check-circle-fill me-1"></i>Completed
+                    </span>
+                `;
+            } else if (postqcStatus === 'FAILED') {
+                postqcStatusHtml = `
+                    <span class="badge bg-danger" title="Post-QC failed">
+                        <i class="bi bi-x-circle-fill me-1"></i>Failed
+                    </span>
+                `;
+            } else if (postqcStatus === 'ABORTED') {
+                postqcStatusHtml = `
+                    <span class="badge bg-secondary" title="Post-QC aborted">
+                        <i class="bi bi-stop-circle-fill me-1"></i>Aborted
+                    </span>
+                `;
+            } else if (postqcStatus && postqcStatus !== 'Not Started') {
+                postqcStatusHtml = `
+                    <span class="badge bg-warning text-dark" title="Post-QC status: ${postqcStatus}">
+                        <i class="bi bi-clock-fill me-1"></i>${postqcStatus}
+                    </span>
+                `;
+            } else {
+                postqcStatusHtml = `
+                    <span class="badge bg-light text-muted" title="Post-QC not started">
+                        <i class="bi bi-circle me-1"></i>Not Started
+                    </span>
+                `;
+            }
+
+            // Format latest update time
+            const formattedLatestUpdate = job.latest_update ? this.formatDate(job.latest_update) : 'N/A';
 
             row.innerHTML = `
                 <td class="field-fastq_name">${job.fastq_name}</td>
-                <td class="demand-id-cell">
-                    <span class="text-monospace">${job.demand_id}</span>
-                </td>
                 <td>
                     <span class="badge workflow-badge ${job.workflow === 'MTX' ? 'badge-mtx' : 'bg-primary'}">
-                        ${job.workflow || 'RTX'}
+                        ${job.workflow}
                     </span>
                 </td>
-                <td data-field="start_time">${formattedStartTime}</td>
-                <td data-field="end_time">${formattedEndTime}</td>
-                <td data-field="duration">${job.duration || 'N/A'}</td>
-                <td class="job-status">
-                    <span class="badge ${statusBadgeClass} status-badge">
-                        <i class="${statusIcon} me-1"></i>${job.status || 'Unknown'}
-                    </span>
+                <td class="alignment-status-cell">
+                    ${alignmentStatusHtml}
+                </td>
+                <td class="postqc-status-cell">
+                    ${postqcStatusHtml}
+                </td>
+                <td class="demand-id-cell">
+                    ${job.alignment_demand_id ?
+                    `<span class="text-monospace small">${job.alignment_demand_id}</span>` :
+                    `<span class="text-muted">-</span>`
+                }
+                </td>
+                <td class="demand-id-cell">
+                    ${job.postqc_demand_id ?
+                    `<span class="text-monospace small">${job.postqc_demand_id}</span>` :
+                    `<span class="text-muted">-</span>`
+                }
+                </td>
+                <td data-field="total_duration">${this.formatDuration(job.total_duration)}</td>
+                <td data-field="latest_update">${formattedLatestUpdate}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-info job-details-btn" 
+                            data-fastq-name="${job.fastq_name}"
+                            data-alignment-demand-id="${job.alignment_demand_id || ''}"
+                            data-postqc-demand-id="${job.postqc_demand_id || ''}"
+                            title="View job details">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
                 </td>
             `;
+
+            // Add event listener for the details button
+            const detailsBtn = row.querySelector('.job-details-btn');
+            if (detailsBtn) {
+                detailsBtn.addEventListener('click', () => {
+                    this.showJobDetails(job);
+                });
+            }
 
             tableBody.appendChild(row);
         });
@@ -1202,15 +1507,37 @@ class JobMonitor {
     }
 
     /**
+     * Format duration in minutes to days-hours-minutes format
+     * @param {number} totalMinutes - Total duration in minutes
+     * @returns {string} Formatted duration string
+     */
+    formatDuration(totalMinutes) {
+        if (!totalMinutes || totalMinutes <= 0) {
+            return '0m';
+        }
+
+        const days = Math.floor(totalMinutes / (24 * 60));
+        const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+        const minutes = Math.floor(totalMinutes % 60);
+
+        const parts = [];
+        if (days > 0) parts.push(`${days}d`);
+        if (hours > 0) parts.push(`${hours}h`);
+        if (minutes > 0) parts.push(`${minutes}m`);
+
+        return parts.length > 0 ? parts.join(' ') : '0m';
+    }
+
+    /**
      * Update all running jobs by checking their status with OCS
      */
     async updateAllJobs() {
         if (this.updateJobsInProgress) return;
         this.updateJobsInProgress = true;
 
-        const refreshBtn = document.getElementById('updateAllJobsBtn');
-        const icon = refreshBtn.querySelector('.refresh-icon');
-        const spinner = refreshBtn.querySelector('.refresh-spinner');
+        const updateAllJobsBtn = document.getElementById('updateAllJobsBtn');
+        const icon = updateAllJobsBtn.querySelector('.refresh-icon');
+        const spinner = updateAllJobsBtn.querySelector('.refresh-spinner');
 
         icon.classList.add('d-none');
         spinner.classList.remove('d-none');
@@ -1237,7 +1564,7 @@ class JobMonitor {
                 this.showToastNotification(message, 'success');
 
                 // Now refresh the display to show updated data
-                await this.refreshJobs(false);
+                await this.refreshNow(false);
             } else {
                 throw new Error(data.message || 'Failed to update jobs');
             }
@@ -1249,6 +1576,312 @@ class JobMonitor {
             icon.classList.remove('d-none');
             spinner.classList.add('d-none');
             this.updateJobsInProgress = false;
+        }
+    }
+
+    /**
+     * Show job details in a modal
+     * @param {Object} job - Job object with details
+     */
+    showJobDetails(job) {
+        console.log('Showing job details for:', job.fastq_name);
+
+        // Create details modal if it doesn't exist
+        let detailsModal = document.getElementById('jobDetailsModal');
+        if (!detailsModal) {
+            const modalHtml = `
+                <div class="modal fade" id="jobDetailsModal" tabindex="-1" aria-labelledby="jobDetailsModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title text-white" id="jobDetailsModalLabel" style="color: white !important;">
+                                    <i class="bi bi-info-circle-fill me-2" style="color: white !important;"></i>
+                                    Job Details
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div id="jobDetailsContent">
+                                    <!-- Content will be populated by JavaScript -->
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            detailsModal = document.getElementById('jobDetailsModal');
+        }
+
+        // Populate modal content
+        const content = document.getElementById('jobDetailsContent');
+        const alignmentEndTime = job.alignment_end_time ? this.formatDate(job.alignment_end_time) : 'N/A';
+        const alignmentStartTime = job.alignment_start_time ? this.formatDate(job.alignment_start_time) : 'N/A';
+        const postqcEndTime = job.postqc_end_time ? this.formatDate(job.postqc_end_time) : 'N/A';
+        const postqcStartTime = job.postqc_start_time ? this.formatDate(job.postqc_start_time) : 'N/A';
+
+        // Calculate individual durations
+        let alignmentDuration = 0;
+        if (job.alignment_start_time && job.alignment_end_time) {
+            const start = new Date(job.alignment_start_time);
+            const end = new Date(job.alignment_end_time);
+            alignmentDuration = Math.round((end - start) / (1000 * 60));
+        }
+
+        let postqcDuration = 0;
+        if (job.postqc_start_time && job.postqc_end_time) {
+            const start = new Date(job.postqc_start_time);
+            const end = new Date(job.postqc_end_time);
+            postqcDuration = Math.round((end - start) / (1000 * 60));
+        }
+
+        const totalDuration = alignmentDuration + postqcDuration;
+
+        content.innerHTML = `
+            <div class="row">
+                <div class="col-12 mb-3">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>General Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>FASTQ Name:</strong> <span class="text-monospace">${job.fastq_name}</span>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Workflow:</strong> 
+                                    <span class="badge ${job.workflow === 'MTX' ? 'badge-mtx' : 'bg-primary'}">${job.workflow || 'RTX'}</span>
+                                </div>
+                                <div class="col-md-6 mt-2">
+                                    <strong>Organism:</strong> ${job.organism_common_name || 'Unknown'}
+                                </div>
+                                <div class="col-md-6 mt-2">
+                                    <strong>Batch:</strong> ${job.batch_name_from_vendor || 'Unknown'}
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <strong>Total Duration:</strong> ${this.formatDuration(totalDuration)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-cpu me-2"></i>Alignment Job</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <strong>Status:</strong> 
+                                ${job.alignment_status === 'COMPLETED' || job.alignment_status === 'Completed' ?
+                '<span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Completed</span>' :
+                job.alignment_status === 'FAILED' ?
+                    '<span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i>Failed</span>' :
+                    job.alignment_status === 'ABORTED' ?
+                        '<span class="badge bg-secondary"><i class="bi bi-stop-circle-fill me-1"></i>Aborted</span>' :
+                        job.alignment_status && job.alignment_status !== 'Not Started' ?
+                            `<span class="badge bg-warning text-dark"><i class="bi bi-clock-fill me-1"></i>${job.alignment_status}</span>` :
+                            '<span class="badge bg-light text-muted"><i class="bi bi-circle me-1"></i>Not Started</span>'
+            }
+                            </div>
+                            ${job.alignment_demand_id ? `
+                                <div class="mb-2">
+                                    <strong>Demand ID:</strong> 
+                                    <span class="text-monospace small">${job.alignment_demand_id}</span>
+                                </div>
+                            ` : ''}
+                            <div class="mb-2">
+                                <strong>Start Time:</strong> ${alignmentStartTime}
+                            </div>
+                            <div class="mb-2">
+                                <strong>End Time:</strong> ${alignmentEndTime}
+                            </div>
+                            <div class="mb-2">
+                                <strong>Duration:</strong> ${this.formatDuration(alignmentDuration)}
+                            </div>
+                            <div class="mb-2">
+                                <strong>Attempts:</strong> ${job.alignment_attempts || 0}
+                            </div>
+                            ${job.alignment_command ? `
+                                <div class="mt-3">
+                                    <strong>Command:</strong>
+                                    <div class="bg-light p-2 rounded mt-1">
+                                        <code class="small text-wrap">${job.alignment_command}</code>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Post-QC Job</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <strong>Status:</strong> 
+                                ${job.postqc_status === 'COMPLETED' || job.postqc_status === 'Completed' ?
+                '<span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Completed</span>' :
+                job.postqc_status === 'FAILED' ?
+                    '<span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i>Failed</span>' :
+                    job.postqc_status === 'ABORTED' ?
+                        '<span class="badge bg-secondary"><i class="bi bi-stop-circle-fill me-1"></i>Aborted</span>' :
+                        job.postqc_status && job.postqc_status !== 'Not Started' ?
+                            `<span class="badge bg-warning text-dark"><i class="bi bi-clock-fill me-1"></i>${job.postqc_status}</span>` :
+                            '<span class="badge bg-light text-muted"><i class="bi bi-circle me-1"></i>Not Started</span>'
+            }
+                            </div>
+                            ${job.postqc_demand_id ? `
+                                <div class="mb-2">
+                                    <strong>Demand ID:</strong> 
+                                    <span class="text-monospace small">${job.postqc_demand_id}</span>
+                                </div>
+                            ` : ''}
+                            <div class="mb-2">
+                                <strong>Start Time:</strong> ${postqcStartTime}
+                            </div>
+                            <div class="mb-2">
+                                <strong>End Time:</strong> ${postqcEndTime}
+                            </div>
+                            <div class="mb-2">
+                                <strong>Duration:</strong> ${this.formatDuration(postqcDuration)}
+                            </div>
+                            <div class="mb-2">
+                                <strong>Attempts:</strong> ${job.postqc_attempts || 0}
+                            </div>
+                            ${job.postqc_command ? `
+                                <div class="mt-3">
+                                    <strong>Command:</strong>
+                                    <div class="bg-light p-2 rounded mt-1">
+                                        <code class="small text-wrap">${job.postqc_command}</code>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Show the modal
+        const modal = new bootstrap.Modal(detailsModal);
+        modal.show();
+    }
+
+    /**
+     * Extract job data from HTML table row and show job details
+     * @param {HTMLElement} row - Table row element
+     * @param {string} fastqName - FASTQ name
+     * @param {string} alignmentDemandId - Alignment demand ID
+     * @param {string} postqcDemandId - Post-QC demand ID
+     */
+    extractAndShowJobDetails(row, fastqName, alignmentDemandId, postqcDemandId) {
+        console.log('Extracting job details from row for:', fastqName);
+
+        // Extract workflow from badge
+        let workflow = 'RTX'; // default
+        const workflowBadge = row.querySelector('.workflow-badge');
+        if (workflowBadge) {
+            workflow = workflowBadge.textContent.trim();
+        }
+
+        // Extract status information from badges
+        let alignmentStatus = 'Not Started';
+        const alignmentStatusBadge = row.querySelector('.alignment-status-cell .badge');
+        if (alignmentStatusBadge) {
+            const badgeText = alignmentStatusBadge.textContent.trim();
+            if (badgeText.includes('Completed')) {
+                alignmentStatus = 'COMPLETED';
+            } else if (badgeText.includes('Failed')) {
+                alignmentStatus = 'FAILED';
+            } else if (badgeText.includes('Aborted')) {
+                alignmentStatus = 'ABORTED';
+            } else if (!badgeText.includes('Not Started')) {
+                alignmentStatus = badgeText;
+            }
+        }
+
+        let postqcStatus = 'Not Started';
+        const postqcStatusBadge = row.querySelector('.postqc-status-cell .badge');
+        if (postqcStatusBadge) {
+            const badgeText = postqcStatusBadge.textContent.trim();
+            if (badgeText.includes('Completed')) {
+                postqcStatus = 'COMPLETED';
+            } else if (badgeText.includes('Failed')) {
+                postqcStatus = 'FAILED';
+            } else if (badgeText.includes('Aborted')) {
+                postqcStatus = 'ABORTED';
+            } else if (!badgeText.includes('Not Started')) {
+                postqcStatus = badgeText;
+            }
+        }
+
+        // Create job object with available data
+        const job = {
+            fastq_name: fastqName,
+            workflow: workflow,
+            alignment_demand_id: alignmentDemandId || null,
+            postqc_demand_id: postqcDemandId || null,
+            alignment_status: alignmentStatus,
+            postqc_status: postqcStatus,
+            // For server-rendered rows, we don't have all the detailed timing info
+            // The modal will show what's available
+            alignment_start_time: null,
+            alignment_end_time: null,
+            postqc_start_time: null,
+            postqc_end_time: null,
+            alignment_attempts: 0,
+            postqc_attempts: 0,
+            alignment_command: null,
+            postqc_command: null,
+            organism_common_name: 'Unknown',
+            batch_name_from_vendor: 'Unknown',
+            total_duration: 0
+        };
+
+        this.showJobDetails(job);
+    }
+
+    /**
+     * Update data source indicator
+     * @param {boolean} fromCache - Whether data came from cache
+     * @param {boolean} isInitial - Whether this is the initial data load
+     */
+    updateDataSourceIndicator(fromCache, isInitial) {
+        const indicatorText = document.getElementById('dataSourceText');
+        const indicator = document.getElementById('dataSourceIndicator');
+
+        if (indicatorText && indicator) {
+            const now = new Date().toLocaleTimeString();
+
+            if (fromCache) {
+                indicatorText.textContent = `Cached data (${now}) - 1min cache`;
+                indicator.className = 'text-warning ms-2';
+                indicator.querySelector('i').className = 'bi bi-hdd-stack';
+                indicator.title = 'Data from cache (up to 1 minute old)';
+            } else {
+                indicatorText.textContent = `Fresh data (${now}) - Live from DB`;
+                indicator.className = 'text-success ms-2';
+                indicator.querySelector('i').className = 'bi bi-database-check';
+                indicator.title = 'Fresh data from database';
+            }
+
+            // Add visual pulse effect for fresh data
+            if (!fromCache) {
+                indicator.style.animation = 'pulse 1s ease-in-out';
+                setTimeout(() => {
+                    indicator.style.animation = '';
+                }, 1000);
+            }
         }
     }
 }
