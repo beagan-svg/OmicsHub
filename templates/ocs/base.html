@@ -1,0 +1,185 @@
+{% load static %}
+{% load ocs_extras %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}OCS Database Viewer{% endblock %}</title>
+
+    <!-- Modern Font Stack -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <!-- Django Tables2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/django-tables2@2.4.1/dist/bootstrap5/css/django-tables2.min.css"
+        rel="stylesheet">
+
+    <!-- Design system: tokens first (single source of truth), then components -->
+    <link rel="stylesheet" href="{% asset 'ocs/css/tokens.css' %}">
+    <link rel="stylesheet" href="{% asset 'ocs/css/components.css' %}">
+
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+    <link rel="stylesheet" href="{% asset 'ocs/css/base.css' %}">
+
+    <!-- Page-specific CSS / head content -->
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body class="{% block body_class %}application-body{% endblock %}">
+    {% block navbar %}
+    <nav class="navbar navbar-expand-lg">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'ocs:ocs-browser' %}">
+                <i class="bi bi-database-fill me-2"></i>OCS Database
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/' %}active{% endif %}"
+                            href="{% url 'ocs:ocs-browser' %}">
+                            <i class="bi bi-table me-1"></i>Samples
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/pipeline' in request.path %}active{% endif %}"
+                            href="{% url 'ocs:pipeline_checkout' %}">
+                            <i class="bi bi-diagram-3 me-1"></i>Pipeline Checkout
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    {% if user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-circle me-1"></i>{{ user.get_full_name|default:user.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'user_profile' %}">
+                                    <i class="bi bi-person me-2"></i>Profile
+                                </a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item" href="{% url 'logout' %}">
+                                    <i class="bi bi-box-arrow-right me-2"></i>Sign Out
+                                </a></li>
+                        </ul>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'login' %}">
+                            <i class="bi bi-box-arrow-in-right me-1"></i>Sign In
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'register' %}">
+                            <i class="bi bi-person-plus me-1"></i>Sign Up
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endblock %}
+
+    {% block container_start %}
+    <div class="container mt-4">
+        {% endblock %}
+        {% block content %}
+        {% endblock %}
+        {% block container_end %}
+    </div>
+    {% endblock %}
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Django Tables2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/django-tables2@2.4.1/dist/django-tables2.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <!-- Shared frontend modules (app-wide) -->
+    <script src="{% asset 'ocs/js/utils.js' %}"></script>
+    <script src="{% asset 'ocs/js/copyCell.js' %}"></script>
+
+    <!-- Page-specific scripts -->
+    {% block extra_scripts %}{% endblock %}
+
+    <!-- Enhanced navbar active state and smooth transitions -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Enhanced navbar highlighting
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.navbar-nav .nav-link').forEach(link => {
+                const href = link.getAttribute('href');
+                if (href === currentPath || (href !== '/' && currentPath.startsWith(href))) {
+                    link.classList.add('active');
+                }
+            });
+
+            // Initialize Bootstrap dropdowns (Bootstrap 5 auto-initializes, but we'll ensure it)
+            if (typeof bootstrap !== 'undefined') {
+                const dropdownElementList = document.querySelectorAll('.dropdown-toggle');
+                console.log('Found dropdown toggles:', dropdownElementList.length);
+
+                // Bootstrap 5 should auto-initialize, but let's ensure manual init if needed
+                dropdownElementList.forEach(dropdownToggleEl => {
+                    if (!bootstrap.Dropdown.getInstance(dropdownToggleEl)) {
+                        console.log('Manually initializing dropdown for:', dropdownToggleEl);
+                        try {
+                            new bootstrap.Dropdown(dropdownToggleEl);
+                        } catch (e) {
+                            console.error('Error initializing dropdown:', e);
+                        }
+                    }
+                });
+            } else {
+                console.error('Bootstrap is not loaded');
+            }
+
+            // Add smooth transitions to form elements
+            document.querySelectorAll('.form-control').forEach(input => {
+                input.addEventListener('focus', function () {
+                    this.parentElement.style.transform = 'translateY(-2px)';
+                });
+
+                input.addEventListener('blur', function () {
+                    this.parentElement.style.transform = 'translateY(0)';
+                });
+            });
+
+            // Enhanced button hover effects
+            document.querySelectorAll('.btn-auth').forEach(btn => {
+                btn.addEventListener('mouseenter', function () {
+                    this.style.transform = 'translateY(-2px)';
+                });
+
+                btn.addEventListener('mouseleave', function () {
+                    this.style.transform = 'translateY(0)';
+                });
+            });
+        });
+    </script>
+
+</body>
+
+</html>

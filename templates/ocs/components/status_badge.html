@@ -1,0 +1,25 @@
+{% comment %}
+Status badge (icon + uppercase label) — the one badge used app-wide.
+Params:
+  status   - raw status string, e.g. "Completed", "FAILED", "Not Started" (required)
+  label    - optional display text override; defaults to the status (run through
+             status_label so "Not Started" reads "Not Completed")
+Maps status -> color variant + icon in ONE place. Unknown/empty -> NOT COMPLETED.
+Example: {% include "ocs/components/status_badge.html" with status=job.status only %}
+{% endcomment %}
+{% load ocs_extras %}
+{% with s=status|lower %}
+{% if s == "completed" or s == "complete" %}
+  <span class="status-badge status-completed"><i class="bi bi-check-circle-fill"></i><span class="status-text">{{ label|default:"Completed" }}</span></span>
+{% elif s == "in progress" or s == "in-progress" or s == "running" %}
+  <span class="status-badge status-in-progress"><i class="bi bi-arrow-clockwise"></i><span class="status-text">{{ label|default:"In Progress" }}</span></span>
+{% elif s == "failed" or s == "error" %}
+  <span class="status-badge status-failed"><i class="bi bi-x-circle-fill"></i><span class="status-text">{{ label|default:"Failed" }}</span></span>
+{% elif s == "aborted" or s == "stopped" or s == "killed" %}
+  <span class="status-badge status-stopped"><i class="bi bi-slash-circle-fill"></i><span class="status-text">{{ label|default:status }}</span></span>
+{% elif s == "pending" or s == "submitted" or s == "queued" or s == "ready" %}
+  <span class="status-badge status-pending"><i class="bi bi-clock-fill"></i><span class="status-text">{{ label|default:status }}</span></span>
+{% else %}
+  <span class="status-badge status-not-completed"><i class="bi bi-circle"></i><span class="status-text">{{ label|default:"Not Completed" }}</span></span>
+{% endif %}
+{% endwith %}

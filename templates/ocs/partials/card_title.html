@@ -1,0 +1,10 @@
+{% comment %}
+Reusable card-header title: icon + title + optional translucent count badge.
+Params:
+  icon     - Bootstrap Icons class, e.g. "bi-hourglass-split" (required)
+  title    - header text (required)
+  count    - optional number shown as a translucent badge (0 is shown)
+  badge_id - optional id on the badge span (for JS to update the count)
+Example: include "ocs/partials/card_title.html" with icon="bi-activity" title="Running" count=jobs|length only
+{% endcomment %}
+<h5 class="mb-0"><i class="bi {{ icon }} me-2"></i>{{ title }}{% if count or count == 0 %} <span class="badge ms-2"{% if badge_id %} id="{{ badge_id }}"{% endif %}>{{ count }}</span>{% endif %}</h5>

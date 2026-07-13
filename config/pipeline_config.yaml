@@ -40,16 +40,6 @@ settings:
     max_retries: 3
     timeout_hours: 24
 
-  # Notification settings
-  notifications:
-    email:
-      enabled: true
-      recipients:
-        - beagan.nguy@alleninstitute.org
-      events:
-        - FAILED
-        - COMPLETED
-
 # Workflow mappings
 workflows:
   mtx:
@@ -58,7 +48,6 @@ workflows:
       command_template: "ocs fastqs align tenx-arc --asset-name cellranger-arc --reference-names \"{reference}\" --load-names \"{load_name}\" --notify-on FAILED --notify {notification_email}"
     postqc:
       asset_name: "multi_gex_qc"
-      asset_tag: "latest"
       command_template: "ocs fastqs postalign tenx-arc --asset-name multi_gex_qc --asset-tag latest --load-names \"{load_name}\" --notify-on FAILED --notify {notification_email}"
 
   rtx:

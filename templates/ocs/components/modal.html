@@ -1,0 +1,25 @@
+{% comment %}
+Bootstrap modal shell with a tinted header and standardized chrome.
+Params:
+  id        - modal element id (required)
+  title     - header text (required)
+  icon      - Bootstrap Icons class for the header (optional)
+  variant   - header accent: primary | success | warning | danger (optional)
+  size      - "lg" | "xl" (optional; default normal)
+  body      - body HTML (safe) (optional)
+  footer    - footer HTML (safe), typically the action buttons (optional)
+Example:
+  {% include "ocs/components/modal.html" with id="confirmRetryModal" title="Confirm Retry" icon="bi-arrow-repeat" variant="success" body=body_html footer=footer_html only %}
+{% endcomment %}
+<div class="modal fade c-modal" id="{{ id }}" tabindex="-1" aria-labelledby="{{ id }}Label" aria-hidden="true">
+  <div class="modal-dialog{% if size %} modal-{{ size }}{% endif %}">
+    <div class="modal-content">
+      <div class="modal-header{% if variant %} modal-header--{{ variant }}{% endif %}">
+        <h5 class="modal-title" id="{{ id }}Label">{% if icon %}<i class="bi {{ icon }} me-2"></i>{% endif %}{{ title }}</h5>
+        <button type="button" class="btn-close{% if variant %} btn-close-white{% endif %}" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">{{ body|safe }}</div>
+      {% if footer %}<div class="modal-footer">{{ footer|safe }}</div>{% endif %}
+    </div>
+  </div>
+</div>

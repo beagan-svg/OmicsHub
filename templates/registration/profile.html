@@ -1,0 +1,434 @@
+{% extends "ocs/base.html" %}
+{% load static %}
+
+{% block title %}Profile - {{ user.get_full_name|default:user.username }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <!-- Profile Header -->
+            <div class="profile-header-card mb-4">
+                <div class="profile-banner"></div>
+                <div class="profile-content">
+                    <div class="profile-avatar">
+                        <i class="bi bi-person-circle"></i>
+                    </div>
+                    <div class="profile-info">
+                        <h1 class="profile-name">{{ user.get_full_name|default:user.username }}</h1>
+                        <p class="profile-email">{{ user.email }}</p>
+                        <div class="profile-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Member since</span>
+                                <span class="stat-value">{{ user.date_joined|date:"M Y" }}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Last login</span>
+                                <span class="stat-value">{{ user.last_login|date:"M d, Y" }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Sections -->
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="profile-section-card">
+                        <div class="section-header">
+                            <i class="bi bi-gear-fill"></i>
+                            <h5>Preferences</h5>
+                        </div>
+                        <div class="section-content">
+                            {% if user_preferences %}
+                            <div class="preference-item">
+                                <span class="preference-label">Theme</span>
+                                <span class="preference-value badge">{{ user_preferences.theme|capfirst }}</span>
+                            </div>
+                            <div class="preference-item">
+                                <span class="preference-label">Default Page Size</span>
+                                <span class="preference-value">{{ user_preferences.default_page_size }} items</span>
+                            </div>
+                            <div class="preference-item">
+                                <span class="preference-label">Auto Refresh</span>
+                                <span class="preference-value">
+                                    {% if user_preferences.auto_refresh_enabled %}
+                                    <i class="bi bi-check-circle-fill text-success"></i> Enabled
+                                    {% else %}
+                                    <i class="bi bi-x-circle-fill text-muted"></i> Disabled
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">No preferences set</p>
+                            {% endif %}
+                            <a href="#" class="btn btn-outline-primary btn-sm mt-3">
+                                <i class="bi bi-gear me-1"></i>Manage Preferences
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 mb-4">
+                    <div class="profile-section-card">
+                        <div class="section-header">
+                            <i class="bi bi-activity"></i>
+                            <h5>Recent Activity</h5>
+                        </div>
+                        <div class="section-content">
+                            {% if recent_activity %}
+                            {% for activity in recent_activity %}
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="bi bi-{{ activity.action|default:'circle' }}"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <span class="activity-text">{{ activity.action|capfirst }}</span>
+                                    <span class="activity-time">{{ activity.timestamp|timesince }} ago</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% else %}
+                            <p class="text-muted">No recent activity</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Settings -->
+            <div class="profile-section-card">
+                <div class="section-header">
+                    <i class="bi bi-shield-lock-fill"></i>
+                    <h5>Account Settings</h5>
+                </div>
+                <div class="section-content">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="setting-group">
+                                <h6>Personal Information</h6>
+                                <div class="setting-item">
+                                    <label>Username</label>
+                                    <input type="text" class="form-control" value="{{ user.username }}" readonly>
+                                </div>
+                                <div class="setting-item">
+                                    <label>Email</label>
+                                    <input type="email" class="form-control" value="{{ user.email }}" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="setting-group">
+                                <h6>Security</h6>
+                                <div class="setting-item">
+                                    <a href="{% url 'password_change' %}" class="btn btn-outline-primary">
+                                        <i class="bi bi-key me-1"></i>Change Password
+                                    </a>
+                                </div>
+                                <div class="setting-item">
+                                    <small class="text-muted">
+                                        Password last changed: {{ user.last_login|date:"M d, Y" }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .profile-header-card {
+        background: white;
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-lg);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .profile-banner {
+        height: 120px;
+        background: linear-gradient(135deg, var(--primary-color), #8b5cf6, #ec4899);
+        position: relative;
+    }
+
+    .profile-banner::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="profilePattern" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23profilePattern)"/></svg>');
+    }
+
+    .profile-content {
+        padding: 0 2rem 2rem;
+        position: relative;
+    }
+
+    .profile-avatar {
+        width: 100px;
+        height: 100px;
+        background: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: -50px auto 1.5rem;
+        box-shadow: var(--shadow-lg);
+        border: 4px solid white;
+    }
+
+    .profile-avatar i {
+        font-size: 3rem;
+        color: var(--primary-color);
+    }
+
+    .profile-info {
+        text-align: center;
+    }
+
+    .profile-name {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--dark-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .profile-email {
+        color: var(--secondary-color);
+        font-size: 1.1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .profile-stats {
+        display: flex;
+        justify-content: center;
+        gap: 3rem;
+    }
+
+    .stat-item {
+        text-align: center;
+    }
+
+    .stat-label {
+        display: block;
+        font-size: 0.875rem;
+        color: var(--secondary-color);
+        font-weight: 500;
+    }
+
+    .stat-value {
+        display: block;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--dark-color);
+        margin-top: 0.25rem;
+    }
+
+    .profile-section-card {
+        background: white;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+
+    .section-header {
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(139, 92, 246, 0.1));
+        padding: 1.5rem 2rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .section-header i {
+        font-size: 1.25rem;
+        color: var(--primary-color);
+    }
+
+    .section-header h5 {
+        margin: 0;
+        font-weight: 600;
+        color: var(--dark-color);
+    }
+
+    .section-content {
+        padding: 2rem;
+    }
+
+    .preference-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .preference-item:last-child {
+        border-bottom: none;
+    }
+
+    .preference-label {
+        font-weight: 500;
+        color: var(--dark-color);
+    }
+
+    .preference-value {
+        color: var(--secondary-color);
+    }
+
+    .preference-value .badge {
+        background: var(--primary-color);
+        color: white;
+    }
+
+    .activity-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        background: rgba(37, 99, 235, 0.1);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .activity-icon i {
+        color: var(--primary-color);
+    }
+
+    .activity-content {
+        flex: 1;
+    }
+
+    .activity-text {
+        display: block;
+        font-weight: 500;
+        color: var(--dark-color);
+    }
+
+    .activity-time {
+        display: block;
+        font-size: 0.875rem;
+        color: var(--secondary-color);
+        margin-top: 0.25rem;
+    }
+
+    .setting-group {
+        margin-bottom: 2rem;
+    }
+
+    .setting-group h6 {
+        font-weight: 600;
+        color: var(--dark-color);
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .setting-item {
+        margin-bottom: 1rem;
+    }
+
+    .setting-item label {
+        display: block;
+        font-weight: 500;
+        color: var(--dark-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .setting-item .form-control {
+        border: 2px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--light-color);
+    }
+
+    .setting-item .btn {
+        border-radius: var(--radius-md);
+        font-weight: 500;
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .profile-stats {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .profile-content {
+            padding: 0 1rem 1.5rem;
+        }
+
+        .section-content {
+            padding: 1.5rem;
+        }
+
+        .section-header {
+            padding: 1rem 1.5rem;
+        }
+    }
+
+    /* Animation */
+    .profile-header-card {
+        animation: slideInUp 0.6s ease-out;
+    }
+
+    .profile-section-card {
+        animation: fadeInUp 0.6s ease-out forwards;
+        opacity: 0;
+    }
+
+    .profile-section-card:nth-child(1) {
+        animation-delay: 0.1s;
+    }
+
+    .profile-section-card:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .profile-section-card:nth-child(3) {
+        animation-delay: 0.3s;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+{% endblock %}

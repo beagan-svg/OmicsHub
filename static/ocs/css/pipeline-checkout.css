@@ -1,0 +1,95 @@
+/* ===============================================
+   Pipeline Checkout — page-specific styles only.
+   Cards, buttons, tables, pagination, forms, badges all come from the shared
+   design system (tokens.css + components.css). What remains here is unique to
+   this page: the full-width container, the Submit/Clear/ATAC action toggles,
+   and the custom modal-manager z-index layering.
+   =============================================== */
+
+* { font-family: var(--font-family-sans); }
+
+/* Full-width container */
+.container-fluid {
+    max-width: none;
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+}
+
+.lead { font-size: 1rem; font-weight: 400; color: var(--text-secondary); line-height: 1.6; }
+.goto-page-input { width: 4rem; text-align: center; }
+
+/* ===============================================
+   Action toggles (Submit / Clear Selection / Clear ATAC)
+   A distinct two-state slider switch, separate from the kit's .c-toggle.
+   =============================================== */
+.action-button-toggle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+.toggle-switch input { opacity: 0; width: 100%; height: 100%; position: absolute; left: 0; top: 0; margin: 0; cursor: pointer; }
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--neutral-300);
+    transition: all var(--transition-fast);
+    border-radius: var(--radius-full);
+    border: 2px solid transparent;
+}
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: var(--neutral-0);
+    transition: all var(--transition-fast);
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-sm);
+}
+.toggle-switch input:checked + .toggle-slider {
+    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+    border-color: var(--primary-600);
+}
+.toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); box-shadow: var(--shadow-md); }
+
+.toggle-switch-lg { width: 52px; height: 28px; }
+.toggle-switch-lg .toggle-slider:before { height: 20px; width: 20px; left: 2px; bottom: 2px; }
+.toggle-switch-lg input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+.toggle-switch-action input:checked + .toggle-slider {
+    background: linear-gradient(135deg, var(--error-500) 0%, var(--error-600) 100%);
+    border-color: var(--error-600);
+}
+.toggle-switch-atac input:checked + .toggle-slider {
+    background: linear-gradient(135deg, var(--warning-500) 0%, var(--warning-600) 100%);
+    border-color: var(--warning-600);
+}
+
+.toggle-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+@media (max-width: 768px) {
+    .container-fluid { padding-left: var(--space-3); padding-right: var(--space-3); }
+    .action-button-toggle { flex-direction: row; justify-content: space-between; align-items: center; }
+}
+
+/* ===============================================
+   Custom modal-manager z-index (the submit / final-commands modal flow needs
+   a custom backdrop layered above Bootstrap's default).
+   =============================================== */
+.modal { z-index: 10001 !important; }
+.modal-backdrop:not(.modal-manager-backdrop) { display: none !important; }
+.modal-backdrop.modal-manager-backdrop { z-index: 10000 !important; display: block !important; }

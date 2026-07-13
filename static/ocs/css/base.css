@@ -1,0 +1,366 @@
+/* Design tokens (colors, shadows, radii, --dark-color/--light-color) live in
+   tokens.css — single source. This file holds auth/navbar/dropdown styles. */
+
+
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-weight: 400;
+            line-height: 1.6;
+        }
+
+        .auth-body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .auth-body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.15"/><circle cx="20" cy="80" r="0.5" fill="white" opacity="0.15"/><circle cx="80" cy="30" r="0.5" fill="white" opacity="0.15"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+            position: relative;
+            z-index: 1030 !important;
+        }
+
+        .navbar-brand {
+            font-weight: 700 !important;
+            font-size: 1.5rem;
+            color: var(--primary-color) !important;
+            text-decoration: none;
+        }
+
+        .navbar-brand:hover {
+            color: var(--primary-dark) !important;
+        }
+
+        .nav-link {
+            font-weight: 500;
+            color: var(--secondary-color) !important;
+            border-radius: var(--radius-md);
+            margin: 0 0.25rem;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-color) !important;
+            background-color: rgba(37, 99, 235, 0.1);
+        }
+
+        .nav-link.active {
+            color: var(--primary-color) !important;
+            background-color: rgba(37, 99, 235, 0.1);
+            font-weight: 600;
+        }
+
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+
+        .auth-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-xl);
+            padding: 3rem;
+            width: 100%;
+            max-width: 480px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .auth-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), #8b5cf6, #ec4899);
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .auth-icon {
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
+            border-radius: var(--radius-xl);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .auth-icon i {
+            font-size: 2rem;
+            color: white;
+        }
+
+        .auth-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--dark-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .auth-subtitle {
+            color: var(--secondary-color);
+            font-size: 1rem;
+            font-weight: 400;
+        }
+
+        .form-floating {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-floating>.form-control {
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1rem 0.75rem;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .form-floating>.form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
+            background: white;
+        }
+
+        .form-floating>label {
+            color: var(--secondary-color);
+            font-weight: 500;
+        }
+
+        .form-check {
+            margin: 1.5rem 0;
+        }
+
+        .form-check-input:checked {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .form-check-label {
+            color: var(--secondary-color);
+            font-weight: 500;
+        }
+
+        .btn-auth {
+            background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
+            border: none;
+            border-radius: var(--radius-lg);
+            padding: 0.875rem 1.5rem;
+            font-weight: 600;
+            font-size: 1rem;
+            text-transform: none;
+            letter-spacing: 0.025em;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-auth:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-lg);
+            background: linear-gradient(135deg, var(--primary-dark), #7c3aed);
+        }
+
+        .btn-auth:active {
+            transform: translateY(0);
+        }
+
+        .auth-links {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .auth-links a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .auth-links a:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
+        }
+
+        .alert {
+            border-radius: var(--radius-lg);
+            border: none;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+        }
+
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: #059669;
+        }
+
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #2563eb;
+        }
+
+        .application-body {
+            background: var(--neutral-50, #f9fafb);
+            min-height: 100vh;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 576px) {
+            .auth-card {
+                padding: 2rem 1.5rem;
+                margin: 1rem;
+                border-radius: var(--radius-lg);
+            }
+
+            .auth-title {
+                font-size: 1.75rem;
+            }
+
+            .auth-icon {
+                width: 60px;
+                height: 60px;
+            }
+
+            .auth-icon i {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .application-body {
+                background: var(--neutral-0, #111827);
+                color: var(--neutral-900, #ffffff);
+            }
+        }
+
+        /* Manual dark mode toggle support */
+        [data-theme="dark"] .application-body {
+            background: var(--neutral-0, #111827);
+            color: var(--neutral-900, #ffffff);
+        }
+
+        /* Enhanced dropdown styling and visibility */
+        .dropdown-menu {
+            border: none !important;
+            border-radius: var(--radius-lg) !important;
+            box-shadow: var(--shadow-xl) !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(20px);
+            padding: 0.5rem 0 !important;
+            margin-top: 0.5rem !important;
+            min-width: 200px !important;
+            z-index: 1040 !important;
+        }
+
+        .dropdown-item {
+            padding: 0.75rem 1.5rem !important;
+            font-weight: 500;
+            color: var(--dark-color) !important;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+
+        .dropdown-item:hover,
+        .dropdown-item:focus {
+            background: rgba(37, 99, 235, 0.1) !important;
+            color: var(--primary-color) !important;
+            transform: translateX(4px);
+        }
+
+        .dropdown-item i {
+            width: 16px;
+            text-align: center;
+            margin-right: 0.5rem;
+        }
+
+        .dropdown-divider {
+            margin: 0.5rem 1rem !important;
+            border-color: var(--border-color) !important;
+        }
+
+        /* Ensure dropdown works properly with proper z-index layering */
+        .navbar .dropdown {
+            position: relative;
+            z-index: 1040 !important;
+        }
+
+        .navbar .dropdown-toggle {
+            cursor: pointer !important;
+            position: relative;
+            z-index: 1040 !important;
+        }
+
+        .navbar .dropdown-toggle:focus {
+            box-shadow: none;
+        }
+
+        .navbar .dropdown-menu {
+            position: absolute !important;
+            top: 100% !important;
+            right: 0 !important;
+            left: auto !important;
+            z-index: 1040 !important;
+        }
+
+        /* Ensure dropdown appears above cards and other content */
+        .navbar .dropdown.show .dropdown-menu {
+            display: block !important;
+            z-index: 1040 !important;
+        }
+
+        /* Force dropdown to appear above everything except modals */
+        .navbar .dropdown-menu,
+        .dropdown-menu.show {
+            z-index: 1040 !important;
+            position: absolute !important;
+        }
+
+        /* Ensure modals appear above navbar */
+        .modal {
+            z-index: 1050 !important;
+        }
+
+        .modal-backdrop {
+            z-index: 1040 !important;
+        }
+

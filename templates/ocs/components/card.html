@@ -1,0 +1,20 @@
+{% comment %}
+Card with a tinted header + body. For simple cards. When a card needs complex
+header controls (buttons/toggles next to the title), use the .c-card / .c-card__*
+classes directly in the page and reuse card_title.html for the title.
+Params:
+  icon     - Bootstrap Icons class for the title (optional)
+  title    - header text (optional; omit for a header-less card)
+  variant  - header accent: primary | success | warning | danger (optional)
+  count    - optional count badge in the header
+  body     - body HTML (optional; or use the {% raw %}{% block %}{% endraw %} form by writing the card inline)
+Example: {% include "ocs/components/card.html" with icon="bi-list" title="Jobs" variant="warning" only %}
+{% endcomment %}
+<div class="c-card">
+  {% if title %}
+  <div class="c-card__header{% if variant %} c-card__header--{{ variant }}{% endif %}">
+    {% include "ocs/partials/card_title.html" with icon=icon title=title count=count only %}
+  </div>
+  {% endif %}
+  <div class="c-card__body">{{ body|safe }}</div>
+</div>

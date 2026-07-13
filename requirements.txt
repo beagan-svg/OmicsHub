@@ -1,14 +1,17 @@
-Django>=4.2.0
+# Django pinned to the 5.1 line (the app's known-good version is 5.1.7).
+# 5.2 is the current LTS — a deliberate, tested upgrade for later.
+Django>=5.1,<5.2
 psycopg2-binary>=2.9.9
-django-tables2>=2.7.0
+django-tables2>=2.7,<3.0
 django-filter>=23.5
 django-crispy-forms>=2.0
 crispy-bootstrap5>=2024.0
-django-debug-toolbar>=4.3.0
+django-extensions>=3.2,<5
 tablib>=3.5.0
 gunicorn>=21.2.0
+django-allauth>=65.0  # Google SSO; only required when ENABLE_GOOGLE_SSO=true
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 ipython>=8.18.0
 flake8>=7.0.0
-pyyaml==6.0.2 
+pyyaml==6.0.2

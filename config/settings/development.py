@@ -8,6 +8,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+# OCS Command Execution Settings
+# Set to False to log commands instead of executing them (for testing)
+EXECUTE_OCS_COMMANDS = True
+
 # Database
 DATABASES = {
     'default': {

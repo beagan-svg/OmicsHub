@@ -1,0 +1,10 @@
+{% comment %}
+Click-to-copy cell content (demand IDs, etc.). Render inside a <td>. Behavior
+(ripple + copy + toast) is wired by copyCell.js, which targets ".copy-cell".
+Params:
+  value - the text to display and copy (required)
+Example: <td>{% include "ocs/components/copy_cell.html" with value=job.demand_id only %}</td>
+Note: place the {% raw %}{% include %}{% endraw %} as the <td>'s content, or add the
+      "copy-cell" class to the <td> itself and put a .text-monospace span inside.
+{% endcomment %}
+<span class="copy-cell"><span class="text-monospace">{{ value }}</span></span>

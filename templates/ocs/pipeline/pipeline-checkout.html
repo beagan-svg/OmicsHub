@@ -1,0 +1,813 @@
+{% extends "ocs/base.html" %}
+{% load static %}
+{% load ocs_extras %}
+
+{% block title %}Pipeline Checkout{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% asset 'ocs/css/pipeline-checkout.css' %}">
+{% endblock %}
+
+{% block body_class %}application-body{% endblock %}
+
+{% block container_start %}
+<div class="container-fluid mt-4">
+    {% endblock %}
+
+    {% block content %}
+    <div class="row">
+        <div class="col-12">
+            <div class="c-card">
+                <div class="c-card__header c-card__header--primary">
+                    {% include "ocs/partials/card_title.html" with icon="bi-diagram-3" title="Pipeline Checkout" only %}
+                </div>
+
+                <div class="c-card__body">
+                    <p class="lead mb-4">
+                        Pipeline Checkout lets you manage and monitor the RNA sequencing pipeline process.
+                        Select samples from the table below to submit them for processing.
+                    </p>
+
+                    <!-- Action buttons row -->
+                    <div class="row mb-4">
+                        <div class="col-lg-7">
+                            <div class="d-flex align-items-center gap-3">
+                                <a href="{% url 'ocs:job_monitor' %}" class="btn btn-outline-primary">
+                                    <i class="bi bi-eye me-1"></i> Job Monitor
+                                </a>
+                                <a href="{% url 'ocs:failed_jobs' %}" class="btn btn-outline-warning">
+                                    <i class="bi bi-exclamation-triangle me-1"></i> View Failed Jobs
+                                </a>
+                            </div>
+                        </div>
+
+                        <div
+                            class="col-lg-5 text-end mt-3 mt-lg-0 d-flex align-items-center justify-content-end flex-wrap gap-3">
+                            <!-- Submit Button -->
+                            <button id="submit-action-btn" class="btn btn-primary" disabled>
+                                <i class="bi bi-play-fill me-1"></i>SUBMIT SELECTED
+                            </button>
+
+                            <!-- Clear Selection Toggle -->
+                            <div class="action-button-toggle">
+                                <label class="toggle-switch toggle-switch-lg toggle-switch-action" for="clear-toggle">
+                                    <input type="checkbox" id="clear-toggle" class="action-toggle">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <label class="toggle-label" for="clear-toggle">
+                                    Clear Selection
+                                </label>
+                            </div>
+
+                            <!-- Clear ATAC Toggle -->
+                            <div class="action-button-toggle">
+                                <label class="toggle-switch toggle-switch-lg toggle-switch-atac"
+                                    for="clear-atac-toggle">
+                                    <input type="checkbox" id="clear-atac-toggle" class="action-toggle">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <label class="toggle-label" for="clear-atac-toggle">
+                                    Clear ATAC
+                                </label>
+                            </div>
+
+                            <!-- Keep the original buttons in a hidden div for functionality -->
+                            <div style="display: none;">
+                                <button id="submit-selected" class="btn btn-primary" disabled>
+                                    <i class="bi bi-play-fill"></i> Submit Selected
+                                </button>
+                                <button class="btn btn-outline-danger" id="clear-selection">
+                                    <i class="bi bi-x-circle"></i> Clear Selection
+                                </button>
+                                <button id="clear-atac" class="btn btn-outline-danger">
+                                    <i class="bi bi-x-circle"></i> Clear ATAC
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="c-table-wrap">
+                        <table class="c-table" id="samples-table">
+                            <thead>
+                                <tr>
+                                    <th class="selection-column">
+                                        <input type="checkbox" id="select-all-samples" class="sample-select">
+                                    </th>
+                                    <th>Fastq Name</th>
+                                    <th>Study Set</th>
+                                    <th>Load Name</th>
+                                    <th>Batch Name From Vendor</th>
+                                    <th>Organism Common Name</th>
+                                    <th>Library Prep Method</th>
+                                    <th>Ingest Status</th>
+                                    <th>Alignment Status</th>
+                                    <th>POSTQC STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if page_obj.object_list %}
+                                {% for sample in page_obj.object_list %}
+                                <tr data-fastq="{{ sample.fastq }}">
+                                    <td class="selection-column"><input type="checkbox" class="sample-select"></td>
+                                    <td class="field-fastq_name">{{ sample.fastq }}</td>
+                                    <td>{{ sample.study_set }}</td>
+                                    <td>{{ sample.load_name }}</td>
+                                    <td>{{ sample.batch }}</td>
+                                    <td>{{ sample.organism }}</td>
+                                    <td>{{ sample.library_prep }}</td>
+                                    <td>{% include "ocs/components/status_badge.html" with status=sample.ingest_status only %}</td>
+                                    <td>{% include "ocs/components/status_badge.html" with status=sample.alignment_status only %}</td>
+                                    <td>{% include "ocs/components/status_badge.html" with status=sample.postqc_status only %}</td>
+                                </tr>
+                                {% endfor %}
+                                {% else %}
+                                <tr>
+                                    <td colspan="10" class="text-center py-5">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <div class="mb-3">
+                                                <i class="bi bi-x-circle" style="font-size: 2rem;"></i>
+                                            </div>
+                                            <p class="text-muted mb-4">No samples selected. Use the Sample Browser to
+                                                select samples.</p>
+                                            <a href="{% url 'ocs:ocs-browser' %}" class="btn btn-primary">
+                                                <i class="bi bi-table me-2"></i>GO TO SAMPLE BROWSER
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <div class="c-pagination">
+                        <!-- Pagination navigation -->
+                        <div class="pagination-navigation c-pagination__nav">
+                            {% if page_obj.has_previous %}
+                            <a href="#" class="page-nav" title="First page">
+                                <i class="bi bi-chevron-double-left"></i>
+                            </a>
+                            <a href="#" class="page-nav ms-1" title="Previous page">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                            {% else %}
+                            <a href="#" class="page-nav disabled" title="First page">
+                                <i class="bi bi-chevron-double-left"></i>
+                            </a>
+                            <a href="#" class="page-nav ms-1 disabled" title="Previous page">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                            {% endif %}
+
+                            <span class="page-indicator mx-2">
+                                <span class="current-page">{{ page_obj.number }}</span>
+                                <span class="text-muted">/</span>
+                                <span class="total-pages">{{ page_obj.paginator.num_pages }}</span>
+                            </span>
+
+                            {% if page_obj.has_next %}
+                            <a href="#" class="page-nav me-1" title="Next page">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                            <a href="#" class="page-nav" title="Last page">
+                                <i class="bi bi-chevron-double-right"></i>
+                            </a>
+                            {% else %}
+                            <a href="#" class="page-nav me-1 disabled" title="Next page">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                            <a href="#" class="page-nav disabled" title="Last page">
+                                <i class="bi bi-chevron-double-right"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+
+                        <div class="c-pagination__controls">
+                            <!-- Rows per page selector -->
+                            <div class="pagination-control d-flex align-items-center me-3">
+                                <label for="rowsPerPageDropdown" class="text-muted me-2 mb-0">Rows per page:</label>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-3" type="button"
+                                        id="rowsPerPageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                        {{ current_per_page }}
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end pagination-dropdown"
+                                        aria-labelledby="rowsPerPageDropdown">
+                                        <li><a class="dropdown-item{% if current_per_page == 10 %} active{% endif %}"
+                                                href="#">10</a></li>
+                                        <li><a class="dropdown-item{% if current_per_page == 25 %} active{% endif %}"
+                                                href="#">25</a></li>
+                                        <li><a class="dropdown-item{% if current_per_page == 50 %} active{% endif %}"
+                                                href="#">50</a></li>
+                                        <li><a class="dropdown-item{% if current_per_page == 100 %} active{% endif %}"
+                                                href="#">100</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Go to page input -->
+                            <div class="goto-page d-flex align-items-center me-3">
+                                <form id="gotoPageForm" class="d-flex align-items-center">
+                                    <label for="gotoPage" class="text-muted me-2 mb-0">Go to:</label>
+                                    <input type="number" id="gotoPage" name="page"
+                                        class="form-control form-control-sm goto-page-input" min="1"
+                                        max="{{ page_obj.paginator.num_pages|default:1 }}"
+                                        value="{{ page_obj.number }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary ms-1 goto-btn">
+                                        <i class="bi bi-arrow-right"></i>
+                                    </button>
+                                </form>
+                            </div>
+
+                            <span class="text-muted pagination-info">Results {{ page_obj.start_index }}-{{
+                                page_obj.end_index }} of {{ page_obj.paginator.count }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% block container_end %}
+</div>
+{% endblock %}
+
+<!-- Submit Modal -->
+<div class="modal fade" id="submit-modal" tabindex="-1" role="dialog" aria-modal="true"
+    aria-labelledby="submit-modal-label">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="submit-modal-label">Submit Samples</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>The following samples will be submitted for processing:</p>
+                <div class="overflow-auto mb-3" style="max-height: 400px;">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>FASTQ Name</th>
+                                <th>Load Name</th>
+                                <th>Batch Name From Vendor</th>
+                                <th>Workflow</th>
+                                <th>Organism</th>
+                                <th>Library Prep Method</th>
+                                <th>Ingest Status</th>
+                                <th>Alignment Status</th>
+                                <th>POSTQC STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="submit-sample-list">
+                            <!-- Sample list will be populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Warning for incomplete samples -->
+                <div id="incomplete-samples-warning" class="alert alert-warning mb-3 d-none">
+                    <h6 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>Incomplete Samples
+                        Detected</h6>
+                    <p>The following samples have not completed ingest:</p>
+                    <ul id="incomplete-samples-list" class="mb-2"></ul>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="include-incomplete-samples">
+                        <label class="form-check-label" for="include-incomplete-samples">
+                            Include incomplete samples in submission
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Auto-proceed to Post-QC toggle -->
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="auto-proceed-toggle">
+                    <label class="form-check-label" for="auto-proceed-toggle">
+                        <strong>Automatically proceed to Post-QC after alignment completes</strong>
+                    </label>
+                </div>
+
+                <!-- Reprocess completed samples toggle -->
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="reprocess-completed-toggle">
+                    <label class="form-check-label" for="reprocess-completed-toggle">
+                        <strong>Reprocess completed samples (treat as "Not Started")</strong>
+                    </label>
+                    <div class="form-text">Enable this option to rerun samples through the pipeline even if they are
+                        already completed</div>
+                </div>
+
+                <!-- Notification Email Section -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="bi bi-envelope"></i>
+                            <h6 class="mb-0">Notification Email</h6>
+                        </div>
+                        <div class="mb-3">
+                            <input type="email" class="form-control" id="global-notification-email"
+                                placeholder="Enter email...">
+                            <div class="form-text">You will be notified at this email address if any jobs fail.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submission Commands Section -->
+                <div class="row g-4">
+                    <!-- Alignment Submissions -->
+                    <div class="col-12">
+                        <div class="card submission-card">
+                            <div
+                                class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-gear-fill me-2"></i>
+                                    <h6 class="mb-0">Alignment Submissions</h6>
+                                </div>
+                                <small class="text-white-50">Samples that have completed ingest and will proceed to
+                                    alignment</small>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="alignment-batches" class="batches-container">
+                                    <!-- Will be populated dynamically -->
+                                    <div class="text-center text-muted p-4">No samples eligible for alignment</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Post-QC Submissions -->
+                    <div class="col-12">
+                        <div class="card submission-card">
+                            <div
+                                class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-check-circle-fill me-2"></i>
+                                    <h6 class="mb-0">Post-QC Submissions</h6>
+                                </div>
+                                <small class="text-white-50">Samples that have completed alignment and will proceed to
+                                    post-QC</small>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="postqc-batches" class="batches-container">
+                                    <!-- Will be populated dynamically -->
+                                    <div class="text-center text-muted p-4">No samples eligible for post-QC</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <style>
+                    .submission-card {
+                        border: none;
+                        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+                        transition: box-shadow 0.2s ease-in-out;
+                    }
+
+                    .submission-card:hover {
+                        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+                    }
+
+                    .submission-card .card-header {
+                        border-bottom: none;
+                        padding: 1rem 1.25rem;
+                    }
+
+                    .batches-container {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 1rem;
+                        padding: 1.25rem;
+                    }
+
+                    .batch-group {
+                        background-color: #fff;
+                        border: 1px solid rgba(0, 0, 0, 0.125);
+                        border-radius: 0.5rem;
+                        overflow: hidden;
+                        transition: all 0.2s ease-in-out;
+                    }
+
+                    .batch-group:hover {
+                        border-color: rgba(0, 0, 0, 0.2);
+                    }
+
+                    .batch-header {
+                        background-color: #f8f9fa;
+                        padding: 0.75rem 1.25rem;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+                    }
+
+                    .batch-name {
+                        font-weight: 500;
+                        color: #212529;
+                    }
+
+                    .batch-content {
+                        padding: 1.25rem;
+                    }
+
+                    .batch-table {
+                        width: 100%;
+                        margin-bottom: 0;
+                        border-collapse: separate;
+                        border-spacing: 0;
+                    }
+
+                    .batch-table th {
+                        background-color: #f8f9fa;
+                        border-bottom: 2px solid #dee2e6;
+                        padding: 0.75rem 1rem;
+                        font-weight: 500;
+                        color: #495057;
+                    }
+
+                    .batch-table td {
+                        padding: 1rem;
+                        vertical-align: middle;
+                        border-bottom: 1px solid #dee2e6;
+                    }
+
+                    .batch-table tr:last-child td {
+                        border-bottom: none;
+                    }
+
+                    .command-cell {
+                        position: relative;
+                        min-width: 300px;
+                    }
+
+                    .command-cell code {
+                        display: block;
+                        background-color: #f8f9fa;
+                        padding: 0.75rem;
+                        border-radius: 0.375rem;
+                        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+                        font-size: 0.875rem;
+                        color: #212529;
+                        margin-bottom: 0.5rem;
+                        white-space: pre-wrap;
+                        word-break: break-word;
+                    }
+
+                    .command-actions {
+                        position: absolute;
+                        right: 0;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        display: flex;
+                        gap: 0.5rem;
+                        opacity: 0;
+                        transition: opacity 0.2s ease-in-out;
+                    }
+
+                    .command-cell:hover .command-actions {
+                        opacity: 1;
+                    }
+
+                    .command-edit-form {
+                        display: none;
+                        padding: 1.25rem;
+                        background-color: #f8f9fa;
+                        border-radius: 0.5rem;
+                        margin-top: 1rem;
+                        border: 1px solid rgba(0, 0, 0, 0.125);
+                    }
+
+                    .command-edit-form.show {
+                        display: block;
+                    }
+
+                    .auto-proceed-section {
+                        margin-top: 1.5rem;
+                        padding-top: 1.5rem;
+                        border-top: 1px solid rgba(0, 0, 0, 0.125);
+                    }
+
+                    .auto-proceed-badge {
+                        background-color: #198754;
+                        color: white;
+                        padding: 0.375rem 0.75rem;
+                        border-radius: 0.375rem;
+                        font-size: 0.875rem;
+                        font-weight: 500;
+                        margin-bottom: 1rem;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                    }
+
+                    .auto-proceed-badge i {
+                        font-size: 1rem;
+                    }
+
+                    .toggle-batch {
+                        padding: 0.25rem 0.5rem;
+                        font-size: 0.875rem;
+                        border-radius: 0.375rem;
+                        transition: all 0.2s ease-in-out;
+                    }
+
+                    .toggle-batch:hover {
+                        background-color: #e9ecef;
+                    }
+
+                    .toggle-batch i {
+                        transition: transform 0.2s ease-in-out;
+                    }
+
+                    .toggle-batch.collapsed i {
+                        transform: rotate(-90deg);
+                    }
+
+                    /* Rainbow badge for MTX workflow */
+                    .rainbow-badge {
+                        background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
+                        background-size: 1800% 1800%;
+                        animation: rainbow 8s ease infinite;
+                        color: white;
+                        font-weight: 500;
+                        padding: 0.35em 0.65em;
+                        border-radius: 0.375rem;
+                        font-size: 0.875rem;
+                    }
+
+                    @keyframes rainbow {
+                        0% {
+                            background-position: 0% 80%
+                        }
+
+                        50% {
+                            background-position: 100% 20%
+                        }
+
+                        100% {
+                            background-position: 0% 80%
+                        }
+                    }
+                </style>
+
+                <div class="alert alert-info my-3">
+                    <small>
+                        <i class="bi bi-info-circle"></i>
+                        Samples will be automatically removed from Pipeline Checkout after successful submission.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirm-submit">Confirm and Submit</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Final Commands Modal -->
+<div class="modal fade" id="final-commands-modal" tabindex="-1" aria-labelledby="final-commands-modal-label"
+    aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="final-commands-modal-label">Final Commands to Submit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-4">
+                    <!-- Alignment Commands -->
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0">Alignment Commands</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered command-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 200px;">SAMPLE</th>
+                                            <th>COMMAND</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="final-alignment-commands">
+                                        <!-- Will be populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Post-QC Commands -->
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0">Post-QC Commands</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered command-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 200px;">SAMPLE</th>
+                                            <th>COMMAND</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="final-postqc-commands">
+                                        <!-- Will be populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Back</button>
+                <button type="button" class="btn btn-primary" id="execute-submit">Execute Commands</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container" class="position-fixed bottom-0 start-50 translate-middle-x p-3" style="z-index: 1100;">
+    <!-- Toasts will be added here dynamically -->
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'ocs/js/modal-manager.js' %}"></script>
+<script src="{% static 'ocs/js/pipeline-local-data.js' %}"></script>
+<script src="{% static 'ocs/js/pipeline-final-modal.js' %}"></script>
+<script src="{% static 'ocs/js/pipeline-submit-modal.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('[PipelineCheckout] Initializing Pipeline Checkout with modern modal management');
+
+        // Wait for modal manager to be ready
+        const initializeWhenReady = () => {
+            if (window.modalManager) {
+                console.log('[PipelineCheckout] Modal manager is ready, setting up Pipeline Checkout');
+                setupPipelineCheckout();
+            } else {
+                console.log('[PipelineCheckout] Waiting for modal manager...');
+                setTimeout(initializeWhenReady, 100);
+            }
+        };
+
+        // Setup Pipeline Checkout functionality
+        const setupPipelineCheckout = () => {
+            // Initialize pipeline local data
+            if (window.pipelineLocalData) {
+                console.log('[PipelineCheckout] Initializing pipeline local data');
+                window.pipelineLocalData.reinitialize();
+            } else {
+                console.error('[PipelineCheckout] PipelineLocalData object not available!');
+            }
+
+            // Setup modern submit button handler
+            setupSubmitButton();
+
+            // Setup pipeline submit modal integration
+            setupPipelineSubmitModal();
+        };
+
+        // Setup the modern submit button
+        const setupSubmitButton = () => {
+            const submitActionBtn = document.getElementById('submit-action-btn');
+            if (submitActionBtn) {
+                console.log('[PipelineCheckout] Setting up modern submit button handler');
+
+                // Remove any existing event listeners
+                const newSubmitBtn = submitActionBtn.cloneNode(true);
+                submitActionBtn.parentNode.replaceChild(newSubmitBtn, submitActionBtn);
+
+                // Add modern event listener
+                newSubmitBtn.addEventListener('click', () => {
+                    console.log('[PipelineCheckout] Submit button clicked - checking selected samples');
+
+                    const selectedSamples = document.querySelectorAll('.sample-select:checked');
+                    console.log(`[PipelineCheckout] Found ${selectedSamples.length} selected samples`);
+
+                    if (selectedSamples.length === 0) {
+                        console.log('[PipelineCheckout] No samples selected, showing alert');
+                        alert('Please select at least one sample');
+                        return;
+                    }
+
+                    // Log sample details
+                    selectedSamples.forEach((checkbox, index) => {
+                        const row = checkbox.closest('tr');
+                        if (row) {
+                            const fastqName = row.querySelector('td:nth-child(2)')?.textContent?.trim();
+                            console.log(`[PipelineCheckout] Selected sample ${index + 1}: ${fastqName}`);
+                        }
+                    });
+
+                    // Open submit modal using modal manager
+                    console.log('[PipelineCheckout] Opening submit modal via modal manager');
+                    window.modalManager.openModal('submit-modal', {
+                        onOpen: () => {
+                            console.log('[PipelineCheckout] Submit modal opened, populating with samples');
+                            // Populate modal after it's opened
+                            if (window.pipelineSubmitModal && window.pipelineSubmitModal.populateModal) {
+                                setTimeout(() => {
+                                    window.pipelineSubmitModal.populateModal();
+                                    console.log('[PipelineCheckout] Modal populated with sample data');
+                                }, 100);
+                            }
+                        }
+                    });
+                });
+
+                console.log('[PipelineCheckout] Submit button handler setup complete');
+            }
+        };
+
+        // Setup pipeline submit modal integration
+        const setupPipelineSubmitModal = () => {
+            setTimeout(() => {
+                if (window.pipelineSubmitModal) {
+                    console.log('[PipelineCheckout] Setting up pipeline submit modal integration');
+
+                    // Override the submit button state update to work with both systems
+                    const originalUpdateSubmitButtonState = window.pipelineLocalData?.updateSubmitButtonState;
+                    if (originalUpdateSubmitButtonState) {
+                        window.pipelineLocalData.updateSubmitButtonState = function () {
+                            const selectedSamples = document.querySelectorAll('.sample-select:checked');
+                            const isDisabled = selectedSamples.length === 0;
+
+                            console.log(`[PipelineCheckout] Updating submit button state: disabled=${isDisabled}`);
+
+                            // Update both submit buttons
+                            const submitButton = document.getElementById('submit-selected');
+                            const actionSubmitButton = document.getElementById('submit-action-btn');
+
+                            if (submitButton) submitButton.disabled = isDisabled;
+                            if (actionSubmitButton) actionSubmitButton.disabled = isDisabled;
+                        };
+
+                        // Call it once to set initial state
+                        window.pipelineLocalData.updateSubmitButtonState();
+                    }
+
+                    // Setup modal switching functionality
+                    setupModalSwitching();
+                } else {
+                    console.error('[PipelineCheckout] Pipeline submit modal not available after timeout');
+                }
+            }, 200);
+        };
+
+        // Setup modal switching between submit and final modal
+        const setupModalSwitching = () => {
+            console.log('[PipelineCheckout] Setting up modal switching functionality');
+
+            // Listen for submission from submit modal
+            document.addEventListener('pipelineSubmitComplete', (event) => {
+                console.log('[PipelineCheckout] Pipeline submit complete, switching to final modal', event.detail);
+
+                window.modalManager.switchModal('submit-modal', 'final-commands-modal', {
+                    onComplete: () => {
+                        console.log('[PipelineCheckout] Successfully switched to final modal');
+
+                        // Initialize final modal with commands
+                        if (window.pipelineFinalModal && event.detail.commands) {
+                            window.pipelineFinalModal.show(event.detail);
+                        }
+                    }
+                });
+            });
+
+            // Listen for back button from final modal
+            document.addEventListener('finalModalBack', () => {
+                console.log('[PipelineCheckout] Final modal back button clicked, returning to submit modal');
+
+                window.modalManager.switchModal('final-commands-modal', 'submit-modal', {
+                    onComplete: () => {
+                        console.log('[PipelineCheckout] Successfully returned to submit modal');
+
+                        // Restore submit modal state if needed
+                        if (window.pipelineSubmitModal && window.pipelineSubmitModal.restoreState) {
+                            window.pipelineSubmitModal.restoreState();
+                        }
+                    }
+                });
+            });
+
+            // Listen for final modal close
+            document.addEventListener('finalModalClose', () => {
+                console.log('[PipelineCheckout] Final modal closed completely');
+                // Modal manager will handle backdrop cleanup automatically
+            });
+
+            console.log('[PipelineCheckout] Modal switching setup complete');
+        };
+
+        // Start initialization
+        initializeWhenReady();
+    });
+</script>
+{% endblock %}

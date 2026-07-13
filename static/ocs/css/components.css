@@ -1,0 +1,501 @@
+/*
+ * components.css — the reusable UI component layer.
+ *
+ * Styles the shared component partials in templates/ocs/components/. References
+ * tokens.css only (no hard-coded colors). Load AFTER tokens.css, app-wide.
+ *
+ * Sections: Card · Button · Status badge · Table · Copy cell · Pagination ·
+ *           Filter bar · Toggle switch · Toast · Modal.
+ *
+ * A page is assembled by including the component partials and filling in data;
+ * change a component's look here once and every page follows.
+ */
+
+/* ============================================================ CARD */
+.c-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: var(--space-6);
+    /* No overflow:hidden — would clip dropdowns/popovers inside the card.
+       The header rounds its own top corners instead. */
+}
+
+.c-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-muted);
+    color: var(--text-primary);
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
+}
+
+/* Header accent variants — tint the header by intent (uses tokens). */
+.c-card__header--primary { background: var(--grad-info); color: #fff; border-bottom: none; }
+.c-card__header--success { background: var(--grad-success); color: #fff; border-bottom: none; }
+.c-card__header--warning { background: var(--grad-warning); color: #fff; border-bottom: none; }
+.c-card__header--danger  { background: var(--grad-danger);  color: #fff; border-bottom: none; }
+
+.c-card__header h5 { margin: 0; font-size: var(--font-size-lg); font-weight: 600; }
+
+/* Translucent count badge inside a tinted header (matches card_title.html). */
+.c-card__header [class*="--"] .badge,
+.c-card__header.c-card__header--primary .badge,
+.c-card__header.c-card__header--success .badge,
+.c-card__header.c-card__header--warning .badge,
+.c-card__header.c-card__header--danger .badge {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+}
+
+.c-card__body { padding: var(--space-5); }
+
+/* ============================================================ BUTTON */
+/* Lightweight button variants layered on top of Bootstrap's .btn. The kit
+   prefers tokenized variants; .btn-* Bootstrap classes still work. */
+.c-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    line-height: 1.5;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    text-decoration: none;
+}
+
+.c-btn--primary   { background: var(--primary-600); color: #fff; }
+.c-btn--primary:hover:not(:disabled) { background: var(--primary-700); }
+.c-btn--secondary { background: var(--neutral-100); color: var(--neutral-700); border-color: var(--border-default); }
+.c-btn--secondary:hover:not(:disabled) { background: var(--neutral-200); }
+.c-btn--danger    { background: var(--error-500); color: #fff; }
+.c-btn--danger:hover:not(:disabled) { background: var(--error-600); }
+.c-btn--success   { background: var(--success-500); color: #fff; }
+.c-btn--light     { background: var(--neutral-0); color: var(--neutral-700); border-color: var(--border-default); }
+.c-btn--light:hover:not(:disabled) { background: var(--neutral-100); }
+.c-btn:disabled   { opacity: 0.5; cursor: not-allowed; }
+
+/* Round icon button (replaces per-page .btn-icon). */
+.c-btn-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--neutral-500);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+.c-btn-icon:hover:not(:disabled) { background: var(--primary-100); color: var(--primary-600); }
+.c-btn-icon:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ============================================================ STATUS BADGE
+   Soft pill: light tinted background + colored text + subtle border + icon.
+   One source of truth for every page (SSR partial + all JS renderers). */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    border: 1px solid transparent;
+    min-height: 24px;
+    text-align: center;
+    white-space: nowrap;
+    transition: var(--transition-fast);
+}
+.status-badge i { font-size: 0.8rem; line-height: 1; }
+
+.status-badge.status-completed,
+.status-badge.status-ready {
+    background: var(--success-50); color: var(--success-700); border-color: var(--success-100);
+}
+.status-badge.status-in-progress,
+.status-badge.status-running {
+    background: var(--primary-50); color: var(--primary-700); border-color: var(--primary-100);
+}
+.status-badge.status-pending,
+.status-badge.status-paused {
+    background: var(--warning-50); color: var(--warning-600); border-color: var(--warning-100);
+}
+.status-badge.status-failed {
+    background: var(--error-50); color: var(--error-600); border-color: var(--error-100);
+}
+.status-badge.status-not-completed,
+.status-badge.status-stopped {
+    background: var(--neutral-50); color: var(--neutral-600); border-color: var(--neutral-200);
+}
+
+/* In-progress icon spins (matches the previous Pipeline Checkout look) */
+.status-badge.status-in-progress i.bi-arrow-clockwise { animation: badge-spin 2s linear infinite; }
+@keyframes badge-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ============================================================ TABLE
+   The full reusable data-table behavior — wrapper + scroll, header, sortable
+   headers + sort indicator, body/rows, the sticky selection column, and the
+   row-select checkbox. Any page uses <div class="c-table-wrap"><table
+   class="c-table">… and gets all of this. Theme-aware via tokens (dark mode
+   works through the neutral flip). Page-specific column/field formatting stays
+   in that page's CSS, retargeted to .c-table. */
+.c-table-wrap {
+    border-radius: var(--radius-lg);
+    overflow-x: auto;
+    overflow-y: visible;
+    box-shadow: var(--shadow-sm);
+    background: var(--surface-card);
+    width: 100%;
+    position: relative;
+}
+.c-table-wrap .c-table { margin: 0; font-size: 0.875rem; }
+
+/* Custom scrollbar (webkit) */
+.c-table-wrap::-webkit-scrollbar { height: 8px; }
+.c-table-wrap::-webkit-scrollbar-track { background: var(--neutral-100); border-radius: var(--radius-sm); }
+.c-table-wrap::-webkit-scrollbar-thumb { background: var(--primary-400); border-radius: var(--radius-sm); transition: background var(--transition-fast); }
+.c-table-wrap::-webkit-scrollbar-thumb:hover { background: var(--primary-600); }
+
+.c-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface-card);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+}
+
+/* Header */
+.c-table thead th {
+    background: var(--neutral-100);
+    border-bottom: 2px solid var(--neutral-200);
+    color: var(--neutral-700);
+    font-weight: 600;
+    padding: var(--space-4);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    text-align: left;
+    vertical-align: middle;
+    position: sticky;
+    top: 0;
+}
+
+/* Sortable headers + sort indicator */
+.c-table thead th.sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-right: calc(var(--space-4) + 20px);
+    transition: all var(--transition-fast);
+}
+.c-table thead th.sortable:hover { background: var(--neutral-200); color: var(--neutral-900); }
+.c-table thead th.sortable:active { background: var(--neutral-300); }
+.c-table thead th.sortable .sort-indicator {
+    position: absolute;
+    right: var(--space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.3;
+    transition: all var(--transition-fast);
+    font-size: 0.8rem;
+    color: var(--neutral-500);
+}
+.c-table thead th.sortable:hover .sort-indicator { opacity: 0.6; }
+.c-table thead th.sortable.sort-asc .sort-indicator,
+.c-table thead th.sortable.sort-desc .sort-indicator { opacity: 1; color: var(--primary-600); }
+.c-table thead th.sortable.sort-asc .sort-indicator { transform: translateY(-50%) rotate(0deg); }
+.c-table thead th.sortable.sort-desc .sort-indicator { transform: translateY(-50%) rotate(180deg); }
+.sort-indicator i { display: block; transition: all var(--transition-fast); }
+.c-table thead th.sortable.sort-asc,
+.c-table thead th.sortable.sort-desc {
+    background: var(--primary-50);
+    color: var(--primary-800);
+    border-bottom-color: var(--primary-300);
+    font-weight: 700;
+}
+
+/* Body */
+.c-table tbody tr { transition: all var(--transition-fast); border-bottom: 1px solid var(--neutral-200); }
+.c-table tbody tr:hover { background: var(--neutral-50); box-shadow: var(--shadow-sm); }
+.c-table tbody tr.sample-selected,
+.c-table tbody tr.is-selected {
+    background: var(--primary-50) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2) !important;
+    border-color: var(--primary-300) !important;
+}
+.c-table tbody td { padding: var(--space-4); vertical-align: middle; border-bottom: 1px solid var(--neutral-200); white-space: nowrap; }
+
+/* Sticky selection column (checkbox column that stays put on horizontal scroll) */
+.c-table thead th.selection-column,
+.c-table .selection-column { width: 50px; text-align: center; position: sticky; left: 0; border-right: 1px solid var(--neutral-200); }
+.c-table thead th.selection-column { background: var(--neutral-100); }
+.c-table tbody td.selection-column { background: var(--surface-card); }
+.c-table thead th.selection-column::after,
+.c-table tbody td.selection-column::after {
+    content: ''; position: absolute; top: 0; right: -5px; bottom: 0; width: 5px;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.1), transparent);
+    opacity: 0; transition: opacity var(--transition-fast); pointer-events: none;
+}
+.c-table-wrap.is-scrolled .c-table thead th.selection-column::after,
+.c-table-wrap.is-scrolled .c-table tbody td.selection-column::after { opacity: 1; }
+.c-table tbody tr:hover td.selection-column { background: var(--neutral-50); }
+
+/* Row-select checkbox */
+.sample-select {
+    width: 18px; height: 18px;
+    accent-color: var(--primary-600);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+.sample-select:hover { transform: scale(1.1); }
+
+/* Mobile sort-indicator spacing */
+@media (max-width: 768px) {
+    .c-table thead th.sortable { padding-right: calc(var(--space-3) + 16px); }
+    .c-table .sort-indicator { right: var(--space-2); font-size: 0.7rem; }
+}
+
+/* Monospace cell (demand IDs, commands, timestamps) */
+.cell-mono { font-family: var(--font-family-mono); font-size: 0.8rem; }
+
+/* Generic field-cell helpers (used by JS-rendered rows) */
+.c-table td.field-fastq_name { font-weight: 600; color: var(--primary-700); word-break: break-word; min-width: 150px; max-width: 500px; white-space: normal; }
+.c-table td.field-command { white-space: normal; min-width: 150px; word-break: break-word; }
+.c-table td.field-command code,
+.c-table td .text-wrap code { font-family: var(--font-family-mono); font-size: 0.8rem; color: var(--neutral-700); }
+
+/* ============================================================ COPY CELL */
+/* Click-to-copy cell with ripple + copied pulse (one definition, was duplicated
+   in job-monitor.css and inline in failed_jobs.html). Drive with copyCell.js. */
+.copy-cell {
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+    transition: background var(--transition-fast);
+}
+.copy-cell:hover  { background: rgba(0, 0, 0, 0.04); }
+.copy-cell:active { background: rgba(0, 0, 0, 0.08); }
+.copy-cell.copied { background: rgba(16, 185, 129, 0.12); animation: copy-pulse 0.5s ease; }
+.copy-cell .text-monospace {
+    position: relative;
+    display: inline-block;
+    padding-right: 24px;
+    font-family: var(--font-family-mono);
+    color: var(--primary-600);
+    transition: color var(--transition-fast);
+}
+.copy-cell:hover .text-monospace { color: var(--primary-700); }
+/* Clipboard icon that fades in on hover, turns to a check when copied */
+.copy-cell .text-monospace::after {
+    content: "\F4CB";
+    font-family: "bootstrap-icons";
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    color: var(--neutral-500);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+.copy-cell:hover .text-monospace::after { opacity: 0.7; }
+.copy-cell.copied .text-monospace::after { content: "\F26E"; color: var(--success-600); opacity: 1; }
+
+.copy-cell .ripple {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(37, 99, 235, 0.3);
+    transform: scale(0);
+    animation: ripple 0.6s linear;
+    pointer-events: none;
+}
+
+@keyframes ripple    { to { transform: scale(4); opacity: 0; } }
+@keyframes copy-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+
+/* ============================================================ PAGINATION */
+.c-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+}
+.c-pagination__nav { display: flex; align-items: center; gap: var(--space-1); }
+.c-pagination .page-nav {
+    width: 34px; height: 34px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+.c-pagination .page-nav:hover:not(:disabled) { background: var(--primary-50); color: var(--primary-600); border-color: var(--primary-300); }
+.c-pagination .page-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+.c-pagination .page-indicator { margin: 0 var(--space-3); font-size: var(--font-size-sm); color: var(--text-secondary); }
+.c-pagination__controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.c-pagination .goto-page-input { width: 60px; text-align: center; }
+.c-pagination .pagination-info { font-size: var(--font-size-sm); color: var(--text-muted); white-space: nowrap; }
+
+/* ============================================================ FILTER BAR */
+.c-filter-bar {
+    background: var(--surface-muted);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+/* ============================================================ TOGGLE SWITCH */
+/* Two-label pill toggle (Local / All, etc.). Variant color via --toggle-accent. */
+.c-toggle { position: relative; width: 96px; user-select: none; font-family: var(--font-family-sans); --toggle-accent: var(--error-500); }
+.c-toggle__checkbox { position: absolute; opacity: 0; pointer-events: none; }
+.c-toggle__label {
+    display: flex; align-items: center; justify-content: space-between;
+    border-radius: var(--radius-full);
+    background: var(--toggle-accent);
+    height: 28px; width: 96px; margin: 0; padding: 0;
+    cursor: pointer; position: relative;
+    font-size: var(--font-size-base); font-weight: 500; color: #fff;
+    transition: background var(--transition-fast);
+}
+.c-toggle__label span {
+    flex: 1 1 0; text-align: center; z-index: 2;
+    transition: color var(--transition-fast), font-weight var(--transition-fast), opacity var(--transition-fast);
+    line-height: 28px; font-size: var(--font-size-sm); letter-spacing: 0.01em;
+    color: #fff; opacity: 0.85; font-weight: 500;
+}
+.c-toggle__label:after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 44px; height: 24px; background: #fff; border-radius: var(--radius-full);
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+.c-toggle__checkbox:checked + .c-toggle__label:after { transform: translateX(48px); }
+.c-toggle__checkbox:not(:checked) + .c-toggle__label .c-toggle__on,
+.c-toggle__checkbox:checked + .c-toggle__label .c-toggle__off { color: #fff; opacity: 0.85; font-weight: 500; }
+.c-toggle__checkbox:not(:checked) + .c-toggle__label .c-toggle__off,
+.c-toggle__checkbox:checked + .c-toggle__label .c-toggle__on { color: var(--toggle-accent); font-weight: 700; opacity: 1; }
+
+/* ============================================================ TOAST */
+.c-toast {
+    position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 250px;
+    border: none; border-radius: var(--radius-lg); font-weight: 500;
+}
+
+/* ============================================================ MODAL */
+.c-modal .modal-content { border: none; border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); }
+.c-modal .modal-header { border-bottom: 1px solid var(--border-default); }
+.c-modal .modal-header--primary { background: var(--grad-info); color: #fff; border-bottom: none; }
+.c-modal .modal-header--success { background: var(--grad-success); color: #fff; border-bottom: none; }
+.c-modal .modal-header--danger  { background: var(--grad-danger);  color: #fff; border-bottom: none; }
+
+/* ============================================================ GLOBAL ELEMENTS
+   App-wide element defaults folded in from the former style.css, retokenized.
+   These style bare Bootstrap elements (.btn, .form-control, .card, .table)
+   that pages still use directly; the .c-* components above are preferred. */
+
+/* Bootstrap .btn baseline (sizing/transition); Bootstrap variant colors apply */
+.btn {
+    padding: 0.5rem 1rem;
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    transition: var(--transition-fast);
+}
+
+/* Form controls (override Bootstrap -sm so inputs render at a consistent size) */
+.form-control,
+.form-select {
+    padding: 0.5rem 0.75rem;
+    font-size: var(--font-size-base);
+    line-height: 1.5;
+    border: 1px solid var(--input-border-color);
+    border-radius: var(--radius-md);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--input-focus-color);
+    box-shadow: var(--input-focus-shadow);
+}
+.form-label { font-weight: 500; margin-bottom: 0.25rem; }
+
+/* Bootstrap .card baseline (used by submit-modal + job-monitor action cards).
+   The .c-card component above is preferred for page chrome. */
+.card {
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+.card-header { background: var(--surface-muted); border-bottom: 1px solid var(--border-default); padding: var(--space-4); }
+.card-body { padding: var(--space-4); }
+
+/* Bare Bootstrap .table baseline — used by the submit-modal command tables
+   (.table.table-bordered) and any plain table. The main data tables use the
+   richer .c-table above. */
+.table { width: 100%; margin-bottom: 1rem; background: transparent; border-collapse: collapse; }
+.table thead th {
+    background: var(--table-header-bg);
+    border-bottom: 2px solid var(--table-border-color);
+    border-top: none;
+    color: var(--text-secondary);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: var(--font-size-sm);
+    letter-spacing: 0.025em;
+    white-space: nowrap;
+    text-align: left;
+    padding: var(--table-cell-padding);
+    vertical-align: bottom;
+}
+.table tbody td { padding: var(--table-cell-padding); border-top: 1px solid var(--table-border-color); border-bottom: none; vertical-align: middle; }
+.table tbody tr:hover { background: var(--table-hover-bg); transition: background-color var(--transition-fast); }
+/* Horizontal rules only (no cell grid) — replaces custom-table.css */
+.table th, .table td { border-left: none; border-right: none; }
+.table-bordered, .table-bordered th, .table-bordered td { border: none; }
+.table-bordered th, .table-bordered td { border-top: 1px solid var(--table-border-color); }
+.table-bordered thead th { border-bottom: 2px solid var(--table-border-color); border-top: none; }
+
+/* Select2 multi-select scroll fixes (used on the filters) */
+.select2-container--bootstrap4 .select2-selection--multiple { overflow-y: hidden !important; }
+.select2-container--bootstrap4 .select2-selection--multiple .select2-selection__rendered { overflow-y: auto; overflow-x: hidden; max-height: 68px; }
+.select2-container--bootstrap4 .select2-results { max-height: 200px; overflow-y: hidden !important; }
+.select2-container--bootstrap4 .select2-results__options { max-height: 200px; overflow-y: auto; }
+
+/* Bootstrap .pagination (the SSR list pagination, distinct from .c-pagination) */
+.pagination { margin-top: 1rem; }
+.pagination .page-item.active .page-link { background: var(--primary-600); border-color: var(--primary-600); }
+.pagination .page-link { color: var(--text-secondary); border: none; padding: 0.5rem 0.75rem; margin: 0 0.25rem; border-radius: var(--radius-sm); }
+.pagination .page-link:hover { background: var(--surface-muted); color: var(--primary-600); }
+
+@media (max-width: 768px) {
+    .table-responsive { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}

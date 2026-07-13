@@ -1,0 +1,14 @@
+{% comment %}
+Reusable "no rows" state for a table body.
+Params:
+  colspan - number of table columns (required)
+  message - text to show (required)
+  icon    - optional Bootstrap Icons class (default bi-info-circle-fill)
+{% endcomment %}
+<tr>
+    <td colspan="{{ colspan }}" class="text-center">
+        <div class="alert alert-info mb-0">
+            <i class="bi {{ icon|default:'bi-info-circle-fill' }} me-2"></i>{{ message }}
+        </div>
+    </td>
+</tr>

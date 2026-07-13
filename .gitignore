@@ -57,5 +57,19 @@ tests/scripts/
 data/
 logs/*.log
 
+# Local curl cookie jars
+cookies.txt
+csrf_cookies.txt
+
+# Pipeline command audit logs (runtime artifacts)
+pipeline_command_logs/
+
 # Exclude staticfiles in debug
-staticfiles/ viewer/static/viewer/js/trash.js
+staticfiles/
+
+# Editor/test/backup artifacts
+*.backup
+.pytest_cache/
+
+# Local data snapshots — NOT a backup strategy; keep real backups outside the repo
+backup_files/

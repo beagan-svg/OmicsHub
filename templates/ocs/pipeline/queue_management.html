@@ -1,0 +1,344 @@
+{% extends "ocs/base.html" %}
+{% load static %}
+
+{% block title %}Queue Management{% endblock %}
+
+{% block body_class %}application-body queue-page{% endblock %}
+
+{% block container_start %}
+<div class="container-fluid mt-4" data-is-superuser="{{ user.is_superuser|yesno:'true,false' }}">
+    {% endblock %}
+
+    {% block extra_css %}
+    <style>
+        /* Page-specific only: the live queue page's bespoke bits. All chrome
+           (cards, table, buttons, badges, modals, pagination) comes from
+           tokens.css + components.css. */
+        #auto-process-countdown { font-variant-numeric: tabular-nums; color: var(--primary-600); }
+
+        #toast-container {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .toast { min-width: 300px; text-align: center; margin-bottom: 0.5rem; }
+        .toast:last-child { margin-bottom: 0; }
+        .toast .toast-body { display: flex; justify-content: center; align-items: center; }
+
+        /* Next-in-queue panel */
+        #next-job-info { transition: var(--transition-normal); }
+        #next-job-info:hover { background: var(--neutral-100) !important; box-shadow: var(--shadow-sm); }
+        #next-job-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #next-job-command { white-space: pre-wrap; word-break: break-all; }
+        #next-job-type {
+            background: var(--grad-neutral) !important; color: #fff !important; border: none !important;
+            border-radius: var(--radius-md) !important; padding: 0.25rem 0.5rem !important;
+            font-size: 0.65rem !important; font-weight: 500 !important; text-transform: uppercase !important;
+            letter-spacing: 0.05em !important; line-height: 1.2 !important;
+        }
+
+        /* Live-table cells produced by queue-management.js */
+        .fastq-name-cell { font-weight: 600; font-size: 0.95rem; color: var(--text-primary); }
+        .owner-cell { font-size: var(--font-size-sm); color: var(--text-secondary); }
+        .command-text { font-size: var(--font-size-sm); color: var(--neutral-700); line-height: 1.5; word-break: break-word; white-space: normal; display: block; }
+        #queue-table th:nth-child(1), #queue-table td:nth-child(1) { width: 1%; text-align: center; }
+        #queue-table .form-check { display: flex; justify-content: center; align-items: center; margin: 0; padding: 0; }
+        #queue-table .form-check-input { margin: 0; position: static; }
+        .actions-container { display: flex; align-items: center; justify-content: center; gap: var(--space-1); }
+        .move-up-btn, .move-down-btn { padding: 0.25rem 0.5rem; font-size: var(--font-size-xs); }
+        .move-up-btn:disabled, .move-down-btn:disabled { opacity: 0.3; }
+    </style>
+    {% endblock %}
+
+    {% block content %}
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="c-card">
+                <div class="c-card__header c-card__header--primary">
+                    {% include "ocs/partials/card_title.html" with icon="bi-list-task" title="Pipeline Queue Management" only %}
+                    <div>
+                        <a href="{% url 'ocs:job_monitor' %}" class="c-btn c-btn--light me-2">
+                            <i class="bi bi-arrow-left"></i> Back to Monitor
+                        </a>
+                        <a href="{% url 'ocs:pipeline_checkout' %}" class="c-btn c-btn--light">
+                            <i class="bi bi-house"></i> Pipeline Checkout
+                        </a>
+                    </div>
+                </div>
+                <div class="c-card__body">
+                    <p class="lead mb-0">
+                        Shared execution queue for alignment and post-QC processing.
+                        Jobs are submitted automatically by the backend processor.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Next-in-queue (everyone) + Controls (superuser only) -->
+    <div class="row mb-4">
+        <div class="{% if user.is_superuser %}col-md-6{% else %}col-12{% endif %} mb-4 mb-md-0">
+            <div class="c-card h-100">
+                <div class="c-card__header c-card__header--primary">
+                    {% include "ocs/partials/card_title.html" with icon="bi-hourglass-split" title="Next In Queue" only %}
+                </div>
+                <div class="c-card__body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="text-muted mb-0">Next auto-submit in</h6>
+                        <h3 id="auto-process-countdown" class="mb-0 fw-bold">--:--</h3>
+                    </div>
+                    <div id="next-job-container">
+                        <div id="next-job-info" class="p-3 border rounded bg-light">
+                            <div class="d-flex justify-content-between">
+                                <span id="next-job-badge" class="status-badge status-pending">Ready</span>
+                                <span id="next-job-type" class="badge bg-secondary">Alignment</span>
+                            </div>
+                            <h6 id="next-job-name" class="mb-2">Loading...</h6>
+                            <p id="next-job-command" class="text-muted small mb-0"
+                                style="max-height: 60px; overflow: hidden; text-overflow: ellipsis;">
+                                Command will appear here
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if user.is_superuser %}
+        <div class="col-md-6">
+            <div class="c-card h-100">
+                <div class="c-card__header c-card__header--primary">
+                    {% include "ocs/partials/card_title.html" with icon="bi-sliders" title="Queue Controls" only %}
+                </div>
+                <div class="c-card__body">
+                    <div class="row row-cols-2 g-2">
+                        <div class="col">
+                            <button class="btn btn-primary w-100" id="process-queue-btn">
+                                <i class="bi bi-play-fill me-1"></i> Process Now
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button class="btn btn-warning w-100" id="pause-queue-btn">
+                                <i class="bi bi-pause-fill me-1"></i> Pause
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button class="btn btn-success w-100" id="resume-queue-btn">
+                                <i class="bi bi-play-circle me-1"></i> Resume
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button class="btn btn-secondary w-100" id="stop-queue-btn">
+                                <i class="bi bi-stop-fill me-1"></i> Stop
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button class="btn btn-info text-white w-100" id="reset-queue-btn">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Reset
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button class="btn btn-danger w-100" id="clear-queue-btn">
+                                <i class="bi bi-trash me-1"></i> Clear Queue
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label for="interval-input" class="form-label mb-1">
+                            Auto-submit interval (minutes)
+                        </label>
+                        <div class="input-group input-group-sm" style="max-width: 240px;">
+                            <input type="number" class="form-control" id="interval-input" min="1" max="60"
+                                value="3">
+                            <button class="btn btn-outline-primary" id="save-interval-btn">Save</button>
+                        </div>
+                    </div>
+                    <p class="text-muted small mb-0 mt-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        While the queue is <strong>Running</strong>, the backend submits one job each time
+                        the timer reaches zero. Pause and Stop halt submission; Reset re-queues stuck jobs.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Queue Card -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="c-card">
+                <div class="c-card__header c-card__header--primary">
+                    {% include "ocs/partials/card_title.html" with icon="bi-hourglass" title="Job Queue" count=0 badge_id="queue-count" only %}
+                    <div class="d-flex align-items-center">
+                        <button class="c-btn c-btn--danger me-3" id="remove-selected-btn"
+                            title="Remove selected (your own jobs)">
+                            <i class="bi bi-trash"></i> Remove Selected
+                        </button>
+                        <button class="c-btn-icon" id="refresh-queue-btn" title="Refresh Queue">
+                            <i class="bi bi-arrow-repeat refresh-icon"></i>
+                            <span class="spinner-border spinner-border-sm d-none refresh-spinner" role="status"
+                                aria-hidden="true"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="c-card__body">
+                    <div class="c-table-wrap">
+                        <table class="c-table" id="queue-table">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="selectAll">
+                                        </div>
+                                    </th>
+                                    <th>FASTQ Name</th>
+                                    <th>Owner</th>
+                                    <th>Command</th>
+                                    <th>Status</th>
+                                    <th>Queued At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="queue-body">
+                                <tr>
+                                    <td colspan="7" class="text-center">Loading queue data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-light">
+                    <div class="c-pagination">
+                        <!-- Pagination navigation -->
+                        <div class="pagination-navigation c-pagination__nav">
+                            <a href="#" class="page-nav" id="first-page-btn" title="First page">
+                                <i class="bi bi-chevron-double-left"></i>
+                            </a>
+                            <a href="#" class="page-nav ms-1" id="prev-page-btn" title="Previous page">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+
+                            <span class="page-indicator mx-2">
+                                <span class="current-page" id="current-page">1</span>
+                                <span class="text-muted">/</span>
+                                <span class="total-pages" id="total-pages">1</span>
+                            </span>
+
+                            <a href="#" class="page-nav me-1" id="next-page-btn" title="Next page">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                            <a href="#" class="page-nav" id="last-page-btn" title="Last page">
+                                <i class="bi bi-chevron-double-right"></i>
+                            </a>
+                        </div>
+
+                        <div class="c-pagination__controls">
+                            <!-- Rows per page selector -->
+                            <div class="pagination-control d-flex align-items-center me-3">
+                                <label for="rowsPerPageDropdown" class="text-muted me-2 mb-0">Rows per page:</label>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-3" type="button"
+                                        id="rowsPerPageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                        10
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end pagination-dropdown"
+                                        aria-labelledby="rowsPerPageDropdown">
+                                        <li><a class="dropdown-item active" href="#" data-value="10">10</a></li>
+                                        <li><a class="dropdown-item" href="#" data-value="25">25</a></li>
+                                        <li><a class="dropdown-item" href="#" data-value="50">50</a></li>
+                                        <li><a class="dropdown-item" href="#" data-value="100">100</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Go to page input -->
+                            <div class="goto-page d-flex align-items-center me-3">
+                                <form id="gotoPageForm" class="d-flex align-items-center">
+                                    <label for="gotoPage" class="text-muted me-2 mb-0">Go to:</label>
+                                    <input type="number" id="gotoPage" name="page"
+                                        class="form-control form-control-sm goto-page-input" min="1" max="1" value="1">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary ms-1 goto-btn">
+                                        <i class="bi bi-arrow-right"></i>
+                                    </button>
+                                </form>
+                            </div>
+
+                            <span class="text-muted pagination-info" id="pagination-info">Results 0-0 of 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Clear Queue Modal (superuser) -->
+    <div class="modal fade c-modal" id="confirmClearModal" tabindex="-1" aria-labelledby="confirmClearModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header modal-header--danger">
+                    <h5 class="modal-title" id="confirmClearModalLabel">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        Confirm Clear Queue
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to clear all items from the queue?</p>
+                    <p class="text-danger mb-0"><strong>This action cannot be undone.</strong></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmClearBtn">
+                        <i class="bi bi-trash me-1"></i>
+                        Clear Queue
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Remove Selected Modal -->
+    <div class="modal fade c-modal" id="confirmRemoveSelectedModal" tabindex="-1"
+        aria-labelledby="confirmRemoveSelectedModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header modal-header--warning">
+                    <h5 class="modal-title" id="confirmRemoveSelectedModalLabel">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        Confirm Remove Selected Items
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="selected-items-summary">
+                        <!-- Content will be filled by JavaScript -->
+                    </div>
+                    <p class="mt-3 mb-0">Are you sure you want to remove these items from the queue?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning" id="confirmRemoveSelectedBtn">
+                        <i class="bi bi-trash me-1"></i>
+                        Remove Selected
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    {% endblock %}
+
+    {% block extra_scripts %}
+    <script src="{% static 'ocs/js/queue-management.js' %}"></script>
+    {% endblock %}

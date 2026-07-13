@@ -1,0 +1,195 @@
+{% extends "ocs/base.html" %}
+{% load static %}
+
+{% block title %}Sign In - OCS Database{% endblock %}
+
+{% block body_class %}auth-body{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block container_start %}{% endblock %}
+{% block container_end %}{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-icon">
+                <i class="bi bi-shield-lock-fill"></i>
+            </div>
+            <h1 class="auth-title">Welcome Back</h1>
+            <p class="auth-subtitle">Sign in to access your OCS Database</p>
+        </div>
+
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            <i
+                class="bi bi-{% if message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'success' %}check-circle{% else %}info-circle{% endif %} me-2"></i>
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <form method="post" class="auth-form">
+            {% csrf_token %}
+
+            <div class="form-floating">
+                <input type="text" class="form-control" id="username" name="username" placeholder="Username" required
+                    autocomplete="username">
+                <label for="username">
+                    <i class="bi bi-person me-2"></i>Username
+                </label>
+            </div>
+
+            <div class="form-floating">
+                <input type="password" class="form-control" id="password" name="password" placeholder="Password"
+                    required autocomplete="current-password">
+                <label for="password">
+                    <i class="bi bi-key me-2"></i>Password
+                </label>
+            </div>
+
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="remember_me" name="remember_me">
+                <label class="form-check-label" for="remember_me">
+                    <i class="bi bi-clock-history me-2"></i>Remember me for 2 weeks
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-auth w-100">
+                <i class="bi bi-box-arrow-in-right me-2"></i>
+                Sign In
+            </button>
+        </form>
+
+        <div class="auth-links">
+            <p class="mb-3">
+                <a href="{% url 'password_reset' %}">
+                    <i class="bi bi-key me-1"></i>Forgot your password?
+                </a>
+            </p>
+            <p class="mb-0">
+                Don't have an account?
+                <a href="{% url 'register' %}">
+                    <i class="bi bi-person-plus me-1"></i>Create Account
+                </a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Floating particles animation -->
+<div class="floating-elements"
+    style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1;">
+    <div class="floating-element"
+        style="position: absolute; top: 20%; left: 10%; width: 60px; height: 60px; background: rgba(255,255,255,0.1); border-radius: 50%; animation: float 6s ease-in-out infinite;">
+    </div>
+    <div class="floating-element"
+        style="position: absolute; top: 60%; right: 15%; width: 80px; height: 80px; background: rgba(255,255,255,0.08); border-radius: 50%; animation: float 8s ease-in-out infinite reverse;">
+    </div>
+    <div class="floating-element"
+        style="position: absolute; bottom: 30%; left: 20%; width: 40px; height: 40px; background: rgba(255,255,255,0.12); border-radius: 50%; animation: float 7s ease-in-out infinite;">
+    </div>
+</div>
+
+<style>
+    @keyframes float {
+
+        0%,
+        100% {
+            transform: translateY(0px) rotate(0deg);
+        }
+
+        33% {
+            transform: translateY(-20px) rotate(5deg);
+        }
+
+        66% {
+            transform: translateY(10px) rotate(-3deg);
+        }
+    }
+
+    .floating-element {
+        backdrop-filter: blur(5px);
+    }
+
+    .auth-form {
+        position: relative;
+    }
+
+    /* Enhanced form animations */
+    .form-floating {
+        position: relative;
+        transition: transform 0.2s ease;
+    }
+
+    .form-floating:hover {
+        transform: translateY(-1px);
+    }
+
+    .form-control {
+        transition: all 0.3s ease;
+    }
+
+    .form-control:focus {
+        transform: translateY(-1px);
+    }
+
+    /* Loading state for submit button */
+    .btn-auth:active {
+        transform: scale(0.98);
+    }
+
+    /* Pulse animation for icons */
+    .auth-icon {
+        animation: iconPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes iconPulse {
+
+        0%,
+        100% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.05);
+        }
+    }
+
+    /* Smooth entrance animation */
+    .auth-card {
+        animation: slideInUp 0.6s ease-out;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Enhanced alert styling */
+    .alert {
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* Focus ring enhancement */
+    .form-control:focus {
+        box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25), 0 8px 16px rgba(37, 99, 235, 0.1);
+    }
+
+    /* Checkbox enhancement */
+    .form-check-input:focus {
+        box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
+    }
+</style>
+{% endblock %}

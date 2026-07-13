@@ -1,0 +1,16 @@
+{% comment %}
+Reusable loading state for a table body (replaced by AJAX data).
+Params:
+  colspan - number of table columns (required)
+  message - text to show (required)
+{% endcomment %}
+<tr>
+    <td colspan="{{ colspan }}" class="text-center py-5">
+        <div class="d-flex flex-column align-items-center">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <div class="text-muted"><i class="bi bi-database me-2"></i>{{ message }}</div>
+        </div>
+    </td>
+</tr>
