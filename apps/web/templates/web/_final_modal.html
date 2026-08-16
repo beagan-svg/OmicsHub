@@ -1,0 +1,110 @@
+{% comment %}
+Step 2: the exact commands that will run, and who OCS notifies. Nothing is queued until this
+form is submitted.
+
+This is the product's whole thesis in one panel — nothing runs that has not been read first —
+so the commands are the content here, not a detail behind a disclosure.
+{% endcomment %}
+<div class="modal fade" id="final-modal" {% if has_unsaved_choices %}data-has-edits="true"{% endif %} tabindex="-1" aria-labelledby="final-modal-label" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      {% include "web/_discard_confirm.html" with id_prefix="final" %}
+      <form method="post" action="{% url 'web:submit-confirm' %}">
+        {% csrf_token %}
+        {% comment %}
+        include_overrides carries the per-sample edits made in the submit modal, which are
+        not otherwise represented on this step — the commands below are rendered text, not
+        form fields, so without these the confirm would re-plan from the config alone and
+        silently discard every edit the user just made.
+        {% endcomment %}
+        {% include "web/_submission_fields.html" with include_overrides=True %}
+
+        <div class="modal-header">
+          <h2 class="modal-title h2" id="final-modal-label">Confirm Submission</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <p class="text-secondary">
+            These are the exact commands that will be queued. The worker submits them one at
+            a time, waiting each command's spacing in between.
+          </p>
+
+          <div class="mb-3">
+            <label class="form-label" for="global-notification-email">Notification Email</label>
+            <input type="email" class="form-control" id="global-notification-email" name="email"
+                   value="{{ submission.email }}" required>
+            <div class="form-text">
+              OCS notifies this address on failure. Changing it rebuilds the commands below on submit.
+            </div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="card-header">
+              <span>Alignment Commands <span class="count">{{ align_entries|length }}</span></span>
+            </div>
+            <div class="card-body" id="final-alignment-commands">
+              {% for entry in align_entries %}
+                <div class="mb-3">
+                  <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <span class="mono">{{ entry.sample.fastq_name }}</span>
+                    <span class="tag">{{ entry.command_config_name }}</span>
+                    {% if entry.edited %}<span class="state" data-state="warn">edited</span>{% endif %}
+                    <span class="text-secondary">waits {{ entry.spacing }}s before the next</span>
+                  </div>
+                  <div class="command">{{ entry.command }}</div>
+                </div>
+              {% empty %}
+                <div class="text-secondary">No alignment commands.</div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span>Post-alignment Commands <span class="count">{{ postalign_entries|length }}</span></span>
+            </div>
+            <div class="card-body" id="final-postqc-commands">
+              {% for entry in postalign_entries %}
+                <div class="mb-3">
+                  <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <span class="mono">{{ entry.sample.fastq_name }}</span>
+                    <span class="tag">{{ entry.command_config_name }}</span>
+                    {% if entry.edited %}<span class="state" data-state="warn">edited</span>{% endif %}
+                    <span class="text-secondary">waits {{ entry.spacing }}s before the next</span>
+                  </div>
+                  <div class="command">{{ entry.command }}</div>
+                </div>
+              {% empty %}
+                <div class="text-secondary">No post-QC commands.</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          {% comment %}
+          Back to step 1. This is the last screen before real compute is queued, so the only
+          way out of it should not be to abandon the submission and rebuild it: someone who
+          reads a command here and wants a different reference needs the editor, not Cancel.
+
+          It posts this form at the review step rather than being a link, which is what
+          carries the choices back — the hidden fields above hold every edit made so far, so
+          step 1 re-renders with them rather than re-planning from the config. `formnovalidate`
+          because going back must not be blocked by the email field's own validation.
+          {% endcomment %}
+          <button type="submit" class="btn btn-outline-secondary me-auto" id="back-to-review"
+                  formaction="{% url 'web:submit-review' %}" formnovalidate>
+            <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to commands
+          </button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="confirm-submit"
+                  {% if not plan.entries %}disabled{% endif %}>
+            <i class="bi bi-check2" aria-hidden="true"></i>
+            Queue {{ plan.entries|length }} job{{ plan.entries|length|pluralize }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

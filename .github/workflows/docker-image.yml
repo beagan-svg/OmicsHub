@@ -1,0 +1,75 @@
+# Build the image on every pull request, so a Dockerfile that no longer builds is found
+# here rather than during a release.
+#
+# Nothing is pushed. The point is only "does this still build" — and it catches the things
+# the test job cannot: a dependency with no wheel for linux/amd64, a lock file that no
+# longer resolves, a COPY of a path that .dockerignore now excludes.
+name: Docker image
+
+on:
+  pull_request:
+
+concurrency:
+  group: docker-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # For when vendor/gcs becomes a submodule, which is what scripts/vendor_gcs.sh
+          # says it is on its way to being. Harmless until then.
+          submodules: recursive
+
+      - name: Check the build context is complete
+        id: context
+        # The image installs the `ocs` CLI from vendor/gcs/, and .gitignore excludes
+        # vendor/ — those packages live in a separate genomics-cloud-services checkout and
+        # are copied in by scripts/vendor_gcs.sh before a local build. A runner has no such
+        # checkout, so on a clean clone there is nothing to build against.
+        #
+        # Reported as a skip with a notice rather than a red X, because a failure here would
+        # say "the Dockerfile is broken" on every single pull request when the Dockerfile is
+        # fine and the sources are simply not in the repository. A misleading permanent
+        # failure is worse than an honest skip: people stop reading it.
+        run: |
+          if [ -f vendor/gcs/gcs-cli/pyproject.toml ]; then
+            echo "buildable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "buildable=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipped: vendor/gcs is not in the repository, so the image cannot be built here. Make it a git submodule (see scripts/vendor_gcs.sh) to turn this job on."
+            {
+              echo "### Docker image build skipped"
+              echo
+              echo "\`vendor/gcs/\` is not present in a clean clone — \`.gitignore\` excludes"
+              echo "\`vendor/\`, and the \`ocs\` CLI packages are copied in from a separate"
+              echo "checkout by \`scripts/vendor_gcs.sh\`."
+              echo
+              echo "Until those packages are reachable from the repository — as a git"
+              echo "submodule, or published to an index the runner can install from — this"
+              echo "job cannot verify the Dockerfile, and the image is only ever built on"
+              echo "a developer's machine."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Set up Buildx
+        if: steps.context.outputs.buildable == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        if: steps.context.outputs.buildable == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          # linux/amd64 only: it is what the deployment runs, and building the arm64 variant
+          # as well would double the slowest job here to check a platform nothing uses.
+          platforms: linux/amd64
+          # The dependency layer is minutes of wheel downloads and a few sdist compiles, and
+          # it only changes when pyproject.toml or requirements.lock does. Caching it across
+          # runs is the difference between this job being worth having and being resented.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

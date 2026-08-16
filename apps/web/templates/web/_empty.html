@@ -1,0 +1,16 @@
+{% comment %}
+One empty state, used by every table in the product. Expects `icon` and `title`; `hint` and
+an `action_url`/`action_label` pair are optional.
+
+An empty region has to answer which of two things happened — there is nothing here yet, or
+the filters excluded everything — and offer the way out. Five ad-hoc empty states were five
+different answers to that question.
+{% endcomment %}
+<div class="empty">
+  <i class="bi bi-{{ icon|default:'inbox' }}" aria-hidden="true"></i>
+  <p class="empty__title">{{ title }}</p>
+  {% if hint %}<p class="empty__hint">{{ hint }}</p>{% endif %}
+  {% if action_url %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ action_url }}">{{ action_label }}</a>
+  {% endif %}
+</div>

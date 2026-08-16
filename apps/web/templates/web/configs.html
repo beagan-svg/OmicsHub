@@ -1,0 +1,87 @@
+{% extends "web/base.html" %}
+
+{% block title %}Configs — OmicsHub{% endblock %}
+
+{% block page_head %}
+<div class="page-head">
+  <div class="page-head__text">
+    <h1>Configs</h1>
+    <p class="page-head__desc">
+      The config decides the reference, chemistry and command for every sample, based on its
+      workflow and library prep method. One is active at a time, and that is the one every
+      submission is built from.
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+  <div class="card-header">
+    <span><i class="bi bi-upload" aria-hidden="true"></i> Upload a Config</span>
+  </div>
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data" class="row g-2 align-items-center">
+      {% csrf_token %}
+      {% comment %}
+      The file input has no visible label — the panel header is the only thing naming it —
+      so it carries its own, or it announces as an unnamed "choose file" button.
+      {% endcomment %}
+      <div class="col-sm-6"><input type="file" name="file" accept=".json,.jsonc" class="form-control"
+                                   aria-label="Config file to upload" required></div>
+      <div class="col-auto"><button class="btn btn-primary" type="submit">Upload</button></div>
+      <div class="col text-secondary">
+        Parsed and checked on upload. Uploading does not activate it.
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <caption class="visually-hidden">
+        Uploaded pipeline configs, showing which one is active.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Name</th><th scope="col">Uploaded by</th>
+          <th scope="col">Uploaded</th><th scope="col">Status</th>
+          {# The actions column has no visible title; the label is what names it. #}
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for config in configs %}
+        <tr>
+          <td class="mono">{{ config.name }}</td>
+          <td class="text-secondary">{{ config.uploaded_by }}</td>
+          <td class="text-secondary">{{ config.uploaded_at|date:"Y-m-d H:i" }}</td>
+          <td>
+            {% if config.is_active %}
+              <span class="state" data-state="done">Active</span>
+            {% else %}
+              <span class="state" data-state="queued">Inactive</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            {% if not config.is_active %}
+            <form method="post" action="{% url 'web:activate-config' config.pk %}">
+              {% csrf_token %}
+              {# One "Activate" per row; the label says which config it activates. #}
+              <button class="btn btn-sm btn-outline-secondary" type="submit"
+                      aria-label="Activate {{ config.name }}">Activate</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5">
+          {% include "web/_empty.html" with icon="sliders" title="No configs yet." hint="Upload one to start submitting — nothing can be planned without an active config." %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

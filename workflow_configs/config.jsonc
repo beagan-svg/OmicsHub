@@ -1,0 +1,768 @@
+{
+  // Main configuration.
+  // Edit this file to add or change alignment and post-alignment commands.
+  //
+  // Alignment — workflows.<MODALITY>.alignment_command_configs
+  //   1. Add a config object with name, match, command, arguments, and spacing.
+  //   2. In match, set library_preps and optionally organisms.
+  //      Omit organisms to match any organism, or list specific names to restrict.
+  //   3. Put more specific configs before general ones — first match wins.
+  //
+  // Post-alignment QC — workflows.<MODALITY>.post_alignment_command_configs
+  //   1. Add a config object with name, match, command, arguments, and spacing.
+  //   2. In match, set library_preps to the specific library preps that run QC.
+  //   3. Put more specific configs before general ones — first match wins.
+  //
+  // Argument values support these placeholders:
+  // - {reference_name}
+  // - {input_name}: the selected load or FASTQ name
+  // - {input_name_flag}: "load-names" or "fastq-names", used to form the matching CLI flag
+  // - {load_name}
+  // - {email}
+  // - {chemistry}
+  // - {probe_set}
+  // - {execution_vcpus}
+  "references": {
+    "human": {
+      "RTX": "human_10x_grch38_genome_star2.7.1a",
+      "MTX": "human_10x_grch38_genome_star2.7.1a",
+      "RFX": "human_10x_grch38-2024-a_probe-genome_cr-v9-0-0"
+    },
+    "mouse": {
+      "MTX": "mouse_10x_mm10_genome_star2.7.1a",
+      "RTX": "mouse_10x_mm10_genome_star2.7.1a",
+      "RFX": {
+        "library_preps": {
+          "10xV4_FX16": "mouse_10x_mm10-flex-custom-v1_probe-genome_cr9.0.1",
+          "10xV4_FX16-TK": "mouse_10x_mm10-flex-custom-v1_probe-genome_cr9.0.1",
+          "10xFXv2": "mouse_10x_grcm39-fx2v01_probe-genome_cr10.0.0"
+        }
+      }
+    },
+    "macaque | macaque_nemestrina | macaque_fascicularis": {
+      "RTX": "macaque_ncbi_mmul10_genome_star2.7.1a-1",
+      "MTX": "macaque_ncbi_mmul10_genome_star2.7.1a"
+    },
+    "african-green-monkey": {
+      "all": "african-green-monkey_ncbi_vero-who-p1-0_genomefixed_star2.7.1a"
+    },
+    "arctic-ground-squirrel": {
+      "all": "arctic-ground-squirrel_ncbi_asm342692v1_genome_star2.7.1a"
+    },
+    "armadillo": {
+      "all": "armadillo_ncbi_mdasnov1-hap2_genome_star2-7-1a"
+    },
+    "baboon": {
+      "all": "baboon_ncbi_panubis1-0_genome_star2.7.1a"
+    },
+    "capuchin": {
+      "all": "capuchin_ncbi_gsc-monkey-1-0_genome_star2.7.1a"
+    },
+    "cat": {
+      "all": "cat_ncbi_f-catus-fca126-mat1-0_genome_star2.7.1a"
+    },
+    "chimp": {
+      "all": "chimp_ncbi_mpantro3-v11_genome.fixed_star2.7.1a"
+    },
+    "dog": {
+      "all": "dog_ncbi_uu-cfam-gsd-1-0_genome_star2.7.1a"
+    },
+    "egyptian-fruit-bat": {
+      "all": "egyptian-fruit-bat_ncbi_mrouaeg1_genome.fixed_star2.7.1a"
+    },
+    "ferret": {
+      "all": "ferret_ncbi_asm1176430v1.1_genome_star2.7.1a"
+    },
+    "galago": {
+      "all": "galago_ncbi_otogar3_genome_star2.7.1a-1"
+    },
+    "gorilla": {
+      "all": "gorilla_ncbi_kamilah-ggo-v0_genome_star2.7.1a"
+    },
+    "gray-mouse-lemur": {
+      "all": "gray-mouse-lemur_ncbi_mmur-3-0_genome_star2.7.1a"
+    },
+    "harbor-porpoise | harbor_porpoise": {
+      "MTX": "harbor-porpoise_ncbi_mphopho1-1_genome_star2.7.1a",
+      "RTX": "harbor-porpoise_ncbi_mphopho1-1_genome_cr-v8-0-0"
+    },
+    "common-marmoset": {
+      "all": "marmoset_ncbi_caljac240-pri_genome_arc-v2-0"
+    },
+    "naked-mole-rat": {
+      "all": "naked-mole-rat_ncbi_hetgla-female-1-0_genome_star2.7.1a"
+    },
+    "opossum": {
+      "all": "opossum_ncbi_ommondom1_genome.fixed_star2.7.1a"
+    },
+    "owl-monkey": {
+      "all": "owl-monkey_ncbi_anan-2-0_genome_star2.7.1a"
+    },
+    "pig": {
+      "all": "pig_ncbi_sscrofa11.1_genome_star2.7.1a"
+    },
+    "rabbit": {
+      "all": "rabbit_ncbi_um-nzw-1.0_genome_star2.7.1a"
+    },
+    "rat": {
+      "all": "rat_ncbi_mratbn7.2_genome_star2.7.1a"
+    },
+    "south-american-squirrel-monkey": {
+      "all": "squirrel-monkey_ncbi_bcm.sbol.2.1_genome_star2.7.1a"
+    },
+    "treeshrew": {
+      "all": "treeshrew_ncbi_tupchi-1-0_genome_star2.7.1a"
+    }
+  },
+  "probe_sets_by_organism": {
+    "mouse": {
+      "10xV4_FX4": "mouse_10x_mm10-egfp-mscarlet-vbc_chromium_v1.1_cellflex_probe_set",
+      "10xV4_FX16": "mouse_10x_mm10-flex-custom-v1_chromium_v1.1_cellflex_probe_set",
+      "10xV4_FX16-TK": "mouse_10x_mm10-flex-custom-v1_chromium_v1.1_cellflex_probe_set",
+      "10xFXv2": "mouse_10x_grcm39-fx2v01_chromium_v2.0_cellflex_probe_set"
+    },
+    "human": "human_10x_grch38-2024-A_chromium_v2.0_cellflex_probe_set"
+  },
+  "chemistry_by_library_prep": {
+    "10xV3.1D": "SC3Pv3",
+    "10xRseq_Mult_noATAC": "ARC-v1",
+    "10xV3.1_HT": "SC3Pv3HT",
+    "10xV4": "SC3Pv4",
+    "10xV4-TK": "SC3Pv4",
+    "10Xv2": "SC3Pv2",
+    "10Xv3.1": "SC3Pv3"
+  },
+  "workflows": {
+    "MTX": {
+      "alignment_command_configs": [
+        {
+          "name": "10xMultX_GEX",
+          "match": {
+            "library_preps": [
+              "10xMultX_GEX"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "align",
+            "tenx-arc"
+          ],
+          "arguments": [
+            {
+              "flag": "--reference-names",
+              "value": "{reference_name}"
+            },
+            {
+              "flag": "--asset-name",
+              "value": "cellranger-arc"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "2.2.0"
+            },
+            {
+              "flag": "--load-names",
+              "value": "{load_name}"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "spacing": 180
+        },
+        {
+          "name": "standard",
+          "match": {
+            "library_preps": [
+              "10xRSeq_Mult"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "align",
+            "tenx-arc"
+          ],
+          "arguments": [
+            {
+              "flag": "--reference-names",
+              "value": "{reference_name}"
+            },
+            {
+              "flag": "--asset-name",
+              "value": "cellranger-arc"
+            },
+            {
+              "flag": "--load-names",
+              "value": "{load_name}"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "spacing": 180
+        }
+      ],
+      "post_alignment_command_configs": [
+        {
+          "name": "10xMultX_GEX",
+          "match": {
+            "library_preps": [
+              "10xMultX_GEX"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "postalign",
+            "tenx-arc"
+          ],
+          "arguments": [
+            {
+              "flag": "--asset-name",
+              "value": "10x_multiome_qc"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "1.0.1"
+            },
+            {
+              "flag": "--load-names",
+              "value": "{load_name}"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "spacing": 60
+        },
+        {
+          "name": "10xRSeq_Mult",
+          "match": {
+            "library_preps": [
+              "10xRSeq_Mult"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "postalign",
+            "tenx-arc"
+          ],
+          "arguments": [
+            {
+              "flag": "--asset-name",
+              "value": "10x_multiome_qc"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "1.0.0"
+            },
+            {
+              "flag": "--load-names",
+              "value": "{load_name}"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "spacing": 60
+        }
+      ]
+    },
+    "RTX": {
+      "alignment_command_configs": [
+        {
+          "name": "standard",
+          "match": {
+            "library_preps": [
+              "10xV3.1D",
+              "10xRseq_Mult_noATAC",
+              "10xV3.1_HT",
+              "10Xv3.1",
+              "10Xv3.1_LT",
+              "10Xv3",
+              "10Xv2"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "align",
+            "tenx-rnaseq"
+          ],
+          "arguments": [
+            {
+              "flag": "--reference-names",
+              "value": "{reference_name}"
+            },
+            {
+              "flag": "--asset-name",
+              "value": "cellranger-rnaseq"
+            },
+            {
+              "flag": "--{input_name_flag}",
+              "value": "{input_name}"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "latest"
+            },
+            {
+              "flag": "--cellranger-addopts",
+              "value": "--chemistry {chemistry} --include-introns"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "spacing": 180
+        },
+        {
+          "name": "multi",
+          "match": {
+            "library_preps": [
+              "10xV3.1_HT_CP"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "align",
+            "tenx-rnaseq-multi"
+          ],
+          "arguments": [
+            {
+              "flag": "--reference-names",
+              "value": "{reference_name}"
+            },
+            {
+              "flag": "--asset-name",
+              "value": "cellranger-multi"
+            },
+            {
+              "flag": "--{input_name_flag}",
+              "value": "{input_name}"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "latest"
+            },
+            {
+              "flag": "--cellranger-addopts",
+              "value": "--include-introns"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "spacing": 180
+        },
+        {
+          "name": "10xV4_PX",
+          "match": {
+            "library_preps": [
+              "10xV4_PX"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "align",
+            "tenx-rnaseq-multi"
+          ],
+          "arguments": [
+            {
+              "flag": "--reference-names",
+              "value": "{reference_name}"
+            },
+            {
+              "flag": "--asset-name",
+              "value": "cellranger-multi"
+            },
+            {
+              "flag": "--{input_name_flag}",
+              "value": "{input_name}"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "9.0.1"
+            },
+            {
+              "flag": "--cellranger-addopts",
+              "value": "--create-bam=TRUE"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "spacing": 180
+        },
+        {
+          "name": "10xV4",
+          "match": {
+            "library_preps": [
+              "10xV4",
+              "10xV4-TK"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "align",
+            "tenx-rnaseq"
+          ],
+          "arguments": [
+            {
+              "flag": "--reference-names",
+              "value": "{reference_name}"
+            },
+            {
+              "flag": "--asset-name",
+              "value": "cellranger-rnaseq"
+            },
+            {
+              "flag": "--{input_name_flag}",
+              "value": "{input_name}"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "8.0.1"
+            },
+            {
+              "flag": "--cellranger-addopts",
+              "value": "--chemistry {chemistry}"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "spacing": 180
+        },
+        {
+          "name": "10xV4_FX4",
+          "match": {
+            "library_preps": [
+              "10xV4_FX4",
+              "10xV4_FX4-cps"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "align",
+            "tenx-rnaseq-multi"
+          ],
+          "arguments": [
+            {
+              "flag": "--reference-names",
+              "value": "{reference_name}"
+            },
+            {
+              "flag": "--asset-name",
+              "value": "cellranger-multi"
+            },
+            {
+              "flag": "--{input_name_flag}",
+              "value": "{input_name}"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "9.0.1"
+            },
+            {
+              "flag": "--cellflex-probe-set-name",
+              "value": "{probe_set}"
+            },
+            {
+              "flag": "--cellranger-addopts",
+              "value": "--create-bam=true"
+            },
+            {
+              "flag": "--execution-vcpus",
+              "value": "{execution_vcpus}"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "execution_vcpus": 180,
+          "spacing": 180
+        }
+      ],
+      "post_alignment_command_configs": [
+        {
+          "name": "standard",
+          "match": {
+            "library_preps": [
+              "10xV3.1D",
+              "10xRseq_Mult_noATAC",
+              "10xV3.1_HT",
+              "10Xv3.1",
+              "10Xv3.1_LT",
+              "10Xv3",
+              "10Xv2",
+              "10xV3.1_HT_CP",
+              "10xV4_PX-placeholders",
+              "10xV4",
+              "10xV4-TK",
+              "10xV4_FX4",
+              "10xV4_FX4-cps"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "postalign",
+            "tenx-rnaseq"
+          ],
+          "arguments": [
+            {
+              "flag": "--asset-name",
+              "value": "tenx_rnaseq_qc"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "latest"
+            },
+            {
+              "flag": "--{input_name_flag}",
+              "value": "{input_name}"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "spacing": 60
+        }
+      ]
+    },
+    "RFX": {
+      "alignment_command_configs": [
+        {
+          "name": "10xV4_FX16",
+          "match": {
+            "library_preps": [
+              "10xV4_FX16",
+              "10xV4_FX16-TK"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "align",
+            "tenx-rnaseq-multi"
+          ],
+          "arguments": [
+            {
+              "flag": "--reference-names",
+              "value": "{reference_name}"
+            },
+            {
+              "flag": "--asset-name",
+              "value": "tenx-rnaseq-multi"
+            },
+            {
+              "flag": "--{input_name_flag}",
+              "value": "{input_name}"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "9.0.1"
+            },
+            {
+              "flag": "--cellflex-probe-set-name",
+              "value": "{probe_set}"
+            },
+            {
+              "flag": "--cellranger-addopts",
+              "value": "--create-bam=true"
+            },
+            {
+              "flag": "--execution-vcpus",
+              "value": "{execution_vcpus}"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "execution_vcpus": 180,
+          "spacing": 180
+        },
+        {
+          "name": "10xFXv2",
+          "match": {
+            "library_preps": [
+              "10xFXv2"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "align",
+            "tenx-rnaseq-multi"
+          ],
+          "arguments": [
+            {
+              "flag": "--reference-names",
+              "value": "{reference_name}"
+            },
+            {
+              "flag": "--asset-name",
+              "value": "tenx-rnaseq-multi"
+            },
+            {
+              "flag": "--{input_name_flag}",
+              "value": "{input_name}"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "10.0.0"
+            },
+            {
+              "flag": "--cellflex-probe-set-name",
+              "value": "{probe_set}"
+            },
+            {
+              "flag": "--cellranger-addopts",
+              "value": "--create-bam=true"
+            },
+            {
+              "flag": "--execution-vcpus",
+              "value": "{execution_vcpus}"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "execution_vcpus": 180,
+          "spacing": 180
+        }
+      ],
+      "post_alignment_command_configs": [
+        {
+          "name": "10xV4_FX16",
+          "match": {
+            "library_preps": [
+              "10xV4_FX16",
+              "10xV4_FX16-TK",
+              "10xFXv2"
+            ]
+          },
+          "command": [
+            "ocs",
+            "fastqs",
+            "postalign",
+            "tenx-rnaseq"
+          ],
+          "arguments": [
+            {
+              "flag": "--asset-name",
+              "value": "tenx_rnaseq_qc"
+            },
+            {
+              "flag": "--asset-tag",
+              "value": "latest"
+            },
+            {
+              "flag": "--{input_name_flag}",
+              "value": "{input_name}"
+            },
+            {
+              "flag": "--notify-on",
+              "value": "FAILED"
+            },
+            {
+              "flag": "--notify",
+              "value": "{email}"
+            }
+          ],
+          "spacing": 60
+        }
+      ]
+    }
+  },
+  "job_settings": {
+    "limit": 100,
+    // When the limit is reached, wait this many hours before re-checking capacity
+    // instead of skipping the job. Default 1.
+    "poll_interval_hours": 1
+  },
+  // List of literal OCS completed status labels.
+  "status_mappings": {
+    "ingest_complete": [
+      "INGEST_COMPLETE",
+      "COMPLETED",
+      "ARCHIVED"
+    ],
+    "alignment_complete": [
+      "COMPLETED",
+      "ARCHIVED"
+    ],
+    "post_alignment_complete": [
+      "COMPLETED",
+      "ARCHIVED"
+    ]
+  }
+}

@@ -1,0 +1,93 @@
+{% comment %}
+The column chooser: thirty-odd columns, so sections and a filter field rather than one flat
+checklist, and a fixed footer whose Apply stays disabled until something changes — which is
+also how the menu says there is an unsaved change.
+
+The inputs belong to #columns-form, which lives outside the submission form. HTML forbids
+nested forms, so without the form attribute the browser would attach them to the submission
+form and Apply would try to submit samples.
+{% endcomment %}
+<div class="dropdown column-menu">
+  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+          id="column-menu-toggle" data-bs-toggle="dropdown"
+          data-bs-auto-close="outside" data-bs-display="static" aria-expanded="false">
+    <i class="bi bi-layout-three-columns" aria-hidden="true"></i> Columns
+    <span class="count" data-column-count>{{ visible_column_keys|length }}</span>
+  </button>
+
+  {% comment %}
+  `data-bs-display="static"` on the trigger turns Popper off for this menu. Popper decides
+  placement before the panel's height is known and re-decides it on every scroll, and this
+  panel has to trade placement against height rather than pick one and live with it — so
+  the script on the dashboard places it instead. See `place()` there.
+  {% endcomment %}
+  <div class="dropdown-menu dropdown-menu-end column-menu__panel"
+       aria-labelledby="column-menu-toggle">
+    <div class="column-menu__head">
+      <div class="column-menu__search">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <label class="visually-hidden" for="column-filter">Filter the column list</label>
+        <input type="search" id="column-filter" class="form-control form-control-sm"
+               placeholder="Filter columns" autocomplete="off">
+      </div>
+      <div class="column-menu__meta">
+        {# aria-live so a screen reader hears the tally change as boxes are ticked. #}
+        <span data-column-summary aria-live="polite">
+          {{ visible_column_keys|length }} of {{ all_columns|length }} shown
+        </span>
+        <button type="button" class="column-menu__link" data-column-reset>Restore defaults</button>
+      </div>
+    </div>
+
+    <div class="column-menu__body" data-column-list>
+      {% for group in column_groups %}
+      <section class="column-menu__group" data-column-group>
+        <div class="column-menu__group-head">
+          <span class="label">{{ group.label }}</span>
+          <span class="column-menu__group-actions">
+            <button type="button" class="column-menu__link" data-column-all>All</button>
+            <span class="column-menu__link-sep" aria-hidden="true">·</span>
+            <button type="button" class="column-menu__link" data-column-none>None</button>
+          </span>
+        </div>
+        {% for column in group.columns %}
+          {% if column.key == locked_column %}
+          {% comment %}
+          Not a disabled checkbox: a checkbox you cannot move reads as a bug until you find
+          out why. The lock and the note say the reason on the line itself.
+          {% endcomment %}
+          <div class="column-option column-option--locked"
+               data-column-option data-column-label="{{ column.label|lower }}">
+            <i class="bi bi-lock-fill" aria-hidden="true"></i>
+            <span class="column-option__label">{{ column.label }}</span>
+            <span class="column-option__note">Always shown</span>
+            <input type="hidden" name="columns" value="{{ column.key }}" form="columns-form">
+          </div>
+          {% else %}
+          <label class="column-option"
+                 data-column-option data-column-label="{{ column.label|lower }}">
+            <input class="form-check-input" type="checkbox" name="columns"
+                   value="{{ column.key }}" form="columns-form"
+                   {% if column.key in visible_column_keys %}checked{% endif %}>
+            <span class="column-option__label">{{ column.label }}</span>
+          </label>
+          {% endif %}
+        {% endfor %}
+      </section>
+      {% endfor %}
+      <p class="column-menu__empty" data-column-empty hidden>No column matches that.</p>
+    </div>
+
+    {{ default_column_keys|json_script:"default-column-keys" }}
+
+    <div class="column-menu__foot">
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-column-cancel>
+        Cancel
+      </button>
+      <button class="btn btn-sm btn-primary" type="submit" form="columns-form"
+              data-column-apply disabled>
+        Apply
+      </button>
+    </div>
+  </div>
+</div>

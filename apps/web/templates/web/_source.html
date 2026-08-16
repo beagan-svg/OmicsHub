@@ -1,0 +1,14 @@
+{% comment %}
+Where a demand came from. The monitor reads the mirror, so it shows OCS work this app never
+asked for — submitted by hand, or by the tool this replaced. Saying which is which is the
+difference between "nobody queued that" and "somebody queued that somewhere else".
+
+Expects `queued_here`.
+{% endcomment %}
+{% if queued_here %}
+  <span class="tag">OmicsHub</span>
+{% else %}
+  <span class="tag" title="No queue entry here holds this demand id — it was submitted outside OmicsHub">
+    External
+  </span>
+{% endif %}

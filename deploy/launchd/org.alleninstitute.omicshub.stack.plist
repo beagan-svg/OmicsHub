@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Brings the compose stack up at login.
+
+  A LaunchAgent, not a LaunchDaemon: Docker Desktop runs inside a GUI login session, so a
+  root daemon starting at boot would find no Docker to talk to. The machine therefore has
+  to reach a logged-in desktop before the stack starts, which is the honest limitation of
+  running this on a Mac.
+
+  Nothing here supervises the four application processes. `restart: unless-stopped` in
+  compose.yaml already does that, and a second supervisor could start a second
+  worker-submissions — two consumers on that queue is how the same alignment gets
+  submitted twice.
+
+  Install (replace the path with this checkout's):
+
+      sed 's|__OMICSHUB_DIR__|/Users/you/path/to/omicshub|g' \
+        deploy/launchd/org.alleninstitute.omicshub.stack.plist \
+        > ~/Library/LaunchAgents/org.alleninstitute.omicshub.stack.plist
+      launchctl bootstrap gui/$UID ~/Library/LaunchAgents/org.alleninstitute.omicshub.stack.plist
+
+  Run it now without waiting for a login:  launchctl kickstart -p gui/$UID/org.alleninstitute.omicshub.stack
+  Stop it starting at login:               launchctl bootout gui/$UID/org.alleninstitute.omicshub.stack
+  What it did:                             tail -f __OMICSHUB_DIR__/logs/launchd-stack.log
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>org.alleninstitute.omicshub.stack</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__OMICSHUB_DIR__/deploy/launchd/start-stack.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__OMICSHUB_DIR__</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!--
+      One shot. The script returns as soon as compose reports the containers healthy, and
+      with KeepAlive set launchd would read that exit as a crash and start it again in a
+      loop.
+    -->
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>__OMICSHUB_DIR__/logs/launchd-stack.log</string>
+    <key>StandardErrorPath</key>
+    <string>__OMICSHUB_DIR__/logs/launchd-stack.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

@@ -1,0 +1,281 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+
+{% block title %}Checkout — OmicsHub{% endblock %}
+
+{% block page_head %}
+{% comment %}
+Step 3 of the flow: the cart, and the config that will be applied to whatever is submitted
+from it. Nothing here decides what runs — ticking rows and pressing Submit hands the
+selection to `planning.build_plan`, which works out the stage, the command config, the
+reference and the chemistry for each sample.
+{% endcomment %}
+<div class="page-head">
+  <div class="page-head__text">
+    <h1>Checkout</h1>
+    <p class="page-head__desc">
+      Untick the fastq samples you do not want to run and pick a config. Read every command,
+      then queue the job.
+    </p>
+  </div>
+  <div class="page-head__actions">
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'web:dashboard' %}">
+      <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to samples
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+  <div class="card-header">
+    <span><i class="bi bi-sliders" aria-hidden="true"></i> Submission Config</span>
+    {% if config %}
+      {% if config.is_active %}
+        <span class="state" data-state="done">Active config</span>
+      {% else %}
+        <span class="state" data-state="warn" tabindex="0" data-bs-toggle="tooltip"
+              title="You are previewing a config that is not the active one. It still drives this submission.">
+          Preview — not the active config
+        </span>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% if configs %}
+  {% comment %}
+  Two panel sections: the control keeps a measured width — a select does not get more
+  readable at 1400px — but the sections it sits in span the panel, so the rules run edge to
+  edge and the gaps are the panel's own.
+  {% endcomment %}
+  <div class="card-body">
+    <form method="get">
+      <label class="form-label" for="config-picker">Config driving this submission</label>
+      {% comment %}
+      Applies from its own button rather than on change: submitting on change reloads the
+      page on a keyboard user's first arrow keystroke, so they can never reach the option
+      they want.
+      {% endcomment %}
+      <div class="d-flex gap-2" style="max-width: 32rem;">
+        <select class="form-select" id="config-picker" name="config_id">
+          {% for option in configs %}
+          <option value="{{ option.pk }}" {% if config and option.pk == config.pk %}selected{% endif %}>
+            {{ option.name }}{% if option.is_active %} — active{% endif %}
+            (uploaded {{ option.uploaded_at|date:"Y-m-d H:i" }})
+          </option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-outline-secondary text-nowrap" type="submit">Use this</button>
+      </div>
+      <div class="form-text">
+        Chooses the reference, chemistry and command for every sample below.
+      </div>
+    </form>
+  </div>
+
+  {% if config %}
+  <div class="card-body is-toolbar d-flex flex-wrap align-items-center gap-2 border-top">
+    <span class="label">Workflows</span>
+    {% for value in modalities %}<span class="tag tag--accent">{{ value }}</span>{% endfor %}
+    <a class="btn btn-sm btn-outline-secondary ms-auto" href="{% url 'web:configs' %}">
+      <i class="bi bi-upload" aria-hidden="true"></i> Upload a new config
+    </a>
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="card-body">
+    <div class="alert alert-warning mb-0">
+      No config has been uploaded yet, so nothing can be submitted.
+      {% if user.is_staff %}
+        Upload one in <a href="{% url 'web:configs' %}">Configs</a>.
+      {% else %}
+        Ask a staff member to upload one in Configs.
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<form method="post" action="{% url 'web:submit-review' %}" id="checkout-form">
+  {% csrf_token %}
+  <input type="hidden" name="config_id" value="{{ config.pk|default:'' }}">
+
+  <div class="card">
+    <div class="card-header">
+      <span><i class="bi bi-bag" aria-hidden="true"></i> Cart</span>
+      <span class="text-secondary">{{ cart_count }} sample{{ cart_count|pluralize }} staged</span>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-pinned align-middle mb-0" id="cart-table">
+        <caption class="visually-hidden">
+          Samples staged for submission. Ticked rows are the ones that will be submitted.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" style="width:2rem">
+              <input type="checkbox" class="form-check-input" id="select-all-cart" checked
+                     aria-label="Select all staged samples">
+            </th>
+            {% for column in columns %}<th scope="col" class="col--{{ column.kind }}">{{ column.label }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in cart_items %}
+          <tr>
+            {% comment %}
+            Checked by default: everything in the cart was already deliberately put there, so
+            the common case is submitting all of it and unticking the exceptions.
+            {% endcomment %}
+            <td><input type="checkbox" class="form-check-input select-cart-sample" name="fastq_names"
+                       value="{{ item.sample.fastq_name }}" checked
+                       aria-label="Submit {{ item.sample.fastq_name }}"></td>
+            {% for column in columns %}{% include "web/_cell.html" with sample=item.sample %}{% endfor %}
+          </tr>
+          {% empty %}
+          {% url 'web:dashboard' as samples_url %}
+          <tr><td colspan="{{ columns|length|add:1 }}">
+            {% include "web/_empty.html" with icon="bag" title="Your cart is empty." hint="Pick samples on the Samples page and add them to your cart." action_url=samples_url action_label="Go to samples" %}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if cart_items %}
+    <div class="card-body is-toolbar d-flex flex-wrap gap-2 align-items-center">
+      <label class="visually-hidden" for="force-select">Force a stage</label>
+      <select name="force" id="force-select" class="form-select form-select-sm w-auto"
+              data-bs-toggle="tooltip"
+              title="Run this stage even when the sample's history says it is not due for it. A sample that has not finished the stage before it is left alone, not advanced.">
+        <option value="">Force: no</option>
+        <option value="align" {% if submission.force == "align" %}selected{% endif %}>Force alignment</option>
+        <option value="post-align" {% if submission.force == "post-align" %}selected{% endif %}>Force post-alignment</option>
+      </select>
+      <div class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" name="batch_processing" id="batch-processing"
+               {% if submission.batch_processing %}checked{% endif %}>
+        <label class="form-check-label" for="batch-processing">Address by FASTQ name (RTX/RFX)</label>
+      </div>
+
+      {% comment %}
+      Both buttons post this form — that is what carries the ticked rows — and redirect it at
+      their own URL. Remove takes the ticked rows out of the cart; Submit plans them.
+      {% endcomment %}
+      <button class="btn btn-sm btn-outline-secondary" type="submit" formaction="{% url 'web:cart-remove' %}">
+        Remove selected
+      </button>
+      <button class="btn btn-sm btn-outline-danger" type="submit" formaction="{% url 'web:cart-clear' %}">
+        Empty cart
+      </button>
+
+      <button class="btn btn-primary ms-auto" type="submit" id="submit-selected"
+              {% if not config %}disabled title="Upload and activate a config first"{% endif %}>
+        Review Submission <i class="bi bi-arrow-right" aria-hidden="true"></i>
+      </button>
+    </div>
+    {% endif %}
+  </div>
+</form>
+
+{% if plan %}
+  {% include "web/_submit_modal.html" %}
+  {% include "web/_final_modal.html" %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const selectAllCart = document.getElementById("select-all-cart");
+  if (selectAllCart) {
+    selectAllCart.addEventListener("change", (e) => {
+      document.querySelectorAll(".select-cart-sample").forEach((b) => { b.checked = e.target.checked; });
+    });
+  }
+
+  // Remember what each menu started on, so Reset has something to go back to.
+  document.querySelectorAll("select[name^='override__']").forEach((menu) => {
+    menu.dataset.original = menu.value;
+  });
+
+  // Rebuild one sample's command when a menu in its editor changes.
+  //
+  // The command is assembled from the config on the server, so the browser cannot work out
+  // what a changed Reference produces — it has to ask. It asks for one command, posting the
+  // form as it stands so the config, the email and every other override travel with it, and
+  // writes the answer straight into the textarea. The previous version asked by re-posting
+  // the whole form and re-rendering the page, which is a full navigation to change one
+  // field, and it snapped every open editor shut on the way through.
+  const submitForm = document.querySelector("#submit-modal form");
+
+  async function refreshCommand(editor) {
+    const textarea = editor.querySelector(".raw-command");
+    const original = editor.querySelector("input[name$='__command_original']");
+    const row = document.getElementById(editor.dataset.row);
+    const meta = row.parentElement;
+    const error = meta.querySelector("[data-role='preview-error']");
+
+    // A command the user has typed into is theirs; rebuilding it from the menus would
+    // discard the edit they are looking at.
+    if (textarea.value.trim() !== textarea.dataset.original.trim()) return;
+
+    const body = new FormData(submitForm);
+    body.set("fastq_name", editor.dataset.fastq);
+    textarea.setAttribute("aria-busy", "true");
+
+    try {
+      const response = await fetch("{% url 'web:command-preview' %}", {
+        method: "POST", body, headers: { "X-Requested-With": "XMLHttpRequest" },
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        error.textContent = data.error || "Could not rebuild this command.";
+        error.hidden = false;
+        return;
+      }
+
+      error.hidden = true;
+      row.textContent = data.command;
+      textarea.value = data.command;
+      // Both move with it, or the next post would read this rebuild as a hand edit.
+      textarea.dataset.original = data.command;
+      original.value = data.command;
+      meta.querySelector("[data-role='config-name']").textContent = data.command_config;
+      meta.querySelector("[data-role='spacing']").textContent =
+        `waits ${data.spacing}s before the next`;
+      meta.querySelector("[data-role='edited-flag']").hidden = !data.edited;
+    } catch {
+      error.textContent = "Could not reach the server to rebuild this command.";
+      error.hidden = false;
+    } finally {
+      textarea.removeAttribute("aria-busy");
+    }
+  }
+
+  document.querySelectorAll(".command-editor").forEach((editor) => {
+    editor.querySelectorAll("select[name^='override__']").forEach((menu) => {
+      menu.addEventListener("change", () => refreshCommand(editor));
+    });
+  });
+
+  // Put an edited command back to what the config produced, menus included. A reset that
+  // restored the command but left a changed Reference selected would be reverting to
+  // something the config never said — and the rebuild below would immediately undo it.
+  document.querySelectorAll(".reset-command").forEach((button) => {
+    button.addEventListener("click", () => {
+      const editor = button.closest(".command-editor");
+      const field = document.getElementById(button.dataset.target);
+      editor.querySelectorAll("select[name^='override__']").forEach((menu) => {
+        menu.value = menu.dataset.original;
+      });
+      field.value = field.dataset.original;
+      refreshCommand(editor);
+    });
+  });
+
+  {% if open_modal %}
+  // The step's content is rendered server-side; this just shows it.
+  new bootstrap.Modal(document.getElementById("{{ open_modal }}-modal")).show();
+  {% endif %}
+</script>
+{% endblock %}

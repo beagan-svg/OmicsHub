@@ -1,0 +1,45 @@
+{% extends "web/_auth_base.html" %}
+
+{% block title %}Create an account — OmicsHub{% endblock %}
+{% comment %}
+Signup keeps its visible heading: unlike sign-in, "create an account" is not obvious from a
+form of fields, and this is the page someone reaches by accident.
+{% endcomment %}
+{% block heading %}<h1 class="mb-1">Create an account</h1>{% endblock %}
+{% block subheading %}<p class="text-secondary mb-4">Queue and submit OCS alignment and post-alignment jobs.</p>{% endblock %}
+
+{% block form %}
+{% if form.non_field_errors %}
+<div class="alert alert-danger">
+  {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% for field in form %}
+  <div class="mb-3">
+    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% if field.help_text %}
+    <div class="form-text">{{ field.help_text }}</div>
+    {% endif %}
+    {% for error in field.errors %}
+    {% comment %}
+    An error message that is only red is invisible to a colour-blind reader and silent to a
+    screen reader arriving at the field. The icon is the second channel and `role="alert"`
+    is what gets it announced — this is a signed-out page with no live region of its own.
+    {% endcomment %}
+    <div class="form-text mt-1 d-flex gap-1" role="alert" style="color: var(--state-fail-ink)">
+      <i class="bi bi-exclamation-circle" aria-hidden="true"></i> {{ error }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  <button class="btn btn-primary w-100" type="submit">Create account</button>
+</form>
+{% endblock %}
+
+{% block footer %}
+Already have an account? <a href="{% url 'login' %}">Sign in</a>
+{% endblock %}
