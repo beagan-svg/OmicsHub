@@ -9,8 +9,8 @@ from __future__ import annotations
 import pytest
 from django.core.cache import cache
 
-from apps.catalog.models import NOT_COMPLETED, Sample, Stage, StageStatus
-from apps.workflows.models import WorkflowConfig
+from apps.sample_catalog.models import NOT_COMPLETED, Sample, Stage, StageStatus
+from apps.workflow_engine.models import WorkflowConfig
 
 EMAIL = "bicore@alleninstitute.org"
 
@@ -19,11 +19,11 @@ EMAIL = "bicore@alleninstitute.org"
 def _clear_cache():
     """Clear process-wide cache values between tests.
 
-    Django rolls the database back between tests; nothing rolls the cache back. Two things
-live there now: the submission worker's capacity hold and the timestamp of the last
-stage-status sweep. Both are read as "has this already happened", so a value left
-    by one test silently changes the answer for the next. That is exactly the kind of
-    order-dependent failure that only appears when someone runs a subset.
+        Django rolls the database back between tests; nothing rolls the cache back. Two things
+    live there now: the submission worker's capacity hold and the timestamp of the last
+    stage-status sweep. Both are read as "has this already happened", so a value left
+        by one test silently changes the answer for the next. That is exactly the kind of
+        order-dependent failure that only appears when someone runs a subset.
     """
     cache.clear()
     yield

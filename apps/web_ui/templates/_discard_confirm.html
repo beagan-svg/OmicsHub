@@ -1,0 +1,31 @@
+{% comment %}
+The confirmation shown when someone tries to leave a submission modal that holds choices.
+
+Rendered inside the modal it guards rather than as a second modal on top of it: a dialog
+stacked on a dialog has two backdrops, two Escape handlers and a focus order nobody can
+predict. This is one panel over the content it is asking about, which is also the honest
+picture. The submission has not gone anywhere. It is waiting behind the question.
+
+Hidden until needed, and shown by the handler in base.html for *every* way out of the
+modal, not just the Cancel button. Expects `id_prefix`.
+{% endcomment %}
+<div class="discard-confirm" id="{{ id_prefix }}-discard" hidden
+     role="alertdialog" aria-modal="true"
+     aria-labelledby="{{ id_prefix }}-discard-title"
+     aria-describedby="{{ id_prefix }}-discard-body">
+  <div class="discard-confirm__panel">
+    <h3 class="discard-confirm__title" id="{{ id_prefix }}-discard-title">Discard this submission?</h3>
+    <p class="discard-confirm__body" id="{{ id_prefix }}-discard-body">
+      The workflow, asset and command changes you made here will be lost. Nothing has been
+      queued, so the samples stay in your cart.
+    </p>
+    <div class="discard-confirm__actions">
+      {% comment %}
+      Keep editing comes first and takes focus: the safe answer should be the one already
+      under the finger, and the destructive one should take a deliberate move to reach.
+      {% endcomment %}
+      <button type="button" class="btn btn-outline-secondary" data-discard="keep">Keep editing</button>
+      <button type="button" class="btn btn-danger" data-discard="confirm">Discard changes</button>
+    </div>
+  </div>
+</div>

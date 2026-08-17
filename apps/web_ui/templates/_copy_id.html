@@ -1,0 +1,8 @@
+{% if value %}
+<button type="button" class="copy-id" data-copy="{{ value }}"
+        title="{{ value }}. Click to copy"
+        aria-label="Copy {{ label }} {{ value }}">
+  <span class="copy-id__value">{{ value }}</span>
+  <i class="bi bi-clipboard copy-id__icon" aria-hidden="true"></i>
+</button>
+{% else %}—{% endif %}

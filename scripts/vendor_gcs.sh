@@ -2,7 +2,7 @@
 # Copy the genomics-cloud-services packages the `ocs` CLI is built from into vendor/gcs/.
 #
 # They live outside this repo, and a Docker build can only read files inside its own build
-# context — so they have to be brought in before `docker compose build`. This is the step
+# context, so they have to be brought in before `docker compose build`. This is the step
 # that becomes a git submodule once the repo is under version control; the Dockerfile reads
 # vendor/gcs/ either way and will not need changing.
 #

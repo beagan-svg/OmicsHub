@@ -1,0 +1,8 @@
+<div class="empty">
+  <i class="bi bi-{{ icon|default:'inbox' }}" aria-hidden="true"></i>
+  <p class="empty__title">{{ title }}</p>
+  {% if hint %}<p class="empty__hint">{{ hint }}</p>{% endif %}
+  {% if action_url %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ action_url }}">{{ action_label }}</a>
+  {% endif %}
+</div>

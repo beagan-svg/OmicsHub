@@ -30,9 +30,7 @@ WORKDIR /src
 COPY pyproject.toml requirements.lock ./
 RUN pip install --no-cache-dir -r requirements.lock -c requirements.lock .
 
-# The `ocs` CLI. Installed properly into the venv rather than reached through the PYTHONPATH
-# the interactive shell function sets up — which is what makes OCS_CLI_PYTHONPATH unnecessary
-# in the container, and what makes the CLI work the same on every machine.
+# Install the `ocs` CLI into the image so it works the same on every machine.
 #
 # Two steps because gcs-cli depends on the other three by name: they have to be installed
 # before pip resolves it, or it goes looking for them on an index that does not have them.

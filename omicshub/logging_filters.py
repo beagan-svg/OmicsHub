@@ -1,25 +1,4 @@
-"""Attach correlation ids and redact email addresses in logs.
-
-Two of the book's "Best practices for logging in production" (Chapter 6) need code rather
-than configuration:
-
-* *Use the common logging function ... this will give the logs a consistent format, make
-  them easy to parse by logging agents.* Rather than route every call site through a
-wrapper. There are already eighteen call sites spread over three apps. The consistency is
-  imposed at the handler: `RequestIDFilter` guarantees every record carries a
-  `request_id`, so the one format string in `LOGGING` always renders.
-* *Avoid passing sensitive information to logs ... this can be achieved by using custom
-  logging filters that the Python logging module provides.* `EmailRedactingFilter` is that
-  filter. The one genuinely sensitive value this app logs is an institutional email
-  address: `ocs` submission commands carry `--notify <address>`, and that argv is logged
-  verbatim on the way out and again inside `CalledProcessError` when a submission fails.
-
-The Celery signal handlers live here rather than in `config/celery.py` because this module
-is the one thing both processes are guaranteed to import: Django applies `LOGGING` through
-`dictConfig` during `django.setup()`, which the web server and the worker both run. Wiring
-the correlation id here keeps a request id attached to the log lines a task emits, so a
-user-reported failure can be followed from the web log into the worker log.
-"""
+"""Attach request ids and redact email addresses in logs."""
 
 from __future__ import annotations
 
@@ -27,17 +6,20 @@ import logging
 import re
 import traceback
 from contextvars import ContextVar
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from celery import signals
+
+if TYPE_CHECKING:
+    from sentry_sdk.types import Event, Hint
 
 # The inbound and outbound HTTP header, and the Celery message header the same value rides
 # on when a request enqueues a task.
 REQUEST_ID_HEADER = "X-Request-ID"
 CELERY_HEADER = "request_id"
 
-# What the formatter prints when there is no request in scope — a management command, a
+# What the formatter prints when there is no request in scope, such as a management command or
 # module imported at startup. A literal placeholder keeps every log line the same shape.
 NO_REQUEST_ID = "-"
 
@@ -122,12 +104,12 @@ class EmailRedactingFilter(logging.Filter):
         return True
 
 
-def scrub_event(event: dict, hint: dict | None = None) -> dict:
+def scrub_event(event: Event, hint: Hint | None = None) -> Event:
     """Remove email addresses from every value in a Sentry event.
 
-    `send_default_pii=False` stops the SDK attaching the user and the request body, but it
-says nothing about an address that is part of a message or a stack frame. That is
-    exactly where this app's addresses are. Passed as Sentry's `before_send`.
+        `send_default_pii=False` stops the SDK attaching the user and the request body, but it
+    says nothing about an address that is part of a message or a stack frame. That is
+        exactly where this app's addresses are. Passed as Sentry's `before_send`.
     """
     return _scrub(event)
 
@@ -155,8 +137,8 @@ def _scrub(value: Any, depth: int = 0) -> Any:
 def _attach_request_id(headers=None, **kwargs) -> None:
     """Copy the publishing request id into the Celery message.
 
-Use `setdefault` so a caller that has already chosen an id keeps it when a retry
-republishes the original message.
+    Use `setdefault` so a caller that has already chosen an id keeps it when a retry
+    republishes the original message.
     """
     request_id = get_request_id()
     if headers is not None and request_id:
@@ -167,8 +149,8 @@ republishes the original message.
 def _adopt_request_id(task=None, task_id=None, **kwargs) -> None:
     """Use the queuing request id when logging a Celery task.
 
-Fall back to the task id for beat-triggered work. The sweeps and reconciler have no request
-id, so the task id correlates each run with its own log records.
+    Fall back to the task id for beat-triggered work. The sweeps and reconciler have no request
+    id, so the task id correlates each run with its own log records.
     """
     published = getattr(getattr(task, "request", None), CELERY_HEADER, None)
     set_request_id(published or task_id)

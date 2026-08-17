@@ -1,17 +1,15 @@
 # Releasing OmicsHub
 
-A release moves five processes at once: the web process, the `submissions` worker, the
-`default` worker, beat, and the migration process. All five use one Postgres database and one
-Redis. They all load the same settings module, so a missing variable stops all of them,
-and they all hold different halves of an in-flight submission, so the order they come back
-in matters.
+A release updates five processes: the web process, the `submissions` worker, the `default`
+worker, beat, and the migration process. All five use the same Postgres database, Redis
+instance, and settings module. A missing setting stops all five processes. Restart them in
+the order below because they hold different parts of an in-flight submission.
 
-Use these steps for the compose stack. Use the same order for host processes and change
-only the restart commands.
+Use these steps for the Compose stack. Run every application process in Docker.
 
 ## Environment
 
-The app reads the variables listed below from `env(...)` calls in `config/settings/`.
+The app reads the variables listed below from `env(...)` calls in `omicshub/settings/`.
 
 These have **no default**. `django-environ` raises `ImproperlyConfigured` at import, so a
 missing one is not a degraded service. The web process, both workers, and beat all exit
@@ -32,27 +30,18 @@ These have defaults, but four of the defaults are wrong for anything but a lapto
 | Variable | Default | |
 |---|---|---|
 | `CACHE_URL` | `redis://localhost:6379/1` | **localhost**. Point this at the real Redis, or the submission worker's capacity hold is kept in an isolated cache. |
-| `OCS_CLI_PATH` | `ocs` | correct in the image, where the CLI is pip-installed and on `PATH`; on a host it must be the absolute path into the CLI's venv |
-| `OCS_CLI_PYTHONPATH` | empty | not needed in the image; on a host, submissions fail on `ModuleNotFoundError` without it |
+| `OCS_CLI_PATH` | `ocs` | the executable used for alignment and post-alignment submissions |
 | `AWS_PROFILE` | empty | empty means boto3 falls back to environment variables and then the instance role, which is what you want on EC2/ECS and not what you want on a host |
 | `AWS_SHARED_CREDENTIALS_FILE` | empty | the app-scoped credentials file; see the README |
 | `OCS_CLI_TIMEOUT` | `300` | seconds for one `ocs` call |
 | `CONN_MAX_AGE` | `60` | seconds a database connection is reused |
 | `STAGE_STATUS_SYNC_SECONDS` | `300` | how often the stage-status sweep runs |
 | `ADMIN_URL` | `admin` | the path the Django admin is mounted at , see below |
-| `DEBUG` | `True` | read only by `omicshub.settings.dev`; the prod settings hardcode it off |
+| `DEBUG` | `False` | production settings keep debug pages off |
 
-Two more that are not `env()` calls and are easy to miss:
-
-- **`DJANGO_SETTINGS_MODULE` must be `omicshub.settings.prod`.** `manage.py` defaults it to
-  `omicshub.settings.dev`, which leaves `DEBUG` on, `ALLOWED_HOSTS` permissive, and the
-  secure-cookie and SSL-redirect settings off. Set it for the web process, both workers
-  and beat , a worker on dev settings is a worker with a different cache and a different
-  idea of `DEBUG`.
-- **Compose reads `.env.docker`, not `.env`,** and only when `--env-file .env.docker` is
-  passed on every command. That file carries `POSTGRES_PASSWORD`, `AWS_CREDENTIALS_FILE`,
-  and the three host-side port numbers; compose sets `DATABASE_URL`, `CELERY_BROKER_URL`,
-  `CACHE_URL` and the `OCS_CLI_*` paths itself.
+Compose reads `.env.docker` only when `--env-file .env.docker` is passed. That file carries
+`POSTGRES_PASSWORD`, `AWS_CREDENTIALS_FILE`, and the host-side port numbers. Compose sets
+`DATABASE_URL`, `CELERY_BROKER_URL`, `CACHE_URL`, and the container's `OCS_CLI_PATH`.
 
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are not on either list and must not be
 added. The app resolves credentials through boto3 from a profile.
@@ -78,18 +67,18 @@ minutes of checking OCS by hand:
 
 ```bash
 docker compose --env-file .env.docker exec web python manage.py shell -c "
-from apps.queueing.models import QueueEntry
+from apps.submission_queue.models import QueueEntry
 print(QueueEntry.objects.filter(status='SUBMITTING').count())"
 ```
 
 The command prints zero when no submission is in flight. If it is not zero, wait. A submission takes
 seconds, and the next entry is only claimed after the previous one's `spacing`.
 
-Then:
+Then run the setup command. It prepares the OCS packages, validates the environment, and
+starts the full stack.
 
 ```bash
-scripts/vendor_gcs.sh                                          # if the CLI packages moved
-docker compose --env-file .env.docker up -d --build
+scripts/setup_docker.sh
 ```
 
 The compose `web` service runs `migrate` and then `collectstatic` before gunicorn binds,
@@ -135,7 +124,7 @@ If the queue is too slow, lower `spacing` in the config. Do not scale the worker
 
 ## Migrations that need care
 
-`apps/catalog/migrations/0009_stagestatus_catalog_sta_stage_c0b808_idx.py` adds an index to
+`apps/sample_catalog/migrations/0009_stagestatus_catalog_sta_stage_c0b808_idx.py` adds an index to
 `catalog_stagestatus` with a plain `AddIndex`. Postgres takes an **ACCESS EXCLUSIVE lock on
 the table for the whole time the index builds** , not a moment, the whole build. On this
 table (roughly four rows per sample, so well into six figures) that is seconds to tens of
@@ -146,7 +135,7 @@ if it waits long enough.
 Run it in a quiet window. `AddIndexConcurrently` would avoid the lock but needs
 `django.contrib.postgres` in `INSTALLED_APPS`, which this project does not have.
 
-Everything else in `catalog/` and `queueing/` to date is column additions and index
+Everything else in `sample_catalog/` and `submission_queue/` to date is column additions and index
 changes on small tables. Check any new migration against the same question before
 shipping it: does it rewrite or lock a table the sweep writes to every five minutes?
 
@@ -175,15 +164,15 @@ most.
 1. **Readiness.**
 
    ```bash
-   curl -fsS http://127.0.0.1:8000/healthz/
+   curl -fsS http://127.0.0.1:8001/healthz/
    ```
 
    Expect `{"status": "ok", ...}`. A 503 names the failing check: `database`, `cache`,
    `broker`, or `submissions_worker` (`workflow_config` is reported but does not gate
-   readiness). `submissions_worker` is the one that matters most and the one a deploy is
-   most likely to break: it reads a heartbeat the submission task refreshes on every run,
-   so it goes stale if beat is down, the broker is not delivering, or nothing is consuming
-   `submissions` — all of which queue jobs that never reach OCS while every page still
+   readiness). `submissions_worker` is the check most likely to fail after a deploy because
+   it reads a heartbeat the submission task refreshes on every run. The heartbeat goes stale
+   if beat is down, the broker is not delivering, or nothing is consuming `submissions`.
+   These failures queue jobs that never reach OCS while every page still
    renders.
 
    Give it a minute. No tick has landed immediately after a restart, so the first probe
@@ -214,7 +203,7 @@ most.
 ## Starting after a host reboot
 
 Compose restarts a container that dies; it does not survive the host restarting. Install
-the LaunchAgent in `deploy/launchd/` so a reboot brings the stack back — the README's
+the LaunchAgent in `deploy/launchd/` so a reboot brings the stack back. The README's
 *Starting the stack at login* section has the two commands and the caveat that it needs a
 GUI login before Docker Desktop, and therefore the stack, can start.
 

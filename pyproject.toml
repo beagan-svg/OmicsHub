@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-# This is a Django project, not an importable library — `apps/` and `config/` are found
+# This is a Django project, not an importable library. `apps/` and `omicshub/` are found
 # through the working directory, never installed. Pinning discovery to nothing is what
 # lets the Dockerfile run `pip install .` to resolve the dependencies above without
 # setuptools trying to package the app tree, and without the list being repeated there.
@@ -28,6 +28,8 @@ py-modules = []
 
 [dependency-groups]
 dev = [
+    "django-stubs>=5.2",
+    "mypy>=1.13",
     "pytest>=8.3",
     "pytest-django>=4.9",
     "ruff>=0.8",
@@ -48,3 +50,16 @@ extend-exclude = ["*/migrations/*", "vendor"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "DJ"]
+
+[tool.mypy]
+plugins = ["mypy_django_plugin.main"]
+python_version = "3.12"
+check_untyped_defs = true
+ignore_missing_imports = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+exclude = "(^|/)(vendor|migrations|tests)/"
+
+[tool.django-stubs]
+django_settings_module = "omicshub.settings.test"

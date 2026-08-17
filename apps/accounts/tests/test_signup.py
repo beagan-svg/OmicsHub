@@ -22,7 +22,7 @@ def test_signup_creates_user_and_signs_them_in(client):
     assert user.email == "ada@example.org"
     # Redirected into the app, not back to the login page.
     assert response.status_code == 302
-    assert response.url == reverse("web:dashboard")
+    assert response.url == reverse("web_ui:dashboard")
     assert client.session["_auth_user_id"] == str(user.pk)
 
 
@@ -86,7 +86,7 @@ def test_signed_in_user_is_redirected_away(client):
     response = client.get(reverse("accounts:signup"))
 
     assert response.status_code == 302
-    assert response.url == reverse("web:dashboard")
+    assert response.url == reverse("web_ui:dashboard")
 
 
 @pytest.mark.django_db

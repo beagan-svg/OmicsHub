@@ -31,7 +31,7 @@ fi
 
 # --wait blocks until the healthchecks pass, so the log line below reports what actually
 # happened rather than what was asked for. No --wait-timeout: compose v2.3, which is what
-# is installed here, does not have that flag and rejects the whole command — checked by
+# is installed here, does not have that flag, and rejects the whole command. Check this with
 # running this script rather than assumed.
 log "starting the stack"
 if docker compose --env-file .env.docker up -d --wait; then

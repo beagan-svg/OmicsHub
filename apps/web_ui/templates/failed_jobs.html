@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% load web_ui_extras %}
+
+{% block title %}Failures | OmicsHub{% endblock %}
+
+{% block page_head %}
+<div class="page-head">
+  <div class="page-head__text">
+    <h1>Failures</h1>
+    <p class="page-head__desc">
+      OmicsHub submissions that need attention. Retry resubmits the same command; delete
+      removes the local record without touching OCS.
+    </p>
+  </div>
+  <div class="page-head__actions">
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:job-monitor' %}">
+      <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to monitor
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if has_stranded %}
+<div class="alert alert-warning d-flex gap-2 mb-3">
+  <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+  <div>
+    <strong>Some jobs below are stranded.</strong>
+    The worker stopped mid-submission and it is not known whether OCS received the command.
+    Retry is disabled when the outcome is unknown. Deterministic pre-submission errors show a
+    safe Retry action; otherwise check OCS for a demand covering the sample and stage before
+    taking any action, or the job may run twice.
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Submission failures</span>
+    <span class="text-secondary">{{ entries|length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <caption class="visually-hidden">
+        Jobs that failed or were stranded mid-submission, with the error OCS reported.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">FASTQ Name</th><th scope="col">Stage</th>
+          <th scope="col">Workflow</th><th scope="col">Status</th>
+          <th scope="col">Command</th><th scope="col">Error Details</th>
+          <th scope="col">Queued At</th><th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <td class="mono">{{ entry.sample.fastq_name }}</td>
+          <td><span class="tag">{{ entry.stage }}</span></td>
+          <td><span class="tag tag--accent">{{ entry.modality }}</span></td>
+          <td>{% include "_state.html" with status=entry.status %}</td>
+          <td class="command">{{ entry.command }}</td>
+          <td class="text-secondary">{{ entry.error_message|default:"—" }}</td>
+          <td class="text-secondary">{{ entry.created_at|date:"Y-m-d H:i" }}</td>
+          <td class="text-end text-nowrap">
+            {% comment %}
+            Every row carries the same two words, so "Retry" and "Delete" on their own name
+            nothing. The labels say which job each button acts on; the visible copy stays
+            short.
+            {% endcomment %}
+            <div class="d-flex gap-1 justify-content-end">
+              {% if entry.can_retry %}
+              <form method="post" action="{% url 'web_ui:retry' entry.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-secondary" type="submit"
+                        aria-label="Retry {{ entry.stage }} for {{ entry.sample.fastq_name }}">Retry</button>
+              </form>
+              {% endif %}
+              <form method="post" action="{% url 'web_ui:delete-job' entry.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-danger" type="submit"
+                        aria-label="Delete {{ entry.stage }} job for {{ entry.sample.fastq_name }}">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8">
+          {% include "_empty.html" with icon="check2-circle" title="No failures." hint="Everything submitted so far either finished or is still running." %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mt-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Running job failures</span>
+    <span class="text-secondary">{{ running_failures|length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <caption class="visually-hidden">
+        OmicsHub submissions accepted by OCS that later failed while running.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">FASTQ Name</th><th scope="col">Stage</th>
+          <th scope="col">Workflow</th><th scope="col">Status</th>
+          <th scope="col">Demand ID</th><th scope="col">OCS Failure Message</th>
+          <th scope="col">Submitted At</th><th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in running_failures %}
+        <tr>
+          <td class="mono">{{ entry.sample.fastq_name }}</td>
+          <td><span class="tag">{{ entry.stage }}</span></td>
+          <td><span class="tag tag--accent">{{ entry.modality }}</span></td>
+          <td>{% include "_state.html" with status=entry.status %}</td>
+          <td>{% include "_copy_id.html" with value=entry.demand_id label="Demand ID" %}</td>
+          <td class="text-secondary">{{ entry.error_message|default:"—" }}</td>
+          <td class="text-secondary">{{ entry.submitted_at|date:"Y-m-d H:i" }}</td>
+          <td class="text-end text-nowrap">
+            <div class="d-flex gap-1 justify-content-end">
+              {% if entry.can_retry %}
+              <form method="post" action="{% url 'web_ui:retry' entry.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-secondary" type="submit"
+                        aria-label="Retry {{ entry.stage }} for {{ entry.sample.fastq_name }}">Retry</button>
+              </form>
+              {% endif %}
+              <form method="post" action="{% url 'web_ui:delete-job' entry.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-danger" type="submit"
+                        aria-label="Delete {{ entry.stage }} job for {{ entry.sample.fastq_name }}">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8">
+          {% include "_empty.html" with icon="check2-circle" title="No running job failures." hint="OmicsHub submissions accepted by OCS have not failed." %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

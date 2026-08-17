@@ -1,21 +1,6 @@
-"""Settings for the test suite.
-
-Defaults are set before importing base so the suite runs without a .env file. The database
-still points at Postgres: the queue claim uses SELECT ... FOR UPDATE SKIP LOCKED, which
-SQLite does not implement.
-
-.env is read here rather than only in base, because `setdefault` below fills a variable
-base's own read would then decline to overwrite. Without this the DATABASE_URL fallback
-wins over the real one and the suite runs against whatever that string happens to name.
-which after the database password changed meant every test erroring on authentication.
-"""
+"""Configure the test suite without Docker environment files."""
 
 import os
-from pathlib import Path
-
-import environ
-
-environ.Env.read_env(Path(__file__).resolve().parents[2] / ".env")
 
 os.environ.setdefault("SECRET_KEY", "test-only-not-a-real-secret")
 os.environ.setdefault("DATABASE_URL", "postgres://omicshub:omicshub@localhost:5432/omicshub")
@@ -28,8 +13,16 @@ os.environ.setdefault("OCS_AWS_REGION", "us-west-2")
 os.environ["SENTRY_DSN"] = ""
 
 from .base import *  # noqa: E402, F403
+from .base import MIDDLEWARE as BASE_MIDDLEWARE
 
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+# Tests render templates but never serve static files. WhiteNoise checks STATIC_ROOT when
+# middleware loads, which adds a warning to every request because collectstatic is not a test
+# setup step.
+MIDDLEWARE = [
+    middleware for middleware in BASE_MIDDLEWARE if middleware != "whitenoise.middleware.WhiteNoiseMiddleware"
+]
 
 # No persistent connections under test. base.py keeps them for 60 seconds, which is right
 # for a server and wrong here: a held connection is still open when the runner tries to

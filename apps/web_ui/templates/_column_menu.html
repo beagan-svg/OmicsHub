@@ -1,0 +1,78 @@
+<div class="dropdown column-menu">
+  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+          id="column-menu-toggle" data-bs-toggle="dropdown"
+          data-bs-auto-close="outside" data-bs-display="static" aria-expanded="false">
+    <i class="bi bi-layout-three-columns" aria-hidden="true"></i> Columns
+    <span class="count" data-column-count>{{ visible_column_keys|length }}</span>
+  </button>
+
+  <div class="dropdown-menu dropdown-menu-end column-menu__panel"
+       aria-labelledby="column-menu-toggle">
+    <div class="column-menu__head">
+      <div class="column-menu__search">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <label class="visually-hidden" for="column-filter">Filter the column list</label>
+        <input type="search" id="column-filter" class="form-control form-control-sm"
+               placeholder="Filter columns" autocomplete="off">
+      </div>
+      <div class="column-menu__meta">
+        {# aria-live so a screen reader hears the tally change as boxes are ticked. #}
+        <span data-column-summary aria-live="polite">
+          {{ visible_column_keys|length }} of {{ all_columns|length }} shown
+        </span>
+        <button type="button" class="column-menu__link" data-column-reset>Restore defaults</button>
+      </div>
+    </div>
+
+    <div class="column-menu__body" data-column-list>
+      {% for group in column_groups %}
+      <section class="column-menu__group" data-column-group>
+        <div class="column-menu__group-head">
+          <span class="label">{{ group.label }}</span>
+          <span class="column-menu__group-actions">
+            <button type="button" class="column-menu__link" data-column-all>All</button>
+            <span class="column-menu__link-sep" aria-hidden="true">·</span>
+            <button type="button" class="column-menu__link" data-column-none>None</button>
+          </span>
+        </div>
+        {% for column in group.columns %}
+          {% if column.key == locked_column %}
+          {% comment %}
+          Not a disabled checkbox: a checkbox you cannot move reads as a bug until you find
+          out why. The lock and the note say the reason on the line itself.
+          {% endcomment %}
+          <div class="column-option column-option--locked"
+               data-column-option data-column-label="{{ column.label|lower }}">
+            <i class="bi bi-lock-fill" aria-hidden="true"></i>
+            <span class="column-option__label">{{ column.label }}</span>
+            <span class="column-option__note">Always shown</span>
+            <input type="hidden" name="columns" value="{{ column.key }}" form="columns-form">
+          </div>
+          {% else %}
+          <label class="column-option"
+                 data-column-option data-column-label="{{ column.label|lower }}">
+            <input class="form-check-input" type="checkbox" name="columns"
+                   value="{{ column.key }}" form="columns-form"
+                   {% if column.key in visible_column_keys %}checked{% endif %}>
+            <span class="column-option__label">{{ column.label }}</span>
+          </label>
+          {% endif %}
+        {% endfor %}
+      </section>
+      {% endfor %}
+      <p class="column-menu__empty" data-column-empty hidden>No column matches that.</p>
+    </div>
+
+    {{ default_column_keys|json_script:"default-column-keys" }}
+
+    <div class="column-menu__foot">
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-column-cancel>
+        Cancel
+      </button>
+      <button class="btn btn-sm btn-primary" type="submit" form="columns-form"
+              data-column-apply disabled>
+        Apply
+      </button>
+    </div>
+  </div>
+</div>

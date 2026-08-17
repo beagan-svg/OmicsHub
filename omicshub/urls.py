@@ -10,14 +10,11 @@ from omicshub.health import health
 
 # Where the admin is mounted. It is the one page on this host that can edit users, read
 # every queue entry, and activate a config, and "/admin/" is the first path anything
-# scanning the tunnel will try — so it is configurable and should not be the default
+# scanning the tunnel will try, so it is configurable and should not be the default
 # anywhere the app is reachable by more than the machine it runs on.
 #
-# Read from settings when a setting exists, and from the environment otherwise:
-# `environ.Env.read_env` in config/settings/base.py puts everything in .env into
-# os.environ before this module is imported, so ADMIN_URL is picked up from .env either
-# way. Nothing else in the project hardcodes the path — templates and tests go through
-# reverse("admin:index") — so changing it is this one variable.
+# Read from settings when a setting exists, and from the environment otherwise. Templates
+# and tests use reverse("admin:index"), so changing it requires one variable.
 _admin_url = getattr(settings, "ADMIN_URL", None) or os.environ.get("ADMIN_URL") or "admin"
 # Tolerate "ops/", "/ops" and "ops" alike; path() needs exactly one trailing slash and no
 # leading one.
@@ -33,10 +30,10 @@ urlpatterns = [
     path("accounts/login/", LoginView.as_view(authentication_form=LoginForm), name="login"),
     path("accounts/logout/", LogoutView.as_view(), name="logout"),
     path("api-auth/", include("rest_framework.urls")),
-    path("api/", include("apps.catalog.urls")),
-    path("api/", include("apps.workflows.urls")),
-    path("api/", include("apps.queueing.urls")),
+    path("api/", include("apps.sample_catalog.urls")),
+    path("api/", include("apps.workflow_engine.urls")),
+    path("api/", include("apps.submission_queue.urls")),
     # Last: the web app owns "" and would otherwise shadow nothing, but keeping it here
     # makes the API and admin prefixes the first thing a reader sees.
-    path("", include("apps.web.urls")),
+    path("", include("apps.web_ui.urls")),
 ]

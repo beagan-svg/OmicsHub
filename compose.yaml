@@ -1,15 +1,9 @@
-# The whole stack. Until now Postgres and Redis ran as hand-started containers that nothing
-# on disk described; this file is that missing record as much as it is a deployment.
+# Define the complete OmicsHub stack.
 #
-#     scripts/vendor_gcs.sh          # bring the ocs CLI packages into the build context
-#     cp .env.docker.example .env.docker && $EDITOR .env.docker
-#     docker compose --env-file .env.docker up -d --build
+#     scripts/setup_docker.sh        # create config, prepare dependencies, and start the stack
 #
-# `--env-file .env.docker` is required, not a nicety. Compose resolves `${...}` below from
-# the shell or from a file named `.env` — and this project's `.env` is the *host* config,
-# pointing at localhost. Without the flag the interpolations come out empty and the mount
-# spec fails; with a `.env` present but wrong, they would come out wrong instead, which is
-# worse. There is deliberately no default value on either of them for that reason.
+# `--env-file .env.docker` is required. Compose resolves `${...}` below from the shell or
+# its default environment file. Without the flag the credential mount path is empty.
 name: omicshub
 
 # Everything the four application processes share. They run the same image and differ only
@@ -23,16 +17,14 @@ x-app: &app
   environment:
     # Service names, not localhost: inside the network these resolve to the containers.
     # Set here rather than in .env.docker because they are a property of this topology,
-    # and a stale copy of the host .env pointing at localhost would half-work and confuse.
+    # and a stale environment file pointing at localhost would half-work and confuse.
     DATABASE_URL: postgres://omicshub:${POSTGRES_PASSWORD}@postgres:5432/omicshub
     CELERY_BROKER_URL: redis://redis:6379/0
     CACHE_URL: redis://redis:6379/1
     AWS_SHARED_CREDENTIALS_FILE: /run/aws/credentials
+    AWS_REGION: ${OCS_AWS_REGION}
+    AWS_DEFAULT_REGION: ${OCS_AWS_REGION}
     OCS_CLI_PATH: /opt/venv/bin/ocs
-    # The CLI is pip-installed in the image, so unlike on the host there is no source tree
-    # to point at. Set empty rather than left out, so a copied host .env cannot reintroduce
-    # macOS paths that do not exist here.
-    OCS_CLI_PYTHONPATH: ""
     DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-omicshub.settings.prod}
   volumes:
     # Read-only, and a bind mount rather than anything baked into the image: these are
@@ -59,7 +51,7 @@ services:
     # the web port only; the database should not be reachable from the network as well.
     #
     # The host side is settable because a machine that has been running this stack by hand
-    # already has something on 5432 — moving the published port is how you bring the two up
+    # already has something on 5432. Move the published port to run both stacks.
     # side by side. The container side is fixed: it is what DATABASE_URL above resolves to.
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
@@ -83,7 +75,7 @@ services:
       retries: 10
     restart: unless-stopped
 
-  web:
+  web_ui:
     <<: *app
     # migrate before serving, and only here: one web container means one migrator, so no
     # two processes race to apply the same migration. collectstatic runs at start rather
@@ -114,12 +106,12 @@ services:
     # containers run the same image but serve no HTTP, so the same check on them would
     # report a permanent failure that means nothing.
     #
-    # /healthz/ is a *readiness* answer — it goes 503 when the broker or the submissions
+    # /healthz/ reports readiness. It returns 503 when the broker or the submissions
     # worker is down, not only when this container is. That is deliberate: a web container
-    # that renders pages while no submission can reach OCS is the exact failure config/
+    # that renders pages while no submission can reach OCS is the exact failure mode.
     # health.py was written for, and it should be visible in `docker compose ps` rather
-    # than only to whoever opens the endpoint. Nothing here restarts on it — `restart:
-    # unless-stopped` reacts to the process exiting, not to the health status — so an
+    # than only to whoever opens the endpoint. `restart: unless-stopped` reacts to the
+    # process exiting, not to health status, so an
     # unhealthy web container stays up and keeps serving while it says what is wrong.
     #
     # start_period covers migrate and collectstatic, which run before gunicorn binds.
@@ -145,7 +137,7 @@ services:
     # the above so a long metadata sweep cannot sit in front of a queued job.
     #
     # No --queues, on purpose. A worker started without one consumes exactly the app's
-    # `task_default_queue`, which config/settings/base.py sets to "default" — so the queue
+    # `task_default_queue`, which omicshub/settings/base.py sets to "default". The queue
     # this consumes is read from the same setting that decides where those tasks are
     # published, and the two cannot disagree.
     #
@@ -154,14 +146,14 @@ services:
     # by nobody: beat logs "Sending due task" every time, the messages pile up in Redis, and
     # the dashboard silently stops updating with no error anywhere to say why. Naming the
     # queue here at all is what made that possible, so it is no longer named here.
-    # apps/queueing/tests/test_celery_routing.py holds the other half of this, asserting
+    # apps/submission_queue/tests/test_celery_routing.py holds the other half of this, asserting
     # every scheduled task routes to a queue one of these two workers takes.
     command: celery -A omicshub worker --concurrency 2 --loglevel info
 
   beat:
     <<: *app
     # The schedule file is regenerated from CELERY_BEAT_SCHEDULE on start, so it is state
-    # nobody needs kept — /tmp rather than a volume, and out of the read-only app tree.
+    # nobody needs kept. Use /tmp rather than a volume and keep it out of the read-only app tree.
     command: celery -A omicshub beat --loglevel info --schedule /tmp/celerybeat-schedule
 
 volumes:

@@ -30,9 +30,9 @@ class RequestIDMiddleware:
     def __call__(self, request):
         request_id = sanitize_request_id(request.headers.get(REQUEST_ID_HEADER)) or new_request_id()
         request.request_id = request_id
-        # Deliberately not reset on the way out. Django logs `django.request` — the
+        # Deliberately not reset on the way out. Django logs `django.request`, and the
         # "Internal Server Error: /path" line for every 5xx, which is the single line most
-        # worth correlating — from `BaseHandler.get_response`, *after* the middleware chain
+        # request remains available from `BaseHandler.get_response` after the middleware chain
         # has returned. Resetting here stamps that line with "-" and breaks the trail at
         # precisely the failure it exists for. Nothing leaks between requests as a result:
         # this runs first, so the next request overwrites the value before anything reads

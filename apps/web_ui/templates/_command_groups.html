@@ -1,0 +1,127 @@
+{% for group in groups %}
+<div class="card mb-2">
+  <div class="card-header">
+    <span class="mono">{{ group.batch }}</span>
+    <span class="d-flex align-items-center gap-2">
+      <span class="text-secondary">{{ group.entries|length }} sample{{ group.entries|pluralize }}</span>
+      <button class="btn btn-sm btn-outline-secondary show-hide-btn" type="button"
+              data-bs-toggle="collapse" data-bs-target="#group-{{ stage_key }}-{{ forloop.counter }}"
+              aria-controls="group-{{ stage_key }}-{{ forloop.counter }}" aria-expanded="true">
+        Show/Hide
+      </button>
+    </span>
+  </div>
+
+  <div class="collapse show" id="group-{{ stage_key }}-{{ forloop.counter }}">
+    <table class="table table-sm align-middle mb-0">
+      <caption class="visually-hidden">
+        Commands that will run for batch {{ group.batch }}.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col" style="min-width:9rem">Fastq Name</th>
+          <th scope="col">Workflow</th>
+          <th scope="col">Command</th>
+          <th scope="col"><span class="visually-hidden">Edit</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in group.entries %}
+        {% with entry=row.entry fastq=row.entry.sample.fastq_name %}
+        <tr>
+          <td class="mono">{{ fastq }}</td>
+          <td><span class="tag tag--accent">{{ entry.modality }}</span></td>
+          <td>
+            <div class="command" id="cmd-{{ stage_key }}-{{ fastq|slugify }}">{{ entry.command }}</div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
+              <span class="tag" data-role="config-name">{{ entry.command_config_name }}</span>
+              <span class="state" data-state="warn" data-role="edited-flag"
+                    {% if not entry.edited %}hidden{% endif %}>edited</span>
+              <span class="text-secondary" data-role="spacing">waits {{ entry.spacing }}s before the next</span>
+              <span class="state" data-state="warn" data-role="preview-error" hidden></span>
+            </div>
+          </td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-secondary edit-command" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#edit-{{ stage_key }}-{{ fastq|slugify }}"
+                    aria-controls="edit-{{ stage_key }}-{{ fastq|slugify }}" aria-expanded="false"
+                    aria-label="Edit command for {{ fastq }}">
+              <i class="bi bi-pencil" aria-hidden="true"></i>
+            </button>
+          </td>
+        </tr>
+        <tr class="collapse command-editor" id="edit-{{ stage_key }}-{{ fastq|slugify }}"
+            data-fastq="{{ fastq }}" data-row="cmd-{{ stage_key }}-{{ fastq|slugify }}">
+          <td colspan="4" class="p-0">
+            <div class="card-body is-toolbar">
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <label class="label d-block mb-1" for="cc-{{ stage_key }}-{{ fastq|slugify }}">Command config</label>
+                  <select class="form-select form-select-sm" id="cc-{{ stage_key }}-{{ fastq|slugify }}"
+                          name="override__{{ fastq }}__command_config">
+                    {% for option in row.options %}
+                    <option value="{{ option.name }}" {% if option.name == entry.command_config_name %}selected{% endif %}>
+                      {{ option.asset_name|default:option.name }} ({{ option.name }})
+                    </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                {% if row.fields.reference_name %}
+                <div class="col-md-4">
+                  <label class="label d-block mb-1" for="ref-{{ stage_key }}-{{ fastq|slugify }}">Reference</label>
+                  <select class="form-select form-select-sm" id="ref-{{ stage_key }}-{{ fastq|slugify }}"
+                          name="override__{{ fastq }}__reference_name">
+                    {% for value in row.fields.reference_name %}
+                    <option value="{{ value }}" {% if value == entry.placeholders.reference_name %}selected{% endif %}>{{ value }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                {% endif %}
+                {% if row.fields.chemistry %}
+                <div class="col-md-4">
+                  <label class="label d-block mb-1" for="chem-{{ stage_key }}-{{ fastq|slugify }}">Chemistry</label>
+                  <select class="form-select form-select-sm" id="chem-{{ stage_key }}-{{ fastq|slugify }}"
+                          name="override__{{ fastq }}__chemistry">
+                    <option value="">None</option>
+                    {% for value in row.fields.chemistry %}
+                    <option value="{{ value }}" {% if value == entry.placeholders.chemistry %}selected{% endif %}>{{ value }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                {% endif %}
+                <div class="col-12">
+                  <label class="label d-block mb-1" for="raw-{{ stage_key }}-{{ fastq|slugify }}">
+                    Command sent to OCS
+                  </label>
+                  <textarea class="form-control form-control-sm mono raw-command" rows="3"
+                            id="raw-{{ stage_key }}-{{ fastq|slugify }}"
+                            name="override__{{ fastq }}__command"
+                            aria-describedby="raw-help-{{ stage_key }}-{{ fastq|slugify }}"
+                            data-original="{{ entry.command }}">{{ entry.command }}</textarea>
+                  <input type="hidden" name="override__{{ fastq }}__command_original"
+                         value="{{ entry.command }}">
+                  <div class="d-flex justify-content-between align-items-center gap-3 mt-1">
+                    <div class="form-text m-0" id="raw-help-{{ stage_key }}-{{ fastq|slugify }}">
+                      Rebuilt from the menus as you change them, and submitted exactly as it
+                      reads here. Type in it and the menus stop applying to this sample. Use
+                      Reset to config to hand it back to them.
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary reset-command text-nowrap" type="button"
+                            data-target="raw-{{ stage_key }}-{{ fastq|slugify }}">
+                      Reset to config
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% empty %}
+<div class="text-secondary">Nothing to run.</div>
+{% endfor %}

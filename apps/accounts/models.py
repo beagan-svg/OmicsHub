@@ -10,7 +10,7 @@ class User(AbstractUser):
     mid-project user-model migration.
     """
 
-    # Dashboard column keys this user has chosen to see. Empty means the default set —
+    # Dashboard column keys this user has chosen to see. Empty means the default set.
     # storing the choice here rather than in a session keeps it across logins and browsers.
     visible_columns = models.JSONField(default=list, blank=True)
 

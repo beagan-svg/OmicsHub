@@ -1,11 +1,10 @@
 # Build context. Everything the image needs is listed in the Dockerfile; the point of this
 # file is that nothing else reaches the daemon — most importantly credentials.
 
-# Never. .env holds the database password and names the AWS profile; an image layer is
+# Never. .env.docker holds the database password and names the AWS profile; an image layer is
 # permanent and pushable, so a secret that lands in one is a secret that has leaked.
 .env
 .env.*
-!.env.example
 !.env.docker.example
 
 # Built on the host, for the host. Copying a macOS venv into a Linux image gives broken
@@ -42,5 +41,5 @@ __pycache__/
 #   pyproject.toml, requirements.lock   dependency install, before the source copy
 #   vendor/gcs/                         the `ocs` CLI packages; see scripts/vendor_gcs.sh
 #   scripts/                            healthcheck.py runs inside the web container
-#   apps/, config/, manage.py           the application
-#   configs/                            the sample workflow config
+#   apps/, omicshub/, manage.py         the application
+#   workflow_manifests/                 the sample workflow manifest

@@ -18,14 +18,14 @@ concurrency:
 
 env:
   DJANGO_SETTINGS_MODULE: omicshub.settings.test
-  # config/settings/test.py fills these in with os.environ.setdefault, so the suite runs
+      # omicshub/settings/test.py fills these in with os.environ.setdefault, so the suite runs
   # without them — they are set here anyway so the workflow says out loud what it depends
   # on, and so a change to those defaults shows up as a CI failure to look at rather than
   # as a silent switch to a different database.
   #
   # Fake values, and only fake values. SECRET_KEY has no default in base.py and has to come
   # from somewhere; nothing signed by this one ever leaves the runner.
-  SECRET_KEY: ci-only-not-a-real-secret
+  SECRET_KEY: ci-only-not-a-real-secret-with-enough-length-for-django-checks-12345
   DATABASE_URL: postgres://omicshub:omicshub@127.0.0.1:5432/omicshub
   # memory://, not the Redis service. The tests that touch the broker patch it, and pointing
   # this at a real Redis would make the health-check tests reach for workers that do not
@@ -57,7 +57,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      # 7, matching compose.yaml. The suite does not currently need it: config/settings/
+      # 7, matching compose.yaml. The suite does not currently need it: omicshub/settings/
       # test.py forces a locmem cache and the memory:// broker above, precisely so the tests
       # run on a laptop with nothing installed. It is here so that the day a test does need
       # Redis — a cache backend test, or the capacity hold exercised across processes — it
@@ -80,49 +80,50 @@ jobs:
         with:
           python-version: "3.12"
 
-      # uv rather than pip: it is what generated the lock files and what the project's own
-      # virtualenv is built with, so CI resolves dependencies the same way a developer does.
+      # uv is the project's dependency manager, so CI uses the same lockfile as local development.
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
       - name: Install dependencies
-        # --system installs into the runner's Python rather than a venv, which is what the
-        # later steps run with. requirements-dev.lock is the runtime lock plus pytest,
-        # pytest-django and ruff, all pinned — a new ruff release should fail the build on
-        # the commit that upgrades it, not on an unrelated pull request.
-        run: uv pip install --system -r requirements-dev.lock
+        run: uv sync --frozen --group dev
 
-      - name: Check the lock files still match pyproject.toml
-        # The locks are generated, and a dependency added to pyproject.toml without
-        # regenerating them is a dependency the Docker image will not have. Recompiling and
-        # diffing is the check; uv pip compile has no --check of its own.
-        run: |
-          uv pip compile pyproject.toml --universal --python-version 3.12 \
-            --no-header -o /tmp/requirements.lock
-          uv pip compile pyproject.toml --group dev --universal --python-version 3.12 \
-            --no-header -o /tmp/requirements-dev.lock
-          # Comment lines are dropped from both sides: it is the pinned versions that have
-          # to match, not the hand-written header the committed file carries and the freshly
-          # compiled one does not.
-          diff <(grep -v '^#' requirements.lock) <(grep -v '^#' /tmp/requirements.lock) \
-            || { echo "::error::requirements.lock is stale — regenerate it (see the file header)"; exit 1; }
-          diff <(grep -v '^#' requirements-dev.lock) <(grep -v '^#' /tmp/requirements-dev.lock) \
-            || { echo "::error::requirements-dev.lock is stale — regenerate it (see the file header)"; exit 1; }
+      - name: Check the lock file matches pyproject.toml
+        run: uv lock --check
 
       - name: Lint
-        run: ruff check .
+        run: uv run ruff check .
 
       - name: Check formatting
-        run: ruff format --check .
+        run: uv run ruff format --check .
 
       - name: Check for model changes with no migration
         # The failure this catches: a field added to a model and shipped without the
         # migration, which passes every test on a developer's already-migrated database and
         # then breaks the deployment's `migrate` step. --check exits non-zero if
         # makemigrations would have written anything; --dry-run keeps it from writing.
-        run: python manage.py makemigrations --check --dry-run
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Check production settings
+        env:
+          DJANGO_SETTINGS_MODULE: omicshub.settings.prod
+          ALLOWED_HOSTS: localhost
+          CSRF_TRUSTED_ORIGINS: https://localhost
+          SECURE_SSL_REDIRECT: "True"
+          SECURE_HSTS_SECONDS: "31536000"
+          SECURE_HSTS_INCLUDE_SUBDOMAINS: "True"
+          SECURE_HSTS_PRELOAD: "True"
+          SESSION_COOKIE_SECURE: "True"
+          CSRF_COOKIE_SECURE: "True"
+        # Use production settings with CI-only values. The deploy check validates settings
+        # and does not need a live database, AWS account, or Celery worker.
+        run: uv run python manage.py check --deploy
+
+      - name: Type check stable application boundaries
+        # The first typing gate covers models, the OCS command boundary, and the container
+        # health probe. The remaining dynamic manifest and view code is being typed in stages.
+        run: uv run mypy apps/sample_catalog/models.py apps/workflow_engine/models.py apps/submission_queue/models.py apps/ocs_integration/cli.py scripts/healthcheck.py
 
       - name: Test
-        run: python -m pytest -q
+        run: uv run python -m pytest -q

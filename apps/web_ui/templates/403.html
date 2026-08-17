@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}No access | OmicsHub{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <div class="empty">
+      <i class="bi bi-lock" aria-hidden="true"></i>
+      <h1 class="empty__title">You do not have access to this page.</h1>
+      <p class="empty__hint">
+        {{ exception|default:"This page is staff-only." }}
+        You are signed in as {{ user.get_username }}. Ask a staff member to grant your
+        account access, or return to your samples.
+      </p>
+      <a class="btn btn-sm btn-primary" href="{% url 'web_ui:dashboard' %}">Back to samples</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load web_ui_extras %}
+
+{% block title %}Queue | OmicsHub{% endblock %}
+
+{% block page_head %}
+<div class="page-head">
+  <div class="page-head__text">
+    <h1>Queue</h1>
+    <p class="page-head__desc">
+      Submission jobs in queue. The worker executes the next job command in queue as OCS
+      capacity allows.
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="card queue-summary mb-3" aria-labelledby="queue-summary-title">
+  <div class="queue-summary__block">
+    <h2 class="label mb-2" id="queue-summary-title">Queue status</h2>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="state" data-state="done">Active</span>
+      <span class="text-secondary">Automatic processing · round-robin fairness</span>
+    </div>
+  </div>
+  {% if next_entry %}
+  <div class="queue-summary__block queue-summary__next">
+    <div class="label mb-2">Next eligible submission</div>
+    <div class="queue-next-line">
+      <span class="mono">{{ next_entry.sample.fastq_name }}</span>
+      <span class="tag">{{ next_entry.stage }}</span>
+      <span class="tag tag--accent">{{ next_entry.modality }}</span>
+      <span class="queue-requester">requested by {{ next_entry.requested_by }}</span>
+      <span class="queue-wait">{{ next_wait }}</span>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<section class="card" aria-labelledby="queue-jobs-title">
+  <div class="card-header">
+    <span id="queue-jobs-title">Queued jobs</span>
+    <span class="text-secondary">
+      {{ entries|length }} {% if entries|length == 1 %}job{% else %}jobs{% endif %} in queue
+    </span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <caption class="visually-hidden">
+        Jobs waiting to be submitted to OCS, oldest first.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">FASTQ Name</th><th scope="col">Stage</th>
+          <th scope="col">Workflow</th>{% if user.is_staff %}<th scope="col">Requested by</th>{% endif %}
+          <th scope="col">Command</th><th scope="col">Status</th>
+          <th scope="col">Queued At</th><th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <td class="mono">{{ entry.sample.fastq_name }}</td>
+          <td><span class="tag">{{ entry.stage }}</span></td>
+          <td><span class="tag tag--accent">{{ entry.modality }}</span></td>
+          {% if user.is_staff %}<td class="text-secondary">{{ entry.requested_by }}</td>{% endif %}
+          <td class="queue-command-cell">
+            <details class="queue-command">
+              <summary>View command</summary>
+              <code>{{ entry.command }}</code>
+            </details>
+          </td>
+          <td>{% include "_state.html" with status=entry.status %}</td>
+          <td class="text-secondary">{{ entry.created_at|date:"Y-m-d H:i" }}</td>
+          <td class="text-end">
+            {% if entry.status == "PENDING" %}
+            <form method="post" action="{% url 'web_ui:cancel' entry.pk %}">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-outline-danger" type="submit"
+                      aria-label="Cancel {{ entry.stage }} for {{ entry.sample.fastq_name }}">Cancel</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        {% url 'web_ui:dashboard' as samples_url %}
+        <tr><td colspan="{% if user.is_staff %}8{% else %}7{% endif %}">
+          {% include "_empty.html" with icon="list-ol" title="The queue is empty." hint="Pick samples and add them to your cart, then submit from checkout." action_url=samples_url action_label="Go to samples" %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

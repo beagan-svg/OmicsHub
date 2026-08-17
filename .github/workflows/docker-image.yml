@@ -24,6 +24,14 @@ jobs:
           # says it is on its way to being. Harmless until then.
           submodules: recursive
 
+      - name: Validate Compose configuration
+        run: |
+          cp .env.docker.example /tmp/omicshub.env
+          sed -i 's|^SECRET_KEY=.*|SECRET_KEY=ci-only-not-a-real-secret-with-enough-length-for-django-checks-12345|' /tmp/omicshub.env
+          sed -i 's|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=ci-only-postgres-password|' /tmp/omicshub.env
+          sed -i 's|^AWS_CREDENTIALS_FILE=.*|AWS_CREDENTIALS_FILE=/tmp/omicshub-credentials|' /tmp/omicshub.env
+          docker compose --env-file /tmp/omicshub.env config --quiet
+
       - name: Check the build context is complete
         id: context
         # The image installs the `ocs` CLI from vendor/gcs/, and .gitignore excludes

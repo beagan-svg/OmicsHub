@@ -1,0 +1,248 @@
+"""Read OCS metadata, history, and demand data from DynamoDB."""
+
+from __future__ import annotations
+
+import datetime as dt
+import re
+import threading
+import time
+from typing import Any
+
+import boto3
+from boto3.dynamodb.conditions import Attr, Key
+from django.conf import settings
+
+FASTQ_METADATA_TABLE = "fastq-metadata"
+FASTQ_HISTORY_TABLE = "fastq-history"
+DEMAND_REGISTRY_TABLE = "demand-registry"
+
+FASTQ_METADATA_BATCH_INDEX = f"{FASTQ_METADATA_TABLE}-batch-name-from-vendor-index"
+DEMAND_REGISTRY_TYPE_INDEX = f"{DEMAND_REGISTRY_TABLE}-demand-type-start-time-index"
+
+# demand-registry is partitioned by demand_type and sorted by start_time, so counting
+# in-flight demands needs a lower bound on start_time. Two weeks matches the default
+# window GWORegistry.list_demands uses and comfortably covers any running job.
+IN_PROGRESS_LOOKBACK = dt.timedelta(days=14)
+
+# DynamoDB caps BatchGetItem at 100 keys per request.
+BATCH_GET_CHUNK = 100
+
+# Keys come back unprocessed when the table throttles, so retrying them immediately is
+# how a throttled table gets hammered. Doubles per consecutive retry, up to the cap.
+UNPROCESSED_BACKOFF = 0.05
+UNPROCESSED_BACKOFF_CAP = 5.0
+
+# A GFS path is the "gfs://" scheme plus a file store id, which gcs_core defines as the
+# sha1 of the S3 URI, with forty lowercase hex characters. Matching that shape rather than
+# just stripping the scheme keeps a malformed row out of the mirror instead of storing a
+# string nobody can paste into OCS tooling.
+GFS_PATH = re.compile(r"^gfs://([0-9a-f]{40})$")
+
+# One boto3 resource per thread. See _resource().
+_local = threading.local()
+
+
+def reset_resource_cache() -> None:
+    """Clear the current thread's cached DynamoDB resource."""
+    _local.resource = None
+
+
+def _resource():
+    """Return the current thread's DynamoDB resource."""
+    resource = getattr(_local, "resource", None)
+    if resource is None:
+        session = boto3.Session(profile_name=settings.AWS_PROFILE or None)
+        resource = session.resource("dynamodb", region_name=settings.OCS_AWS_REGION)
+        _local.resource = resource
+    return resource
+
+
+def _table(name: str):
+    return _resource().Table(f"{settings.OCS_ENV_BASE}-{name}")
+
+
+def _query_all(table, **kwargs) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    while True:
+        response = table.query(**kwargs)
+        items.extend(response["Items"])
+        last_key = response.get("LastEvaluatedKey")
+        if not last_key:
+            return items
+        kwargs["ExclusiveStartKey"] = last_key
+
+
+def _batch_get(name: str, keys: list[dict[str, str]]) -> list[dict[str, Any]]:
+    if not keys:
+        return []
+
+    resource = _resource()
+    table_name = f"{settings.OCS_ENV_BASE}-{name}"
+    items: list[dict[str, Any]] = []
+
+    # A repeated key makes DynamoDB reject the whole request with ValidationException, and
+    # demand ids gathered across history rows do repeat.
+    unique = list({tuple(sorted(key.items())): key for key in keys}.values())
+
+    for start in range(0, len(unique), BATCH_GET_CHUNK):
+        request = {table_name: {"Keys": unique[start : start + BATCH_GET_CHUNK]}}
+        delay = UNPROCESSED_BACKOFF
+        while request:
+            response = resource.batch_get_item(RequestItems=request)
+            items.extend(response["Responses"].get(table_name, []))
+            request = response.get("UnprocessedKeys") or None
+            if request:
+                time.sleep(delay)
+                delay = min(delay * 2, UNPROCESSED_BACKOFF_CAP)
+
+    return items
+
+
+def get_metadata_by_fastq_names(fastq_names: list[str]) -> list[dict[str, Any]]:
+    """Return fastq metadata entries for the given fastq names."""
+    return _batch_get(FASTQ_METADATA_TABLE, [{"fastq_name": name} for name in fastq_names])
+
+
+def scan_metadata(batch_prefixes: set[str] | None = None, page_size: int = 1000):
+    """Yield fastq metadata entries one page at a time."""
+    kwargs = {}
+    if batch_prefixes:
+        prefixes = sorted(batch_prefixes)
+        condition = Attr("batch_name_from_vendor").begins_with(prefixes[0])
+        for prefix in prefixes[1:]:
+            condition |= Attr("batch_name_from_vendor").begins_with(prefix)
+        kwargs["FilterExpression"] = condition
+
+    yield from _scan(FASTQ_METADATA_TABLE, page_size, **kwargs)
+
+
+def scan_history(page_size: int = 1000):
+    """Yield fastq history rows one page at a time."""
+    yield from _scan(
+        FASTQ_HISTORY_TABLE,
+        page_size,
+        # `file_store_id` reads the two GFS attributes. See that function for
+        # why both are needed to name a single stage's output.
+        ProjectionExpression=(
+            "fastq_name,demand_type_and_id,last_update_time,fastq_gfs_path,input_output_gfs_pairs"
+        ),
+    )
+
+
+def file_store_id(history_row: dict[str, Any]) -> str:
+    """Return the file store id from a history row, or an empty string."""
+    outputs = {
+        path for pair in history_row.get("input_output_gfs_pairs") or [] for path in pair.get("outputs") or []
+    }
+    fastq_gfs_path = history_row.get("fastq_gfs_path")
+    if fastq_gfs_path in outputs:
+        return _file_store_id(fastq_gfs_path)
+    if len(outputs) == 1:
+        return _file_store_id(next(iter(outputs)))
+    return ""
+
+
+def _file_store_id(gfs_path: str) -> str:
+    match = GFS_PATH.match(gfs_path or "")
+    return match.group(1) if match else ""
+
+
+def scan_demands(page_size: int = 1000):
+    """Yield demand registry rows with status and fastq names."""
+    yield from _scan(
+        DEMAND_REGISTRY_TABLE,
+        page_size,
+        # start_time and duration are what let the dashboard say how long a stage took.
+        # The registry computes duration itself (seconds, as a DynamoDB Number), so it is
+        # read rather than derived here. Deriving it from the two timestamps would give a
+        # different answer for any demand OCS retried or backdated.
+        ProjectionExpression=(
+            "demand_id,#s,demand_type,start_time,#d,last_update_time,"
+            "#r.execution_parameters.params.FASTQ_NAMES"
+        ),
+        # "status", "request" and "duration" are all DynamoDB reserved words.
+        ExpressionAttributeNames={"#s": "status", "#r": "request", "#d": "duration"},
+    )
+
+
+def demand_fastq_names(demand: dict[str, Any]) -> list[str]:
+    """Return fastq names from a demand request such as `FASTQ_SET_1=NW_TX0194-1`."""
+    raw = demand.get("request", {}).get("execution_parameters", {}).get("params", {}).get("FASTQ_NAMES", "")
+    return [pair.split("=", 1)[1] for pair in raw.split(",") if "=" in pair]
+
+
+def _scan(table_name: str, page_size: int, **kwargs):
+    table = _table(table_name)
+    kwargs["Limit"] = page_size
+    while True:
+        response = table.scan(**kwargs)
+        yield response["Items"]
+        last_key = response.get("LastEvaluatedKey")
+        if not last_key:
+            return
+        kwargs["ExclusiveStartKey"] = last_key
+
+
+def get_metadata_by_batch(batch_name_from_vendor: str) -> list[dict[str, Any]]:
+    """Return every fastq-metadata entry in a vendor batch."""
+    return _query_all(
+        _table(FASTQ_METADATA_TABLE),
+        IndexName=f"{settings.OCS_ENV_BASE}-{FASTQ_METADATA_BATCH_INDEX}",
+        KeyConditionExpression=Key("batch_name_from_vendor").eq(batch_name_from_vendor),
+    )
+
+
+def get_history(fastq_name: str) -> list[dict[str, str]]:
+    """Return every demand recorded for a fastq name.
+
+    The sort key packs the two values together as "<demand_type>#<demand_id>", so it is
+    split back apart here. Demand types are the lowercase DemandType values: "ingest",
+    "align", "post-align".
+    """
+    entries = _query_all(
+        _table(FASTQ_HISTORY_TABLE),
+        KeyConditionExpression=Key("fastq_name").eq(fastq_name),
+    )
+
+    history = []
+    for entry in entries:
+        demand_type, demand_id = entry["demand_type_and_id"].rsplit("#", 1)
+        history.append(
+            {
+                "demand_type": demand_type.lower(),
+                "demand_id": demand_id,
+                "last_update_time": entry["last_update_time"],
+                "file_store_id": file_store_id(entry),
+            }
+        )
+    return history
+
+
+def get_demands(demand_ids: list[str]) -> dict[str, dict[str, Any]]:
+    """Return demand-registry entries keyed by demand id."""
+    entries = _batch_get(DEMAND_REGISTRY_TABLE, [{"demand_id": demand_id} for demand_id in demand_ids])
+    return {entry["demand_id"]: entry for entry in entries}
+
+
+def count_in_progress(demand_type: str) -> int:
+    """Count OCS demands of one type with IN_PROGRESS status.
+
+    This is the capacity check the queue worker gates submissions on.
+    """
+    since = (dt.datetime.now(dt.UTC) - IN_PROGRESS_LOOKBACK).isoformat().replace("+00:00", "Z")
+    table = _table(DEMAND_REGISTRY_TABLE)
+    kwargs: dict[str, Any] = {
+        "IndexName": f"{settings.OCS_ENV_BASE}-{DEMAND_REGISTRY_TYPE_INDEX}",
+        "KeyConditionExpression": Key("demand_type").eq(demand_type) & Key("start_time").gte(since),
+        "FilterExpression": Attr("status").eq("IN_PROGRESS"),
+        "Select": "COUNT",
+    }
+
+    count = 0
+    while True:
+        response = table.query(**kwargs)
+        count += response["Count"]
+        last_key = response.get("LastEvaluatedKey")
+        if not last_key:
+            return count
+        kwargs["ExclusiveStartKey"] = last_key

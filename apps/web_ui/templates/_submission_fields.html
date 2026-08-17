@@ -1,0 +1,17 @@
+{% for name in submission.fastq_names %}
+  <input type="hidden" name="fastq_names" value="{{ name }}">
+{% endfor %}
+{% for value in choice_values %}
+  <input type="hidden" name="command_config_choice" value="{{ value }}">
+{% endfor %}
+<input type="hidden" name="config_id" value="{{ submission.config_id }}">
+<input type="hidden" name="force" value="{{ submission.force }}">
+{% if submission.batch_processing %}<input type="hidden" name="batch_processing" value="on">{% endif %}
+{% if not plan.needs_modality %}<input type="hidden" name="modality" value="{{ submission.modality }}">{% endif %}
+{% if include_overrides %}
+  {% for fastq_name, fields in submission.overrides.items %}
+    {% for field, value in fields.items %}
+      <input type="hidden" name="override__{{ fastq_name }}__{{ field }}" value="{{ value }}">
+    {% endfor %}
+  {% endfor %}
+{% endif %}

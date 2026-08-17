@@ -22,15 +22,15 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "apps.accounts",
-    "apps.catalog",
-    "apps.workflows",
-    "apps.queueing",
-    "apps.web",
+    "apps.sample_catalog",
+    "apps.workflow_engine",
+    "apps.submission_queue",
+    "apps.web_ui",
 ]
 
 MIDDLEWARE = [
-    # First, so that everything after it — including the security middleware's own
-    # rejections — logs under the request's correlation id.
+    # First, so everything after it, including the security middleware's own rejections,
+    # logs under the request's correlation id.
     "omicshub.middleware.RequestIDMiddleware",
     "django.middleware.security.SecurityMiddleware",
     # Serves the admin's CSS and JS. Django's own static serving only runs with DEBUG on,
@@ -57,15 +57,15 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "apps.web.context_processors.cart",
+                "apps.web_ui.context_processors.cart",
             ],
         },
     },
 ]
 
 # Redis, not the per-process default. The only thing in the cache is the submission
-# worker's capacity hold, and a hold that lives in one process's memory is not a hold —
-# it would vanish on restart and would not be seen by a second worker. Its own database,
+# worker's capacity hold, and a hold that lives in one process's memory is not a hold.
+# It would vanish on restart and would not be seen by a second worker. Its own database,
 # so a `FLUSHDB` on the cache never touches the Celery broker.
 CACHES = {
     "default": {
@@ -92,7 +92,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "web:dashboard"
+LOGIN_REDIRECT_URL = "web_ui:dashboard"
 LOGOUT_REDIRECT_URL = "login"
 # Django's error level is "error"; Bootstrap's alert class is "danger". Remapping here
 # keeps the base template's message loop a plain alert-{{ level_tag }}.
@@ -128,12 +128,12 @@ OCS_ENV_BASE = env("OCS_ENV_BASE")
 OCS_AWS_REGION = env("OCS_AWS_REGION")
 # Named AWS profile for the DynamoDB reads and the `ocs` CLI. Left empty, boto3 falls back
 # to its usual chain (environment variables, then the instance role). Access keys
-# themselves are never read from Django settings — see AWS credentials in the README.
+# themselves are never read from Django settings. See the AWS credentials section in the README.
 AWS_PROFILE = env("AWS_PROFILE", default="")
 
 # Credentials file holding that profile. Pointing this away from ~/.aws/credentials keeps
 # the app's long-lived key out of the machine-wide file, so it is reachable only from this
-# process and the `ocs` subprocess it starts — everything else on the machine keeps using
+# process and the `ocs` subprocess it starts. Everything else on the machine keeps using
 # the SSO profiles in ~/.aws/config.
 AWS_SHARED_CREDENTIALS_FILE = env("AWS_SHARED_CREDENTIALS_FILE", default="")
 if AWS_SHARED_CREDENTIALS_FILE:
@@ -143,10 +143,6 @@ if AWS_SHARED_CREDENTIALS_FILE:
 # The `ocs` executable used to submit alignment and post-alignment demands. Submission is
 # the only thing the CLI is used for; everything else reads DynamoDB directly.
 OCS_CLI_PATH = env("OCS_CLI_PATH", default="ocs")
-# Colon-separated paths the `ocs` CLI needs on PYTHONPATH, mirroring what the interactive
-# `activateocs` shell function exports. A worker is not a login shell and inherits none of
-# it, so the value is passed explicitly to the subprocess.
-OCS_CLI_PYTHONPATH = env("OCS_CLI_PYTHONPATH", default="")
 # Timeout for a single `ocs` submission call, in seconds.
 OCS_CLI_TIMEOUT = env.int("OCS_CLI_TIMEOUT", default=300)
 
@@ -158,37 +154,38 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 # Submissions run on their own queue with a single worker process, so the global OCS job
 # limit and the per-config `spacing` between submissions are both actually enforced.
 # Celery's own default queue is named "celery"; the workers are run as `-Q default` and
-# `-Q submissions`, so without this every unrouted task — both sweeps and the reconciler —
+# `-Q submissions`, so without this every unrouted task, including both sweeps and the
+# reconciler,
 # is published to a queue nobody consumes and silently never runs.
 CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_TASK_ROUTES = {
-    "apps.queueing.tasks.process_next_queue_entry": {"queue": "submissions"},
+    "apps.submission_queue.tasks.process_next_queue_entry": {"queue": "submissions"},
 }
 CELERY_BEAT_SCHEDULE = {
     # The submission chain re-queues itself; this restarts it when the queue has been
     # idle, and is a cheap no-op when there is nothing pending. It is also the only thing
-    # that retries after the OCS job limit is hit — the task does not schedule its own
+    # that retries after the OCS job limit is hit. The task does not schedule its own
     # retry, so `job_settings.poll_interval_hours` is honoured through the capacity hold
-    # in apps/queueing/tasks.py instead.
+    # in apps/submission_queue/tasks.py instead.
     "process-queue": {
-        "task": "apps.queueing.tasks.process_next_queue_entry",
+        "task": "apps.submission_queue.tasks.process_next_queue_entry",
         "schedule": 60.0,
     },
-    # Sweeps fastq-history and demand-registry — a few seconds each — so the dashboard's
+    # Sweeps fastq-history and demand-registry, which take a few seconds each, so the dashboard's
     # ingest/alignment/post-QC columns are never more than this far behind OCS.
     "sync-stage-statuses": {
-        "task": "apps.catalog.tasks.sync_all_stage_statuses",
+        "task": "apps.sample_catalog.tasks.sync_all_stage_statuses",
         "schedule": env.int("STAGE_STATUS_SYNC_SECONDS", default=300),
     },
     # Re-mirrors half a million metadata rows, which takes minutes, so it runs nightly.
     # A batch needed sooner is synced on demand from the dashboard.
     "sync-metadata": {
-        "task": "apps.catalog.tasks.sync_all_metadata",
+        "task": "apps.sample_catalog.tasks.sync_all_metadata",
         "schedule": crontab(hour=3, minute=0),
     },
     # Surfaces submissions a dying worker left mid-flight; without it they stay invisible.
     "reconcile-stranded-submissions": {
-        "task": "apps.queueing.tasks.reconcile_stranded_submissions",
+        "task": "apps.submission_queue.tasks.reconcile_stranded_submissions",
         "schedule": 600.0,
     },
 }
@@ -203,9 +200,16 @@ LOG_LEVEL = env("LOG_LEVEL", default="INFO")
 APP_LOG_LEVEL = env("APP_LOG_LEVEL", default=LOG_LEVEL)
 
 # Named one by one rather than as a single "apps" parent so each can be turned up on its
-# own — LOG_LEVEL_CATALOG=DEBUG to watch a sweep, without the submission worker's chatter.
-# apps.ocs is in here too: it is not an installed app, but it is where the CLI logs from.
-_APP_LOGGERS = ["accounts", "catalog", "ocs", "queueing", "web", "workflows"]
+# own. Set LOG_LEVEL_CATALOG=DEBUG to watch a sweep without the submission worker's chatter.
+# apps.ocs_integration is in here too: it is not an installed app, but it is where the CLI logs from.
+_APP_LOGGERS = [
+    "accounts",
+    "sample_catalog",
+    "ocs_integration",
+    "submission_queue",
+    "web_ui",
+    "workflow_engine",
+]
 
 LOGGING = {
     "version": 1,

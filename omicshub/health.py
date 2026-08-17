@@ -1,26 +1,12 @@
-"""Check database, cache, broker, worker, and workflow manifest readiness.
-
-The backend cannot do any work without the database, the cache, the Celery broker, or a
-worker actually consuming the submissions queue, so those four decide the status code. An
-active workflow config is reported alongside them because its absence is worth seeing, but
-it is a setup step rather than an outage. Gating readiness on it would stop a healthy
-deployment from ever entering service.
-
-The worker check is the one that earns this endpoint. A broker that accepts a job and a
-queue nobody consumes look identical from the outside: entries pile up as PENDING, every
-page renders, nothing errors, and no submission ever reaches OCS. That state held here for
-an hour. Three dead workers and a green health check caused exactly the failure this
-was supposed to name. It reads a heartbeat rather than polling the workers; see
-`_check_submissions_worker` for why the direct question could not be trusted.
-"""
+"""Check required services and worker readiness."""
 
 from celery import current_app
 from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
 
-from apps.queueing.tasks import WORKER_HEARTBEAT_KEY, WORKER_HEARTBEAT_TTL
-from apps.workflows.models import WorkflowConfig
+from apps.submission_queue.tasks import WORKER_HEARTBEAT_KEY, WORKER_HEARTBEAT_TTL
+from apps.workflow_engine.models import WorkflowConfig
 
 OK = "ok"
 
@@ -53,17 +39,7 @@ CACHE_PROBE_TTL = 10
 
 
 def _check_cache():
-    """Check that the cache can write and read a value.
-
-    The cache is a hard dependency of the submission worker: the OCS job-limit hold and
-    the per-config spacing hold both live there, and with the cache gone the worker either
-    stops submitting or loses the pacing that keeps it inside the limit. That makes it a
-    readiness dependency, not a nice-to-have.
-
-    Written and read back rather than pinged, because the failure that matters is a cache
-that accepts connections and refuses writes. A Redis that has hit `maxmemory` with a
-    no-eviction policy, or one failed over to a read-only replica. Both answer a ping.
-    """
+    """Check that the cache can write and read a value."""
     try:
         cache.set(CACHE_PROBE_KEY, OK, CACHE_PROBE_TTL)
         if cache.get(CACHE_PROBE_KEY) != OK:
@@ -74,24 +50,7 @@ that accepts connections and refuses writes. A Redis that has hit `maxmemory` wi
 
 
 def _check_submissions_worker():
-    """Check that the submission task has run recently.
-
-    Reads the heartbeat `process_next_queue_entry` refreshes on every run rather than
-    broadcasting to the workers. `inspect().active_queues()` answers the narrower question
-    "is a consumer attached", and it answers it unreliably: it is an RPC that collects
-    replies until a timeout, so on a busy broker a late reply reads as no worker at all.
-    Probed repeatedly it returned ok / not ready / ok / not ready on a healthy system,
-which is worse than no check. A flapping probe takes instances out of service.
-
-    The heartbeat proves more, and proves it without asking anyone: beat published, the
-    broker delivered, and a worker consumed. That whole chain is what has to work for a
-    queued job to reach OCS, and a break anywhere in it is the outage this endpoint exists
-    to name.
-
-    For the first minute after a deploy no tick has landed yet, so this reports stale and
-readiness is false. That is honest because nothing can be submitted yet, and the container
-    healthcheck's start period covers it.
-    """
+    """Check that the submission task has run within the expected interval."""
     try:
         seen = cache.get(WORKER_HEARTBEAT_KEY)
     except Exception as error:
@@ -99,7 +58,7 @@ readiness is false. That is honest because nothing can be submitted yet, and the
 
     if not seen:
         minutes = WORKER_HEARTBEAT_TTL // 60
-        return f"no submission run in the last {minutes} minutes — check beat and the submissions worker"
+        return f"no submission run in the last {minutes} minutes. Check beat and the submissions worker."
     return OK
 
 
@@ -108,7 +67,7 @@ def _check_workflow_config():
         exists = WorkflowConfig.objects.filter(is_active=True).exists()
     except Exception as error:
         return f"unknown: {error.__class__.__name__}"
-    return OK if exists else "no active config — upload and activate one"
+    return OK if exists else "no active config. Upload and activate one."
 
 
 def health(request):
