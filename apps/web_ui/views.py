@@ -132,6 +132,8 @@ def data_locations(request):
     location_rows = locations.stage_rows(page.object_list)
     if selected_location_stage in {stage.value for stage in columns.LOCATION_STAGES}:
         location_rows = [row for row in location_rows if row["stage"].value == selected_location_stage]
+        for row in location_rows:
+            row["show_selector"] = True
     prefix = request.GET.get("batch_prefix")
     scope = Sample.objects.all()
     if prefix in BatchPrefix.values:

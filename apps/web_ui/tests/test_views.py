@@ -341,6 +341,8 @@ class TestDashboard:
 
         assert response.context["selected_location_stage"] == "align"
         assert {row["stage"] for row in response.context["location_rows"]} == {Stage.ALIGN}
+        assert all(row["show_selector"] for row in response.context["location_rows"])
+        assert b'class="form-check-input select-location"' in response.content
 
     def test_data_location_contents_loads_one_s3_folder(self, logged_in, monkeypatch, make_sample):
         sample = make_sample("A-1", align="COMPLETED")
