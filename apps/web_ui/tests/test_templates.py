@@ -262,6 +262,15 @@ def test_shell_icons_are_hidden_and_toggles_expose_their_state():
         assert attribute in dropdown.group(), f"column menu is missing {attribute}"
 
 
+def test_more_filters_use_the_page_apply_button():
+    """The advanced panel edits fields; the page toolbar submits them."""
+    filters = (TEMPLATES / "partials/sample_advanced_filters.html").read_text()
+    assert ">Apply filters<" not in filters
+    for name in ("dashboard.html", "data_locations.html"):
+        text = (TEMPLATES / name).read_text()
+        assert text.count(">Apply filters<") == 1, name
+
+
 def test_dashboard_table_is_captioned_and_scoped(dashboard_html):
     """A wide table needs to name itself, and every `th` needs to say what it heads."""
     assert re.search(r'<caption class="visually-hidden">', dashboard_html)
