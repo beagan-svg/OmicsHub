@@ -142,6 +142,7 @@ CHECKOUT_COLUMNS = [
     "studies",
     "load_name",
     "batch_name_from_vendor",
+    "modality",
     "organism_common_name",
     "library_prep_method_name",
     *[f"status:{stage.value}" for stage in Stage],

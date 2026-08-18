@@ -32,6 +32,7 @@ BATCH_GET_CHUNK = 100
 # how a throttled table gets hammered. Doubles per consecutive retry, up to the cap.
 UNPROCESSED_BACKOFF = 0.05
 UNPROCESSED_BACKOFF_CAP = 5.0
+UNPROCESSED_MAX_RETRIES = 5
 
 # A GFS path is the "gfs://" scheme plus a file store id, which gcs_core defines as the
 # sha1 of the S3 URI, with forty lowercase hex characters. Matching that shape rather than
@@ -88,11 +89,17 @@ def _batch_get(name: str, keys: list[dict[str, str]]) -> list[dict[str, Any]]:
     for start in range(0, len(unique), BATCH_GET_CHUNK):
         request: dict[str, Any] | None = {table_name: {"Keys": unique[start : start + BATCH_GET_CHUNK]}}
         delay = UNPROCESSED_BACKOFF
+        retries = 0
         while request:
             response = resource.batch_get_item(RequestItems=request)
             items.extend(response["Responses"].get(table_name, []))
             request = response.get("UnprocessedKeys") or None
             if request:
+                if retries >= UNPROCESSED_MAX_RETRIES:
+                    raise RuntimeError(
+                        f"DynamoDB did not process all {name} keys after {UNPROCESSED_MAX_RETRIES} retries"
+                    )
+                retries += 1
                 time.sleep(delay)
                 delay = min(delay * 2, UNPROCESSED_BACKOFF_CAP)
 

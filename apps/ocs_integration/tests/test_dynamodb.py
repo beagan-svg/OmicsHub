@@ -200,6 +200,24 @@ def test_unprocessed_keys_are_retried_with_growing_backoff(fake_boto, monkeypatc
 
 
 @override_settings(OCS_ENV_BASE="prod")
+def test_unprocessed_keys_stop_after_the_retry_limit(fake_boto, monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(dynamodb.time, "sleep", sleeps.append)
+    table = "prod-fastq-metadata"
+    unprocessed = {
+        "Responses": {table: []},
+        "UnprocessedKeys": {table: {"Keys": [{"fastq_name": "A"}]}},
+    }
+    resource = fake_boto(FakeResource(batch_responses=[unprocessed] * (dynamodb.UNPROCESSED_MAX_RETRIES + 1)))
+
+    with pytest.raises(RuntimeError, match=f"after {dynamodb.UNPROCESSED_MAX_RETRIES} retries"):
+        dynamodb.get_metadata_by_fastq_names(["A"])
+
+    assert len(resource.batch_requests) == dynamodb.UNPROCESSED_MAX_RETRIES + 1
+    assert len(sleeps) == dynamodb.UNPROCESSED_MAX_RETRIES
+
+
+@override_settings(OCS_ENV_BASE="prod")
 def test_batch_get_sends_each_key_once(fake_boto):
     """A repeated key makes DynamoDB reject the whole request, and demand ids repeat."""
     table = "prod-demand-registry"

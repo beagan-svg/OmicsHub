@@ -263,6 +263,7 @@ class TestCheckoutPage:
             "Study Set",
             "Load Name",
             "Batch Name From Vendor",
+            "Workflow",
             "Organism",
             "Library Prep Method",
             "Ingest",
