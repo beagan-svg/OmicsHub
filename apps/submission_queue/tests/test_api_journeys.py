@@ -203,18 +203,6 @@ class TestEntriesAreReadOnly:
         entry.refresh_from_db()
         assert entry.command.startswith("ocs fastqs align")
 
-    def test_a_stranded_entry_cannot_be_cancelled_away(self, api, active_config, make_sample):
-        make_sample("READY-1")
-        api.post(QUEUE, {"fastq_names": ["READY-1"]}, format="json")
-        entry = QueueEntry.objects.get()
-        QueueEntry.objects.filter(pk=entry.pk).update(status=QueueEntry.Status.STRANDED)
-
-        response = api.post(reverse("submission_queue:queue-cancel", args=[entry.pk]))
-
-        entry.refresh_from_db()
-        assert response.status_code == 400
-        assert entry.status == QueueEntry.Status.STRANDED
-
 
 class TestTheTwoDoorsAgree:
     """The API preview and the web review modal must plan the same selection the same way."""

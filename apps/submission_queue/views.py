@@ -4,12 +4,12 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.sample_catalog import multiome_pairing as pairing
 from apps.sample_catalog.models import Sample
-from apps.sample_catalog.services import pairing
+from apps.submission_queue import queue_entries as enqueue_service
+from apps.submission_queue import queue_planning as planning
 from apps.submission_queue.models import QueueEntry
 from apps.submission_queue.serializers import QueueEntrySerializer, SubmissionRequestSerializer
-from apps.submission_queue.services import enqueue as enqueue_service
-from apps.submission_queue.services import planning
 from apps.workflow_engine.modality import available_modalities
 from apps.workflow_engine.models import WorkflowConfig
 

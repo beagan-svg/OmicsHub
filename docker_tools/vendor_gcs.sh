@@ -8,7 +8,7 @@
 #
 # Point GCS_SRC at the checkout if it is not in the default place:
 #
-#     GCS_SRC=/path/to/genomics-cloud-services scripts/vendor_gcs.sh
+#     GCS_SRC=/path/to/genomics-cloud-services docker_tools/vendor_gcs.sh
 set -eu
 
 GCS_SRC="${GCS_SRC:-$HOME/Desktop/ocs_assets/genomics-cloud-services}"

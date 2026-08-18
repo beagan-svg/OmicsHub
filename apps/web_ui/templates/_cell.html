@@ -4,7 +4,8 @@ One cell of a sample table, shared by the dashboard and the cart so the two cann
 apart on how a value is rendered. Expects `sample` and `column`.
 {% endcomment %}
 {% with value=sample|column_value:column %}
-<td class="col--{{ column.kind }}{% if column.kind == 'mono' or column.kind == 'copy' %} mono{% endif %}">
+<td class="col--{{ column.kind }}{% if column.kind == 'mono' or column.kind == 'copy' %} mono{% endif %}"
+    {% if column.kind == "status" %}data-live-stage-status="{{ sample.fastq_name }}|{{ column.key|slice:'7:' }}"{% endif %}>
   {% if column.kind == "status" %}
     {% include "_state.html" with status=value %}
   {% elif column.kind == "copy" %}

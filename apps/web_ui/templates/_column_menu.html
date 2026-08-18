@@ -46,13 +46,13 @@
             <i class="bi bi-lock-fill" aria-hidden="true"></i>
             <span class="column-option__label">{{ column.label }}</span>
             <span class="column-option__note">Always shown</span>
-            <input type="hidden" name="columns" value="{{ column.key }}" form="columns-form">
+            <input type="hidden" name="columns" value="{{ column.key }}" form="{{ form_id|default:'columns-form' }}">
           </div>
           {% else %}
           <label class="column-option"
                  data-column-option data-column-label="{{ column.label|lower }}">
             <input class="form-check-input" type="checkbox" name="columns"
-                   value="{{ column.key }}" form="columns-form"
+                   value="{{ column.key }}" form="{{ form_id|default:'columns-form' }}"
                    {% if column.key in visible_column_keys %}checked{% endif %}>
             <span class="column-option__label">{{ column.label }}</span>
           </label>
@@ -69,7 +69,7 @@
       <button type="button" class="btn btn-sm btn-outline-secondary" data-column-cancel>
         Cancel
       </button>
-      <button class="btn btn-sm btn-primary" type="submit" form="columns-form"
+      <button class="btn btn-sm btn-primary" type="submit" form="{{ form_id|default:'columns-form' }}"
               data-column-apply disabled>
         Apply
       </button>

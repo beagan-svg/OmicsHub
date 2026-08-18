@@ -1,32 +1,4 @@
-"""Submit queued alignment and post-alignment commands.
-
-One entry is submitted per task run, and the run queues the next one. Two things pace it,
-and both are expressed as a cache key with a TTL rather than as a delay on a queued task:
-
-* the job limit from the config, checked against the demands OCS currently has in
-  progress. At the limit nothing is claimed and a capacity hold is set for
-  `poll_interval_hours`, so jobs wait rather than being dropped;
-* the `spacing` on the command config, held after each submission.
-
-A hold rather than a countdown because this task has three callers: beat every 60
-seconds, its own follow-up, and the "process now" button. A countdown only paces the
-one that scheduled it. Spacing of 180 seconds against a 60-second beat tick meant beat
-claimed and submitted twice more before the countdown ever came due, so the pacing the
-config asks for was not happening at all. A hold is checked by whoever arrives.
-
-The same reasoning is why the limit branch does not queue its own retry: a retry queued
-per beat tick accumulates while the limit holds, and every accumulated task is already
-past its countdown when capacity frees. That would submit the whole backlog at once, in
-the moment spacing matters most.
-
-Both only mean something if submissions are serialized, which is why this task is routed
-to the `submissions` queue and that queue is run with a single worker process.
-
-`acks_late` is deliberately left off. Celery's default acknowledges a task when it starts,
-so a worker killed mid-submission does *not* get the task redelivered. That is what we
-want, because a redelivered submission could run the same alignment twice. The cost is an
-entry stuck in SUBMITTING, and `reconcile_stranded_submissions` is what answers for it.
-"""
+"""Submit queued alignment and post-alignment commands one at a time."""
 
 from __future__ import annotations
 
@@ -40,13 +12,12 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.ocs_integration import cli, dynamodb
+from apps.sample_catalog import ocs_sync as sync
 from apps.sample_catalog.models import StageStatus
-from apps.sample_catalog.services import sync
 from apps.submission_queue.models import QueueEntry
-from apps.submission_queue.services.claim import (
+from apps.submission_queue.queue_claiming import (
     claim_next_entry,
     record_failure,
-    record_stranded,
     record_submission,
 )
 from apps.workflow_engine.models import WorkflowConfig
@@ -64,10 +35,6 @@ CAPACITY_HOLD_KEY = "submission_queue:capacity-hold"
 # Set for `spacing` seconds after each submission. Every caller checks it, which is what
 # makes the config's spacing hold against beat's own minute tick.
 SPACING_HOLD_KEY = "submission_queue:spacing-hold"
-
-# How long an entry may sit in SUBMITTING before it is treated as abandoned. Comfortably
-# longer than OCS_CLI_TIMEOUT, so a slow submission is never mistaken for a dead worker.
-STRANDED_AFTER = dt.timedelta(minutes=30)
 
 # Refreshed on every task run and read by the health endpoint. A stale key means the
 # scheduler, broker, or submissions worker is not moving queue entries.
@@ -149,25 +116,14 @@ def process_next_queue_entry():
 
     try:
         demand_id = cli.submit(entry.command_args)
-    except cli.OCSSubmissionUncertain as error:
-        # The command may already be running at OCS. STRANDED keeps it out of the admin's
-        # bulk requeue, so recovering it takes a person who has checked. Spaced like a
-        # submission for the same reason: it may well have been one.
-        logger.exception("Submission outcome unknown for %s", entry)
-        record_stranded(entry, str(error))
-        _hold_for_spacing(entry.spacing)
-        process_next_queue_entry.delay()
-        return
     except cli.OCSSubmissionError as error:
-        logger.warning("OCS refused %s: %s", entry, error)
+        logger.warning("OCS submission failed for %s: %s", entry, error)
         record_failure(entry, str(error))
-        # A refused submission did not consume OCS capacity, so move straight on.
         process_next_queue_entry.delay()
         return
     except Exception:
-        # Not a refusal from OCS but a fault on our side. Record it so the entry does not
-        # sit in SUBMITTING until reconcile picks it up, then let it reach the error log
-        # rather than being reported to the user as an ordinary failed job.
+        # Not a refusal from OCS but a fault on our side. Record the failure so the entry
+        # is visible for review, then let the exception reach the worker error log.
         record_failure(entry, "Submission failed unexpectedly. Check the worker log.")
         raise
 
@@ -187,22 +143,3 @@ def process_next_queue_entry():
     logger.info("Submitted %s as demand %s", entry, demand_id)
 
     process_next_queue_entry.apply_async(countdown=entry.spacing)
-
-
-@shared_task
-def reconcile_stranded_submissions():
-    """Move abandoned SUBMITTING entries to STRANDED."""
-    cutoff = timezone.now() - STRANDED_AFTER
-    stranded = QueueEntry.objects.filter(status=QueueEntry.Status.SUBMITTING, claimed_at__lt=cutoff)
-
-    count = stranded.update(
-        status=QueueEntry.Status.STRANDED,
-        error_message=(
-            "The worker stopped while submitting this job. Check OCS for a demand covering "
-            "this sample and stage: if one exists, record it and close this entry; if not, "
-            "set the status back to PENDING to submit it again."
-        ),
-    )
-    if count:
-        logger.warning("Marked %d abandoned submissions STRANDED", count)
-    return count

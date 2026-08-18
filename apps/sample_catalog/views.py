@@ -3,9 +3,9 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.sample_catalog import ocs_sync as sync
 from apps.sample_catalog.models import Sample
 from apps.sample_catalog.serializers import SampleSerializer, SyncRequestSerializer
-from apps.sample_catalog.services import sync
 
 FILTER_FIELDS = ("batch_name_from_vendor", "organism_common_name", "library_prep_method_name")
 

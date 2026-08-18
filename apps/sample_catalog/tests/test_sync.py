@@ -7,8 +7,8 @@ import datetime as dt
 import pytest
 from django.core.cache import cache
 
+from apps.sample_catalog import ocs_sync as sync
 from apps.sample_catalog.models import NOT_COMPLETED, Sample, Stage, StageStatus
-from apps.sample_catalog.services import sync
 from apps.sample_catalog.tests.conftest import when
 from apps.submission_queue.models import QueueEntry
 

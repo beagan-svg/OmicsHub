@@ -12,7 +12,7 @@ from apps.sample_catalog.models import (
     Stage,
     StageStatus,
 )
-from apps.submission_queue.services import planning
+from apps.submission_queue import queue_planning as planning
 
 pytestmark = pytest.mark.django_db
 

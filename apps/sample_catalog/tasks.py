@@ -7,16 +7,15 @@ import logging
 from celery import shared_task
 from django.core.cache import cache
 
-from apps.sample_catalog.services import sync
+from apps.sample_catalog import ocs_sync as sync
 
 logger = logging.getLogger(__name__)
 
-#: Held for the length of a stage-status sweep so a slow one cannot run alongside itself.
+#: Longer than the Celery hard time limit. A worker killed at the limit never reaches its
+#: `finally`, so the lock must expire on its own.
 SWEEP_LOCK_KEY = "catalog:stage-status-sweep"
 
-#: Matches CELERY_TASK_TIME_LIMIT: a worker killed at the limit never reaches its `finally`,
-#: so the lock has to expire on its own or the sweep stops running until someone notices.
-SWEEP_LOCK_TIMEOUT = 900
+SWEEP_LOCK_TIMEOUT = 960
 
 
 # acks_late because the sweep is idempotent. It rereads both OCS tables from scratch and

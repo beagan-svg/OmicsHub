@@ -1,9 +1,4 @@
-"""Define dashboard columns and their default selection.
-
-The mirror holds all of OCS's fastq-metadata, which is more than fits on a screen, so the
-table is column-configurable: this is the single list both the header and the visibility
-menu are built from.
-"""
+"""Define the columns shown by the Samples and Data Locations tables."""
 
 from __future__ import annotations
 
@@ -25,13 +20,7 @@ class Column:
     group: str = "sample"
 
     def value_for(self, sample, *, raw: bool = False):
-        """Return this column's value for one fastq sample.
-
-                The per-stage families are keyed `<family>:<stage>` and read through the sample's
-                stage accessors; everything else is a field on the sample. `raw` is what the CSV
-        export wants, a duration as seconds rather than as "2h 48m", because a
-                spreadsheet column has to sort and sum and "2h 48m" does neither.
-        """
+        """Return the value for this column on one fastq sample."""
         family, _, stage = self.key.partition(":")
         if family == "status":
             return sample.stage_status(stage)
@@ -66,7 +55,7 @@ COLUMNS = [
     Column("batch_name_from_vendor", "Batch Name From Vendor", group="study"),
     Column("batch_name", "Batch Name", group="study"),
     Column("modality", "Workflow", group="assay"),
-    Column("organism_common_name", "Organism", group="sample"),
+    Column("organism_common_name", "Organism Common Name", group="sample"),
     Column("organism_name", "Organism Name", group="sample"),
     Column("library_prep_method_name", "Library Prep Method", group="assay"),
     Column("library_prep_name", "Library Prep Name", group="assay"),
@@ -129,6 +118,23 @@ DEFAULT_COLUMNS = [
     *[f"status:{stage.value}" for stage in Stage],
 ]
 
+LOCATION_COLUMNS = [
+    Column("load_name", "Load Name", "mono", "sample"),
+    Column("studies", "Study Set", "list", "sample"),
+    Column("modality", "Workflow", group="sample"),
+    Column("organism_common_name", "Organism Common Name", group="sample"),
+    Column("library_prep_method_name", "Library Prep Method", group="sample"),
+    Column("stage", "Stage", group="stage"),
+    Column("status", "Status", group="stage"),
+]
+LOCATION_COLUMN_KEYS = {column.key for column in LOCATION_COLUMNS}
+LOCATION_DEFAULT_COLUMNS = [column.key for column in LOCATION_COLUMNS]
+LOCATION_COLUMN_GROUPS = [
+    ColumnGroup("sample", "Sample fields", LOCATION_COLUMNS[:5]),
+    ColumnGroup("stage", "Stage fields", LOCATION_COLUMNS[5:]),
+]
+LOCATION_STAGES = [Stage.INGEST, Stage.ALIGN, Stage.POST_ALIGN]
+
 
 # Checkout always shows the fields used to build the command.
 CHECKOUT_COLUMNS = [
@@ -150,6 +156,12 @@ def visible_columns(user) -> list[Column]:
     """
     chosen = set(user.visible_columns or DEFAULT_COLUMNS)
     return [column for column in COLUMNS if column.key in chosen]
+
+
+def visible_location_columns(user) -> list[Column]:
+    """Return the selected Data Locations fields, or the defaults."""
+    chosen = set(user.visible_location_columns or LOCATION_DEFAULT_COLUMNS)
+    return [column for column in LOCATION_COLUMNS if column.key in chosen]
 
 
 # The fixed set the cart shows, in the canonical order.

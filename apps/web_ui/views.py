@@ -5,15 +5,19 @@ job monitor and failed-jobs pages. The modals are rendered on the server and ope
 load, so the multi-step flow needs no client-side state: each step is a POST that carries
 the previous step's choices forward.
 
-These views delegate decisions to the `planning`, `enqueue`, and `sync` services.
+These views delegate planning, queue creation, and OCS synchronization to the owning app modules.
 which is what keeps the pages and the API from drifting apart. In particular the checkout
 page decides nothing about *what* to run: the selected config does, through
 `planning.build_plan`, which is the same call the API makes.
 """
 
 import csv
+import io
 import logging
-from collections.abc import Sequence
+import re
+import zipfile
+from collections import deque
+from collections.abc import Buffer, Iterator, Sequence
 from functools import wraps
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -26,36 +30,40 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import BigIntegerField, Count, Exists, F, Func, Max, OuterRef, Q, Value
 from django.db.models.functions import Cast, NullIf
-from django.http import JsonResponse, StreamingHttpResponse
+from django.http import Http404, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
-from apps.ocs_integration import cli
+from apps.ocs_integration import dynamodb, s3
+from apps.sample_catalog import multiome_pairing as pairing
+from apps.sample_catalog import ocs_sync as sync
 from apps.sample_catalog.models import MULTIOME_PREPS, NOT_COMPLETED, BatchPrefix, Sample, Stage, StageStatus
-from apps.sample_catalog.services import pairing, sync
+from apps.submission_queue import queue_entries as enqueue_service
+from apps.submission_queue import queue_planning as planning
 from apps.submission_queue import tasks
 from apps.submission_queue.models import CartItem, QueueEntry
-from apps.submission_queue.services import enqueue as enqueue_service
-from apps.submission_queue.services import planning
 from apps.web_ui import columns
+from apps.web_ui import data_location_queries as locations
 from apps.web_ui.forms import ConfigUploadForm, SubmissionForm, SyncForm
-from apps.workflow_engine import command_builder, modality, services
+from apps.workflow_engine import command_builder, manifest_service, modality
 from apps.workflow_engine.models import WorkflowConfig
 
 logger = logging.getLogger(__name__)
 
 FILTER_FIELDS = ("batch_name_from_vendor", "organism_common_name", "library_prep_method_name")
 PAGE_SIZE = 50
+PAGE_SIZE_OPTIONS = (25, 50, 100, 200)
+DOWNLOAD_SELECTION_LIMIT = 1000
 
 # The family tabs read in this order, which is not the order the model declares them in:
 # declaration order answers to the data, this is a reading order.
 TAB_ORDER = (BatchPrefix.RTX, BatchPrefix.RFX, BatchPrefix.MTX, BatchPrefix.ATX)
 
 QUEUED_STATUSES = [QueueEntry.Status.PENDING, QueueEntry.Status.SUBMITTING]
-FAILED_STATUSES = [QueueEntry.Status.FAILED, QueueEntry.Status.STRANDED]
+FAILED_STATUSES = [QueueEntry.Status.FAILED]
 
 # OCS's own labels, as they arrive in the mirror. The monitor reads these rather than queue
 # statuses so it covers demands this app never submitted. AWAITING_TRIGGER and PENDING are
@@ -66,7 +74,7 @@ FINISHED_OCS_STATUSES = ("COMPLETED", "ARCHIVED", "FAILED", "ABORTED", "STRANDED
 
 # The mirror holds every stage OCS has run for half a million samples. The monitor shows
 # the most recent, and says so on the page rather than implying it is the whole picture.
-MONITOR_ROWS = 100
+MONITOR_ROWS = 200
 
 # What the submit modal may change about one planned command. `probe_set` is here because a
 # library prep the config does not list has no probe set to look up, and the modal asks for
@@ -111,6 +119,283 @@ def dashboard(request):
 
 
 @login_required
+def data_locations(request):
+    """List S3 locations for the visible fastq samples and OCS stages."""
+    queryset = _sorted(_filtered_samples(request), request)
+    page_size = _page_size(request)
+    page = Paginator(queryset, page_size).get_page(request.GET.get("page"))
+    stage_filters = [
+        {"stage": stage, "selected": request.GET.get(f"{stage.value}_status", "")}
+        for stage in columns.LOCATION_STAGES
+    ]
+    selected_location_stage = request.GET.get("location_stage", "")
+    location_rows = locations.stage_rows(page.object_list)
+    if selected_location_stage in {stage.value for stage in columns.LOCATION_STAGES}:
+        location_rows = [row for row in location_rows if row["stage"].value == selected_location_stage]
+    prefix = request.GET.get("batch_prefix")
+    scope = Sample.objects.all()
+    if prefix in BatchPrefix.values:
+        scope = scope.filter(batch_prefix=prefix)
+    status_synced_at = (
+        cache.get(sync.LAST_STATUS_SWEEP_KEY) or StageStatus.objects.aggregate(at=Max("synced_at"))["at"]
+    )
+    status_period = settings.CELERY_BEAT_SCHEDULE["sync-stage-statuses"]["schedule"]
+    return render(
+        request,
+        "data_locations.html",
+        {
+            "page": page,
+            "page_size": page_size,
+            "page_size_options": PAGE_SIZE_OPTIONS,
+            "location_rows": location_rows,
+            "columns": columns.visible_location_columns(request.user),
+            "all_columns": columns.LOCATION_COLUMNS,
+            "column_groups": columns.LOCATION_COLUMN_GROUPS,
+            "locked_column": "",
+            "default_column_keys": columns.LOCATION_DEFAULT_COLUMNS,
+            "visible_column_keys": [column.key for column in columns.visible_location_columns(request.user)],
+            "batch_prefixes": _prefix_counts(),
+            "selected_prefix": request.GET.get("batch_prefix", ""),
+            "search": request.GET.get("fastq_name") or "",
+            "studies": _study_options(),
+            "selected_studies": request.GET.getlist("study"),
+            "location_stages": columns.LOCATION_STAGES,
+            "selected_location_stage": selected_location_stage,
+            "filters": {field: request.GET.get(field, "") for field in FILTER_FIELDS},
+            "stage_filters": stage_filters,
+            "batches": _batch_options(request.GET.get("batch_name_from_vendor", ""), scope),
+            "organisms": _scoped_distinct(scope, "organism_common_name"),
+            "library_preps": _scoped_distinct(scope, "library_prep_method_name"),
+            "statuses": [NOT_COMPLETED, *_scoped_statuses(scope)],
+            "filters_open": any(request.GET.get(field) for field in FILTER_FIELDS)
+            or any(row["selected"] for row in stage_filters),
+            "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.get(field))
+            + sum(1 for row in stage_filters if row["selected"])
+            + bool(request.GET.getlist("study")),
+            "status_synced_at": status_synced_at,
+            "status_refresh": _humanised_seconds(status_period),
+            "status_stale": _is_stale(status_synced_at, status_period * 3),
+        },
+    )
+
+
+@login_required
+@require_POST
+def export_data_locations_csv(request):
+    """Return the selected or filtered Data Locations rows as CSV."""
+    chosen = request.POST.getlist("fastq_names")
+    samples = _sorted(_filtered_samples(request), request)
+    if chosen:
+        samples = samples.filter(fastq_name__in=chosen)
+
+    rows = locations.stage_rows(samples)
+    selected_location_stage = request.GET.get("location_stage", "")
+    if selected_location_stage in {stage.value for stage in columns.LOCATION_STAGES}:
+        rows = [row for row in rows if row["stage"].value == selected_location_stage]
+
+    visible = columns.visible_location_columns(request.user)
+    writer = csv.writer(_Echo())
+    headers = ["Fastq Name", *(column.label for column in visible), "S3 Location"]
+
+    def csv_text(value) -> str:
+        text = "" if value is None else str(value)
+        return f"'{text}" if text[:1] in ("=", "+", "-", "@") else text
+
+    def csv_rows():
+        yield writer.writerow(headers)
+        for row in rows:
+            values = []
+            for column in visible:
+                value = (
+                    row["stage"].label
+                    if column.key == "stage"
+                    else row["status"]
+                    if column.key == "status"
+                    else row["column_values"].get(column.key, "")
+                )
+                if isinstance(value, list):
+                    value = ", ".join(value)
+                values.append(csv_text(value))
+            yield writer.writerow([csv_text(row["fastq_name"]), *values, csv_text(row["s3_uri"])])
+
+    response = StreamingHttpResponse(csv_rows(), content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="omicshub-data-locations.csv"'
+    return response
+
+
+@login_required
+@require_GET
+def data_location_contents(request, sample_id: int, stage: str):
+    """List one folder from a stage's registered S3 file store."""
+    if stage not in Stage.values:
+        raise Http404("Unknown OCS stage")
+
+    record = get_object_or_404(StageStatus, sample_id=sample_id, stage=stage)
+    if not record.file_store_id:
+        raise Http404("This stage has no file store")
+
+    file_store = dynamodb.get_file_stores([record.file_store_id]).get(record.file_store_id)
+    if not file_store or not file_store.get("s3_uri"):
+        raise Http404("The file store record has no S3 location")
+
+    prefix = request.GET.get("prefix", "").strip("/")
+    token = request.GET.get("continuation_token") or None
+    try:
+        contents = s3.list_folder(str(file_store["s3_uri"]), prefix, token)
+    except (BotoCoreError, ClientError) as error:
+        logger.warning("S3 contents lookup failed for sample %s stage %s: %s", sample_id, stage, error)
+        return render(
+            request,
+            "partials/data_location_contents.html",
+            {
+                "error": "Could not read this S3 location.",
+                "s3_uri": file_store["s3_uri"],
+            },
+            status=502,
+        )
+
+    base_url = request.path
+    parent_prefix = prefix.rpartition("/")[0]
+    folder_links = [
+        {
+            "name": folder,
+            "prefix": "/".join(part for part in (prefix, folder) if part),
+            "url": f"{base_url}?{urlencode({'prefix': '/'.join(part for part in (prefix, folder) if part)})}",
+        }
+        for folder in contents.folders
+    ]
+    next_url = None
+    if contents.next_token:
+        next_url = f"{base_url}?{urlencode({'prefix': prefix, 'continuation_token': contents.next_token})}"
+
+    return render(
+        request,
+        "partials/data_location_contents.html",
+        {
+            "s3_uri": file_store["s3_uri"],
+            "prefix": prefix,
+            "folders": folder_links,
+            "files": contents.files,
+            "next_url": next_url,
+            "parent_url": (
+                f"{base_url}?{urlencode({'prefix': parent_prefix})}" if parent_prefix else base_url
+            )
+            if prefix
+            else None,
+            "refresh_url": f"{base_url}?{urlencode({'prefix': prefix})}" if prefix else base_url,
+            "download_url": reverse("web_ui:data-location-download", args=[sample_id, stage]),
+        },
+    )
+
+
+@login_required
+@require_POST
+def download_data_location_files(request, sample_id: int, stage: str):
+    """Stream selected S3 files and folders as one ZIP archive."""
+    if stage not in Stage.values:
+        raise Http404("Unknown OCS stage")
+
+    record = get_object_or_404(StageStatus, sample_id=sample_id, stage=stage)
+    sample = record.sample
+    if not record.file_store_id:
+        raise Http404("This stage has no file store")
+
+    file_store = dynamodb.get_file_stores([record.file_store_id]).get(record.file_store_id)
+    if not file_store or not file_store.get("s3_uri"):
+        raise Http404("The file store record has no S3 location")
+
+    keys = list(dict.fromkeys(request.POST.getlist("keys")))
+    folders = list(dict.fromkeys(request.POST.getlist("folders")))
+    if not keys and not folders:
+        return JsonResponse({"error": "Select at least one file or folder."}, status=400)
+    if len(keys) + len(folders) > DOWNLOAD_SELECTION_LIMIT:
+        return JsonResponse(
+            {"error": f"Select no more than {DOWNLOAD_SELECTION_LIMIT} files or folders."}, status=400
+        )
+
+    selected_keys: list[str] = []
+    try:
+        for key in keys:
+            s3.validate_key(file_store["s3_uri"], key)
+            selected_keys.append(key)
+        for folder in folders:
+            selected_keys.extend(s3.list_files(file_store["s3_uri"], folder))
+        selected_keys = list(dict.fromkeys(selected_keys))
+        if len(selected_keys) > DOWNLOAD_SELECTION_LIMIT:
+            return JsonResponse(
+                {"error": f"The selection contains more than {DOWNLOAD_SELECTION_LIMIT} files."},
+                status=400,
+            )
+        if not selected_keys:
+            return JsonResponse({"error": "The selected folders contain no files."}, status=400)
+    except ValueError:
+        return JsonResponse({"error": "One or more selected paths are outside this S3 location."}, status=400)
+    except ClientError as error:
+        code = error.response.get("Error", {}).get("Code")
+        if code in {"404", "NoSuchKey", "NotFound"}:
+            return JsonResponse({"error": "One or more selected paths are no longer available."}, status=400)
+        logger.warning("S3 download authorization failed for sample %s stage %s", sample_id, stage)
+        return JsonResponse({"error": "S3 could not read the selected paths."}, status=502)
+    except BotoCoreError:
+        logger.warning("S3 download authorization failed for sample %s stage %s", sample_id, stage)
+        return JsonResponse({"error": "S3 could not read the selected paths."}, status=502)
+
+    def stream_zip() -> Iterator[bytes]:
+        output = _ZipOutput()
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as archive:
+            for key in selected_keys:
+                body = s3.get_object_body(file_store["s3_uri"], key)
+                try:
+                    info = zipfile.ZipInfo(s3.relative_key(file_store["s3_uri"], key))
+                    info.compress_type = zipfile.ZIP_STORED
+                    with archive.open(info, "w") as target:
+                        while chunk := body.read(1024 * 1024):
+                            target.write(chunk)
+                            yield from output.drain()
+                finally:
+                    body.close()
+        yield from output.drain()
+
+    filename = f"{_archive_part(sample.fastq_name)}-{_archive_part(stage)}.zip"
+    response = StreamingHttpResponse(stream_zip(), content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+class _ZipOutput(io.RawIOBase):
+    """Collect ZIP writer chunks without buffering the archive."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.chunks: deque[bytes] = deque()
+        self.position = 0
+
+    def write(self, value: Buffer) -> int:
+        chunk = bytes(value)
+        self.chunks.append(chunk)
+        self.position += len(chunk)
+        return len(chunk)
+
+    def tell(self) -> int:
+        return self.position
+
+    def seekable(self) -> bool:
+        return False
+
+    def flush(self) -> None:
+        return None
+
+    def drain(self) -> Iterator[bytes]:
+        while self.chunks:
+            yield self.chunks.popleft()
+
+
+def _archive_part(value: str) -> str:
+    """Keep archive names readable while removing unsafe filename characters."""
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", value).strip("._") or "download"
+
+
+@login_required
 @require_POST
 def sync_samples(request):
     form = SyncForm(request.POST)
@@ -146,9 +431,9 @@ def refresh_status(request):
     comes back is written to the same rows the sweep writes, so the answer is the table's
     answer rather than a second opinion rendered beside it.
     """
-    # The page posts the rows it is showing, so this refreshes what the reader is looking
-    # at. Capped at a page's worth because each sample costs its own fastq-history query.
-    fastq_names = request.POST.getlist("fastq_names")[:PAGE_SIZE]
+    # The page posts the rows it is showing, so this refreshes exactly what the reader is
+    # looking at. Remove duplicate names before querying and reporting the count.
+    fastq_names = list(dict.fromkeys(request.POST.getlist("fastq_names")))
     samples = list(Sample.objects.filter(fastq_name__in=fastq_names))
     if not samples:
         messages.error(request, "No samples to refresh.")
@@ -161,19 +446,45 @@ def refresh_status(request):
         logger.warning("Live status refresh failed: %s", error)
         messages.error(request, "Could not reach OCS. The table still shows the last sweep.")
     else:
-        messages.success(request, f"Refreshed status for {len(samples)} samples from OCS.")
+        label = "sample" if len(samples) == 1 else "samples"
+        messages.success(request, f"Refreshed status for {len(samples)} {label} from OCS.")
 
     return redirect(_safe_next(request))
+
+
+@login_required
+@require_GET
+def live_status(request):
+    """Return current database status for the visible fastq samples."""
+    fastq_names = request.GET.getlist("fastq_names")
+    if not fastq_names or len(fastq_names) > PAGE_SIZE_OPTIONS[-1]:
+        return JsonResponse({"rows": {}})
+
+    records = StageStatus.objects.filter(sample__fastq_name__in=fastq_names).values(
+        "sample__fastq_name", "stage", "status"
+    )
+    rows: dict[str, dict[str, dict[str, str]]] = {}
+    for record in records:
+        rows.setdefault(record["sample__fastq_name"], {})[record["stage"]] = {
+            "status": record["status"],
+        }
+    return JsonResponse({"rows": rows})
 
 
 @login_required
 @require_POST
 def set_columns(request):
     """Save the dashboard columns selected by the user."""
-    chosen = [key for key in request.POST.getlist("columns") if key in columns.COLUMNS_BY_KEY]
-    # Fastq name identifies the row; hiding it would leave a table nobody can read.
-    request.user.visible_columns = ["fastq_name", *[k for k in chosen if k != "fastq_name"]]
-    request.user.save(update_fields=["visible_columns"])
+    scope = request.POST.get("scope", "samples")
+    allowed = columns.LOCATION_COLUMN_KEYS if scope == "locations" else columns.COLUMNS_BY_KEY
+    chosen = [key for key in request.POST.getlist("columns") if key in allowed]
+    if scope == "locations":
+        request.user.visible_location_columns = chosen
+        request.user.save(update_fields=["visible_location_columns"])
+    else:
+        # Fastq name identifies the row; hiding it would leave a table nobody can read.
+        request.user.visible_columns = ["fastq_name", *[key for key in chosen if key != "fastq_name"]]
+        request.user.save(update_fields=["visible_columns"])
     return redirect(_safe_next(request))
 
 
@@ -377,7 +688,7 @@ def command_preview(request):
 
     form = SubmissionForm(request.POST)
     if not form.is_valid():
-        return JsonResponse({"error": next(iter(form.errors.values()))[0]}, status=400)
+        return JsonResponse({"error": str(next(iter(form.errors.values()))[0])}, status=400)
 
     plan = planning.build_plan(
         samples=samples,
@@ -467,7 +778,11 @@ def submit_confirm(request):
 @login_required
 def queue(request):
     entries = list(_owned(request).filter(status__in=QUEUED_STATUSES))
-    next_entry = next((e for e in entries if e.status == QueueEntry.Status.PENDING), None)
+    next_entry = (
+        None
+        if request.user.queue_paused
+        else next((e for e in entries if e.status == QueueEntry.Status.PENDING), None)
+    )
     if cache.get(tasks.CAPACITY_HOLD_KEY):
         next_wait = "waiting for OCS capacity"
     elif seconds := tasks.hold_remaining_seconds(tasks.SPACING_HOLD_KEY):
@@ -477,7 +792,12 @@ def queue(request):
     return render(
         request,
         "queue.html",
-        {"entries": entries, "next_entry": next_entry, "next_wait": next_wait},
+        {
+            "entries": entries,
+            "next_entry": next_entry,
+            "next_wait": next_wait,
+            "queue_paused": request.user.queue_paused,
+        },
     )
 
 
@@ -503,6 +823,30 @@ def cancel(request, pk):
     return redirect("web_ui:queue")
 
 
+@login_required
+@require_POST
+def toggle_queue_pause(request):
+    """Pause or resume this user's pending queue entries."""
+    request.user.queue_paused = not request.user.queue_paused
+    request.user.save(update_fields=["queue_paused"])
+    state = "paused" if request.user.queue_paused else "resumed"
+    messages.success(request, f"Your queue is {state}.")
+    return redirect("web_ui:queue")
+
+
+@login_required
+@require_POST
+def delete_queue_entry(request, pk):
+    """Delete this user's pending queue entry without affecting OCS."""
+    entry = get_object_or_404(_owned(request), pk=pk)
+    deleted, _ = QueueEntry.objects.filter(pk=entry.pk, status=QueueEntry.Status.PENDING).delete()
+    if deleted:
+        messages.success(request, f"Deleted {entry.sample.fastq_name} from the queue.")
+    else:
+        messages.error(request, f"{entry.sample.fastq_name} is already being submitted.")
+    return redirect("web_ui:queue")
+
+
 # --- job monitor and failed jobs --------------------------------------------------------
 
 
@@ -510,6 +854,9 @@ def cancel(request, pk):
 def job_monitor(request):
     """Show OCS stages that are running or finished."""
     submitted_here = QueueEntry.objects.filter(demand_id=OuterRef("demand_id")).exclude(demand_id="")
+    running_stage = request.GET.get("running_stage")
+    if running_stage not in {Stage.ALIGN, Stage.POST_ALIGN}:
+        running_stage = ""
 
     stages = (
         StageStatus.objects.select_related("sample")
@@ -517,11 +864,10 @@ def job_monitor(request):
         .annotate(queued_here=Exists(submitted_here))
     )
 
-    running = list(
-        stages.filter(status__in=RUNNING_OCS_STATUSES).order_by(F("started_at").desc(nulls_last=True))[
-            :MONITOR_ROWS
-        ]
-    )
+    running_stages = stages.filter(status__in=RUNNING_OCS_STATUSES)
+    if running_stage:
+        running_stages = running_stages.filter(stage=running_stage)
+    running = list(running_stages.order_by(F("started_at").desc(nulls_last=True))[:MONITOR_ROWS])
     # Newest first and capped: the mirror holds every stage OCS has ever finished for
     # half a million samples, and this page answers "what happened lately".
     finished = list(
@@ -529,29 +875,57 @@ def job_monitor(request):
             :MONITOR_ROWS
         ]
     )
-    monitor_fastq_names = list(dict.fromkeys(row.sample.fastq_name for row in [*running, *finished]))
     monitor_running, monitor_finished = _collapse_multiome_monitor_rows(running, finished)
+    monitor_fastq_names = list(dict.fromkeys(row.sample.fastq_name for row in [*running, *finished]))
+    running_page_size = _page_size(request, "running_page_size")
+    finished_page_size = _page_size(request, "finished_page_size")
+    running_page = Paginator(monitor_running, running_page_size).get_page(request.GET.get("running_page"))
+    finished_page = Paginator(monitor_finished, finished_page_size).get_page(request.GET.get("finished_page"))
 
-    return render(
-        request,
-        "job_monitor.html",
-        {
-            "running": monitor_running,
-            "finished": monitor_finished,
-            "monitor_fastq_names": monitor_fastq_names,
-            "row_limit": MONITOR_ROWS,
-            "counts": {
-                "align": sum(1 for row in monitor_running if row.stage == Stage.ALIGN),
-                "post_align": sum(1 for row in monitor_running if row.stage == Stage.POST_ALIGN),
-                "total": len(monitor_running),
-            },
-            # The queue is this app's own, so these two stay scoped to the reader.
-            **_owned(request).aggregate(
-                queued=Count("pk", filter=Q(status__in=QUEUED_STATUSES)),
-                failed=Count("pk", filter=Q(status__in=FAILED_STATUSES)),
-            ),
+    context = {
+        "running": running_page,
+        "finished": finished_page,
+        "running_page": running_page,
+        "finished_page": finished_page,
+        "running_page_size": running_page_size,
+        "finished_page_size": finished_page_size,
+        "page_size_options": PAGE_SIZE_OPTIONS,
+        "monitor_fastq_names": monitor_fastq_names,
+        "row_limit": MONITOR_ROWS,
+        "running_stage": running_stage,
+        "running_stage_options": _monitor_stage_options(request),
+        "counts": {
+            "align": sum(1 for row in monitor_running if row.stage == Stage.ALIGN),
+            "post_align": sum(1 for row in monitor_running if row.stage == Stage.POST_ALIGN),
+            "total": len(monitor_running),
         },
+        # The queue is this app's own, so these two stay scoped to the reader.
+        **_owned(request).aggregate(
+            queued=Count("pk", filter=Q(status__in=QUEUED_STATUSES)),
+            failed=Count("pk", filter=Q(status__in=FAILED_STATUSES)),
+        ),
+    }
+    template = (
+        "partials/job_monitor_tables.html"
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        else "job_monitor.html"
     )
+    return render(request, template, context)
+
+
+def _monitor_stage_options(request):
+    """Build the Running table's stage filter links."""
+    options = [("", "All"), (Stage.ALIGN, "Alignment"), (Stage.POST_ALIGN, "Post-alignment")]
+    result = []
+    for value, label in options:
+        query = request.GET.copy()
+        query.pop("running_page", None)
+        if value:
+            query["running_stage"] = value
+        else:
+            query.pop("running_stage", None)
+        result.append({"label": label, "value": value, "url": f"?{query.urlencode()}"})
+    return result
 
 
 def _collapse_multiome_monitor_rows(
@@ -597,23 +971,16 @@ def failed_jobs(request):
     owned = _owned(request).select_related("sample", "requested_by")
     entries = owned.filter(status__in=FAILED_STATUSES, demand_id="")
     running_failures = owned.filter(status=QueueEntry.Status.FAILED).exclude(demand_id="")
-    # The stranded warning is the most consequential thing on the page, so it sits above the
-    # table. The template needs to know whether any row warrants it. Evaluated
-    # from the list rather than as a second query; the page renders every row anyway.
     entries = list(entries)
     running_failures = list(running_failures)
     for entry in [*entries, *running_failures]:
-        entry.can_retry = entry.status == QueueEntry.Status.FAILED or cli.is_safe_to_retry(
-            entry.error_message
-        )
-    stranded = any(entry.status == QueueEntry.Status.STRANDED for entry in entries)
+        entry.can_retry = True
     return render(
         request,
         "failed_jobs.html",
         {
             "entries": entries,
             "running_failures": running_failures,
-            "has_stranded": stranded,
             "failure_count": len(entries) + len(running_failures),
         },
     )
@@ -624,19 +991,17 @@ def failed_jobs(request):
 def retry_job(request, pk):
     """Return a retryable failed job to the pending queue."""
     entry = get_object_or_404(_owned(request), pk=pk)
-    if entry.status == QueueEntry.Status.STRANDED and not cli.is_safe_to_retry(entry.error_message):
-        # It may already be running at OCS; retrying blind could run the same job twice.
-        messages.error(
-            request,
-            f"{entry.sample.fastq_name} is stranded. Check OCS for a demand covering this "
-            "sample and stage before retrying it from the admin.",
-        )
     # Conditional on FAILED for the same reason `cancel` is conditional on PENDING: the
     # worker may claim the entry between reading it and writing it back.
-    elif QueueEntry.objects.filter(
+    if QueueEntry.objects.filter(
         pk=entry.pk,
-        status__in=[QueueEntry.Status.FAILED, QueueEntry.Status.STRANDED],
-    ).update(status=QueueEntry.Status.PENDING, error_message=""):
+        status=QueueEntry.Status.FAILED,
+    ).update(
+        status=QueueEntry.Status.PENDING,
+        demand_id="",
+        submitted_at=None,
+        error_message="",
+    ):
         messages.success(request, f"{entry.sample.fastq_name} is back on the queue.")
     else:
         messages.error(request, f"{entry.sample.fastq_name} is {entry.status} and cannot be retried.")
@@ -648,7 +1013,7 @@ def retry_job(request, pk):
 def delete_job(request, pk):
     entry = get_object_or_404(_owned(request), pk=pk)
     if entry.status not in FAILED_STATUSES:
-        messages.error(request, "Only failed or stranded entries can be deleted.")
+        messages.error(request, "Only failed entries can be deleted.")
     else:
         fastq_name = entry.sample.fastq_name
         entry.delete()
@@ -667,12 +1032,12 @@ def configs(request):
         form = ConfigUploadForm(request.POST, request.FILES)
         if not form.is_valid():
             for error in form.errors.values():
-                messages.error(request, error[0])
+                messages.error(request, str(error[0]))
             return redirect("web_ui:configs")
 
         name = form.cleaned_data["file"].name
         try:
-            services.create_config(raw=form.raw, name=name[:255], user=request.user)
+            manifest_service.create_config(raw=form.raw, name=name[:255], user=request.user)
         except ValidationError as error:
             messages.error(request, f"{name} was rejected: {'; '.join(error.messages)}")
             return redirect("web_ui:configs")
@@ -711,7 +1076,11 @@ def _filtered_samples(request):
 
     search = request.GET.get("fastq_name")
     if search:
-        queryset = queryset.filter(Q(fastq_name__icontains=search) | Q(load_name__icontains=search))
+        queryset = queryset.filter(
+            Q(fastq_name__icontains=search)
+            | Q(load_name__icontains=search)
+            | Q(batch_name_from_vendor__icontains=search)
+        )
 
     # The family toggle. Filters on the stored prefix, not the modality, so ATX stays
     # selectable on its own even though it runs as MTX.
@@ -719,9 +1088,12 @@ def _filtered_samples(request):
     if prefix in BatchPrefix.values:
         queryset = queryset.filter(batch_prefix=prefix)
 
-    study = request.GET.get("study")
-    if study:
-        queryset = queryset.filter(studies__contains=[study])
+    studies = request.GET.getlist("study")
+    if studies:
+        study_filter = Q(studies__contains=[studies[0]])
+        for study in studies[1:]:
+            study_filter |= Q(studies__contains=[study])
+        queryset = queryset.filter(study_filter)
 
     for stage in Stage:
         value = request.GET.get(f"{stage.value}_status")
@@ -761,10 +1133,13 @@ def _dashboard_context(request):
         scope = scope.filter(batch_prefix=prefix)
 
     config = WorkflowConfig.objects.filter(is_active=True).first()
-    page = Paginator(queryset, PAGE_SIZE).get_page(request.GET.get("page"))
+    page_size = _page_size(request)
+    page = Paginator(queryset, page_size).get_page(request.GET.get("page"))
 
     return {
         "page": page,
+        "page_size": page_size,
+        "page_size_options": PAGE_SIZE_OPTIONS,
         "sync_form": SyncForm(),
         "stages": Stage,
         "columns": columns.visible_columns(request.user),
@@ -789,7 +1164,7 @@ def _dashboard_context(request):
         "batch_prefixes": _prefix_counts(),
         "selected_prefix": request.GET.get("batch_prefix", ""),
         "studies": _study_options(),
-        "selected_study": request.GET.get("study", ""),
+        "selected_studies": request.GET.getlist("study"),
         "modalities": modality.available_modalities(config.data) if config else [],
         # Filter options come from what is actually in the mirror, so a dropdown never
         # offers a value that would return nothing. That is what keeps the batch menu
@@ -838,6 +1213,15 @@ def _batch_options(selected: str, scope) -> list[str]:
     if selected and selected not in batches:
         batches.append(selected)
     return sorted(batches, key=batch_sort_key, reverse=True)
+
+
+def _page_size(request, parameter: str = "page_size") -> int:
+    """Return the selected table page size."""
+    try:
+        page_size = int(request.GET.get(parameter, PAGE_SIZE))
+    except (TypeError, ValueError):
+        return PAGE_SIZE
+    return page_size if page_size in PAGE_SIZE_OPTIONS else PAGE_SIZE
 
 
 # Columns the table can be sorted by, mapped to what that means in SQL. An allowlist
@@ -1042,7 +1426,7 @@ def _submission_context(request):
     form = SubmissionForm(request.POST)
     if not form.is_valid():
         for error in form.errors.values():
-            messages.error(request, error[0])
+            messages.error(request, str(error[0]))
         return None
 
     submission = {

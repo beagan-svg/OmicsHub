@@ -18,7 +18,10 @@ NEVER_SERVED = dt.datetime.min.replace(tzinfo=dt.UTC)
 def claim_next_entry() -> QueueEntry | None:
     """Claim one pending entry, mark it SUBMITTING, or return None without one."""
     with transaction.atomic():
-        pending = QueueEntry.objects.filter(status=QueueEntry.Status.PENDING)
+        pending = QueueEntry.objects.filter(
+            status=QueueEntry.Status.PENDING,
+            requested_by__queue_paused=False,
+        )
 
         oldest_pending_by_user = dict(
             pending.values("requested_by")
@@ -66,14 +69,9 @@ def record_submission(entry: QueueEntry, demand_id: str) -> None:
     entry.save(update_fields=["status", "demand_id", "submitted_at"])
 
 
-def record_stranded(entry: QueueEntry, message: str) -> None:
-    """Mark a submission with an unknown outcome as STRANDED."""
-    entry.status = QueueEntry.Status.STRANDED
-    entry.error_message = message
-    entry.save(update_fields=["status", "error_message"])
-
-
 def record_failure(entry: QueueEntry, message: str) -> None:
     entry.status = QueueEntry.Status.FAILED
+    entry.demand_id = ""
+    entry.submitted_at = None
     entry.error_message = message
-    entry.save(update_fields=["status", "error_message"])
+    entry.save(update_fields=["status", "demand_id", "submitted_at", "error_message"])

@@ -13,8 +13,8 @@ from decimal import Decimal
 import pytest
 
 from apps.ocs_integration import dynamodb
+from apps.sample_catalog import ocs_sync as sync
 from apps.sample_catalog.models import Sample, Stage, StageStatus
-from apps.sample_catalog.services import sync
 
 pytestmark = pytest.mark.django_db
 
@@ -117,7 +117,7 @@ class TestStoredValues:
 
     @pytest.mark.parametrize(
         ("seconds", "shown"),
-        [(0, "0s"), (45, "45s"), (90, "1m 30s"), (3600, "1h 0m"), (10102, "2h 48m")],
+        [(0, "0m"), (45, "0m"), (90, "1m"), (3600, "1h"), (10102, "2h 48m"), (190800, "2d 5h")],
     )
     def test_duration_display_across_the_range(self, seconds, shown):
         record = StageStatus(duration_seconds=seconds)
@@ -168,7 +168,7 @@ class TestStoredValues:
 
         assert sample.stage_demand_id(Stage.INGEST) == "ingest-id"
         assert sample.stage_demand_id(Stage.ALIGN) == "align-id"
-        assert sample.stage_duration(Stage.ALIGN) == "2h 0m"
+        assert sample.stage_duration(Stage.ALIGN) == "2h"
         assert sample.stage_duration_seconds(Stage.ALIGN) == 7200
         # A stage OCS has no record of reads blank rather than raising.
         assert sample.stage_duration(Stage.POST_ALIGN) == ""

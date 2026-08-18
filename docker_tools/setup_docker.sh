@@ -58,11 +58,11 @@ fi
 
 if [ ! -f vendor/gcs/gcs-cli/pyproject.toml ]; then
     echo "Preparing the OCS CLI packages for the Docker build."
-    scripts/vendor_gcs.sh
+    docker_tools/vendor_gcs.sh
 fi
 
 docker compose --env-file "$ENV_FILE" config --quiet
 docker compose --env-file "$ENV_FILE" up -d --build --wait
 
 echo "OmicsHub is running at http://127.0.0.1:$web_port"
-echo "Use 'docker compose --env-file .env.docker logs -f web_ui' to view web UI logs."
+echo "Use 'docker compose --env-file .env.docker logs -f web-ui' to view web UI logs."

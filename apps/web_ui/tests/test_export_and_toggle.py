@@ -93,6 +93,20 @@ class TestStudySet:
         assert b"A-1" in response.content
         assert b"B-1" not in response.content
 
+    def test_filters_by_multiple_studies(self, logged_in):
+        make("A-1", "10X120", studies=["SCORCH"])
+        make("B-1", "10X121", studies=["Aging_Mouse"])
+        make("C-1", "10X122", studies=["Other"])
+
+        response = logged_in.get(
+            reverse("web_ui:dashboard"),
+            [("study", "SCORCH"), ("study", "Aging_Mouse")],
+        )
+
+        assert b"A-1" in response.content
+        assert b"B-1" in response.content
+        assert b"C-1" not in response.content
+
     def test_offers_each_study_once(self, logged_in):
         make("A-1", "10X120", studies=["SCORCH", "Aging_Mouse"])
         make("B-1", "10X121", studies=["SCORCH"])

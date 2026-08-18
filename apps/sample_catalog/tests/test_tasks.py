@@ -10,8 +10,8 @@ from __future__ import annotations
 import pytest
 from django.core.cache import cache
 
+from apps.sample_catalog import ocs_sync as sync
 from apps.sample_catalog import tasks
-from apps.sample_catalog.services import sync
 from apps.workflow_engine.models import WorkflowConfig
 
 pytestmark = pytest.mark.django_db

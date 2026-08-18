@@ -5,15 +5,15 @@ from __future__ import annotations
 from apps.sample_catalog.models import Stage
 
 COMMAND_CONFIG_FIELD = {
-    Stage.ALIGN: "alignment_command_configs",
-    Stage.POST_ALIGN: "post_alignment_command_configs",
+    Stage.ALIGN.value: "alignment_command_configs",
+    Stage.POST_ALIGN.value: "post_alignment_command_configs",
 }
 
 # Which status_mappings list says a stage is finished.
 COMPLETE_STATUS_KEY = {
-    Stage.INGEST: "ingest_complete",
-    Stage.ALIGN: "alignment_complete",
-    Stage.POST_ALIGN: "post_alignment_complete",
+    Stage.INGEST.value: "ingest_complete",
+    Stage.ALIGN.value: "alignment_complete",
+    Stage.POST_ALIGN.value: "post_alignment_complete",
 }
 
 

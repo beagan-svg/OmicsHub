@@ -14,8 +14,8 @@ import datetime as dt
 import pytest
 
 from apps.ocs_integration import dynamodb
+from apps.sample_catalog import ocs_sync as sync
 from apps.sample_catalog.models import Sample, Stage
-from apps.sample_catalog.services import sync
 
 FASTQ_GFS = "gfs://a86dcdfc0ce54e2fb16740a83131da36ae47976d"
 FASTQ_ID = "a86dcdfc0ce54e2fb16740a83131da36ae47976d"

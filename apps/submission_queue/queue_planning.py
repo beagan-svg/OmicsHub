@@ -19,7 +19,7 @@ from __future__ import annotations
 import shlex
 from dataclasses import dataclass
 
-from apps.sample_catalog.models import MULTIOME_ATAC_PREP, Stage
+from apps.sample_catalog.models import MULTIOME_ATAC_PREP, Sample, Stage
 from apps.workflow_engine import command_builder
 from apps.workflow_engine.command_builder import COMPLETE_STATUS_KEY, ConfigurationError
 
@@ -51,7 +51,7 @@ class SkipReason:
 
 @dataclass(frozen=True)
 class PlannedEntry:
-    sample: object
+    sample: Sample
     stage: str
     modality: str
     modality_source: str
@@ -69,7 +69,7 @@ class PlannedEntry:
 
 @dataclass(frozen=True)
 class SkippedSample:
-    sample: object
+    sample: Sample
     reason: str
     detail: str
     # Set when the skip is tied to a stage, so the UI can ask about that stage specifically.
@@ -89,7 +89,7 @@ class Plan:
     # ATAC halves that this plan aligns through their GEX partner rather than on their own.
     # These samples are submitted with their partners, not as separate rows, so they are kept
     # apart from `skipped` rather than filtered out of it at each place that reads it.
-    covered_by_pair: list
+    covered_by_pair: list[Sample]
 
     @property
     def unpaired_multiome(self) -> list[SkippedSample]:
@@ -173,7 +173,7 @@ class Plan:
 
 def build_plan(
     *,
-    samples,
+    samples: list[Sample],
     config: dict,
     email: str,
     modality: str | None = None,
@@ -444,7 +444,7 @@ def _aligned_through_partner(*, sample, pair_index: dict, config: dict, force: s
     return _next_stage(sample=sample, config=config, force=force) == Stage.ALIGN
 
 
-def _is_complete(sample, stage: str, config: dict) -> bool:
+def _is_complete(sample: Sample, stage: str, config: dict) -> bool:
     return sample.stage_status(stage) in config["status_mappings"][COMPLETE_STATUS_KEY[stage]]
 
 

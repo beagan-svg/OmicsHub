@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.sample_catalog.services import sync
+from apps.sample_catalog import ocs_sync as sync
 
 
 class Command(BaseCommand):

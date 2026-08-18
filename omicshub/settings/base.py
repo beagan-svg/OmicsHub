@@ -71,6 +71,12 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": env("CACHE_URL", default="redis://localhost:6379/1"),
+        "KEY_PREFIX": env("CACHE_KEY_PREFIX", default="omicshub"),
+        "TIMEOUT": env.int("CACHE_TIMEOUT", default=300),
+        "OPTIONS": {
+            "socket_connect_timeout": 2,
+            "socket_timeout": 2,
+        },
     }
 }
 
@@ -94,6 +100,7 @@ AUTH_PASSWORD_VALIDATORS = [
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "web_ui:dashboard"
 LOGOUT_REDIRECT_URL = "login"
+ADMIN_URL = env("ADMIN_URL", default="admin")
 # Django's error level is "error"; Bootstrap's alert class is "danger". Remapping here
 # keeps the base template's message loop a plain alert-{{ level_tag }}.
 MESSAGE_TAGS = {message_constants.ERROR: "danger"}
@@ -153,20 +160,18 @@ CELERY_TASK_SOFT_TIME_LIMIT = 870
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 # Submissions run on their own queue with a single worker process, so the global OCS job
 # limit and the per-config `spacing` between submissions are both actually enforced.
-# Celery's own default queue is named "celery"; the workers are run as `-Q default` and
-# `-Q submissions`, so without this every unrouted task, including both sweeps and the
-# reconciler,
-# is published to a queue nobody consumes and silently never runs.
-CELERY_TASK_DEFAULT_QUEUE = "default"
+# Celery's own default queue is named "celery". Set the application default explicitly so
+# catalog synchronization tasks are delivered to the catalog-sync worker.
+CELERY_TASK_DEFAULT_QUEUE = "catalog-sync"
 CELERY_TASK_ROUTES = {
-    "apps.submission_queue.tasks.process_next_queue_entry": {"queue": "submissions"},
+    "apps.submission_queue.tasks.process_next_queue_entry": {"queue": "ocs-submissions"},
+    "apps.sample_catalog.tasks.sync_all_stage_statuses": {"queue": "catalog-sync"},
+    "apps.sample_catalog.tasks.sync_all_metadata": {"queue": "catalog-sync"},
 }
 CELERY_BEAT_SCHEDULE = {
-    # The submission chain re-queues itself; this restarts it when the queue has been
-    # idle, and is a cheap no-op when there is nothing pending. It is also the only thing
-    # that retries after the OCS job limit is hit. The task does not schedule its own
-    # retry, so `job_settings.poll_interval_hours` is honoured through the capacity hold
-    # in apps/submission_queue/tasks.py instead.
+    # Beat restarts the submission chain when the queue is idle. The task also schedules
+    # its next run after a successful submission, while the Redis holds prevent duplicate
+    # work when both paths arrive during the same spacing window.
     "process-queue": {
         "task": "apps.submission_queue.tasks.process_next_queue_entry",
         "schedule": 60.0,
@@ -182,11 +187,6 @@ CELERY_BEAT_SCHEDULE = {
     "sync-metadata": {
         "task": "apps.sample_catalog.tasks.sync_all_metadata",
         "schedule": crontab(hour=3, minute=0),
-    },
-    # Surfaces submissions a dying worker left mid-flight; without it they stay invisible.
-    "reconcile-stranded-submissions": {
-        "task": "apps.submission_queue.tasks.reconcile_stranded_submissions",
-        "schedule": 600.0,
     },
 }
 

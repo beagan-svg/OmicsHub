@@ -6,7 +6,7 @@ import datetime as dt
 
 import pytest
 
-from apps.sample_catalog.services import sync
+from apps.sample_catalog import ocs_sync as sync
 
 
 def when(days_ago: float) -> str:

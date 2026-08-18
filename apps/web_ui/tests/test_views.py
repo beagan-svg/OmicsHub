@@ -1,11 +1,16 @@
-"""The pages, and the three-step submission the dashboard exists for."""
+"""The pages, data downloads, and the three-step submission the dashboard exists for."""
 
 from __future__ import annotations
 
+import io
+import zipfile
+from datetime import timedelta
+
 import pytest
 from django.urls import reverse
+from django.utils import timezone
 
-from apps.sample_catalog.models import NOT_COMPLETED, Stage
+from apps.sample_catalog.models import NOT_COMPLETED, Stage, StageStatus
 from apps.submission_queue.models import QueueEntry
 from apps.web_ui import columns
 
@@ -29,6 +34,7 @@ class TestAccess:
         "name",
         [
             "web_ui:dashboard",
+            "web_ui:data-locations",
             "web_ui:queue",
             "web_ui:job-monitor",
             "web_ui:failed",
@@ -52,6 +58,15 @@ class TestAccess:
 
 
 class TestDashboard:
+    def test_page_size_changes_the_number_of_rows(self, logged_in, make_sample):
+        for index in range(55):
+            make_sample(f"NW-PAGE-{index:03d}")
+
+        response = logged_in.get(reverse("web_ui:dashboard"), {"page_size": "25"})
+
+        assert response.context["page"].paginator.per_page == 25
+        assert len(response.context["page"].object_list) == 25
+
     def test_lists_samples_with_stage_status(self, logged_in, make_sample):
         make_sample("READY-1", align="IN_PROGRESS")
 
@@ -59,6 +74,33 @@ class TestDashboard:
 
         assert b"READY-1" in response.content
         assert b"IN_PROGRESS" in response.content
+
+    def test_live_status_returns_only_requested_sample_stage_data(self, logged_in, make_sample):
+        sample = make_sample("LIVE-1")
+        sample.stage_statuses.create(
+            stage=Stage.ALIGN,
+            status="IN_PROGRESS",
+            demand_id="live-demand",
+            file_store_id="live-store",
+        )
+        other = make_sample("LIVE-2")
+        other.stage_statuses.create(stage=Stage.ALIGN, status="COMPLETED", demand_id="other-demand")
+
+        response = logged_in.get(
+            reverse("web_ui:live-status"), {"fastq_names": [sample.fastq_name, "MISSING"]}
+        )
+
+        assert response.json()["rows"]["LIVE-1"]["align"] == {
+            "status": "IN_PROGRESS",
+        }
+        assert "LIVE-2" not in response.json()["rows"]
+
+    def test_live_status_ignores_requests_for_too_many_samples(self, logged_in):
+        response = logged_in.get(
+            reverse("web_ui:live-status"), {"fastq_names": [f"LIVE-{i}" for i in range(201)]}
+        )
+
+        assert response.json() == {"rows": {}}
 
     def test_shows_the_inferred_workflow(self, logged_in, active_config, make_sample):
         make_sample("READY-1", batch_name_from_vendor="MTX-22068")
@@ -177,8 +219,17 @@ class TestDashboard:
         assert b"A-1" in response.content
         assert b"B-1" not in response.content
 
+    def test_searches_fastq_load_and_vendor_batch_names(self, logged_in, make_sample):
+        make_sample("FASTQ-1", load_name="LOAD-1", batch_name_from_vendor="MTX-22068")
+        make_sample("FASTQ-2", load_name="LOAD-2", batch_name_from_vendor="RTX-34056")
+
+        response = logged_in.get(reverse("web_ui:dashboard"), {"fastq_name": "MTX-22068"})
+
+        assert b"FASTQ-1" in response.content
+        assert b"FASTQ-2" not in response.content
+
     def test_refresh_status_re_reads_the_posted_rows_from_ocs(self, logged_in, monkeypatch, make_sample):
-        from apps.sample_catalog.services import sync as sync_service
+        from apps.sample_catalog import ocs_sync as sync_service
 
         make_sample("A-1")
         make_sample("B-1")
@@ -192,13 +243,25 @@ class TestDashboard:
         response = logged_in.post(reverse("web_ui:refresh-status"), {"fastq_names": ["A-1"]}, follow=True)
 
         assert refreshed == ["A-1"]
-        assert b"Refreshed status for 1 samples" in response.content
+        assert b"Refreshed status for 1 sample from OCS" in response.content
+
+    def test_refresh_status_uses_the_submitted_table_row_count(self, logged_in, monkeypatch, make_sample):
+        from apps.sample_catalog import ocs_sync as sync_service
+
+        fastq_names = [f"REFRESH-{index:02d}" for index in range(55)]
+        for fastq_name in fastq_names:
+            make_sample(fastq_name)
+        monkeypatch.setattr(sync_service, "sync_stage_statuses", lambda samples: None)
+
+        response = logged_in.post(reverse("web_ui:refresh-status"), {"fastq_names": fastq_names}, follow=True)
+
+        assert b"Refreshed status for 55 samples from OCS" in response.content
 
     def test_refresh_status_survives_ocs_being_unreachable(self, logged_in, monkeypatch, make_sample):
         """The mirror is still readable; only the live read failed, and the table stays up."""
         from botocore.exceptions import EndpointConnectionError
 
-        from apps.sample_catalog.services import sync as sync_service
+        from apps.sample_catalog import ocs_sync as sync_service
 
         make_sample("A-1")
 
@@ -212,8 +275,224 @@ class TestDashboard:
         assert response.status_code == 200
         assert b"Could not reach OCS" in response.content
 
+    def test_data_locations_uses_stage_file_store_rows(self, logged_in, monkeypatch, make_sample):
+        sample = make_sample("A-1", align="COMPLETED")
+        sample.stage_statuses.filter(stage=Stage.ALIGN).update(file_store_id="store-1")
+        monkeypatch.setattr(
+            "apps.web_ui.data_location_queries.dynamodb.get_file_stores",
+            lambda ids: {"store-1": {"file_store_id": "store-1", "s3_uri": "s3://bucket/results"}},
+        )
+
+        response = logged_in.get(reverse("web_ui:data-locations"), {"fastq_name": "A-1"})
+
+        assert response.status_code == 200
+        assert b"s3://bucket/results" in response.content
+        assert b"store-1" not in response.content
+        assert b"demand-align" not in response.content
+
+    def test_data_locations_uses_sample_filters_and_default_fields(self, logged_in, make_sample):
+        make_sample("A-1", batch_name_from_vendor="MTX-10", organism_common_name="mouse")
+        make_sample("B-1", batch_name_from_vendor="RTX-20", organism_common_name="human")
+
+        response = logged_in.get(
+            reverse("web_ui:data-locations"),
+            {"study": "StudyA", "organism_common_name": "mouse", "batch_prefix": "MTX"},
+        )
+
+        assert [sample.fastq_name for sample in response.context["page"].object_list] == ["A-1"]
+        assert b"Study Set" in response.content
+        assert b"Batch Name From Vendor" in response.content
+        assert b"Library Prep Method" in response.content
+        assert "studies" in [column.key for column in response.context["all_columns"]]
+        assert b"More filters" in response.content
+
+    def test_data_locations_filters_by_multiple_studies(self, logged_in, make_sample):
+        for fastq_name, study in (("A-1", "StudyA"), ("B-1", "StudyB"), ("C-1", "StudyC")):
+            sample = make_sample(fastq_name)
+            sample.studies = [study]
+            sample.save(update_fields=["studies"])
+
+        response = logged_in.get(
+            reverse("web_ui:data-locations"),
+            [("study", "StudyA"), ("study", "StudyB")],
+        )
+
+        assert {sample.fastq_name for sample in response.context["page"].object_list} == {"A-1", "B-1"}
+
+    def test_data_locations_uses_the_shared_column_settings(self, logged_in, make_sample):
+        make_sample("A-1")
+
+        logged_in.post(
+            reverse("web_ui:set-columns"),
+            {"scope": "locations", "columns": ["load_name", "organism_common_name"]},
+        )
+
+        response = logged_in.get(reverse("web_ui:data-locations"))
+
+        assert [column.key for column in response.context["columns"]] == [
+            "load_name",
+            "organism_common_name",
+        ]
+
+    def test_data_locations_can_show_one_stage(self, logged_in, make_sample):
+        make_sample("A-1")
+
+        response = logged_in.get(reverse("web_ui:data-locations"), {"location_stage": "align"})
+
+        assert response.context["selected_location_stage"] == "align"
+        assert {row["stage"] for row in response.context["location_rows"]} == {Stage.ALIGN}
+
+    def test_data_location_contents_loads_one_s3_folder(self, logged_in, monkeypatch, make_sample):
+        sample = make_sample("A-1", align="COMPLETED")
+        StageStatus.objects.filter(sample=sample, stage=Stage.ALIGN).update(file_store_id="store-1")
+        monkeypatch.setattr(
+            "apps.web_ui.views.dynamodb.get_file_stores",
+            lambda ids: {"store-1": {"file_store_id": "store-1", "s3_uri": "s3://bucket/results"}},
+        )
+        from apps.ocs_integration.s3 import FolderContents
+
+        monkeypatch.setattr(
+            "apps.web_ui.views.s3.list_folder",
+            lambda uri, prefix, token: FolderContents(
+                ["counts"], [{"name": "summary.csv", "key": "results/summary.csv", "size": 12}], None
+            ),
+        )
+
+        response = logged_in.get(
+            reverse("web_ui:data-location-contents", args=[sample.pk, Stage.ALIGN.value])
+        )
+
+        assert response.status_code == 200
+        assert b"counts/" in response.content
+        assert b"summary.csv" in response.content
+        assert b"Download selected" in response.content
+        assert b"location-file-select" in response.content
+
+        nested_response = logged_in.get(
+            reverse("web_ui:data-location-contents", args=[sample.pk, Stage.ALIGN.value]),
+            {"prefix": "counts/sub"},
+        )
+
+        assert b'aria-label="Go to parent folder"' in nested_response.content
+        assert b"prefix=counts" in nested_response.content
+
+    def test_downloads_selected_files_as_one_zip(self, logged_in, monkeypatch, make_sample):
+        sample = make_sample("A-1", align="COMPLETED")
+        StageStatus.objects.filter(sample=sample, stage=Stage.ALIGN).update(file_store_id="store-1")
+        monkeypatch.setattr(
+            "apps.web_ui.views.dynamodb.get_file_stores",
+            lambda ids: {"store-1": {"file_store_id": "store-1", "s3_uri": "s3://bucket/results"}},
+        )
+        monkeypatch.setattr("apps.web_ui.views.s3.validate_key", lambda uri, key: None)
+        monkeypatch.setattr(
+            "apps.web_ui.views.s3.relative_key", lambda uri, key: key.removeprefix("results/")
+        )
+        monkeypatch.setattr(
+            "apps.web_ui.views.s3.get_object_body",
+            lambda uri, key: io.BytesIO(key.encode()),
+        )
+
+        response = logged_in.post(
+            reverse("web_ui:data-location-download", args=[sample.pk, Stage.ALIGN.value]),
+            {"keys": ["results/summary.csv", "results/summary.csv", "results/counts.csv"]},
+        )
+
+        archive = b"".join(response.streaming_content)
+        assert response.status_code == 200
+        assert response["Content-Disposition"] == 'attachment; filename="A-1-align.zip"'
+        with zipfile.ZipFile(io.BytesIO(archive)) as download:
+            assert download.namelist() == ["summary.csv", "counts.csv"]
+            assert download.read("summary.csv") == b"results/summary.csv"
+
+    def test_downloads_a_folder_as_one_zip(self, logged_in, monkeypatch, make_sample):
+        sample = make_sample("A-1", align="COMPLETED")
+        StageStatus.objects.filter(sample=sample, stage=Stage.ALIGN).update(file_store_id="store-1")
+        monkeypatch.setattr(
+            "apps.web_ui.views.dynamodb.get_file_stores",
+            lambda ids: {"store-1": {"file_store_id": "store-1", "s3_uri": "s3://bucket/results"}},
+        )
+        monkeypatch.setattr(
+            "apps.web_ui.views.s3.list_files", lambda uri, prefix: iter(["results/counts/a.csv"])
+        )
+        monkeypatch.setattr(
+            "apps.web_ui.views.s3.relative_key", lambda uri, key: key.removeprefix("results/")
+        )
+        monkeypatch.setattr("apps.web_ui.views.s3.get_object_body", lambda uri, key: io.BytesIO(b"data"))
+
+        response = logged_in.post(
+            reverse("web_ui:data-location-download", args=[sample.pk, Stage.ALIGN.value]),
+            {"folders": ["counts"]},
+        )
+
+        with zipfile.ZipFile(io.BytesIO(b"".join(response.streaming_content))) as download:
+            assert download.namelist() == ["counts/a.csv"]
+
+    def test_download_requires_a_selected_file(self, logged_in, monkeypatch, make_sample):
+        sample = make_sample("A-1", align="COMPLETED")
+        StageStatus.objects.filter(sample=sample, stage=Stage.ALIGN).update(file_store_id="store-1")
+        monkeypatch.setattr(
+            "apps.web_ui.views.dynamodb.get_file_stores",
+            lambda ids: {"store-1": {"file_store_id": "store-1", "s3_uri": "s3://bucket/results"}},
+        )
+
+        response = logged_in.post(
+            reverse("web_ui:data-location-download", args=[sample.pk, Stage.ALIGN.value])
+        )
+
+        assert response.status_code == 400
+        assert response.json() == {"error": "Select at least one file or folder."}
+
+    def test_data_locations_export_includes_s3_rows_for_selected_samples(
+        self, logged_in, monkeypatch, make_sample
+    ):
+        sample = make_sample("A-1", align="COMPLETED")
+        StageStatus.objects.filter(sample=sample, stage=Stage.ALIGN).update(file_store_id="store-1")
+        monkeypatch.setattr(
+            "apps.web_ui.views.dynamodb.get_file_stores",
+            lambda ids: {"store-1": {"file_store_id": "store-1", "s3_uri": "s3://bucket/results"}},
+        )
+
+        response = logged_in.post(reverse("web_ui:data-locations-export"), {"fastq_names": ["A-1"]})
+
+        body = b"".join(response.streaming_content)
+        assert response.status_code == 200
+        assert b"S3 Location" in body
+        assert b"s3://bucket/results" in body
+        assert b"A-1" in body
+
+    def test_data_locations_export_respects_the_active_tab(self, logged_in, monkeypatch, make_sample):
+        make_sample("MTX-1", batch_name_from_vendor="MTX-10")
+        make_sample("RTX-1", batch_name_from_vendor="RTX-20")
+        monkeypatch.setattr(
+            "apps.web_ui.data_location_queries.dynamodb.get_file_stores",
+            lambda ids: {},
+        )
+
+        response = logged_in.post(f"{reverse('web_ui:data-locations-export')}?batch_prefix=MTX")
+
+        body = b"".join(response.streaming_content)
+        assert b"MTX-1" in body
+        assert b"RTX-1" not in body
+
+    def test_data_locations_export_matches_selected_columns_and_stage(
+        self, logged_in, monkeypatch, make_sample
+    ):
+        make_sample("A-1", align="COMPLETED")
+        monkeypatch.setattr("apps.web_ui.data_location_queries.dynamodb.get_file_stores", lambda ids: {})
+        logged_in.post(
+            reverse("web_ui:set-columns"),
+            {"scope": "locations", "columns": ["load_name", "stage"]},
+        )
+
+        response = logged_in.post(f"{reverse('web_ui:data-locations-export')}?location_stage=align")
+
+        body = b"".join(response.streaming_content)
+        assert b"Fastq Name,Load Name,Stage,S3 Location" in body
+        assert b"Organism Common Name" not in body
+        assert b"A-1" in body
+
     def test_sync_pulls_a_batch(self, logged_in, monkeypatch, make_sample):
-        from apps.sample_catalog.services import sync as sync_service
+        from apps.sample_catalog import ocs_sync as sync_service
 
         monkeypatch.setattr(sync_service, "sync_batch", lambda batch_name_from_vendor: [make_sample("NEW-1")])
 
@@ -422,6 +701,54 @@ class TestQueue:
         entry.refresh_from_db()
         assert entry.status == QueueEntry.Status.CANCELLED
 
+    def test_pausing_hides_the_next_submission_and_persists(self, logged_in, user, queued):
+        queued("READY-1")
+
+        logged_in.post(reverse("web_ui:toggle-queue-pause"), follow=True)
+
+        user.refresh_from_db()
+        assert user.queue_paused is True
+        response = logged_in.get(reverse("web_ui:queue"))
+        assert response.context["queue_paused"] is True
+        assert b"Next eligible submission" not in response.content
+
+    def test_resuming_restores_the_next_submission(self, logged_in, user, queued):
+        queued("READY-1")
+        user.queue_paused = True
+        user.save(update_fields=["queue_paused"])
+
+        logged_in.post(reverse("web_ui:toggle-queue-pause"), follow=True)
+
+        user.refresh_from_db()
+        assert user.queue_paused is False
+        assert b"Next eligible submission" in logged_in.get(reverse("web_ui:queue")).content
+
+    def test_deleting_a_pending_entry_removes_it(self, logged_in, queued):
+        entry = queued("READY-1")
+
+        logged_in.post(reverse("web_ui:delete-queue-entry", args=[entry.pk]), follow=True)
+
+        assert not QueueEntry.objects.filter(pk=entry.pk).exists()
+
+    def test_deleting_another_users_entry_is_refused(self, logged_in, queued, client, django_user_model):
+        entry = queued("READY-1")
+        other = django_user_model.objects.create_user(username="other", email="o@b.org")
+        client.force_login(other)
+
+        response = client.post(reverse("web_ui:delete-queue-entry", args=[entry.pk]))
+
+        assert response.status_code == 404
+        assert QueueEntry.objects.filter(pk=entry.pk).exists()
+
+    def test_deleting_a_submitting_entry_leaves_it_untouched(self, logged_in, queued):
+        entry = queued("READY-1")
+        entry.status = QueueEntry.Status.SUBMITTING
+        entry.save(update_fields=["status"])
+
+        logged_in.post(reverse("web_ui:delete-queue-entry", args=[entry.pk]), follow=True)
+
+        assert QueueEntry.objects.filter(pk=entry.pk).exists()
+
 
 class TestJobMonitor:
     """The monitor reads the mirror, so it covers OCS work this app never submitted.
@@ -440,6 +767,81 @@ class TestJobMonitor:
         assert b"RUNNING-1" in response.content
         assert b"demand-123" in response.content
         assert response.context["counts"]["align"] == 1
+
+    def test_running_stage_filter_shows_only_alignment_jobs(self, logged_in, make_sample):
+        alignment = make_sample("RUNNING-ALIGN-1")
+        alignment.stage_statuses.create(stage=Stage.ALIGN, status="IN_PROGRESS", demand_id="demand-align")
+        post_alignment = make_sample("RUNNING-POST-1")
+        post_alignment.stage_statuses.create(
+            stage=Stage.POST_ALIGN, status="IN_PROGRESS", demand_id="demand-post"
+        )
+
+        response = logged_in.get(reverse("web_ui:job-monitor"), {"running_stage": Stage.ALIGN})
+
+        assert [row.sample.fastq_name for row in response.context["running"]] == ["RUNNING-ALIGN-1"]
+        assert response.context["counts"] == {"align": 1, "post_align": 0, "total": 1}
+        assert response.context["running_stage"] == Stage.ALIGN
+
+    def test_running_stage_filter_shows_only_post_alignment_jobs(self, logged_in, make_sample):
+        alignment = make_sample("RUNNING-ALIGN-2")
+        alignment.stage_statuses.create(stage=Stage.ALIGN, status="IN_PROGRESS", demand_id="demand-align-2")
+        post_alignment = make_sample("RUNNING-POST-2")
+        post_alignment.stage_statuses.create(
+            stage=Stage.POST_ALIGN, status="IN_PROGRESS", demand_id="demand-post-2"
+        )
+
+        response = logged_in.get(reverse("web_ui:job-monitor"), {"running_stage": Stage.POST_ALIGN})
+
+        assert [row.sample.fastq_name for row in response.context["running"]] == ["RUNNING-POST-2"]
+        assert response.context["counts"] == {"align": 0, "post_align": 1, "total": 1}
+
+    def test_invalid_running_stage_shows_all_running_jobs(self, logged_in, make_sample):
+        for name, stage in (("RUNNING-ALIGN-3", Stage.ALIGN), ("RUNNING-POST-3", Stage.POST_ALIGN)):
+            sample = make_sample(name)
+            sample.stage_statuses.create(stage=stage, status="IN_PROGRESS", demand_id=f"demand-{name}")
+
+        response = logged_in.get(reverse("web_ui:job-monitor"), {"running_stage": "export"})
+
+        assert len(response.context["running"]) == 2
+        assert response.context["running_stage"] == ""
+
+    def test_monitor_poll_returns_only_the_table_fragment(self, logged_in, make_sample):
+        sample = make_sample("POLL-1")
+        sample.stage_statuses.create(stage=Stage.ALIGN, status="IN_PROGRESS", demand_id="poll-demand")
+
+        response = logged_in.get(reverse("web_ui:job-monitor"), HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+
+        assert response.status_code == 200
+        assert b"Running" in response.content
+        assert b"monitor-live-data" not in response.content
+        assert b"Refresh data" not in response.content
+
+    def test_a_running_stage_shows_elapsed_duration(self, logged_in, make_sample):
+        sample = make_sample("RUNNING-TIMED-1")
+        sample.stage_statuses.create(
+            stage=Stage.ALIGN,
+            status="IN_PROGRESS",
+            demand_id="demand-timed",
+            started_at=timezone.now() - timedelta(minutes=5, seconds=10),
+        )
+
+        response = logged_in.get(reverse("web_ui:job-monitor"))
+
+        assert b"5m" in response.content
+
+    def test_monitor_tables_paginate_with_the_shared_page_size(self, logged_in, make_sample):
+        for index in range(30):
+            sample = make_sample(f"RUNNING-PAGE-{index:02d}")
+            sample.stage_statuses.create(
+                stage=Stage.ALIGN,
+                status="IN_PROGRESS",
+                demand_id=f"demand-page-{index}",
+            )
+
+        response = logged_in.get(reverse("web_ui:job-monitor"), {"running_page_size": "25"})
+
+        assert response.context["running_page"].paginator.per_page == 25
+        assert len(response.context["running_page"].object_list) == 25
 
     def test_a_multiome_pair_is_one_running_mtx_job(self, logged_in, make_sample):
         gex = make_sample(
@@ -600,6 +1002,8 @@ class TestFailedJobs:
     def test_retry_puts_it_back_on_the_queue(self, logged_in, queued):
         entry = queued("BAD-1")
         entry.status = QueueEntry.Status.FAILED
+        entry.demand_id = "old-demand"
+        entry.submitted_at = timezone.now()
         entry.error_message = "boom"
         entry.save()
 
@@ -607,33 +1011,9 @@ class TestFailedJobs:
 
         entry.refresh_from_db()
         assert entry.status == QueueEntry.Status.PENDING
+        assert entry.demand_id == ""
+        assert entry.submitted_at is None
         assert entry.error_message == ""
-
-    def test_a_stranded_entry_is_not_retryable(self, logged_in, queued):
-        """It may already be running at OCS."""
-        entry = queued("STRANDED-1")
-        entry.status = QueueEntry.Status.STRANDED
-        entry.save()
-
-        response = logged_in.post(reverse("web_ui:retry", args=[entry.pk]), follow=True)
-
-        entry.refresh_from_db()
-        assert entry.status == QueueEntry.Status.STRANDED
-        assert b"Check OCS" in response.content
-
-    def test_a_region_preflight_stranded_entry_can_be_retried(self, logged_in, queued):
-        entry = queued("REGION-1")
-        entry.status = QueueEntry.Status.STRANDED
-        entry.error_message = "`ocs` exited 1: Could not determine region from default session or environment"
-        entry.save()
-
-        response = logged_in.get(reverse("web_ui:failed"))
-        assert b">Retry<" in response.content
-
-        logged_in.post(reverse("web_ui:retry", args=[entry.pk]), follow=True)
-
-        entry.refresh_from_db()
-        assert entry.status == QueueEntry.Status.PENDING
 
     def test_delete_removes_the_entry(self, logged_in, queued):
         entry = queued("BAD-1")

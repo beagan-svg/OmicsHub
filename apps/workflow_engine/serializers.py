@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from apps.workflow_engine import services
+from apps.workflow_engine import manifest_service
 from apps.workflow_engine.models import WorkflowConfig
 
 
@@ -44,7 +44,7 @@ class WorkflowConfigUploadSerializer(serializers.Serializer):
 
         name = (validated_data.get("name") or uploaded.name or "")[:NAME_MAX_LENGTH]
         try:
-            return services.create_config(
+            return manifest_service.create_config(
                 raw=raw,
                 name=name,
                 user=self.context["request"].user,

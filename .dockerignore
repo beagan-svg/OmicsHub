@@ -39,7 +39,7 @@ __pycache__/
 # Kept deliberately, because the build or the running container needs them and an over-broad
 # rule above would be easy to write:
 #   pyproject.toml, requirements.lock   dependency install, before the source copy
-#   vendor/gcs/                         the `ocs` CLI packages; see scripts/vendor_gcs.sh
-#   scripts/                            healthcheck.py runs inside the web container
+#   vendor/gcs/                         the `ocs` CLI packages; see docker_tools/vendor_gcs.sh
+#   docker_tools/                       healthcheck.py runs inside the web container
 #   apps/, omicshub/, manage.py         the application
 #   workflow_manifests/                 the sample workflow manifest

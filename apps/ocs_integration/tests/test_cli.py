@@ -9,7 +9,7 @@ import pytest
 from django.test import override_settings
 
 from apps.ocs_integration import cli
-from apps.ocs_integration.cli import OCSSubmissionError, OCSSubmissionUncertain
+from apps.ocs_integration.cli import OCSSubmissionError
 
 SUBMITTED = json.dumps({"demand_status": "SUBMITTED", "demand_execution": {"demand_id": "abc-123"}})
 
@@ -37,7 +37,7 @@ def test_returns_the_demand_id(fake_run):
     assert cli.submit(["ocs", "fastqs", "align", "tenx-arc"]) == "abc-123"
 
 
-def test_region_preflight_failure_is_safe_to_retry(fake_run):
+def test_region_preflight_failure_is_recorded_as_failed(fake_run):
     fake_run(
         stdout="",
         stderr="Could not determine region from default session or environment",
@@ -127,9 +127,7 @@ class TestTheCommandItself:
             cli.submit(["ocs", "fastqs", "align", "tenx-arc"])
 
 
-class TestOutcomeIsKnownOrNot:
-    """Whether a retry is safe turns entirely on which of these two the caller sees."""
-
+class TestSubmissionOutcome:
     def test_a_refusal_is_a_plain_failure(self, fake_run):
         """OCS answered and said no, so nothing is running and a retry is safe."""
         fake_run(stdout=json.dumps({"demand_status": "REJECTED"}))
@@ -137,36 +135,33 @@ class TestOutcomeIsKnownOrNot:
         with pytest.raises(OCSSubmissionError):
             cli.submit(["ocs", "fastqs", "align", "tenx-arc"])
 
-    def test_a_non_zero_exit_is_uncertain(self, fake_run):
-        """The CLI can fail after submitting, so only a parsed refusal is a safe retry."""
+    def test_a_non_zero_exit_is_a_failure(self, fake_run):
         fake_run(stdout="", stderr="AccessDenied: not your queue\n", returncode=2)
 
-        with pytest.raises(OCSSubmissionUncertain, match="AccessDenied: not your queue"):
+        with pytest.raises(OCSSubmissionError, match="AccessDenied: not your queue"):
             cli.submit(["ocs", "fastqs", "align", "tenx-arc"])
 
     def test_a_non_zero_exit_falls_back_to_stdout(self, fake_run):
         """Some failures are only ever printed to stdout; the reason must survive either way."""
         fake_run(stdout="no such asset tag\n", stderr="", returncode=1)
 
-        with pytest.raises(OCSSubmissionUncertain, match="no such asset tag"):
+        with pytest.raises(OCSSubmissionError, match="no such asset tag"):
             cli.submit(["ocs", "fastqs", "align", "tenx-arc"])
 
-    def test_a_timeout_is_uncertain(self, fake_run):
-        """The command may have submitted before it stopped answering."""
+    def test_a_timeout_is_a_failure(self, fake_run):
         fake_run(side_effect=subprocess.TimeoutExpired("ocs", 300))
 
-        with pytest.raises(OCSSubmissionUncertain):
+        with pytest.raises(OCSSubmissionError):
             cli.submit(["ocs", "fastqs", "align", "tenx-arc"])
 
-    def test_unreadable_output_is_uncertain(self, fake_run):
-        """A demand may exist; we simply cannot read the answer."""
+    def test_unreadable_output_is_a_failure(self, fake_run):
         fake_run(stdout="Warning: profile expired\n")
 
-        with pytest.raises(OCSSubmissionUncertain):
+        with pytest.raises(OCSSubmissionError):
             cli.submit(["ocs", "fastqs", "align", "tenx-arc"])
 
-    def test_a_response_without_a_status_is_uncertain(self, fake_run):
+    def test_a_response_without_a_status_is_a_failure(self, fake_run):
         fake_run(stdout=json.dumps({"demand_execution": {"demand_id": "abc-123"}}))
 
-        with pytest.raises(OCSSubmissionUncertain):
+        with pytest.raises(OCSSubmissionError):
             cli.submit(["ocs", "fastqs", "align", "tenx-arc"])

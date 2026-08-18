@@ -34,7 +34,7 @@ fi
 # is installed here, does not have that flag, and rejects the whole command. Check this with
 # running this script rather than assumed.
 log "starting the stack"
-if docker compose --env-file .env.docker up -d --wait; then
+if docker compose --env-file .env.docker up -d --build --wait; then
     log "stack is up"
 else
     log "stack did not come up healthy; see: docker compose --env-file .env.docker ps"

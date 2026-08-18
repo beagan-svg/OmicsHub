@@ -1,0 +1,32 @@
+<div class="dropdown">
+  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+          data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
+          data-study-toggle>
+    Study Set: <span data-study-summary>{% if selected_studies %}{{ selected_studies|length }} selected{% else %}all{% endif %}</span>
+  </button>
+  <div class="dropdown-menu study-filter-menu">
+    <div class="study-filter__head">
+      <div>
+        <div class="study-filter__title">Study sets</div>
+        <div class="small text-muted" data-study-menu-summary>
+          {% if selected_studies %}{{ selected_studies|length }} selected{% else %}All study sets{% endif %}
+        </div>
+      </div>
+      <div class="study-filter__actions">
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                data-study-action aria-label="Select all study sets">Select all</button>
+      </div>
+    </div>
+    <div class="study-filter__options">
+      {% for study in studies %}
+      <label class="dropdown-item rounded d-flex align-items-center gap-2">
+        <input class="form-check-input mt-0 study-filter__option" type="checkbox" name="study" value="{{ study }}"
+               form="{{ filter_form_id }}" {% if study in selected_studies %}checked{% endif %}>
+        <span>{{ study }}</span>
+      </label>
+      {% empty %}
+      <span class="dropdown-item-text text-muted">No study sets available</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>

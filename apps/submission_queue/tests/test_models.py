@@ -1,4 +1,4 @@
-"""Database-level guarantees the services rely on."""
+"""Database-level guarantees used by queue operations."""
 
 from __future__ import annotations
 

@@ -69,16 +69,6 @@ def test_requeue_skips_submitted_entries(model_admin, request_with_messages, ent
     assert submitted.status == QueueEntry.Status.SUBMITTED
 
 
-def test_requeue_skips_stranded_entries(model_admin, request_with_messages, entry):
-    """Nobody knows yet whether these reached OCS , bulk requeueing could duplicate a job."""
-    stranded = entry(QueueEntry.Status.STRANDED)
-
-    model_admin.requeue_entries(request_with_messages, QueueEntry.objects.all())
-
-    stranded.refresh_from_db()
-    assert stranded.status == QueueEntry.Status.STRANDED
-
-
 def test_changelist_does_not_query_once_per_entry(admin_client, make_sample, django_user_model):
     """list_display dereferences `sample` and `requested_by` on every row.
 

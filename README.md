@@ -23,7 +23,7 @@ Install these tools on the machine that will run OmicsHub:
   or a published package dependency
 
 The app reads AWS credentials from an app-scoped credentials file. It does not read access
-keys from .env.docker.
+keys from .env.docker. Redis is split into separate broker and cache services in Compose.
 
 ### Clone the repository
 
@@ -66,7 +66,7 @@ The same profile must allow the ocs CLI to submit alignment and post-alignment d
 Run the setup command from the repository root:
 
 ~~~bash
-scripts/setup_docker.sh
+docker_tools/setup_docker.sh
 ~~~
 
 The first run copies .env.docker.example to .env.docker and stops. Open .env.docker
@@ -87,7 +87,7 @@ bind mount path. Keep .env.docker out of Git.
 Run the setup command again:
 
 ~~~bash
-scripts/setup_docker.sh
+docker_tools/setup_docker.sh
 ~~~
 
 The command validates the settings, copies the OCS packages into vendor/gcs/, builds the
@@ -97,7 +97,7 @@ returns.
 If the genomics-cloud-services checkout is not at the default location, set GCS_SRC:
 
 ~~~bash
-GCS_SRC=/path/to/genomics-cloud-services scripts/setup_docker.sh
+GCS_SRC=/path/to/genomics-cloud-services docker_tools/setup_docker.sh
 ~~~
 
 The setup script stops with an error when any of the four OCS packages is missing:
@@ -119,8 +119,8 @@ Check the stack and view logs with these commands:
 
 ~~~bash
 docker compose --env-file .env.docker ps
-docker compose --env-file .env.docker logs -f web_ui
-docker compose --env-file .env.docker logs -f worker-submissions
+docker compose --env-file .env.docker logs -f web-ui
+docker compose --env-file .env.docker logs -f ocs-submission-worker
 curl http://127.0.0.1:8001/healthz/
 ~~~
 
@@ -150,7 +150,7 @@ the configured AWS profile to that process.
 OCS_ENV_BASE=prod reads tables such as prod-fastq-metadata. Change this value before
 connecting to another OCS environment.
 
-The dashboard stores the last successful OCS sync in PostgreSQL. A status of Synced means
+The dashboard stores the last successful OCS sync time in PostgreSQL. A `Synced` label means
 the last AWS status pull completed. It does not mean that OCS and PostgreSQL contain the same
 rows at every moment.
 
@@ -161,13 +161,13 @@ Read docs/PROJECT_MAP.md for the ownership map. The main directories are:
 | Directory | Contains |
 |---|---|
 | apps/accounts/ | The custom user model, login, signup, and account admin. |
-| apps/sample_catalog/ | Fastq samples, stage statuses, OCS sync services, and sample API endpoints. |
+| apps/sample_catalog/ | Fastq samples, stage statuses, OCS synchronization, and sample API endpoints. |
 | apps/ocs_integration/ | DynamoDB reads and the ocs CLI submission boundary. |
 | apps/submission_queue/ | Queue models, planning, round-robin claiming, Celery tasks, and queue API endpoints. |
 | apps/workflow_engine/ | Workflow manifest parsing, validation, modality selection, and command building. |
-| apps/web_ui/ | Server-rendered pages, forms, templates, CSS, static assets, and browser tests. |
+| apps/web_ui/ | Server-rendered pages, forms, templates, CSS, static assets, Data Locations queries, and browser tests. |
 | omicshub/ | Django settings, URLs, Celery setup, health checks, middleware, and logging. |
-| scripts/ | Docker setup, container health checks, and OCS package preparation. |
+| docker_tools/ | Docker setup, container health checks, and OCS package preparation. |
 | deploy/launchd/ | Optional macOS startup files for Docker Desktop. |
 | workflow_manifests/ | Example JSONC workflow manifests. |
 | vendor/gcs/ | OCS package source copied in before a Docker build. This is a build input, not app code. |
@@ -248,9 +248,8 @@ the response lists the available modalities and the request must include one:
 }
 ~~~
 
-The planner builds an ingest command only after fastq sample ingest is complete. It builds an
-alignment command only after ingest is complete. It builds a post-alignment command only after
-alignment is complete.
+The planner builds an alignment command only after ingest is complete. It builds a
+post-alignment command only after alignment is complete.
 
 The submission form lets a user change the reference, chemistry, probe set, command options,
 or command text for one fastq sample. OmicsHub plans the command again before it creates the
@@ -263,7 +262,9 @@ queue entry. It rejects invalid command input before submission.
 | / | Sync a vendor batch, filter fastq samples, and add samples to the cart. |
 | /checkout/ | Review samples, select the manifest, and review commands. |
 | /queue/ | View and cancel pending queue entries. |
-| /jobs/ | View submitted, failed, and stranded jobs. |
+| /data-locations/ | View file-store and S3 locations and download selected files. |
+| /jobs/ | View running and recently finished jobs. |
+| /failed/ | Retry or delete this user's submission and running failures. |
 | /settings/ | Upload and activate a workflow manifest as a staff user. |
 
 The cart is stored in PostgreSQL. It is not session data, so a selection survives logout and
@@ -291,39 +292,38 @@ The submissions queue must run one worker process with concurrency one. This pro
 OCS job limit and the manifest spacing value.
 
 ~~~bash
-celery -A omicshub worker -Q submissions -c 1 --hostname=submissions@%h
-celery -A omicshub worker -Q default -c 4
+celery -A omicshub worker -Q ocs-submissions -c 1 --hostname=ocs-submissions@%h
+celery -A omicshub worker -Q catalog-sync -c 4 --hostname=catalog-sync@%h
 celery -A omicshub beat
 ~~~
 
-The Docker Compose stack starts these processes for you. Do not scale worker-submissions.
+The Docker Compose stack starts these processes for you. Do not scale ocs-submission-worker.
 
-If a worker stops after it claims a queue entry but before it records the OCS demand ID, the
-entry stays in SUBMITTING. After 30 minutes, the reconcile task moves it to STRANDED.
-Check OCS before moving a stranded entry back to PENDING. OmicsHub does not retry a failed or
-timed-out ocs process automatically because the command may have reached OCS.
+If the `ocs` command does not return a successful `SUBMITTED` response with a demand ID, the
+entry is recorded as FAILED. It can then be retried from the Failures page.
 
 ## Readiness and troubleshooting
 
-The readiness endpoint returns 200 when these dependencies are ready:
+The readiness endpoint checks these components:
 
 - PostgreSQL
 - Redis
-- A Celery worker consuming the submissions queue
-- An active workflow manifest
+- A Celery worker consuming the ocs-submissions queue
+- An active workflow manifest, reported as `workflow_config`
 
-It returns 503 and names the missing dependency when the app cannot submit jobs.
+It returns 503 when PostgreSQL, Redis, the broker, or the submissions-worker heartbeat is
+unavailable. A missing workflow manifest is reported but does not make readiness fail.
 
 ~~~bash
 curl http://127.0.0.1:8001/healthz/
 docker compose --env-file .env.docker ps
-docker compose --env-file .env.docker logs -f web_ui
-docker compose --env-file .env.docker logs -f worker-submissions
+docker compose --env-file .env.docker logs -f web-ui
+docker compose --env-file .env.docker logs -f ocs-submission-worker
 ~~~
 
-If the browser says it cannot reach the site, check that the dashboard container is running and use
-HTTP on the configured port. If the dashboard shows an OCS error after Refresh, the last local
-sync remains visible while the app reports that the AWS pull failed.
+If the browser cannot reach the site, check that the web container is running and use HTTP on
+the configured port. If an AWS sync fails, the last local data remains visible and the page
+reports the sync error.
 
 ## Data and backups
 
@@ -333,7 +333,8 @@ workflow manifests, cart items, and queue entries are stored only in PostgreSQL.
 Create a database backup before replacing the PostgreSQL volume:
 
 ~~~bash
-docker exec omicshub-postgres pg_dump -U omicshub omicshub > omicshub-$(date +%F).sql
+docker compose --env-file .env.docker exec -T postgres \
+  pg_dump -U omicshub -d omicshub > omicshub-$(date +%F).sql
 ~~~
 
 Do not run docker compose down -v unless you intend to delete the local PostgreSQL volume.
@@ -383,11 +384,11 @@ uv sync --group dev
 Run formatting, linting, type checking, and tests:
 
 ~~~bash
-uv run ruff format .
-uv run ruff check .
-uv run mypy apps/sample_catalog/models.py apps/workflow_engine/models.py apps/submission_queue/models.py \
-  apps/ocs_integration/cli.py scripts/healthcheck.py
-uv run pytest -W error
+uv run --group dev ruff format .
+uv run --group dev ruff check .
+uv run --group dev mypy apps/sample_catalog/models.py apps/workflow_engine/models.py apps/submission_queue/models.py \
+  apps/ocs_integration/cli.py docker_tools/healthcheck.py
+uv run --group dev pytest -q
 ~~~
 
 The tests use PostgreSQL. They replace the DynamoDB client and ocs process with test fakes,

@@ -52,8 +52,14 @@
                  {% if dashboard_active %}aria-current="page"{% endif %}>
                 <i class="bi bi-grid-3x3" aria-hidden="true"></i> Samples</a>
             </li>
-            {% active_class 'checkout' as checkout_active %}
+            {% active_class 'data-locations' as data_locations_active %}
             <li class="nav-item">
+              <a class="nav-link {{ data_locations_active }}" href="{% url 'web_ui:data-locations' %}"
+                 {% if data_locations_active %}aria-current="page"{% endif %}>
+                <i class="bi bi-folder2-open" aria-hidden="true"></i> Data Locations</a>
+            </li>
+            {% active_class 'checkout' as checkout_active %}
+            <li class="nav-item nav-item--section-start">
               <a class="nav-link {{ checkout_active }}" href="{% url 'web_ui:checkout' %}"
                  {% if checkout_active %}aria-current="page"{% endif %}>
                 <i class="bi bi-bag" aria-hidden="true"></i> Checkout
@@ -61,7 +67,7 @@
               </a>
             </li>
             {% active_class 'queue' as queue_active %}
-            <li class="nav-item">
+            <li class="nav-item nav-item--section-start">
               <a class="nav-link {{ queue_active }}" href="{% url 'web_ui:queue' %}"
                  {% if queue_active %}aria-current="page"{% endif %}>
                 <i class="bi bi-list-ol" aria-hidden="true"></i> Queue</a>
@@ -266,6 +272,13 @@
       });
     })();
   </script>
+  <script src="{% static_v 'web_ui/js/disclosure.js' %}"></script>
+  <script src="{% static_v 'web_ui/js/form-submit.js' %}"></script>
+  <script src="{% static_v 'web_ui/js/study-filter.js' %}"></script>
+  <script src="{% static_v 'web_ui/js/column-menu.js' %}"></script>
+  <script src="{% static_v 'web_ui/js/table-resize.js' %}"></script>
+  <script src="{% static_v 'web_ui/js/live-status.js' %}"></script>
+  <script src="{% static_v 'web_ui/js/live-fragments.js' %}"></script>
   {% block extra_js %}{% endblock %}
 </body>
 

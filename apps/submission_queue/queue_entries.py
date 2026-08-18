@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from django.db import IntegrityError, transaction
 
 from apps.submission_queue.models import QueueEntry
-from apps.submission_queue.services.planning import Plan, PlannedEntry
+from apps.submission_queue.queue_planning import Plan, PlannedEntry
 
 
 @dataclass(frozen=True)
@@ -25,8 +25,8 @@ def enqueue(
     batch_processing: bool = False,
 ) -> EnqueueResult:
     """Create one pending queue entry for each planned stage."""
-    created = []
-    already_queued = []
+    created: list[QueueEntry] = []
+    already_queued: list[PlannedEntry] = []
 
     with transaction.atomic():
         pending_keys = set(
@@ -57,7 +57,16 @@ def enqueue(
                 with transaction.atomic():
                     row.save()
             except IntegrityError:
-                already_queued.append(entry)
+                # The conditional unique constraint is the expected race. Do not turn an
+                # unrelated database error into a misleading "already queued" result.
+                if QueueEntry.objects.filter(
+                    sample=entry.sample,
+                    stage=entry.stage,
+                    status=QueueEntry.Status.PENDING,
+                ).exists():
+                    already_queued.append(entry)
+                else:
+                    raise
             else:
                 created.append(row)
 

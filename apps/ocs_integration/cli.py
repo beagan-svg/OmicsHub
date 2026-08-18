@@ -11,20 +11,9 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-REGION_CONFIGURATION_ERROR = "Could not determine region from default session or environment"
-
 
 class OCSSubmissionError(Exception):
-    """Report that OCS refused the command and a retry is safe."""
-
-
-class OCSSubmissionUncertain(Exception):
-    """Report that retrying the command could create a duplicate OCS job."""
-
-
-def is_safe_to_retry(error_message: str) -> bool:
-    """Return whether a stranded error proves the command never reached OCS."""
-    return REGION_CONFIGURATION_ERROR in error_message
+    """Report that the command did not return a successful OCS submission."""
 
 
 def _subprocess_env() -> dict[str, str]:
@@ -60,25 +49,20 @@ def submit(command_args: list[str]) -> str:
             env=_subprocess_env(),
         )
     except subprocess.TimeoutExpired as error:
-        raise OCSSubmissionUncertain(f"`ocs` did not return within {settings.OCS_CLI_TIMEOUT}s") from error
+        raise OCSSubmissionError(f"`ocs` did not return within {settings.OCS_CLI_TIMEOUT}s") from error
     except FileNotFoundError as error:
         # The process did not start, so the command did not reach OCS.
         raise OCSSubmissionError(f"No `ocs` executable at {settings.OCS_CLI_PATH!r}") from error
 
     if result.returncode != 0:
         error_message = f"`ocs` exited {result.returncode}: {(result.stderr or result.stdout).strip()}"
-        # This is a local CLI preflight failure. It happens before the command can contact
-        # OCS, so it is safe to retry and should not be stranded like an unknown outcome.
-        if is_safe_to_retry(error_message):
-            raise OCSSubmissionError(error_message)
-        # Other non-zero exits may happen after OCS accepted the command.
-        raise OCSSubmissionUncertain(error_message)
+        raise OCSSubmissionError(error_message)
 
     try:
         payload = json.loads(result.stdout)
         submitted = payload["demand_status"] == "SUBMITTED"
     except (json.JSONDecodeError, KeyError) as error:
-        raise OCSSubmissionUncertain(f"Unreadable response from `ocs`: {result.stdout}") from error
+        raise OCSSubmissionError(f"Unreadable response from `ocs`: {result.stdout}") from error
 
     if not submitted:
         raise OCSSubmissionError(f"OCS did not accept the submission: {result.stdout}")

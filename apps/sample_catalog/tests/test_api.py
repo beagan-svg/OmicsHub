@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from rest_framework.test import APIClient
 
-from apps.sample_catalog.services import sync as sync_service
+from apps.sample_catalog import ocs_sync as sync_service
 
 pytestmark = pytest.mark.django_db
 

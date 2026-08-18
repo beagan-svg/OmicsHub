@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from apps.sample_catalog.models import NOT_COMPLETED, Stage
-from apps.submission_queue.services.planning import SkipReason, build_plan
+from apps.submission_queue.queue_planning import SkipReason, build_plan
 
 pytestmark = pytest.mark.django_db
 

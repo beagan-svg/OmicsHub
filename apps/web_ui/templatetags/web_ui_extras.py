@@ -37,7 +37,6 @@ STATUS_STATES = {
     "CANCELLED": "queued",
     "FAILED": "fail",
     "ABORTED": "fail",
-    "STRANDED": "fail",
     # A demand OCS left unfinished and stopped updating. Warning rather than fail: the job
     # did not fail, it stopped being reported on, and the stage is free to run again.
     "ABANDONED": "warn",
@@ -54,9 +53,6 @@ STATUS_NOTES = {
     "SUBMITTING": "The worker is handing this command to OCS.",
     "SUBMITTED": "OCS accepted the command and has not reported progress yet.",
     "ABANDONED": "OCS stopped reporting on this demand. It did not fail, and the stage can be run again.",
-    "STRANDED": "The worker stopped mid-submission. It is not known whether OCS received "
-    "the command. Check OCS for a demand covering this sample and stage before "
-    "resubmitting, or the job may run twice.",
     "ABORTED": "The stage was stopped before it finished.",
     "NOT COMPLETED": "OCS has no status for this stage yet.",
 }
@@ -93,7 +89,7 @@ def field_label(name):
 
 @register.filter
 def since_short(value):
-    """Return elapsed time in one unit, such as `4h`, `12m`, or `3d`.
+    """Return a short freshness label, such as `just now`, `12m ago`, or `3d ago`.
 
     `timesince` renders "4 hours, 29 minutes", which is more precision than a freshness
     indicator can use and long enough that it wraps a toolbar. Nobody reading a staleness
@@ -107,13 +103,19 @@ def since_short(value):
         return "just now"
     for cutoff, unit, suffix in ((3600, 60, "m"), (86400, 3600, "h"), (None, 86400, "d")):
         if cutoff is None or seconds < cutoff:
-            return f"{int(seconds // unit)}{suffix}"
+            return f"{int(seconds // unit)}{suffix} ago"
 
 
 @register.filter
 def column_value(sample, column):
     """Return one column's value for a fastq sample."""
     return column.value_for(sample)
+
+
+@register.filter
+def mapping_value(mapping, key):
+    """Return one value from a template mapping."""
+    return mapping.get(key, "")
 
 
 @register.filter
@@ -141,14 +143,21 @@ def with_params(context, **kwargs):
     `page` is dropped unless it is being set, because re-sorting or re-filtering while on
     page 7 should show the top of the new list, not its seventh page.
     """
+    page_param = kwargs.pop("page_param", None) or "page"
+    page_size_param = kwargs.pop("page_size_param", None) or "page_size"
+    if page_param != "page" and "page" in kwargs:
+        kwargs[page_param] = kwargs.pop("page")
+    if page_size_param != "page_size" and "page_size" in kwargs:
+        kwargs[page_size_param] = kwargs.pop("page_size")
+
     params = context["request"].GET.copy()
     for key, value in kwargs.items():
         if value in (None, ""):
             params.pop(key, None)
         else:
             params[key] = value
-    if "page" not in kwargs:
-        params.pop("page", None)
+    if page_param not in kwargs:
+        params.pop(page_param, None)
     return params.urlencode()
 
 

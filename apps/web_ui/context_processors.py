@@ -16,7 +16,6 @@ def cart(request):
     return {
         "cart_count": CartItem.objects.filter(user=user).count(),
         "failure_count": QueueEntry.objects.filter(
-            requested_by=user,
-            status__in=[QueueEntry.Status.FAILED, QueueEntry.Status.STRANDED],
+            requested_by=user, status=QueueEntry.Status.FAILED
         ).count(),
     }

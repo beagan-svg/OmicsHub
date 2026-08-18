@@ -71,6 +71,6 @@ staticfiles/
 # celery beat's schedule database: regenerated from CELERY_BEAT_SCHEDULE on every start.
 celerybeat-schedule*
 
-# Vendored ocs CLI packages, populated by scripts/vendor_gcs.sh from a checkout outside
+# Vendored ocs CLI packages, populated by docker_tools/vendor_gcs.sh from a checkout outside
 # this repo. Copied in rather than committed; becomes a submodule once git is set up.
 vendor/

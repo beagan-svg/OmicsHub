@@ -31,6 +31,7 @@ env:
   # this at a real Redis would make the health-check tests reach for workers that do not
   # exist on a runner and answer differently than they do on a developer's machine.
   CELERY_BROKER_URL: memory://
+  CACHE_URL: redis://127.0.0.1:6379/0
   OCS_ENV_BASE: test
   OCS_AWS_REGION: us-west-2
 
@@ -123,7 +124,7 @@ jobs:
       - name: Type check stable application boundaries
         # The first typing gate covers models, the OCS command boundary, and the container
         # health probe. The remaining dynamic manifest and view code is being typed in stages.
-        run: uv run mypy apps/sample_catalog/models.py apps/workflow_engine/models.py apps/submission_queue/models.py apps/ocs_integration/cli.py scripts/healthcheck.py
+        run: uv run mypy apps/sample_catalog/models.py apps/workflow_engine/models.py apps/submission_queue/models.py apps/ocs_integration/cli.py docker_tools/healthcheck.py
 
       - name: Test
         run: uv run python -m pytest -q

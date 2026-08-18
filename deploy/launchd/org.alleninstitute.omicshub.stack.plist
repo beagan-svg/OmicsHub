@@ -9,7 +9,7 @@
 
   Nothing here supervises the four application processes. `restart: unless-stopped` in
   compose.yaml already does that, and a second supervisor could start a second
-  worker-submissions — two consumers on that queue is how the same alignment gets
+  ocs-submission-worker — two consumers on that queue is how the same alignment gets
   submitted twice.
 
   Install (replace the path with this checkout's):

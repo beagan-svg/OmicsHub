@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% load web_ui_extras %}
+
+{% block title %}Data Locations | OmicsHub{% endblock %}
+
+{% block page_head %}
+<div class="page-head">
+  <div class="page-head__text">
+    <h1>Data Locations</h1>
+    <p class="page-head__desc">Browse the S3 files registered for each fastq sample and OCS stage.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body is-toolbar d-flex flex-wrap gap-2 align-items-center">
+    <div class="btn-group btn-group-sm" role="group" aria-label="Vendor family">
+      <a class="btn {% if not selected_prefix %}active{% endif %}"
+         {% if not selected_prefix %}aria-current="page"{% endif %}
+         href="?{% with_params batch_prefix="" %}">All</a>
+      {% for prefix in batch_prefixes %}
+      <a class="btn {% if selected_prefix == prefix.value %}active{% endif %}"
+         {% if selected_prefix == prefix.value %}aria-current="page"{% endif %}
+         href="?{% with_params batch_prefix=prefix.value %}">
+        {{ prefix.label }} <span class="count">{{ prefix.count }}<span class="visually-hidden"> samples</span></span>
+      </a>
+      {% endfor %}
+    </div>
+
+      <span class="ms-auto d-flex align-items-center gap-2">
+      <span class="state" data-state="{% if status_stale %}warn{% else %}done{% endif %}"
+            title="Stage status last synced {{ status_synced_at|timesince|default:'never' }} ago, and refreshes {{ status_refresh }}."
+            tabindex="0" data-bs-toggle="tooltip" data-bs-placement="left">
+        {% if status_stale %}Stale · {{ status_synced_at|since_short }}{% else %}Sync {{ status_synced_at|since_short }}{% endif %}
+      </span>
+        <button class="btn btn-sm btn-outline-secondary" type="submit" form="refresh-locations-form"
+              data-bs-toggle="tooltip" title="Re-read this page's rows from OCS now">
+          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh
+        </button>
+      </span>
+  </div>
+
+  <div class="card-body is-toolbar">
+    <form method="get" class="row g-2 align-items-center" id="locations-filter-form">
+      <div class="col-sm-4 col-lg-3">
+        <label class="visually-hidden" for="locations-search">Search FASTQ, Load, or Batch Name</label>
+        <input type="search" name="fastq_name" id="locations-search" value="{{ search }}"
+               class="form-control form-control-sm" placeholder="Search FASTQ, Load, or Batch Name" form="locations-filter-form"
+               data-submit-on-enter data-submit-form="locations-filter-form">
+      </div>
+      <div class="col-auto">
+        {% include "_study_filter.html" with filter_form_id="locations-filter-form" %}
+      </div>
+      <div class="col-auto">
+        <label class="visually-hidden" for="locations-stage-filter">Stage</label>
+        <select name="location_stage" id="locations-stage-filter" class="form-select form-select-sm w-auto">
+          <option value="">Stages: all</option>
+          {% for stage in location_stages %}
+          <option value="{{ stage.value }}" {% if selected_location_stage == stage.value %}selected{% endif %}>{{ stage.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if selected_prefix %}<input type="hidden" name="batch_prefix" value="{{ selected_prefix }}">{% endif %}
+      <div class="col-auto">
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-disclosure="locations-advanced-filters"
+                aria-controls="locations-advanced-filters" aria-expanded="{% if filters_open %}true{% else %}false{% endif %}">
+          <i class="bi bi-funnel" aria-hidden="true"></i> More filters
+          {% if active_filter_count %}<span class="count">{{ active_filter_count }}<span class="visually-hidden"> filters active</span></span>{% endif %}
+        </button>
+      </div>
+      <div class="col-auto"><a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:data-locations' %}">Clear</a></div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-primary" type="submit" form="locations-filter-form">Apply filters</button>
+      </div>
+      <div class="col-auto ms-auto">
+        {% include "_column_menu.html" with form_id="location-columns-form" %}
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-outline-secondary" type="submit" form="locations-export-form"
+                data-bs-toggle="tooltip" title="Export selected samples, or every sample in this tab and filter">
+          <i class="bi bi-download" aria-hidden="true"></i> Export CSV
+        </button>
+      </div>
+    </form>
+
+    {% url 'web_ui:data-locations' as data_locations_url %}
+    {% include "_sample_advanced_filters.html" with filter_form_id="locations-filter-form" disclosure_id="locations-advanced-filters" id_prefix="locations-" reset_url=data_locations_url %}
+  </div>
+
+  <div class="table-responsive table-scroll">
+    <table class="table table-sticky table-pinned align-middle mb-0 data-locations-table"
+           data-resizable-table="data-locations" data-live-status-url="{% url 'web_ui:live-status' %}">
+      <colgroup>
+        <col style="width: 44px">
+        <col data-column-key="fastq_name">
+        {% for column in columns %}<col data-column-key="{{ column.key }}">{% endfor %}
+        <col data-column-key="s3_uri">
+        <col data-column-key="contents">
+      </colgroup>
+      <caption class="visually-hidden">S3 locations matching the current filters. Page {{ page.number }} of {{ page.paginator.num_pages }}, {{ page.paginator.count }} samples in total.</caption>
+      <thead>
+        <tr>
+          <th scope="col" style="width:2rem"><input type="checkbox" class="form-check-input" id="select-all-locations" aria-label="Select all samples on this page"></th>
+          <th scope="col" data-column-key="fastq_name">Fastq Name</th>
+          {% for column in columns %}<th scope="col" data-column-key="{{ column.key }}">{{ column.label }}</th>{% endfor %}
+          <th scope="col" data-column-key="s3_uri">S3 Location</th>
+          <th scope="col" data-column-key="contents">Contents</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in location_rows %}
+        <tr>
+          <td>{% if row.show_selector %}<input type="checkbox" class="form-check-input select-location" name="fastq_names" value="{{ row.fastq_name }}" form="locations-export-form" aria-label="Select {{ row.fastq_name }}">{% endif %}</td>
+          <td class="font-monospace">{{ row.fastq_name }}</td>
+          {% for column in columns %}
+          {% if column.key == "stage" %}
+          <td><span class="stage-chip">{{ row.stage.label }}</span></td>
+          {% elif column.key == "status" %}
+          <td data-live-stage-status="{{ row.fastq_name }}|{{ row.stage.value }}">{% include "_state.html" with status=row.status %}</td>
+          {% else %}
+          {% with value=row.column_values|mapping_value:column.key %}
+          <td class="{% if column.kind == 'mono' or column.kind == 'copy' %}font-monospace{% endif %}">
+            {% if column.kind == "copy" and value %}
+              {% include "_copy_id.html" with value=value label=column.label %}
+            {% elif column.kind == "list" %}
+              {{ value|join:", "|default:"—" }}
+            {% elif value %}
+              {{ value }}
+            {% else %}—{% endif %}
+          </td>
+          {% endwith %}
+          {% endif %}
+          {% endfor %}
+          <td class="location-uri">
+            {% if row.s3_uri %}
+              <span class="font-monospace" title="{{ row.s3_uri }}">{{ row.s3_uri }}</span>
+              {% include "_copy_id.html" with value=row.s3_uri label="S3 location" %}
+            {% elif row.file_store_id %}
+              <span class="text-muted">File-store record has no S3 location</span>
+            {% else %}
+              <span class="text-muted">No file store</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.s3_uri %}
+            <button class="btn btn-sm btn-outline-secondary location-contents-toggle"
+                    type="button" data-contents-url="{% url 'web_ui:data-location-contents' row.sample_id row.stage.value %}"
+                    aria-expanded="false" aria-label="View contents">
+              <i class="bi bi-folder2" data-contents-icon aria-hidden="true"></i>
+              <span data-contents-label>View contents</span>
+            </button>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        <tr class="location-contents-row d-none">
+          <td colspan="{{ columns|length|add:4 }}"><div class="location-contents-panel"></div></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="{{ columns|length|add:4 }}" class="text-center text-muted py-5">No samples match these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page.paginator.count %}
+  <div class="card-body is-toolbar d-flex flex-wrap gap-2 align-items-center">
+    <button class="btn btn-sm btn-outline-secondary" type="button" id="clear-location-selection">Clear selection</button>
+    <span class="text-secondary"><span id="location-selection-count">0</span> selected</span>
+    {% include "_sample_pager.html" with pager_label="Data location pages" %}
+  </div>
+  {% endif %}
+</div>
+
+<form method="post" id="refresh-locations-form" action="{% url 'web_ui:refresh-status' %}">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+  {% for sample in page %}<input type="hidden" name="fastq_names" value="{{ sample.fastq_name }}">{% endfor %}
+</form>
+
+<form method="post" id="locations-export-form" action="{% url 'web_ui:data-locations-export' %}?{{ request.GET.urlencode }}">
+  {% csrf_token %}
+</form>
+<form method="post" id="location-columns-form" action="{% url 'web_ui:set-columns' %}">
+  {% csrf_token %}
+  <input type="hidden" name="scope" value="locations">
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+  const selectAll = document.getElementById("select-all-locations");
+  const boxes = () => [...document.querySelectorAll(".select-location")];
+  const count = document.getElementById("location-selection-count");
+  const updateCount = () => { if (count) count.textContent = boxes().filter((box) => box.checked).length; };
+  if (selectAll) {
+    selectAll.addEventListener("change", () => { boxes().forEach((box) => { box.checked = selectAll.checked; }); updateCount(); });
+  }
+  boxes().forEach((box) => box.addEventListener("change", updateCount));
+  document.getElementById("clear-location-selection")?.addEventListener("click", () => {
+    if (selectAll) selectAll.checked = false;
+    boxes().forEach((box) => { box.checked = false; });
+    updateCount();
+  });
+
+  const setContentsButtonState = (button, open) => {
+    button.setAttribute("aria-expanded", String(open));
+    button.setAttribute("aria-label", open ? "Hide contents" : "View contents");
+    const icon = button.querySelector("[data-contents-icon]");
+    const label = button.querySelector("[data-contents-label]");
+    if (icon) icon.className = open ? "bi bi-folder2-open" : "bi bi-folder2";
+    if (label) label.textContent = open ? "Hide contents" : "View contents";
+  };
+
+  const contentsCache = new Map();
+  const pendingContents = new Map();
+
+  const loadContents = async (button, url, row) => {
+    const contentsRow = row.nextElementSibling;
+    const panel = contentsRow.querySelector(".location-contents-panel");
+    const expanded = button.getAttribute("aria-expanded") === "true";
+    if (expanded) {
+      setContentsButtonState(button, false);
+      contentsRow.classList.add("d-none");
+      return;
+    }
+    setContentsButtonState(button, true);
+    contentsRow.classList.remove("d-none");
+    const useCache = button.matches(".location-contents-toggle, .location-folder");
+    if (useCache && contentsCache.has(url)) {
+      panel.innerHTML = contentsCache.get(url);
+      bindContents(panel, row);
+      return;
+    }
+
+    panel.innerHTML = '<div class="location-loading text-muted"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Loading contents</div>';
+    let request = useCache ? pendingContents.get(url) : null;
+    if (!request) {
+      request = fetch(url, {headers: {"X-Requested-With": "XMLHttpRequest"}}).then(async (response) => {
+        if (!response.ok) throw new Error("Could not read this S3 location.");
+        return response.text();
+      });
+      if (useCache) pendingContents.set(url, request);
+    }
+    try {
+      const contents = await request;
+      if (useCache) contentsCache.set(url, contents);
+      panel.innerHTML = contents;
+      bindContents(panel, row);
+    } catch (error) {
+      panel.innerHTML = '<p class="text-danger mb-0">Could not read this S3 location.</p>';
+    } finally {
+      if (useCache && pendingContents.get(url) === request) pendingContents.delete(url);
+    }
+  };
+
+  const bindContents = (panel, row) => {
+    panel.querySelectorAll("[data-contents-url]").forEach((child) => {
+      child.addEventListener("click", (event) => {
+        event.preventDefault();
+        loadContents(child, child.dataset.contentsUrl, row);
+      });
+    });
+
+    const selectVisible = panel.querySelector(".location-select-visible");
+    const fileBoxes = () => [...panel.querySelectorAll(".location-file-select, .location-folder-select")];
+    const summary = panel.querySelector(".location-selection-summary");
+    const downloadButton = panel.querySelector(".location-download-selected");
+    if (!downloadButton) return;
+
+    const updateSelection = () => {
+      const selected = fileBoxes().filter((box) => box.checked);
+      summary.textContent = `${selected.length} selected`;
+      downloadButton.disabled = selected.length === 0;
+      if (selectVisible) {
+        selectVisible.checked = selected.length > 0 && selected.length === fileBoxes().length;
+        selectVisible.indeterminate = selected.length > 0 && selected.length < fileBoxes().length;
+      }
+    };
+
+    selectVisible?.addEventListener("change", () => {
+      fileBoxes().forEach((box) => { box.checked = selectVisible.checked; });
+      updateSelection();
+    });
+    fileBoxes().forEach((box) => box.addEventListener("change", updateSelection));
+
+    downloadButton.addEventListener("click", async () => {
+      const selected = fileBoxes().filter((box) => box.checked);
+      if (!selected.length) return;
+      downloadButton.disabled = true;
+
+      const body = new URLSearchParams();
+      selected.filter((box) => box.classList.contains("location-file-select")).forEach((box) => body.append("keys", box.value));
+      selected.filter((box) => box.classList.contains("location-folder-select")).forEach((box) => body.append("folders", box.value));
+      const csrfToken = document.querySelector("#refresh-locations-form input[name=csrfmiddlewaretoken]")?.value;
+      const target = `location-download-${Date.now()}`;
+      const iframe = document.createElement("iframe");
+      iframe.name = target;
+      iframe.hidden = true;
+      const form = document.createElement("form");
+      form.method = "post";
+      form.action = downloadButton.dataset.downloadUrl;
+      form.target = target;
+      form.hidden = true;
+      const csrf = document.createElement("input");
+      csrf.type = "hidden";
+      csrf.name = "csrfmiddlewaretoken";
+      csrf.value = csrfToken;
+      form.append(csrf);
+      for (const input of body) {
+        const field = document.createElement("input");
+        field.type = "hidden";
+        field.name = input[0];
+        field.value = input[1];
+        form.append(field);
+      }
+      document.body.append(iframe, form);
+      form.submit();
+      selected.forEach((box) => { box.checked = false; });
+      updateSelection();
+      window.setTimeout(() => { iframe.remove(); form.remove(); }, 60000);
+    });
+
+    updateSelection();
+  };
+
+  document.querySelectorAll(".location-contents-toggle").forEach((button) => {
+    button.addEventListener("click", () => loadContents(button, button.dataset.contentsUrl, button.closest("tr")));
+  });
+})();
+</script>
+{% endblock %}

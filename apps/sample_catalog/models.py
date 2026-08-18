@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models import Case, Value, When
+from django.utils import timezone
 
 
 class BatchPrefix(models.TextChoices):
@@ -246,13 +247,21 @@ class StageStatus(models.Model):
 
     @property
     def duration_display(self) -> str:
-        """Return the run time in a human-readable form, such as `2h 48m`."""
-        if self.duration_seconds is None:
+        """Return the run time in minutes, hours, and days."""
+        return self.duration_display_at()
+
+    def duration_display_at(self, at=None) -> str:
+        """Return the recorded duration, or the elapsed time for a running stage."""
+        seconds = self.duration_seconds
+        if seconds is None and self.started_at:
+            seconds = max(0, int(((at or timezone.now()) - self.started_at).total_seconds()))
+        if seconds is None:
             return ""
-        hours, remainder = divmod(int(self.duration_seconds), 3600)
-        minutes, seconds = divmod(remainder, 60)
+        days, remainder = divmod(int(seconds), 86400)
+        hours, remainder = divmod(remainder, 3600)
+        minutes = remainder // 60
+        if days:
+            return f"{days}d" + (f" {hours}h" if hours else "") + (f" {minutes}m" if minutes else "")
         if hours:
-            return f"{hours}h {minutes}m"
-        if minutes:
-            return f"{minutes}m {seconds}s"
-        return f"{seconds}s"
+            return f"{hours}h" + (f" {minutes}m" if minutes else "")
+        return f"{minutes}m"

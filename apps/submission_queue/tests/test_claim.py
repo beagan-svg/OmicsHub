@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from apps.sample_catalog.models import Stage
 from apps.submission_queue.models import QueueEntry
-from apps.submission_queue.services.claim import claim_next_entry
+from apps.submission_queue.queue_claiming import claim_next_entry
 
 pytestmark = pytest.mark.django_db
 
@@ -88,6 +88,30 @@ def test_alternates_between_users(user, other_user, make_entry):
     assert {first.requested_by_id, second.requested_by_id} == {user.pk, other_user.pk}
 
 
+def test_three_users_each_get_one_turn_before_any_user_gets_a_second(
+    user, other_user, django_user_model, make_entry
+):
+    third_user = django_user_model.objects.create_user(username="third", email="third@example.org")
+    users = [user, other_user, third_user]
+    entries = {
+        owner: [make_entry(owner, f"{owner.username}-1"), make_entry(owner, f"{owner.username}-2")]
+        for owner in users
+    }
+
+    claimed_users = []
+    for round_number in range(2):
+        for owner in users:
+            claimed = claim_next_entry()
+            assert claimed.requested_by_id == owner.pk
+            assert claimed.pk == entries[owner][round_number].pk
+            claimed.status = QueueEntry.Status.SUBMITTED
+            claimed.submitted_at = timezone.now()
+            claimed.save(update_fields=["status", "submitted_at"])
+            claimed_users.append(claimed.requested_by_id)
+
+    assert claimed_users == [owner.pk for _ in range(2) for owner in users]
+
+
 def test_a_user_who_has_never_submitted_goes_first(user, other_user, make_entry):
     make_entry(user, "OLD", status=QueueEntry.Status.SUBMITTED, submitted_at=timezone.now())
     make_entry(user, "A-1")
@@ -122,6 +146,26 @@ def test_skips_entries_that_are_not_pending(user, make_entry):
     pending = make_entry(user, "PENDING")
 
     assert claim_next_entry().pk == pending.pk
+
+
+def test_skips_a_paused_users_entries_and_claims_the_next_user(user, other_user, make_entry):
+    user.queue_paused = True
+    user.save(update_fields=["queue_paused"])
+    make_entry(user, "PAUSED-1")
+    eligible = make_entry(other_user, "ELIGIBLE-1")
+
+    assert claim_next_entry().pk == eligible.pk
+
+
+def test_returns_none_when_every_pending_user_is_paused(user, other_user, make_entry):
+    user.queue_paused = True
+    user.save(update_fields=["queue_paused"])
+    other_user.queue_paused = True
+    other_user.save(update_fields=["queue_paused"])
+    make_entry(user, "PAUSED-1")
+    make_entry(other_user, "PAUSED-2")
+
+    assert claim_next_entry() is None
 
 
 class TestTwoWorkers:

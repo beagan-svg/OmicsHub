@@ -1,0 +1,35 @@
+{% load web_ui_extras %}
+<nav class="pager" aria-label="{{ pager_label }}">
+  <label class="pager__size">
+    <span>Rows</span>
+    <select class="form-select form-select-sm" aria-label="Rows per page"
+            onchange="window.location.href = this.value">
+      {% for option in page_size_options %}
+      <option value="?{% with_params page_size=option page_param=page_param page_size_param=page_size_param %}" {% if option == page_size %}selected{% endif %}>{{ option }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <span class="pager__range">
+    {{ page.start_index }}–{{ page.end_index }}
+    <span class="text-secondary">of {{ page.paginator.count }}</span>
+  </span>
+  {% if page.paginator.num_pages > 1 %}
+  <span class="pager__controls">
+    {% if page.has_previous %}
+    <a class="pager__step" href="?{% with_params page=page.previous_page_number page_param=page_param page_size_param=page_size_param %}" aria-label="Previous page">
+      <i class="bi bi-chevron-left" aria-hidden="true"></i>
+    </a>
+    {% else %}
+    <span class="pager__step is-disabled" aria-hidden="true"><i class="bi bi-chevron-left" aria-hidden="true"></i></span>
+    {% endif %}
+    <span class="pager__page">{{ page.number }}<span class="text-secondary"> / {{ page.paginator.num_pages }}</span></span>
+    {% if page.has_next %}
+    <a class="pager__step" href="?{% with_params page=page.next_page_number page_param=page_param page_size_param=page_size_param %}" aria-label="Next page">
+      <i class="bi bi-chevron-right" aria-hidden="true"></i>
+    </a>
+    {% else %}
+    <span class="pager__step is-disabled" aria-hidden="true"><i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+    {% endif %}
+  </span>
+  {% endif %}
+</nav>

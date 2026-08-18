@@ -17,8 +17,8 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.ocs_integration import dynamodb
+from apps.sample_catalog import ocs_sync as sync
 from apps.sample_catalog.models import NOT_COMPLETED, Sample, Stage
-from apps.sample_catalog.services import sync
 from apps.submission_queue.models import CartItem, QueueEntry
 from apps.web_ui import columns as column_defs
 from apps.web_ui import views as web_views
@@ -906,23 +906,6 @@ class TestQueueAndFailures:
         assert entry.status == QueueEntry.Status.PENDING
         assert entry.error_message == ""
 
-    def test_a_stranded_entry_is_refused_with_the_reason(self, logged_in, queued_entry):
-        entry = queued_entry("READY-1")
-        QueueEntry.objects.filter(pk=entry.pk).update(status=QueueEntry.Status.STRANDED)
-
-        response = logged_in.post(reverse("web_ui:retry", args=[entry.pk]), follow=True)
-
-        entry.refresh_from_db()
-        assert b"is stranded" in response.content
-        assert b"Check OCS for a demand covering this sample" in response.content
-        assert entry.status == QueueEntry.Status.STRANDED
-
-    def test_the_failures_page_warns_above_the_table_when_anything_is_stranded(self, logged_in, queued_entry):
-        entry = queued_entry("READY-1")
-        QueueEntry.objects.filter(pk=entry.pk).update(status=QueueEntry.Status.STRANDED)
-
-        assert logged_in.get(reverse("web_ui:failed")).context["has_stranded"] is True
-
     def test_deleting_a_failed_entry(self, logged_in, queued_entry):
         entry = queued_entry("READY-1")
         QueueEntry.objects.filter(pk=entry.pk).update(status=QueueEntry.Status.FAILED)
@@ -937,7 +920,7 @@ class TestQueueAndFailures:
 
         response = logged_in.post(reverse("web_ui:delete-job", args=[entry.pk]), follow=True)
 
-        assert b"Only failed or stranded entries can be deleted" in response.content
+        assert b"Only failed entries can be deleted" in response.content
         assert QueueEntry.objects.filter(pk=entry.pk).exists()
 
 

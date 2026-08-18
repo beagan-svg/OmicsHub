@@ -85,7 +85,7 @@ class TestSubmissionsWorkerCheck:
         message = health_module._check_submissions_worker()
 
         assert "no submission run" in message
-        assert "beat" in message and "submissions worker" in message
+        assert "scheduler" in message and "OCS submission worker" in message
 
     def test_the_task_records_the_heartbeat_before_it_can_return_early(self, active_config):
         """An empty queue returns early, and that run still proves the chain works."""

@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import datetime as dt
-
 import pytest
 from django.core.cache import cache
 from django.utils import timezone
 
-from apps.ocs_integration import cli
 from apps.ocs_integration.cli import OCSSubmissionError
 from apps.sample_catalog.models import Stage, StageStatus
 from apps.submission_queue import tasks
@@ -161,6 +158,10 @@ def test_below_the_job_limit_it_submits(active_config, pending_entry, ocs):
 def test_a_failed_submission_is_recorded_and_does_not_stall_the_queue(
     active_config, pending_entry, ocs, monkeypatch
 ):
+    pending_entry.demand_id = "old-demand"
+    pending_entry.submitted_at = timezone.now()
+    pending_entry.save(update_fields=["demand_id", "submitted_at"])
+
     def fail(command_args):
         raise OCSSubmissionError("OCS rejected the demand")
 
@@ -170,6 +171,8 @@ def test_a_failed_submission_is_recorded_and_does_not_stall_the_queue(
 
     pending_entry.refresh_from_db()
     assert pending_entry.status == QueueEntry.Status.FAILED
+    assert pending_entry.demand_id == ""
+    assert pending_entry.submitted_at is None
     assert "rejected" in pending_entry.error_message
     assert ocs.scheduled == [{"countdown": 0}]
 
@@ -187,81 +190,6 @@ def test_without_an_active_config_nothing_is_submitted(pending_entry, ocs):
     pending_entry.refresh_from_db()
     assert pending_entry.status == QueueEntry.Status.PENDING
     assert ocs.submitted == []
-
-
-class TestReconcileStrandedSubmissions:
-    """A worker killed mid-submission leaves an entry in SUBMITTING with nobody watching."""
-
-    def claim_and_abandon(self, entry, ago):
-        entry.status = QueueEntry.Status.SUBMITTING
-        entry.claimed_at = timezone.now() - ago
-        entry.save()
-        return entry
-
-    def test_an_abandoned_entry_is_marked_stranded(self, pending_entry):
-        self.claim_and_abandon(pending_entry, tasks.STRANDED_AFTER + dt.timedelta(minutes=1))
-
-        assert tasks.reconcile_stranded_submissions() == 1
-
-        pending_entry.refresh_from_db()
-        assert pending_entry.status == QueueEntry.Status.STRANDED
-        assert "Check OCS" in pending_entry.error_message
-
-    def test_it_is_not_requeued_automatically(self, pending_entry):
-        """Resubmitting a job that may already be running costs a duplicate alignment."""
-        self.claim_and_abandon(pending_entry, tasks.STRANDED_AFTER + dt.timedelta(minutes=1))
-
-        tasks.reconcile_stranded_submissions()
-
-        pending_entry.refresh_from_db()
-        assert pending_entry.status != QueueEntry.Status.PENDING
-
-    def test_a_submission_still_in_flight_is_left_alone(self, pending_entry):
-        self.claim_and_abandon(pending_entry, dt.timedelta(minutes=1))
-
-        assert tasks.reconcile_stranded_submissions() == 0
-
-        pending_entry.refresh_from_db()
-        assert pending_entry.status == QueueEntry.Status.SUBMITTING
-
-    def test_entries_in_other_states_are_untouched(self, pending_entry):
-        assert tasks.reconcile_stranded_submissions() == 0
-
-        pending_entry.refresh_from_db()
-        assert pending_entry.status == QueueEntry.Status.PENDING
-
-    def test_a_successful_run_leaves_nothing_to_reconcile(self, active_config, pending_entry, ocs):
-        tasks.process_next_queue_entry()
-
-        assert tasks.reconcile_stranded_submissions() == 0
-
-
-class TestUncertainSubmission:
-    """A submission whose outcome is unknown must not look like a safe retry."""
-
-    def test_is_stranded_rather_than_failed(self, active_config, pending_entry, ocs, monkeypatch):
-        def timed_out(command_args):
-            raise cli.OCSSubmissionUncertain("`ocs` did not return within 300s")
-
-        monkeypatch.setattr(tasks.cli, "submit", timed_out)
-
-        tasks.process_next_queue_entry()
-
-        pending_entry.refresh_from_db()
-        assert pending_entry.status == QueueEntry.Status.STRANDED
-
-    def test_a_refusal_is_still_failed(self, active_config, pending_entry, ocs, monkeypatch):
-        """OCS said no, so this one is safe to requeue in bulk."""
-
-        def refused(command_args):
-            raise cli.OCSSubmissionError("OCS did not accept the submission")
-
-        monkeypatch.setattr(tasks.cli, "submit", refused)
-
-        tasks.process_next_queue_entry()
-
-        pending_entry.refresh_from_db()
-        assert pending_entry.status == QueueEntry.Status.FAILED
 
 
 class TestSpacingHolds:
@@ -321,20 +249,6 @@ class TestSpacingHolds:
         tasks.process_next_queue_entry()
 
         assert ocs.count_calls == calls_after_first
-
-    def test_an_uncertain_submission_is_spaced_like_a_real_one(
-        self, active_config, two_pending, ocs, monkeypatch
-    ):
-        """It may well have reached OCS, so the next job waits as though it had."""
-
-        def refuse(command_args):
-            raise cli.OCSSubmissionUncertain("timed out")
-
-        monkeypatch.setattr(tasks.cli, "submit", refuse)
-
-        tasks.process_next_queue_entry()
-
-        assert cache.get(tasks.SPACING_HOLD_KEY)
 
     def test_a_refusal_is_not_spaced(self, active_config, two_pending, ocs, monkeypatch):
         """A refused command consumed no OCS capacity, so there is nothing to pace."""

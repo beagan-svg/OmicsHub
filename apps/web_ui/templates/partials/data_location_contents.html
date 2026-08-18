@@ -1,0 +1,56 @@
+{% if error %}
+<p class="text-danger mb-0">{{ error }}</p>
+{% else %}
+<div class="location-contents-header">
+  <div class="location-contents-path">
+    {% if parent_url %}
+    <button class="btn btn-sm btn-outline-secondary location-parent" type="button"
+            data-contents-url="{{ parent_url }}" aria-label="Go to parent folder">
+      <i class="bi bi-arrow-up" aria-hidden="true"></i> Back
+    </button>
+    {% endif %}
+    <span class="font-monospace text-break">{{ s3_uri }}{% if prefix %}/{{ prefix }}{% endif %}</span>
+  </div>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ refresh_url }}" data-contents-url="{{ refresh_url }}">
+    <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh contents
+  </a>
+</div>
+{% if folders or files %}
+{% if files %}
+<div class="location-contents-toolbar">
+  <label class="form-check mb-0">
+    <input class="form-check-input location-select-visible" type="checkbox">
+    <span class="form-check-label">Select files list</span>
+  </label>
+  <span class="text-muted location-selection-summary" aria-live="polite">0 selected</span>
+  <button class="btn btn-sm btn-primary location-download-selected" type="button"
+          data-download-url="{{ download_url }}" disabled>
+    <i class="bi bi-download" aria-hidden="true"></i> Download selected
+  </button>
+</div>
+{% endif %}
+<ul class="location-list list-unstyled mb-0">
+{% for folder in folders %}
+  <li class="location-entry location-folder-entry">
+    <input class="form-check-input location-folder-select" type="checkbox"
+           value="{{ folder.prefix }}" aria-label="Select {{ folder.name }} folder for download">
+    <button type="button" class="location-folder" data-contents-url="{{ folder.url }}">
+      <i class="bi bi-folder2" aria-hidden="true"></i> {{ folder.name }}/
+    </button>
+  </li>
+  {% endfor %}
+  {% for file in files %}
+  <li class="location-entry location-file">
+    <input class="form-check-input location-file-select" type="checkbox"
+           value="{{ file.key }}" aria-label="Select {{ file.name }} for download">
+    <i class="bi bi-file-earmark" aria-hidden="true"></i>
+    <span class="font-monospace text-break">{{ file.name }}</span>
+    <span class="text-muted ms-auto">{{ file.size|filesizeformat }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-muted mb-0">This folder is empty.</p>
+{% endif %}
+{% if next_url %}<a class="btn btn-sm btn-outline-secondary mt-3" href="{{ next_url }}" data-contents-url="{{ next_url }}">Load more</a>{% endif %}
+{% endif %}

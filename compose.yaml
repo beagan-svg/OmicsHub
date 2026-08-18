@@ -1,6 +1,6 @@
 # Define the complete OmicsHub stack.
 #
-#     scripts/setup_docker.sh        # create config, prepare dependencies, and start the stack
+#     docker_tools/setup_docker.sh   # create config, prepare dependencies, and start the stack
 #
 # `--env-file .env.docker` is required. Compose resolves `${...}` below from the shell or
 # its default environment file. Without the flag the credential mount path is empty.
@@ -19,24 +19,34 @@ x-app: &app
     # Set here rather than in .env.docker because they are a property of this topology,
     # and a stale environment file pointing at localhost would half-work and confuse.
     DATABASE_URL: postgres://omicshub:${POSTGRES_PASSWORD}@postgres:5432/omicshub
-    CELERY_BROKER_URL: redis://redis:6379/0
-    CACHE_URL: redis://redis:6379/1
+    CELERY_BROKER_URL: redis://redis-broker:6379/0
+    CACHE_URL: redis://redis-cache:6379/0
+    # Keep the host path used for the bind source out of the container environment.
+    # Application code should use the mounted path, not a host-specific path.
+    AWS_CREDENTIALS_FILE: /run/aws/credentials
     AWS_SHARED_CREDENTIALS_FILE: /run/aws/credentials
     AWS_REGION: ${OCS_AWS_REGION}
     AWS_DEFAULT_REGION: ${OCS_AWS_REGION}
     OCS_CLI_PATH: /opt/venv/bin/ocs
     DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-omicshub.settings.prod}
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis-broker:
+      condition: service_healthy
+    redis-cache:
+      condition: service_healthy
+  restart: unless-stopped
+
+# Beat only publishes scheduled tasks. It does not call AWS, so keep the credential mount
+# off that container while sharing the same application image and settings.
+x-aws-app: &aws-app
+  <<: *app
   volumes:
     # Read-only, and a bind mount rather than anything baked into the image: these are
     # long-lived keys against the production OCS account, and an image layer holding them
     # would be permanent and pushable.
     - ${AWS_CREDENTIALS_FILE}:/run/aws/credentials:ro
-  depends_on:
-    postgres:
-      condition: service_healthy
-    redis:
-      condition: service_healthy
-  restart: unless-stopped
 
 services:
   postgres:
@@ -64,10 +74,10 @@ services:
       retries: 10
     restart: unless-stopped
 
-  redis:
+  redis-broker:
     image: redis:7-alpine
     ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_BROKER_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -75,8 +85,19 @@ services:
       retries: 10
     restart: unless-stopped
 
-  web_ui:
-    <<: *app
+  redis-cache:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:${REDIS_CACHE_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  web-ui:
+    <<: *aws-app
     # migrate before serving, and only here: one web container means one migrator, so no
     # two processes race to apply the same migration. collectstatic runs at start rather
     # than at build because whitenoise's manifest storage needs the real settings, and
@@ -116,41 +137,28 @@ services:
     #
     # start_period covers migrate and collectstatic, which run before gunicorn binds.
     healthcheck:
-      test: ["CMD", "python", "/app/scripts/healthcheck.py"]
+      test: ["CMD", "python", "/app/docker_tools/healthcheck.py"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
 
-  worker-submissions:
-    <<: *app
+  ocs-submission-worker:
+    <<: *aws-app
     # One process, one queue, and it must stay that way. The global OCS job limit and the
     # config's `spacing` between submissions are both enforced by this being the only thing
     # submitting; a second replica or a higher concurrency submits the same demand twice.
-    # Do not `docker compose up --scale worker-submissions=N`.
-    command: celery -A omicshub worker --queues submissions --concurrency 1 --loglevel info
+    # Do not `docker compose up --scale ocs-submission-worker=N`.
+    command: celery -A omicshub worker --queues ocs-submissions --concurrency 1 --loglevel info
 
-  worker-default:
-    <<: *app
-    # Everything not routed to `submissions`: the fastq-history and demand-registry sweeps
-    # that keep the dashboard current, and the stranded-submission reconcile. Separate from
-    # the above so a long metadata sweep cannot sit in front of a queued job.
-    #
-    # No --queues, on purpose. A worker started without one consumes exactly the app's
-    # `task_default_queue`, which omicshub/settings/base.py sets to "default". The queue
-    # this consumes is read from the same setting that decides where those tasks are
-    # published, and the two cannot disagree.
-    #
-    # It used to say `--queues celery`, which is Celery's built-in default queue name and
-    # not this app's. The sweeps and the reconciler were published to "default" and consumed
-    # by nobody: beat logs "Sending due task" every time, the messages pile up in Redis, and
-    # the dashboard silently stops updating with no error anywhere to say why. Naming the
-    # queue here at all is what made that possible, so it is no longer named here.
-    # apps/submission_queue/tests/test_celery_routing.py holds the other half of this, asserting
-    # every scheduled task routes to a queue one of these two workers takes.
-    command: celery -A omicshub worker --concurrency 2 --loglevel info
+  catalog-sync-worker:
+    <<: *aws-app
+    # Catalog synchronization tasks read fastq metadata, fastq history, and demand registry
+    # data to keep the dashboard current. This worker is separate from submissions so a long
+    # metadata sweep cannot sit in front of a queued job.
+    command: celery -A omicshub worker --queues catalog-sync --concurrency 2 --loglevel info
 
-  beat:
+  celery-scheduler:
     <<: *app
     # The schedule file is regenerated from CELERY_BEAT_SCHEDULE on start, so it is state
     # nobody needs kept. Use /tmp rather than a volume and keep it out of the read-only app tree.

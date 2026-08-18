@@ -212,6 +212,23 @@ def test_batch_get_sends_each_key_once(fake_boto):
     assert resource.batch_requests[0][table]["Keys"] == [{"demand_id": "A"}, {"demand_id": "B"}]
 
 
+@override_settings(OCS_ENV_BASE="prod")
+def test_file_store_entries_are_keyed_by_file_store_id(fake_boto):
+    table = "prod-file-store"
+    resource = fake_boto(
+        FakeResource(
+            batch_responses=[
+                {"Responses": {table: [{"file_store_id": "store-1", "s3_uri": "s3://bucket/root"}]}}
+            ]
+        )
+    )
+
+    assert dynamodb.get_file_stores(["store-1"]) == {
+        "store-1": {"file_store_id": "store-1", "s3_uri": "s3://bucket/root"}
+    }
+    assert resource.batch_requests[0][table]["Keys"] == [{"file_store_id": "store-1"}]
+
+
 @override_settings(OCS_ENV_BASE="prod", AWS_PROFILE="aibs-bicore", OCS_AWS_REGION="us-west-2")
 def test_uses_the_configured_aws_profile(fake_boto):
     resource = fake_boto(FakeResource(pages=[{"Items": []}]))

@@ -7,7 +7,20 @@ app_name = "web_ui"
 
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
+    path("data-locations/", views.data_locations, name="data-locations"),
+    path("data-locations/export/", views.export_data_locations_csv, name="data-locations-export"),
+    path(
+        "data-locations/<int:sample_id>/<str:stage>/contents/",
+        views.data_location_contents,
+        name="data-location-contents",
+    ),
+    path(
+        "data-locations/<int:sample_id>/<str:stage>/download/",
+        views.download_data_location_files,
+        name="data-location-download",
+    ),
     path("sync/", views.sync_samples, name="sync"),
+    path("live-status/", views.live_status, name="live-status"),
     path("status/refresh/", views.refresh_status, name="refresh-status"),
     path("columns/", views.set_columns, name="set-columns"),
     path("export/", views.export_csv, name="export"),
@@ -20,7 +33,9 @@ urlpatterns = [
     path("submit/commands/", views.submit_commands, name="submit-commands"),
     path("submit/confirm/", views.submit_confirm, name="submit-confirm"),
     path("queue/", views.queue, name="queue"),
+    path("queue/pause/", views.toggle_queue_pause, name="toggle-queue-pause"),
     path("queue/<int:pk>/cancel/", views.cancel, name="cancel"),
+    path("queue/<int:pk>/delete/", views.delete_queue_entry, name="delete-queue-entry"),
     path("jobs/", views.job_monitor, name="job-monitor"),
     path("failed/", views.failed_jobs, name="failed"),
     path("failed/<int:pk>/retry/", views.retry_job, name="retry"),

@@ -21,19 +21,7 @@
 {% endblock %}
 
 {% block content %}
-{% if has_stranded %}
-<div class="alert alert-warning d-flex gap-2 mb-3">
-  <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
-  <div>
-    <strong>Some jobs below are stranded.</strong>
-    The worker stopped mid-submission and it is not known whether OCS received the command.
-    Retry is disabled when the outcome is unknown. Deterministic pre-submission errors show a
-    safe Retry action; otherwise check OCS for a demand covering the sample and stage before
-    taking any action, or the job may run twice.
-  </div>
-</div>
-{% endif %}
-
+<div id="failures-live-data" data-live-fragment data-live-fragment-url="{% url 'web_ui:failed' %}">
 <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span>Submission failures</span>
@@ -42,7 +30,7 @@
   <div class="table-responsive">
     <table class="table align-middle mb-0">
       <caption class="visually-hidden">
-        Jobs that failed or were stranded mid-submission, with the error OCS reported.
+        Jobs whose OCS submission did not succeed, with the error OCS reported.
       </caption>
       <thead>
         <tr>
@@ -92,8 +80,6 @@
       </tbody>
     </table>
   </div>
-</div>
-
 <div class="card mt-4">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span>Running job failures</span>
@@ -147,5 +133,6 @@
       </tbody>
     </table>
   </div>
+</div>
 </div>
 {% endblock %}

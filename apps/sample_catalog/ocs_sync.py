@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, cast
 
 from django.core.cache import cache
 from django.db.models import Q
@@ -90,7 +91,9 @@ SAMPLE_FIELDS = (*TEXT_FIELDS, *NUMBER_FIELDS, *LIST_FIELDS)
 # Vendor text goes straight into fixed-width columns and bulk_create does not validate, so
 # it is clipped to the column width here. Otherwise one over-long string raises DataError
 # and takes the other 499 rows of its batch with it.
-TEXT_FIELD_LIMITS = {field: Sample._meta.get_field(field).max_length for field in TEXT_FIELDS}
+TEXT_FIELD_LIMITS: dict[str, int] = {
+    field: cast(int, cast(Any, Sample._meta.get_field(field)).max_length) for field in TEXT_FIELDS
+}
 
 #: Said by everything that cannot run without knowing which batches are in scope.
 NO_ACTIVE_CONFIG = "No active workflow config, so nothing defines which batches are in scope."
@@ -112,9 +115,11 @@ def sync_fastq_names(fastq_names: list[str]) -> list[Sample]:
     return samples
 
 
-def sample_fields(entry: dict) -> dict:
+def sample_fields(entry: dict[str, Any]) -> dict[str, Any]:
     """Map one fastq-metadata entry to local Sample fields."""
-    fields = {field: _text(entry.get(field), TEXT_FIELD_LIMITS[field]) for field in TEXT_FIELDS}
+    fields: dict[str, Any] = {
+        field: _text(entry.get(field), TEXT_FIELD_LIMITS[field]) for field in TEXT_FIELDS
+    }
     fields |= {field: _as_int(entry.get(field)) for field in NUMBER_FIELDS}
     fields |= {field: list(entry.get(field) or []) for field in LIST_FIELDS}
     return fields
@@ -406,7 +411,7 @@ def _discover_samples(missing: set[str], batch_prefixes: set[str]) -> dict[str, 
 def _sample_ids(fastq_names: set[str]) -> dict[str, int]:
     """Map fastq names to primary keys in query-sized chunks."""
     names = list(fastq_names)
-    mapping = {}
+    mapping: dict[str, int] = {}
     for start in range(0, len(names), SAMPLE_LOOKUP_CHUNK):
         chunk = names[start : start + SAMPLE_LOOKUP_CHUNK]
         mapping.update(Sample.objects.filter(fastq_name__in=chunk).values_list("fastq_name", "id"))

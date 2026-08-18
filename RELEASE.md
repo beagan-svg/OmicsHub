@@ -1,9 +1,9 @@
 # Releasing OmicsHub
 
-A release updates five processes: the web process, the `submissions` worker, the `default`
-worker, beat, and the migration process. All five use the same Postgres database, Redis
-instance, and settings module. A missing setting stops all five processes. Restart them in
-the order below because they hold different parts of an in-flight submission.
+A release updates four application processes: the web process, the OCS submission worker,
+the catalog sync worker, and Celery Scheduler. They use the same PostgreSQL database, Redis instance, and
+settings module. The web process also runs migrations and `collectstatic` before Gunicorn
+starts.
 
 Use these steps for the Compose stack. Run every application process in Docker.
 
@@ -11,11 +11,11 @@ Use these steps for the Compose stack. Run every application process in Docker.
 
 The app reads the variables listed below from `env(...)` calls in `omicshub/settings/`.
 
-These have **no default**. `django-environ` raises `ImproperlyConfigured` at import, so a
-missing one is not a degraded service. The web process, both workers, and beat all exit
-before they log anything about starting up.
+These have no default in the production settings. `django-environ` raises
+`ImproperlyConfigured` when a required value is missing, so the web process and workers
+cannot start with an incomplete environment.
 
-| Variable | Read in | |
+| Variable | Source | Meaning |
 |---|---|---|
 | `SECRET_KEY` | base | rotating it signs every user out |
 | `DATABASE_URL` | base | full URL, e.g. `postgres://user:pw@host:5432/omicshub` |
@@ -25,63 +25,68 @@ before they log anything about starting up.
 | `ALLOWED_HOSTS` | prod | comma-separated; no default in prod, unlike dev |
 | `CSRF_TRUSTED_ORIGINS` | prod | with scheme, or every POST from the tunnel fails CSRF |
 
-These have defaults, but four of the defaults are wrong for anything but a laptop:
+These settings have defaults:
 
-| Variable | Default | |
+| Variable | Default | Meaning |
 |---|---|---|
-| `CACHE_URL` | `redis://localhost:6379/1` | **localhost**. Point this at the real Redis, or the submission worker's capacity hold is kept in an isolated cache. |
+| `CACHE_URL` | required in production | Redis endpoint for application cache data. |
+| `CACHE_KEY_PREFIX` | `omicshub` | Prefix for keys written by this deployment. |
+| `CACHE_TIMEOUT` | `300` | Default cache lifetime in seconds. |
 | `OCS_CLI_PATH` | `ocs` | the executable used for alignment and post-alignment submissions |
-| `AWS_PROFILE` | empty | empty means boto3 falls back to environment variables and then the instance role, which is what you want on EC2/ECS and not what you want on a host |
+| `AWS_PROFILE` | empty | boto3 uses its normal credential chain when no profile is set |
 | `AWS_SHARED_CREDENTIALS_FILE` | empty | the app-scoped credentials file; see the README |
 | `OCS_CLI_TIMEOUT` | `300` | seconds for one `ocs` call |
 | `CONN_MAX_AGE` | `60` | seconds a database connection is reused |
 | `STAGE_STATUS_SYNC_SECONDS` | `300` | how often the stage-status sweep runs |
-| `ADMIN_URL` | `admin` | the path the Django admin is mounted at , see below |
+| `ADMIN_URL` | `admin` | the path where Django mounts the admin |
 | `DEBUG` | `False` | production settings keep debug pages off |
 
 Compose reads `.env.docker` only when `--env-file .env.docker` is passed. That file carries
 `POSTGRES_PASSWORD`, `AWS_CREDENTIALS_FILE`, and the host-side port numbers. Compose sets
 `DATABASE_URL`, `CELERY_BROKER_URL`, `CACHE_URL`, and the container's `OCS_CLI_PATH`.
+Compose keeps the broker and cache on separate Redis services. The host ports are only
+bound to loopback for local inspection and should not be opened on a public host.
 
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are not on either list and must not be
 added. The app resolves credentials through boto3 from a profile.
 
 ### The admin path
 
-The admin can edit users, read every queue entry, and activate a manifest. `/admin/` is
-the first path anything scanning the host will try. `ADMIN_URL` moves it:
+The admin can edit users, read every queue entry, and activate a manifest. Set `ADMIN_URL`
+to mount the admin at another path:
 
 ```
 ADMIN_URL=bicore-ops
 ```
 
-Keep the default `admin/` for local development. The nav link and tests use
+Keep the default `admin/` for local development. The navigation link and tests use
 `reverse("admin:index")`, so set `ADMIN_URL` without changing code. A wrong value produces
 a 404 for the admin path.
 
 ## Deploying
 
-Before starting, check that no entry is mid-submission. An `ocs` call killed by a restart is
-exactly how an entry becomes `STRANDED`, and a stranded entry costs a person twenty
-minutes of checking OCS by hand:
+Before restarting, check that no entry is mid-submission. A restart during an `ocs` call can
+leave the local entry in `SUBMITTING`, so stop the submission worker only after the current
+call finishes:
 
 ```bash
-docker compose --env-file .env.docker exec web python manage.py shell -c "
+docker compose --env-file .env.docker exec web-ui python manage.py shell -c "
 from apps.submission_queue.models import QueueEntry
 print(QueueEntry.objects.filter(status='SUBMITTING').count())"
 ```
 
-The command prints zero when no submission is in flight. If it is not zero, wait. A submission takes
-seconds, and the next entry is only claimed after the previous one's `spacing`.
+The command prints zero when no submission is in flight. If it is not zero, wait for the
+current `ocs` call to finish. The next entry is claimed only after the previous entry's
+spacing period.
 
 Then run the setup command. It prepares the OCS packages, validates the environment, and
 starts the full stack.
 
 ```bash
-scripts/setup_docker.sh
+docker_tools/setup_docker.sh
 ```
 
-The compose `web` service runs `migrate` and then `collectstatic` before gunicorn binds,
+The compose `web-ui` service runs `migrate` and then `collectstatic` before gunicorn binds,
 from one container, so nothing races to apply the same migration. Off compose, run them
 yourself, in this order, from one host:
 
@@ -92,12 +97,12 @@ python manage.py collectstatic --noinput
 
 Then restart, in this order:
 
-1. **web** , it serves the pages and the API.
-2. **`worker-default`** , the sweeps and the reconciler. Restarting it mid-sweep is safe;
+1. **`web-ui`**: serves the pages and API.
+2. **`catalog-sync-worker`**: runs the scheduled synchronization tasks. Restarting it mid-sweep is safe;
    the sweep is idempotent and the next tick redoes it.
-3. **`worker-submissions`** , one process, `--concurrency 1`. Last, and only once the
+3. **`ocs-submission-worker`**: one process with `--concurrency 1`, after the
    `SUBMITTING` count above is zero.
-4. **beat** , last, and *always* when `CELERY_BEAT_SCHEDULE` has changed. Beat keeps its
+4. **`celery-scheduler`**: restart it whenever `CELERY_BEAT_SCHEDULE` changes. Beat keeps its
    own schedule file; an unrestarted beat goes on firing the old schedule and will not
    pick up a new task or a changed interval.
 
@@ -107,7 +112,7 @@ running the old task code.
 ### The submissions worker stays at one process
 
 ```
-worker-submissions   replicas: 1   --concurrency 1
+ocs-submission-worker   replicas: 1   --concurrency 1
 ```
 
 Keep this as a fixed deployment setting. The OCS job limit and the `spacing` between submissions
@@ -124,20 +129,12 @@ If the queue is too slow, lower `spacing` in the config. Do not scale the worker
 
 ## Migrations that need care
 
-`apps/sample_catalog/migrations/0009_stagestatus_catalog_sta_stage_c0b808_idx.py` adds an index to
-`catalog_stagestatus` with a plain `AddIndex`. Postgres takes an **ACCESS EXCLUSIVE lock on
-the table for the whole time the index builds** , not a moment, the whole build. On this
-table (roughly four rows per sample, so well into six figures) that is seconds to tens of
-seconds, during which every read and write of `catalog_stagestatus` blocks: the dashboard,
-the jobs page, and the stage-status sweep all wait, and the sweep will hit its time limit
-if it waits long enough.
+`apps/sample_catalog/migrations/0009_stagestatus_catalog_sta_stage_c0b808_idx.py` adds an
+index to `catalog_stagestatus` with a regular `AddIndex`. Review the lock time for this
+operation before applying it to a large production table.
 
-Run it in a quiet window. `AddIndexConcurrently` would avoid the lock but needs
-`django.contrib.postgres` in `INSTALLED_APPS`, which this project does not have.
-
-Everything else in `sample_catalog/` and `submission_queue/` to date is column additions and index
-changes on small tables. Check any new migration against the same question before
-shipping it: does it rewrite or lock a table the sweep writes to every five minutes?
+Review future migrations for table rewrites and locks on tables written by the scheduled
+status synchronization.
 
 ## Rolling back
 
@@ -153,13 +150,29 @@ reverting this app to yesterday's code, or restoring yesterday's database, does 
 it. Restoring a database backup causes a second problem because it reinstates entries as
 `PENDING` that OCS has already accepted, and the worker will submit them again.
 
-Roll back code freely. Review migrations before rolling them back, and never roll back the
-`queueing_queueentry` table on its own.
+Review migrations before rolling them back. Do not roll back the queue table without first
+checking the OCS demand state.
 
 ## After the deploy
 
-Four checks, in this order. They are ordered so that the first one to fail tells you the
-most.
+### Session cleanup and public ingress
+
+Run Django's standard session cleanup command once a day:
+
+```bash
+docker compose --env-file .env.docker exec -T web-ui python manage.py clearsessions
+```
+
+Schedule this from the host or cloud scheduler. Do not create a second application task for
+it. Public traffic should reach `web-ui` through an HTTPS reverse proxy or WAF. Apply login
+and signup rate limits there, keep PostgreSQL and both Redis services private, and allow only
+ports 80 and 443 from the internet.
+
+Set `SESSION_COOKIE_SECURE=True`, `CSRF_COOKIE_SECURE=True`, and the real HTTPS origins in
+the production environment. `SECURE_PROXY_SSL_HEADER` is valid only when the reverse proxy
+removes untrusted forwarded headers and sets `X-Forwarded-Proto` itself.
+
+Run these checks after the stack starts.
 
 1. **Readiness.**
 
@@ -171,19 +184,18 @@ most.
    `broker`, or `submissions_worker` (`workflow_config` is reported but does not gate
    readiness). `submissions_worker` is the check most likely to fail after a deploy because
    it reads a heartbeat the submission task refreshes on every run. The heartbeat goes stale
-   if beat is down, the broker is not delivering, or nothing is consuming `submissions`.
+   if the scheduler is down, the broker is not delivering, or nothing is consuming `ocs-submissions`.
    These failures queue jobs that never reach OCS while every page still
    renders.
 
-   Give it a minute. No tick has landed immediately after a restart, so the first probe
-   reports `no submission run in the last 5 minutes` and readiness is false until beat
-   fires. That is why the container healthcheck has a start period.
+   A newly restarted stack may need one scheduler tick before the OCS submission worker heartbeat
+   is fresh. The Compose healthcheck has a start period for this startup window.
 
-2. **A sweep completing in the worker log.** Within `STAGE_STATUS_SYNC_SECONDS` (five
-   minutes by default) of the restart:
+2. **A sweep completing in the worker log.** Within `STAGE_STATUS_SYNC_SECONDS` seconds of
+   the restart, five minutes by default:
 
    ```bash
-   docker compose --env-file .env.docker logs --since 10m worker-default \
+   docker compose --env-file .env.docker logs --since 10m catalog-sync-worker \
      | grep sync_all_stage_statuses
    ```
 
@@ -196,9 +208,8 @@ most.
    that the worker, the cache and OCS all work together, which the health endpoint cannot
    tell you.
 
-4. **The queue page.** Open `/queue/` and `/jobs/`. Both render, and any entry queued
-   before the deploy is still in the list with the status it had. An empty `/jobs/` page
-   after a deploy that was not supposed to change anything is worth stopping for.
+4. **The queue and monitor pages.** Open `/queue/`, `/jobs/`, and `/failed/`. Confirm that
+   they render and that existing entries retain their states.
 
 ## Starting after a host reboot
 
@@ -207,38 +218,18 @@ the LaunchAgent in `deploy/launchd/` so a reboot brings the stack back. The READ
 *Starting the stack at login* section has the two commands and the caveat that it needs a
 GUI login before Docker Desktop, and therefore the stack, can start.
 
-After any unattended reboot, run the four checks above rather than assuming recovery.
+After an unattended reboot, run the readiness, worker-log, and page checks above.
 
-## When an entry goes STRANDED
+## When a submission fails
 
-`STRANDED` is the state this app cannot resolve without a person, and the only one that requires
-paging. It means the worker claimed an entry, started an `ocs` submission, and died before
-recording a demand id. Nobody knows whether OCS received the command.
-`reconcile_stranded_submissions` marks it after 30 minutes and stops there. A
-job left unsubmitted costs a delay, while resubmitting a running one costs a duplicate
-alignment.
+The worker records a submission as `SUBMITTED` only when `ocs` returns a successful response
+with a demand id. A non-zero exit, timeout, unreadable response, or missing executable marks
+the entry `FAILED` and preserves the error for retry from the Failures page. A submission
+that reaches OCS and later fails is read from the demand registry and appears in the
+running-failures section with its demand ID.
 
-Handle it the way any production incident is handled here, adapting the usual sequence:
-
-1. **Say something before doing anything.** Post in the team channel that entries are
-   stranded and that you are looking. Someone else may already be resubmitting by hand.
-2. **Find out what happened before acting.** Stranded entries almost always follow
-   something: a restart during a submission, the submissions worker being OOM-killed, or
-   an `ocs` call hitting `OCS_CLI_TIMEOUT`. Check the worker log around the entry's
-   `claimed_at`. `Submission outcome unknown for ...` is the line the worker writes when
-   it cannot tell.
-3. **Stabilise before fixing.** If the stranding was caused by the release, roll the code
-   back first and work out why afterwards. A worker that is still dying will strand the
-   next entry too.
-4. **Resolve each entry by hand, one at a time.** For each one, search OCS for a demand
-   covering that sample and stage. If there is one, the job is running: move the entry to
-   `SUBMITTED`. If there is not, set it back to `PENDING` and the worker picks it up on
-   the next tick. Do this from the entry's change page in the admin. The bulk requeue
-   action excludes `STRANDED` because "requeue all" would create the duplicate job
-   that duplicates a job. `demand_id` is read-only in the admin, so an entry closed this
-   way keeps a blank one; note the id in the incident write-up instead.
-5. **Watch the next few submissions** after the queue restarts, rather than assuming the
-   first success means it is over.
-6. **Write down why it happened,** blamelessly, and what would have prevented it. The
-   useful output is usually one of: something should have drained the worker before the
-   restart, or the timeout was too short for the job that was submitted.
+If a worker is restarted while an `ocs` call is still running, inspect the worker log and OCS
+before retrying the local `SUBMITTING` entry. The command may have reached OCS even though the
+process did not return a demand id. Do not submit it again blindly because that can duplicate
+the alignment. Once the outcome is known, update or retry the entry through the normal queue
+workflow.

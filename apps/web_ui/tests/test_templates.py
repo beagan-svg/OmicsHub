@@ -36,11 +36,12 @@ META_REFRESH = re.compile(r"<meta[^>]*http-equiv\s*=\s*[\"']?refresh", re.IGNORE
 #: The pages whose tables have been brought up to the accessibility bar. Kept explicit
 #: rather than globbed so adding a template is a deliberate decision, not a silent pass.
 CAPTIONED = [
-    "job_monitor.html",
     "queue.html",
     "failed_jobs.html",
     "workflow_manifests.html",
+    "data_locations.html",
 ]
+TABLE_TEMPLATES = [*CAPTIONED, "partials/job_monitor_tables.html"]
 
 
 def test_no_blanket_meta_refresh():
@@ -49,21 +50,64 @@ def test_no_blanket_meta_refresh():
     assert not offenders, f"Blanket meta refresh found in: {', '.join(offenders)}"
 
 
-def test_job_monitor_refresh_is_manual():
-    """Job Monitor refreshes only when the reader explicitly requests a data sync."""
+def test_job_monitor_refreshes_tables_without_reloading_document():
+    """Job Monitor polls its database fragment while keeping the page in place."""
     text = (TEMPLATES / "job_monitor.html").read_text()
-    assert "Refresh data" in text
-    assert "refresh-toggle" not in text
-    assert "setInterval" not in text
+    tables = (TEMPLATES / "partials/job_monitor_tables.html").read_text()
+    assert "Sync monitor data from AWS" not in text
+    assert 'aria-label="Sync running jobs from AWS"' in tables
+    assert 'aria-label="Sync finished jobs from AWS"' in tables
+    assert tables.count('data-bs-toggle="tooltip"') == 2
+    assert tables.count('data-bs-placement="top"') == 2
+    assert "initTooltips();" in text
+    assert "setInterval(updateDurations, 1000)" in text
+    assert "setInterval(refreshTables, 30000)" in text
     assert "window.location.reload" not in text
 
 
+def test_job_monitor_has_a_running_stage_filter():
+    text = (TEMPLATES / "partials/job_monitor_tables.html").read_text()
+    assert 'aria-label="Filter running jobs by stage"' in text
+    assert 'class="monitor-stage-filter__label"' not in text
+    assert "{{ option.label }}" in text
+    assert "running_stage_options" in text
+
+
+def test_pages_poll_database_without_replacing_sample_interactions():
+    dashboard = (TEMPLATES / "dashboard.html").read_text()
+    locations = (TEMPLATES / "data_locations.html").read_text()
+    cell = (TEMPLATES / "_cell.html").read_text()
+    queue = (TEMPLATES / "queue.html").read_text()
+    failures = (TEMPLATES / "failed_jobs.html").read_text()
+    base = (TEMPLATES / "base.html").read_text()
+
+    assert "data-live-status-url=\"{% url 'web_ui:live-status' %}\"" in dashboard
+    assert "data-live-status-url=\"{% url 'web_ui:live-status' %}\"" in locations
+    assert "data-live-stage-status=" in cell
+    assert "data-live-stage-status=" in locations
+    assert 'id="queue-live-data" data-live-fragment' in queue
+    assert 'id="failures-live-data" data-live-fragment' in failures
+    assert "web_ui/js/live-status.js" in base
+    assert "web_ui/js/live-fragments.js" in base
+    fragments = (TEMPLATES.parent / "static/web_ui/js/live-fragments.js").read_text()
+    assert "details[open]" in fragments
+    assert "detail.open = true" in fragments
+    assert 'data-live-detail="{{ entry.sample.fastq_name }}"' in queue
+
+
 def test_job_monitor_demand_ids_are_copyable():
-    text = (TEMPLATES / "job_monitor.html").read_text()
+    text = (TEMPLATES / "partials/job_monitor_tables.html").read_text()
     assert '{% include "_copy_id.html" with value=row.demand_id label="Demand ID" %}' in text
     assert "data-copy-demand-id" not in text
     assert "navigator.clipboard.writeText" not in text
     assert ">Duration<" in text
+
+
+def test_data_location_download_uses_the_native_form():
+    """The S3 download submits one form so the browser can stream the ZIP."""
+    text = (TEMPLATES / "data_locations.html").read_text()
+    assert "form.submit()" in text
+    assert "errorMessage" not in text
 
 
 def test_copy_component_uses_one_clipboard_path():
@@ -74,7 +118,7 @@ def test_copy_component_uses_one_clipboard_path():
 
 def test_every_table_has_a_caption():
     """A caption is what names a table to a screen reader before it is read out."""
-    for name in CAPTIONED:
+    for name in TABLE_TEMPLATES:
         text = (TEMPLATES / name).read_text()
         tables = text.count("<table")
         captions = text.count("<caption")
@@ -83,7 +127,7 @@ def test_every_table_has_a_caption():
 
 def test_table_headers_carry_scope():
     """Without `scope`, a screen reader has to guess which cells a `th` heads."""
-    for name in CAPTIONED:
+    for name in TABLE_TEMPLATES:
         text = (TEMPLATES / name).read_text()
         bare = re.findall(r"<th(?=[\s>])(?![^>]*\bscope=)[^>]*>", text)
         assert not bare, f"{name}: <th> without scope: {bare}"
@@ -96,7 +140,7 @@ def test_row_actions_name_the_job_they_act_on():
     assert 'aria-label="Retry {{ entry.stage }} for {{ entry.sample.fastq_name }}"' in failed
 
     queue = (TEMPLATES / "queue.html").read_text()
-    assert 'aria-label="Cancel {{ entry.stage }} for {{ entry.sample.fastq_name }}"' in queue
+    assert 'aria-label="Delete {{ entry.stage }} for {{ entry.sample.fastq_name }}"' in queue
 
     configs = (TEMPLATES / "workflow_manifests.html").read_text()
     assert 'aria-label="Activate {{ config.name }}"' in configs

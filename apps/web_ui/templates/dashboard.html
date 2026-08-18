@@ -60,7 +60,7 @@
         <span class="state" data-state="{% if status_stale %}warn{% else %}done{% endif %}"
               tabindex="0" data-bs-toggle="tooltip" data-bs-placement="left"
               title="Stage status last synced {{ status_synced_at|timesince|default:'never' }} ago, and refreshes {{ status_refresh }}. Sample metadata last synced {{ metadata_synced_at|timesince|default:'never' }} ago, and refreshes {{ metadata_refresh }}.{% if status_stale %} This is well past its schedule. The sync worker may not be running.{% endif %}">
-          {% if status_stale %}Stale · {{ status_synced_at|since_short }}{% else %}Synced {{ status_synced_at|since_short }} ago{% endif %}
+          {% if status_stale %}Stale · {{ status_synced_at|since_short }}{% else %}Sync {{ status_synced_at|since_short }}{% endif %}
         </span>
         <button class="btn btn-sm btn-outline-secondary" type="submit" form="refresh-status-form"
                 data-bs-toggle="tooltip" title="Re-read this page's rows from OCS now">
@@ -72,32 +72,18 @@
     <div class="card-body is-toolbar">
       <div class="row g-2 align-items-center">
         <div class="col-sm-4 col-lg-3">
-          <label class="visually-hidden" for="fastq-search">Search FASTQ or Load Name</label>
+          <label class="visually-hidden" for="fastq-search">Search FASTQ, Load, or Batch Name</label>
           <input type="search" name="fastq_name" id="fastq-search" value="{{ search }}"
                  class="form-control form-control-sm"
-                 placeholder="Search FASTQ or Load Name" form="filter-form">
+                 placeholder="Search FASTQ, Load, or Batch Name" form="filter-form"
+                 data-submit-on-enter data-submit-form="filter-form">
         </div>
         <div class="col-auto">
-          {% comment %}
-          This select used to submit on change. Arrow-keying through the options fired a
-          page load on the first keystroke, so a keyboard user could never reach the option
-          they wanted. The whole filter form now applies together from one button.
-          {% endcomment %}
-          <label class="visually-hidden" for="study-filter">Study Set</label>
-          <select name="study" id="study-filter" class="form-select form-select-sm w-auto"
-                  form="filter-form">
-            <option value="">Study Set: all</option>
-            {% for study in studies %}
-            <option value="{{ study }}" {% if selected_study == study %}selected{% endif %}>{{ study }}</option>
-            {% endfor %}
-          </select>
+          {% include "_study_filter.html" with filter_form_id="filter-form" %}
         </div>
         {% if selected_prefix %}
         <input type="hidden" name="batch_prefix" value="{{ selected_prefix }}" form="filter-form">
         {% endif %}
-        <div class="col-auto">
-          <button class="btn btn-sm btn-primary" type="submit" form="filter-form">Apply</button>
-        </div>
         <div class="col-auto">
           {% comment %}
           Not Bootstrap's collapse: that one locks input for the length of its own
@@ -119,6 +105,9 @@
         <div class="col-auto">
           <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:dashboard' %}">Clear</a>
         </div>
+        <div class="col-auto">
+          <button class="btn btn-sm btn-primary" type="submit" form="filter-form">Apply filters</button>
+        </div>
 
         <div class="col-auto ms-auto">
           {% include "_column_menu.html" %}
@@ -133,73 +122,8 @@
         </div>
       </div>
 
-      {% comment %}
-      Two groups, not one list of six. Proximity is what says these menus answer two
-      different questions: what the sample *is* and where it has *got to*, so a reader
-      after "Organism" can skip the half of the panel about pipeline state without reading
-      it. The labels carry `for`; without it they are decoration rather than names.
-      {% endcomment %}
-      <div class="disclosure mt-3" id="advanced-filters" data-open="{% if filters_open %}true{% else %}false{% endif %}">
-        <div class="disclosure__inner">
-          <div class="pt-1">
-            <div class="filter-group">
-              <div class="row g-2">
-                <div class="col-md-4">
-                  <label class="label d-block mb-1" for="filter-batch">Batch Name From Vendor</label>
-                  <select name="batch_name_from_vendor" id="filter-batch" class="form-select form-select-sm" form="filter-form">
-                    <option value="">All batches</option>
-                    {% for value in batches %}
-                      <option value="{{ value }}" {% if value == filters.batch_name_from_vendor %}selected{% endif %}>{{ value }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                <div class="col-md-4">
-                  <label class="label d-block mb-1" for="filter-organism">Organism</label>
-                  <select name="organism_common_name" id="filter-organism" class="form-select form-select-sm" form="filter-form">
-                    <option value="">All organisms</option>
-                    {% for value in organisms %}
-                      <option value="{{ value }}" {% if value == filters.organism_common_name %}selected{% endif %}>{{ value }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                <div class="col-md-4">
-                  <label class="label d-block mb-1" for="filter-library-prep">Library Prep Method</label>
-                  <select name="library_prep_method_name" id="filter-library-prep" class="form-select form-select-sm" form="filter-form">
-                    <option value="">All library preps</option>
-                    {% for value in library_preps %}
-                      <option value="{{ value }}" {% if value == filters.library_prep_method_name %}selected{% endif %}>{{ value }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div class="filter-group">
-              <div class="row g-2">
-                {% for row in stage_filters %}
-                <div class="col-md-3">
-                  <label class="label d-block mb-1" for="filter-{{ row.stage.value }}-status">{{ row.stage.label }}</label>
-                  <select name="{{ row.stage.value }}_status" id="filter-{{ row.stage.value }}-status"
-                          class="form-select form-select-sm" form="filter-form">
-                    <option value="">Any status</option>
-                    {% for value in statuses %}
-                      <option value="{{ value }}" {% if value == row.selected %}selected{% endif %}>{{ value }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                {% endfor %}
-              </div>
-            </div>
-
-            <div class="d-flex align-items-center gap-2 mt-3">
-              <button class="btn btn-sm btn-primary" type="submit" form="filter-form">Apply filters</button>
-              {% if active_filter_count %}
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:dashboard' %}">Reset filters</a>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-      </div>
+      {% url 'web_ui:dashboard' as dashboard_url %}
+      {% include "_sample_advanced_filters.html" with filter_form_id="filter-form" disclosure_id="advanced-filters" id_prefix="" reset_url=dashboard_url %}
     </div>
 
     {% comment %}
@@ -210,7 +134,12 @@
     wrapper a height is what puts the column names back on screen through a long page.
     {% endcomment %}
     <div class="table-responsive table-scroll">
-      <table class="table table-sticky table-pinned align-middle mb-0" id="samples-table">
+      <table class="table table-sticky table-pinned align-middle mb-0" id="samples-table"
+             data-resizable-table="samples" data-live-status-url="{% url 'web_ui:live-status' %}">
+        <colgroup>
+          <col style="width: 44px">
+          {% for column in columns %}<col data-column-key="{{ column.key }}">{% endfor %}
+        </colgroup>
         {% comment %}
         A screen reader lands in this table with no idea what it holds or how much of it
         there is; the caption is the one place that can say so before the first cell.
@@ -236,7 +165,7 @@
             {% endcomment %}
             {% for column in columns %}
               {% if column.key in sortable_keys %}
-              <th scope="col" class="col--{{ column.kind }}" {% if sort == column.key %}aria-sort="{% if dir == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
+              <th scope="col" class="col--{{ column.kind }}" data-column-key="{{ column.key }}" {% if sort == column.key %}aria-sort="{% if dir == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
                 <a class="sort-link" href="?{% sort_query column.key %}"
                    title="Sort by {{ column.label }}">
                   {{ column.label }}
@@ -248,7 +177,7 @@
                 </a>
               </th>
               {% else %}
-              <th scope="col" class="col--{{ column.kind }}">{{ column.label }}</th>
+              <th scope="col" class="col--{{ column.kind }}" data-column-key="{{ column.key }}">{{ column.label }}</th>
               {% endif %}
             {% endfor %}
           </tr>
@@ -287,43 +216,21 @@
     moved to the checkout page with the rest of the submission's options, because those are
     decisions about a submission rather than about browsing.
     {% endcomment %}
-    <div class="card-body is-toolbar d-flex flex-wrap gap-2 align-items-center">
-      <button class="btn btn-sm btn-outline-secondary" type="button" id="clear-selection">
-        Clear selection
-      </button>
-
-      {% comment %}
-      The pager says which rows you are looking at, not just which page you are on. "1–50 of
-      1,204" is the fact someone scanning a batch actually wants; "Page 1 of 25" makes them
-      do the arithmetic. The arrows keep the query string, so paging never drops the active
-      tab, filters or sort. A page you cannot go to renders as a disabled control
-      rather than vanishing, so the pager does not change width as you move through it.
-      {% endcomment %}
-      <nav class="pager" aria-label="Sample pages">
-        <span class="pager__range">
-          {{ page.start_index }}–{{ page.end_index }}
-          <span class="text-secondary">of {{ page.paginator.count }}</span>
-        </span>
-        {% if page.paginator.num_pages > 1 %}
-        <span class="pager__controls">
-          {% if page.has_previous %}
-            <a class="pager__step" href="?{% with_params page=page.previous_page_number %}" aria-label="Previous page">
-              <i class="bi bi-chevron-left" aria-hidden="true"></i>
-            </a>
-          {% else %}
-            <span class="pager__step is-disabled" aria-hidden="true"><i class="bi bi-chevron-left" aria-hidden="true"></i></span>
-          {% endif %}
-          <span class="pager__page">{{ page.number }}<span class="text-secondary"> / {{ page.paginator.num_pages }}</span></span>
-          {% if page.has_next %}
-            <a class="pager__step" href="?{% with_params page=page.next_page_number %}" aria-label="Next page">
-              <i class="bi bi-chevron-right" aria-hidden="true"></i>
-            </a>
-          {% else %}
-            <span class="pager__step is-disabled" aria-hidden="true"><i class="bi bi-chevron-right" aria-hidden="true"></i></span>
-          {% endif %}
-        </span>
-        {% endif %}
-      </nav>
+    <div class="card-body is-toolbar dashboard-footer">
+      <div class="dashboard-footer__left">
+        <span class="text-secondary" id="sample-selection-count" aria-live="polite">0 samples selected</span>
+        <div class="dashboard-footer__cart-actions">
+          <span class="text-secondary">
+            <i class="bi bi-bag" aria-hidden="true"></i>
+            <span id="cart-count">{{ cart_count }}</span> in cart
+          </span>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:checkout' %}">Go to checkout</a>
+          <button class="btn btn-sm btn-primary" type="submit" id="add-to-cart"
+                  formaction="{% url 'web_ui:cart-add' %}">
+            <i class="bi bi-plus-lg" aria-hidden="true"></i> Add selected to cart
+          </button>
+        </div>
+      </div>
 
       {% comment %}
       What just happened, said next to the control that did it. The page is barely taller
@@ -334,16 +241,10 @@
       aria-live, so it is announced rather than only seen; polite, because it is a
       confirmation and interrupts nothing.
       {% endcomment %}
-      <span class="text-secondary ms-auto" id="cart-feedback" aria-live="polite"></span>
-      <span class="text-secondary">
-        <i class="bi bi-bag" aria-hidden="true"></i>
-        <span id="cart-count">{{ cart_count }}</span> in cart
-      </span>
-      <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:checkout' %}">Go to checkout</a>
-      <button class="btn btn-sm btn-primary" type="submit" id="add-to-cart"
-              formaction="{% url 'web_ui:cart-add' %}">
-        <i class="bi bi-plus-lg" aria-hidden="true"></i> Add selected to cart
-      </button>
+      <span class="text-secondary" id="cart-feedback" aria-live="polite"></span>
+      <div class="dashboard-footer__pager">
+        {% include "_sample_pager.html" with pager_label="Sample pages" %}
+      </div>
     </div>
     {% endif %}
   </div>
@@ -376,40 +277,21 @@ returns them to it.
 
 {% block extra_js %}
 <script>
-  // The advanced-filter disclosure. Everything that moves is CSS, so a second press lands
-  // mid-flight and the panel retargets from wherever it currently is rather than queueing
-  // behind the first animation. This is why the code does not use Bootstrap's collapse.
-  document.querySelectorAll("[data-disclosure]").forEach(function (toggle) {
-    const panel = document.getElementById(toggle.dataset.disclosure);
-    if (!panel) return;
-
-    // Where the panel grows from: the centre of the button, measured in the panel's own
-    // coordinates, so the surface scales out of the control that opened it.
-    function anchor() {
-      const button = toggle.getBoundingClientRect();
-      const box = panel.getBoundingClientRect();
-      panel.style.setProperty("--origin-x", `${button.left + button.width / 2 - box.left}px`);
-    }
-
-    anchor();
-    // The toolbar wraps at narrow widths, so the button is not always in the same place.
-    window.addEventListener("resize", anchor, { passive: true });
-
-    toggle.addEventListener("click", function () {
-      const open = panel.dataset.open !== "true";
-      anchor();
-      panel.dataset.open = String(open);
-      toggle.setAttribute("aria-expanded", String(open));
-    });
-  });
-
   const selectAll = document.getElementById("select-all-samples");
   const boxes = () => document.querySelectorAll(".select-sample");
-  selectAll.addEventListener("change", (e) => boxes().forEach((b) => { b.checked = e.target.checked; }));
-  document.getElementById("clear-selection").addEventListener("click", () => {
-    selectAll.checked = false;
-    boxes().forEach((b) => { b.checked = false; });
+  const selectionCount = document.getElementById("sample-selection-count");
+  const updateSelectionCount = () => {
+    const count = [...boxes()].filter((box) => box.checked).length;
+    selectionCount.textContent = `${count} sample${count === 1 ? "" : "s"} selected`;
+    selectAll.checked = count > 0 && count === boxes().length;
+    selectAll.indeterminate = count > 0 && count < boxes().length;
+  };
+  selectAll.addEventListener("change", (e) => {
+    boxes().forEach((b) => { b.checked = e.target.checked; });
+    updateSelectionCount();
   });
+  boxes().forEach((box) => box.addEventListener("change", updateSelectionCount));
+  updateSelectionCount();
 
   // --- adding to the cart ----------------------------------------------------------------
   // Adds without leaving the page, so the confirmation appears beside the button rather than
@@ -444,6 +326,7 @@ returns them to it.
           // harmless, but it reads as though the first press did nothing.
           selectAll.checked = false;
           boxes().forEach((b) => { b.checked = false; });
+          updateSelectionCount();
         }
       } catch {
         cartFeedback.textContent = "Could not reach the server. Nothing was added.";
@@ -467,180 +350,5 @@ returns them to it.
   new bootstrap.Modal(document.getElementById("{{ open_modal }}-modal")).show();
   {% endif %}
 
-  // --- the column chooser ----------------------------------------------------------------
-  // Everything here is refinement on top of markup that already works: with JS off the menu
-  // is still a grouped list of checkboxes and an Apply button that posts them. What this
-  // adds is the filter, the tallies, the section toggles, and the promise that a menu you
-  // closed without applying is not left showing a state the table does not have.
-  (() => {
-    const menu = document.querySelector(".column-menu");
-    if (!menu) return;
-
-    const toggle = menu.querySelector("#column-menu-toggle");
-    const filter = menu.querySelector("#column-filter");
-    const options = [...menu.querySelectorAll("[data-column-option]")];
-    const groups = [...menu.querySelectorAll("[data-column-group]")];
-    const empty = menu.querySelector("[data-column-empty]");
-    const summary = menu.querySelector("[data-column-summary]");
-    const countPill = menu.querySelector("[data-column-count]");
-    const apply = menu.querySelector("[data-column-apply]");
-    const boxes = [...menu.querySelectorAll('input[type="checkbox"]')];
-    const defaults = new Set(JSON.parse(document.getElementById("default-column-keys").textContent));
-
-    // The locked column is a hidden input rather than a box, so it counts once here.
-    const locked = menu.querySelectorAll('.column-option--locked').length;
-    const total = boxes.length + locked;
-    // What the server has. Every comparison below is against this, not against the last
-    // keystroke, so ticking a box and unticking it again correctly reads as "no change".
-    const saved = new Set(boxes.filter((b) => b.checked).map((b) => b.value));
-
-    const chosen = () => new Set(boxes.filter((b) => b.checked).map((b) => b.value));
-    const sameAsSaved = (now) =>
-      now.size === saved.size && [...now].every((key) => saved.has(key));
-
-    const sync = () => {
-      const now = chosen();
-      const shown = now.size + locked;
-      summary.textContent = `${shown} of ${total} shown`;
-      countPill.textContent = shown;
-      const dirty = !sameAsSaved(now);
-      apply.disabled = !dirty;
-      // The dot on the trigger is the only thing visible once the menu is scrolled or the
-      // pointer has wandered off, so it is what carries "unapplied changes".
-      menu.classList.toggle("is-dirty", dirty);
-    };
-
-    const search = () => {
-      const query = filter.value.trim().toLowerCase();
-      options.forEach((option) => {
-        option.hidden = query !== "" && !option.dataset.columnLabel.includes(query);
-      });
-      // A section whose every line is filtered out takes its heading with it, or the menu
-      // fills up with headings naming nothing.
-      groups.forEach((group) => {
-        const visible = [...group.querySelectorAll("[data-column-option]")].some((o) => !o.hidden);
-        group.hidden = !visible;
-      });
-      empty.hidden = groups.some((group) => !group.hidden);
-    };
-
-    const revert = () => {
-      boxes.forEach((box) => { box.checked = saved.has(box.value); });
-      filter.value = "";
-      search();
-      sync();
-    };
-
-    boxes.forEach((box) => box.addEventListener("change", sync));
-    filter.addEventListener("input", search);
-
-    filter.addEventListener("keydown", (event) => {
-      // This field sits inside the submission form, so an unguarded Enter would post the
-      // sample selection. It filters as you type; there is nothing for Enter to do.
-      if (event.key === "Enter") event.preventDefault();
-      if (event.key === "Escape" && filter.value !== "") {
-        event.stopPropagation();  // clear the filter first; a second Escape closes the menu
-        filter.value = "";
-        search();
-      }
-    });
-
-    menu.querySelectorAll("[data-column-all], [data-column-none]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const on = button.hasAttribute("data-column-all");
-        // Only the lines currently on screen: after a filter, "All" that quietly ticked
-        // hidden rows too would be the opposite of what the button says.
-        button.closest("[data-column-group]")
-          .querySelectorAll("[data-column-option]:not([hidden]) input[type=checkbox]")
-          .forEach((box) => { box.checked = on; });
-        sync();
-      });
-    });
-
-    menu.querySelector("[data-column-reset]").addEventListener("click", () => {
-      filter.value = "";
-      search();
-      boxes.forEach((box) => { box.checked = defaults.has(box.value); });
-      sync();
-    });
-
-    menu.querySelector("[data-column-cancel]").addEventListener("click", () => {
-      bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
-    });
-
-    // Placement. A menu this size cannot pick a side and then find out how tall it is:
-    // below the trigger there may be room for three rows, and this page does not scroll far
-    // enough to reach an Apply button that fell off the bottom. So height and placement are
-    // decided together, in one pass, against the space actually available.
-    const panel = menu.querySelector(".column-menu__panel");
-    const head = menu.querySelector(".column-menu__head");
-    const foot = menu.querySelector(".column-menu__foot");
-    const GAP = 12;        // breathing room against the edge of the window
-    const TALLEST = 560;   // past this the list is longer than anyone reads in one go
-    const MIN_LIST = 220;  // seven rows; below that the list stops working as a list
-
-    const place = () => {
-      const anchor = toggle.getBoundingClientRect();
-      // The search field and the footer are fixed overhead. Budgeting is done in terms of
-      // what is left for the list, because that is the part with a floor worth defending.
-      const chrome = head.offsetHeight + foot.offsetHeight;
-      const below = window.innerHeight - anchor.bottom - GAP;
-      const above = anchor.top - GAP;
-
-      panel.classList.remove("column-menu__panel--above", "column-menu__panel--pinned");
-      panel.style.top = "";
-      panel.style.left = "";
-      panel.style.transform = "";
-
-      if (Math.max(below, above) >= chrome + MIN_LIST) {
-        // Prefer below, the direction a dropdown is expected to open; go above only when
-        // below cannot seat the list.
-        const useAbove = below < chrome + MIN_LIST;
-        panel.classList.toggle("column-menu__panel--above", useAbove);
-        panel.style.maxHeight = `${Math.min(TALLEST, useAbove ? above : below)}px`;
-        // The panel is right-aligned to a trigger that, on a narrow window, is not 360px
-        // from the left edge. When aligned to the trigger it hangs off the screen. Nudge it
-        // back in; keeping the whole panel visible beats keeping its edges aligned.
-        const box = panel.getBoundingClientRect();
-        const nudge = box.left < GAP
-          ? GAP - box.left
-          : Math.min(0, window.innerWidth - GAP - box.right);
-        if (nudge) panel.style.transform = `translateX(${Math.round(nudge)}px)`;
-        return;
-      }
-
-      // Neither side can, which on a short window is the common case rather than the odd
-      // one. Stop treating the trigger as a ceiling: pin the panel to the window and let it
-      // overlap the toolbar. A menu covering the button that opened it is a little unusual;
-      // a menu whose Apply is below the fold on a page that does not scroll is broken.
-      panel.classList.add("column-menu__panel--pinned");
-      panel.style.maxHeight = `${window.innerHeight - GAP * 2}px`;
-      panel.style.top = `${GAP}px`;
-      panel.style.left = `${Math.min(
-        Math.max(GAP, anchor.right - panel.offsetWidth),
-        window.innerWidth - panel.offsetWidth - GAP,
-      )}px`;
-    };
-
-    // Closing without applying discards. Leaving the boxes as they were left would mean a
-    // reopened menu describes a table that never changed.
-    toggle.addEventListener("hidden.bs.dropdown", () => {
-      panel.style.maxHeight = "";
-      revert();
-    });
-    toggle.addEventListener("shown.bs.dropdown", () => {
-      place();
-      filter.focus();
-    });
-    // Nothing else is re-placing this menu now, so anything that moves the trigger or
-    // changes the space around it has to.
-    ["resize", "scroll"].forEach((event) => {
-      window.addEventListener(event, () => {
-        if (panel.classList.contains("show")) place();
-      }, { passive: true });
-    });
-
-    sync();
-  })();
 </script>
 {% endblock %}

@@ -5,21 +5,13 @@ from apps.sample_catalog.models import Sample, Stage
 
 
 class QueueEntry(models.Model):
-    """Store one OCS job requested by a user.
-
-    A single table with a status, rather than the old app's separate queue / in-progress
-    / running / failed / completed tables: a submitted entry *is* the job record, and how
-    the job is progressing at OCS is read from the sample's StageStatus, which the sync
-    task refreshes from the demand registry.
-    """
+    """Store one OCS job requested by a user."""
 
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
         SUBMITTING = "SUBMITTING", "Submitting"
         SUBMITTED = "SUBMITTED", "Submitted"
         FAILED = "FAILED", "Failed"
-        # The worker claimed the entry but the OCS result is unknown.
-        STRANDED = "STRANDED", "Stranded. Check OCS before requeueing"
         CANCELLED = "CANCELLED", "Cancelled"
 
     class ModalitySource(models.TextChoices):
@@ -60,8 +52,7 @@ class QueueEntry(models.Model):
     demand_id = models.CharField(max_length=64, blank=True)
     error_message = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    # When the worker took this entry off the queue. Set on every claim, so a retry after
-    # a stranded run is timed from the latest attempt.
+    # When the worker took this entry off the queue.
     claimed_at = models.DateTimeField(null=True, blank=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
 
@@ -83,16 +74,7 @@ class QueueEntry(models.Model):
 
 
 class CartItem(models.Model):
-    """Store a fastq sample staged for submission but not yet queued.
-
-        The cart is deliberately a table rather than session state: a selection survives a
-        logout, a different browser, and the round trip through the checkout page, and it is
-        visible to support when someone asks why a sample was submitted.
-
-    It holds no stage, command, or manifest. Those are decided at checkout against
-        whichever config is chosen then, so a cart filled last week still submits under
-        today's rules rather than a stale plan.
-    """
+    """Store a fastq sample staged for submission but not yet queued."""
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

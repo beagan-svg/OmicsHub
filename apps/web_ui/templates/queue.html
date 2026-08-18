@@ -16,12 +16,21 @@
 {% endblock %}
 
 {% block content %}
+<div id="queue-live-data" data-live-fragment data-live-fragment-url="{% url 'web_ui:queue' %}">
 <section class="card queue-summary mb-3" aria-labelledby="queue-summary-title">
   <div class="queue-summary__block">
     <h2 class="label mb-2" id="queue-summary-title">Queue status</h2>
     <div class="d-flex flex-wrap align-items-center gap-2">
-      <span class="state" data-state="done">Active</span>
+      <span class="state" data-state="{% if queue_paused %}warn{% else %}done{% endif %}">
+        {% if queue_paused %}Paused{% else %}Active{% endif %}
+      </span>
       <span class="text-secondary">Automatic processing · round-robin fairness</span>
+      <form method="post" action="{% url 'web_ui:toggle-queue-pause' %}">
+        {% csrf_token %}
+        <button class="btn btn-sm btn-outline-secondary" type="submit">
+          {% if queue_paused %}Resume queue{% else %}Pause queue{% endif %}
+        </button>
+      </form>
     </div>
   </div>
   {% if next_entry %}
@@ -66,7 +75,7 @@
           <td><span class="tag tag--accent">{{ entry.modality }}</span></td>
           {% if user.is_staff %}<td class="text-secondary">{{ entry.requested_by }}</td>{% endif %}
           <td class="queue-command-cell">
-            <details class="queue-command">
+            <details class="queue-command" data-live-detail="{{ entry.sample.fastq_name }}">
               <summary>View command</summary>
               <code>{{ entry.command }}</code>
             </details>
@@ -75,10 +84,10 @@
           <td class="text-secondary">{{ entry.created_at|date:"Y-m-d H:i" }}</td>
           <td class="text-end">
             {% if entry.status == "PENDING" %}
-            <form method="post" action="{% url 'web_ui:cancel' entry.pk %}">
+            <form method="post" action="{% url 'web_ui:delete-queue-entry' entry.pk %}">
               {% csrf_token %}
               <button class="btn btn-sm btn-outline-danger" type="submit"
-                      aria-label="Cancel {{ entry.stage }} for {{ entry.sample.fastq_name }}">Cancel</button>
+                      aria-label="Delete {{ entry.stage }} for {{ entry.sample.fastq_name }}">Delete</button>
             </form>
             {% endif %}
           </td>
@@ -92,5 +101,6 @@
       </tbody>
     </table>
   </div>
+</section>
 </div>
 {% endblock %}

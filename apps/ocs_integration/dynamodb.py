@@ -15,6 +15,7 @@ from django.conf import settings
 FASTQ_METADATA_TABLE = "fastq-metadata"
 FASTQ_HISTORY_TABLE = "fastq-history"
 DEMAND_REGISTRY_TABLE = "demand-registry"
+FILE_STORE_TABLE = "file-store"
 
 FASTQ_METADATA_BATCH_INDEX = f"{FASTQ_METADATA_TABLE}-batch-name-from-vendor-index"
 DEMAND_REGISTRY_TYPE_INDEX = f"{DEMAND_REGISTRY_TABLE}-demand-type-start-time-index"
@@ -85,7 +86,7 @@ def _batch_get(name: str, keys: list[dict[str, str]]) -> list[dict[str, Any]]:
     unique = list({tuple(sorted(key.items())): key for key in keys}.values())
 
     for start in range(0, len(unique), BATCH_GET_CHUNK):
-        request = {table_name: {"Keys": unique[start : start + BATCH_GET_CHUNK]}}
+        request: dict[str, Any] | None = {table_name: {"Keys": unique[start : start + BATCH_GET_CHUNK]}}
         delay = UNPROCESSED_BACKOFF
         while request:
             response = resource.batch_get_item(RequestItems=request)
@@ -142,7 +143,7 @@ def file_store_id(history_row: dict[str, Any]) -> str:
     return ""
 
 
-def _file_store_id(gfs_path: str) -> str:
+def _file_store_id(gfs_path: str | None) -> str:
     match = GFS_PATH.match(gfs_path or "")
     return match.group(1) if match else ""
 
@@ -222,6 +223,14 @@ def get_demands(demand_ids: list[str]) -> dict[str, dict[str, Any]]:
     """Return demand-registry entries keyed by demand id."""
     entries = _batch_get(DEMAND_REGISTRY_TABLE, [{"demand_id": demand_id} for demand_id in demand_ids])
     return {entry["demand_id"]: entry for entry in entries}
+
+
+def get_file_stores(file_store_ids: list[str]) -> dict[str, dict[str, Any]]:
+    """Return GFS file-store entries keyed by file-store ID."""
+    entries = _batch_get(
+        FILE_STORE_TABLE, [{"file_store_id": file_store_id} for file_store_id in file_store_ids]
+    )
+    return {entry["file_store_id"]: entry for entry in entries}
 
 
 def count_in_progress(demand_type: str) -> int:

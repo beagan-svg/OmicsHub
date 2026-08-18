@@ -6,8 +6,8 @@ import pytest
 
 from apps.sample_catalog.models import Stage
 from apps.submission_queue.models import QueueEntry
-from apps.submission_queue.services.enqueue import enqueue
-from apps.submission_queue.services.planning import build_plan
+from apps.submission_queue.queue_entries import enqueue
+from apps.submission_queue.queue_planning import build_plan
 
 pytestmark = pytest.mark.django_db
 

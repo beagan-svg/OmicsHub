@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from apps.sample_catalog.models import MULTIOME_ATAC_PREP, MULTIOME_GEX_PREP, Sample
-from apps.sample_catalog.services.pairing import with_multiome_partners
+from apps.sample_catalog.multiome_pairing import with_multiome_partners
 
 
 def make(fastq_name: str, batch: str, prep: str, load: str) -> Sample:

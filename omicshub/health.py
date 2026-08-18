@@ -58,7 +58,10 @@ def _check_submissions_worker():
 
     if not seen:
         minutes = WORKER_HEARTBEAT_TTL // 60
-        return f"no submission run in the last {minutes} minutes. Check beat and the submissions worker."
+        return (
+            f"no submission run in the last {minutes} minutes. "
+            "Check the scheduler and the OCS submission worker."
+        )
     return OK
 
 

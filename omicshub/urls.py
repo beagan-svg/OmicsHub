@@ -1,5 +1,3 @@
-import os
-
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.views import LoginView, LogoutView
@@ -13,9 +11,9 @@ from omicshub.health import health
 # scanning the tunnel will try, so it is configurable and should not be the default
 # anywhere the app is reachable by more than the machine it runs on.
 #
-# Read from settings when a setting exists, and from the environment otherwise. Templates
+# Read from settings so the URLconf does not parse environment variables itself. Templates
 # and tests use reverse("admin:index"), so changing it requires one variable.
-_admin_url = getattr(settings, "ADMIN_URL", None) or os.environ.get("ADMIN_URL") or "admin"
+_admin_url = settings.ADMIN_URL
 # Tolerate "ops/", "/ops" and "ops" alike; path() needs exactly one trailing slash and no
 # leading one.
 ADMIN_PATH = _admin_url.strip("/") + "/"

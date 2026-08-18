@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from typing import TypeGuard
 
 from django.core.exceptions import ValidationError
 
@@ -42,7 +43,7 @@ def _type_name(value) -> str:
     return _TYPE_NAMES.get(type(value), type(value).__name__)
 
 
-def _is_int(value) -> bool:
+def _is_int(value: object) -> TypeGuard[int]:
     """Return whether a value is a JSON integer rather than a Boolean."""
     return isinstance(value, int) and not isinstance(value, bool)
 

@@ -8,5 +8,7 @@ from .models import User
 class OmicsHubUserAdmin(UserAdmin):
     # `visible_columns` is dashboard state the user sets themselves, so it is shown for
     # support ("why is their table missing a column") but not editable from here.
-    readonly_fields = ["visible_columns"]
-    fieldsets = UserAdmin.fieldsets + (("OmicsHub", {"fields": ["visible_columns"]}),)
+    readonly_fields = ["visible_columns", "visible_location_columns"]
+    fieldsets = list(UserAdmin.fieldsets or ()) + [
+        ("OmicsHub", {"fields": ["visible_columns", "visible_location_columns", "queue_paused"]})
+    ]
