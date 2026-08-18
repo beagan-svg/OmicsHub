@@ -215,6 +215,33 @@ class TestCheckoutPage:
         assert b"READY-1" in response.content
         assert b"Review Submission" in response.content
 
+    def test_paginates_cart_rows_with_the_shared_page_size_control(self, logged_in, make_sample):
+        names = [f"READY-{number}" for number in range(60)]
+        for name in names:
+            make_sample(name)
+        logged_in.post(reverse("web_ui:cart-add"), {"fastq_names": names})
+
+        response = logged_in.get(reverse("web_ui:checkout"), {"checkout_page_size": 25})
+
+        content = response.content.decode()
+        assert "1–25" in content
+        assert "of 60" in content
+        assert 'name="fastq_names" value="READY-0"' in content
+        assert (
+            'class="form-check-input select-cart-sample"\n                       value="READY-59"'
+            not in content
+        )
+        assert "checkout_page=2" in content
+
+    def test_keeps_deselected_samples_out_of_submission_hidden_fields(self, logged_in, make_sample):
+        make_sample("READY-1")
+        make_sample("READY-2")
+        logged_in.post(reverse("web_ui:cart-add"), {"fastq_names": ["READY-1", "READY-2"]})
+
+        response = logged_in.get(reverse("web_ui:checkout"), {"exclude_fastq_names": ["READY-1"]})
+
+        assert response.context["checkout_selected_fastq_names"] == ["READY-2"]
+
     def test_says_when_no_config_has_been_uploaded(self, logged_in, make_sample):
         make_sample("READY-1")
         logged_in.post(reverse("web_ui:cart-add"), {"fastq_names": ["READY-1"]})

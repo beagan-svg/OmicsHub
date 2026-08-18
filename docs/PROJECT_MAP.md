@@ -15,6 +15,7 @@ OmicsHub is a Django application that mirrors OCS data into PostgreSQL, builds O
 `apps/submission_queue/` owns the submission queue. Models store queue entries and cart items. `queue_planning.py` plans work, `queue_entries.py` creates entries, and `queue_claiming.py` selects submissions. Tasks submit commands. API and admin modules expose queue operations.
 
 `apps/web_ui/` owns the server-rendered dashboard, checkout flow, queue pages, exports, templates, CSS, browser behavior, and `data_location_queries.py` for Data Locations rows.
+Reusable template fragments live in `apps/web_ui/templates/partials/` and use names that describe what they render, such as `status_badge.html` and `table_pager.html`.
 
 ## Django project code
 

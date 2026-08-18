@@ -2,10 +2,10 @@
 <div class="modal fade" id="submit-modal" {% if has_unsaved_choices %}data-has-edits="true"{% endif %} tabindex="-1" aria-labelledby="submit-modal-label" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
-      {% include "_discard_confirm.html" with id_prefix="submit" %}
+      {% include "partials/discard_confirmation.html" with id_prefix="submit" %}
       <form method="post" action="{% url 'web_ui:submit-commands' %}">
         {% csrf_token %}
-        {% include "_submission_fields.html" %}
+        {% include "partials/submission_hidden_fields.html" %}
 
         <div class="modal-header">
           <h2 class="modal-title h2" id="submit-modal-label">Review Submission</h2>
@@ -137,7 +137,7 @@
               <span class="text-secondary">Completed ingest, proceeding to alignment</span>
             </div>
             <div class="card-body">
-              {% include "_command_groups.html" with groups=align_groups stage_key="align" %}
+              {% include "partials/command_groups.html" with groups=align_groups stage_key="align" %}
             </div>
           </div>
 
@@ -147,7 +147,7 @@
               <span class="text-secondary">Completed alignment, proceeding to post-alignment</span>
             </div>
             <div class="card-body">
-              {% include "_command_groups.html" with groups=postalign_groups stage_key="postalign" %}
+              {% include "partials/command_groups.html" with groups=postalign_groups stage_key="postalign" %}
             </div>
           </div>
 

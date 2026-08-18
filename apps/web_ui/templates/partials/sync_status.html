@@ -1,0 +1,7 @@
+{% load web_ui_extras %}
+
+<span class="state" data-state="{% if status_stale %}warn{% else %}done{% endif %}"
+      tabindex="0" data-bs-toggle="tooltip" data-bs-placement="left"
+      title="Stage status last synced {{ status_synced_at|timesince|default:'never' }} ago, and refreshes {{ status_refresh }}.{% if include_metadata %} Sample metadata last synced {{ metadata_synced_at|timesince|default:'never' }} ago, and refreshes {{ metadata_refresh }}.{% endif %}{% if status_stale %} This is well past its schedule. The sync worker may not be running.{% endif %}">
+  {% if status_stale %}Stale · {{ status_synced_at|since_short }}{% else %}Sync {{ status_synced_at|since_short }}{% endif %}
+</span>

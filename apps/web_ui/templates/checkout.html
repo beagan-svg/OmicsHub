@@ -48,6 +48,9 @@
           </option>
           {% endfor %}
         </select>
+        {% for fastq_name in checkout_excluded_fastq_names %}
+        <input type="hidden" name="exclude_fastq_names" value="{{ fastq_name }}">
+        {% endfor %}
         <button class="btn btn-outline-secondary text-nowrap" type="submit">Use this</button>
       </div>
       <div class="form-text">
@@ -82,6 +85,11 @@
 <form method="post" action="{% url 'web_ui:submit-review' %}" id="checkout-form">
   {% csrf_token %}
   <input type="hidden" name="config_id" value="{{ config.pk|default:'' }}">
+  <div id="checkout-selected-names">
+    {% for fastq_name in checkout_selected_fastq_names %}
+    <input type="hidden" name="fastq_names" value="{{ fastq_name }}" data-selected-fastq>
+    {% endfor %}
+  </div>
 
   <div class="card">
     <div class="card-header">
@@ -89,66 +97,73 @@
       <span class="text-secondary">{{ cart_count }} sample{{ cart_count|pluralize }} staged</span>
     </div>
 
-    <div class="table-responsive">
-      <table class="table table-pinned align-middle mb-0" id="cart-table">
+    <div class="table-responsive table-scroll">
+      <table class="table table-sticky table-pinned align-middle mb-0" id="cart-table">
         <caption class="visually-hidden">
           Samples staged for submission. Ticked rows are the ones that will be submitted.
         </caption>
         <thead>
           <tr>
             <th scope="col" style="width:2rem">
-              <input type="checkbox" class="form-check-input" id="select-all-cart" checked
-                     aria-label="Select all staged samples">
+              <input type="checkbox" class="form-check-input" id="select-all-cart"
+                     aria-label="Select all staged samples on this page">
             </th>
             {% for column in columns %}<th scope="col" class="col--{{ column.kind }}">{{ column.label }}</th>{% endfor %}
           </tr>
         </thead>
         <tbody>
-          {% for item in cart_items %}
+          {% for item in cart_page %}
           <tr>
             {% comment %}
             Checked by default: everything in the cart was already deliberately put there, so
             the common case is submitting all of it and unticking the exceptions.
             {% endcomment %}
-            <td><input type="checkbox" class="form-check-input select-cart-sample" name="fastq_names"
-                       value="{{ item.sample.fastq_name }}" checked
+            <td><input type="checkbox" class="form-check-input select-cart-sample"
+                       value="{{ item.sample.fastq_name }}"
+                       {% if item.sample.fastq_name not in checkout_excluded_fastq_names %}checked{% endif %}
                        aria-label="Submit {{ item.sample.fastq_name }}"></td>
-            {% for column in columns %}{% include "_cell.html" with sample=item.sample %}{% endfor %}
+            {% for column in columns %}{% include "partials/sample_table_cell.html" with sample=item.sample %}{% endfor %}
           </tr>
           {% empty %}
           {% url 'web_ui:dashboard' as samples_url %}
           <tr><td colspan="{{ columns|length|add:1 }}">
-            {% include "_empty.html" with icon="bag" title="Your cart is empty." hint="Pick samples on the Samples page and add them to your cart." action_url=samples_url action_label="Go to samples" %}
+            {% include "partials/empty_state.html" with icon="bag" title="Your cart is empty." hint="Pick samples on the Samples page and add them to your cart." action_url=samples_url action_label="Go to samples" %}
           </td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
 
-    {% if cart_items %}
-    <div class="card-body is-toolbar d-flex flex-wrap gap-2 align-items-center">
-      <label class="visually-hidden" for="force-select">Force a stage</label>
-      <select name="force" id="force-select" class="form-select form-select-sm w-auto"
-              data-bs-toggle="tooltip"
-              title="Run this stage even when the sample's history says it is not due for it. A sample that has not finished the stage before it is left alone, not advanced.">
-        <option value="">Force: no</option>
-        <option value="align" {% if submission.force == "align" %}selected{% endif %}>Force alignment</option>
-        <option value="post-align" {% if submission.force == "post-align" %}selected{% endif %}>Force post-alignment</option>
-      </select>
-      <div class="form-check mb-0">
-        <input class="form-check-input" type="checkbox" name="batch_processing" id="batch-processing"
-               {% if submission.batch_processing %}checked{% endif %}>
-        <label class="form-check-label" for="batch-processing">Address by FASTQ name (RTX/RFX)</label>
+    {% if cart_page.object_list %}
+    <div class="card-body is-toolbar dashboard-footer">
+      <div class="dashboard-footer__left">
+        <label class="visually-hidden" for="force-select">Force a stage</label>
+        <select name="force" id="force-select" class="form-select form-select-sm w-auto"
+                data-bs-toggle="tooltip"
+                title="Run this stage even when the sample's history says it is not due for it. A sample that has not finished the stage before it is left alone, not advanced.">
+          <option value="">Force: no</option>
+          <option value="align" {% if submission.force == "align" %}selected{% endif %}>Force alignment</option>
+          <option value="post-align" {% if submission.force == "post-align" %}selected{% endif %}>Force post-alignment</option>
+        </select>
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" name="batch_processing" id="batch-processing"
+                 {% if submission.batch_processing %}checked{% endif %}>
+          <label class="form-check-label" for="batch-processing">Address by FASTQ name (RTX/RFX)</label>
+        </div>
+
+        <button class="btn btn-sm btn-outline-secondary" type="submit" formaction="{% url 'web_ui:cart-remove' %}">
+          Remove selected
+        </button>
+        <button class="btn btn-sm btn-outline-danger" type="submit" formaction="{% url 'web_ui:cart-clear' %}">
+          Empty cart
+        </button>
       </div>
 
-      <button class="btn btn-sm btn-outline-secondary" type="submit" formaction="{% url 'web_ui:cart-remove' %}">
-        Remove selected
-      </button>
-      <button class="btn btn-sm btn-outline-danger" type="submit" formaction="{% url 'web_ui:cart-clear' %}">
-        Empty cart
-      </button>
+      <div class="checkout-pager ms-auto">
+        {% include "partials/table_pager.html" with page=cart_page page_size=cart_page_size page_param=checkout_page_param page_size_param=checkout_page_size_param pager_label="Checkout sample pages" %}
+      </div>
 
-      <button class="btn btn-primary ms-auto" type="submit" id="submit-selected"
+      <button class="btn btn-primary" type="submit" id="submit-selected"
               {% if not config %}disabled title="Upload and activate a config first"{% endif %}>
         Review Submission <i class="bi bi-arrow-right" aria-hidden="true"></i>
       </button>
@@ -158,8 +173,8 @@
 </form>
 
 {% if plan %}
-  {% include "_submit_modal.html" %}
-  {% include "_final_modal.html" %}
+  {% include "partials/submission_review_modal.html" %}
+  {% include "partials/submission_confirmation_modal.html" %}
 {% endif %}
 {% endblock %}
 
@@ -167,11 +182,93 @@
 <script>
   const checkoutForm = document.getElementById("checkout-form");
   const selectAllCart = document.getElementById("select-all-cart");
-  if (selectAllCart) {
-    selectAllCart.addEventListener("change", (e) => {
-      document.querySelectorAll(".select-cart-sample").forEach((b) => { b.checked = e.target.checked; });
+  const selectedNames = document.getElementById("checkout-selected-names");
+
+  function excludedNamesFromUrl() {
+    return new Set(new URL(window.location.href).searchParams.getAll("exclude_fastq_names"));
+  }
+
+  function writeExcludedNamesToUrl(excludedNames) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("exclude_fastq_names");
+    [...excludedNames].sort().forEach((name) => url.searchParams.append("exclude_fastq_names", name));
+    window.history.replaceState(null, "", url);
+  }
+
+  function preserveExcludedNames(url) {
+    const excludedNames = excludedNamesFromUrl();
+    url.searchParams.delete("exclude_fastq_names");
+    [...excludedNames].sort().forEach((name) => url.searchParams.append("exclude_fastq_names", name));
+    return url;
+  }
+
+  function setHiddenSelection(name, selected) {
+    const input = [...(selectedNames?.querySelectorAll("[data-selected-fastq]") || [])]
+      .find((candidate) => candidate.value === name);
+    if (selected && !input) {
+      const hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.name = "fastq_names";
+      hidden.value = name;
+      hidden.dataset.selectedFastq = "";
+      selectedNames.append(hidden);
+    } else if (!selected && input) {
+      input.remove();
+    }
+  }
+
+  function updatePaginationLinks() {
+    document.querySelectorAll(".checkout-pager a").forEach((link) => {
+      link.href = preserveExcludedNames(new URL(link.href, window.location.href));
     });
   }
+
+  function updateSelectAllState() {
+    const boxes = [...document.querySelectorAll(".select-cart-sample")];
+    const selectedCount = boxes.filter((box) => box.checked).length;
+    if (selectAllCart) {
+      selectAllCart.checked = boxes.length > 0 && selectedCount === boxes.length;
+      selectAllCart.indeterminate = selectedCount > 0 && selectedCount < boxes.length;
+    }
+  }
+
+  document.querySelectorAll(".select-cart-sample").forEach((box) => {
+    box.addEventListener("change", () => {
+      const excludedNames = excludedNamesFromUrl();
+      if (box.checked) {
+        excludedNames.delete(box.value);
+      } else {
+        excludedNames.add(box.value);
+      }
+      writeExcludedNamesToUrl(excludedNames);
+      setHiddenSelection(box.value, box.checked);
+      updateSelectAllState();
+      updatePaginationLinks();
+    });
+  });
+
+  selectAllCart?.addEventListener("change", () => {
+    const excludedNames = excludedNamesFromUrl();
+    document.querySelectorAll(".select-cart-sample").forEach((box) => {
+      box.checked = selectAllCart.checked;
+      setHiddenSelection(box.value, box.checked);
+      if (box.checked) {
+        excludedNames.delete(box.value);
+      } else {
+        excludedNames.add(box.value);
+      }
+    });
+    writeExcludedNamesToUrl(excludedNames);
+    updateSelectAllState();
+    updatePaginationLinks();
+  });
+
+  document.querySelector(".checkout-pager select")?.addEventListener("change", (event) => {
+    window.location.assign(preserveExcludedNames(new URL(event.target.value, window.location.href)));
+  });
+
+  updateSelectAllState();
+  updatePaginationLinks();
 
   // Remember what each menu started on, so Reset has something to go back to.
   document.querySelectorAll("select[name^='override__']").forEach((menu) => {

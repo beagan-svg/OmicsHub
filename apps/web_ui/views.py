@@ -136,10 +136,6 @@ def data_locations(request):
     scope = Sample.objects.all()
     if prefix in BatchPrefix.values:
         scope = scope.filter(batch_prefix=prefix)
-    status_synced_at = (
-        cache.get(sync.LAST_STATUS_SWEEP_KEY) or StageStatus.objects.aggregate(at=Max("synced_at"))["at"]
-    )
-    status_period = settings.CELERY_BEAT_SCHEDULE["sync-stage-statuses"]["schedule"]
     return render(
         request,
         "data_locations.html",
@@ -172,9 +168,7 @@ def data_locations(request):
             "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.get(field))
             + sum(1 for row in stage_filters if row["selected"])
             + bool(request.GET.getlist("study")),
-            "status_synced_at": status_synced_at,
-            "status_refresh": _humanised_seconds(status_period),
-            "status_stale": _is_stale(status_synced_at, status_period * 3),
+            **_status_sync_context(),
         },
     )
 
@@ -665,7 +659,7 @@ def submit_review(request):
     if context is None:
         return redirect("web_ui:checkout")
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return render(request, "_submit_modal.html", context)
+        return render(request, "partials/submission_review_modal.html", context)
     return render(request, "checkout.html", {**context, "open_modal": "submit"})
 
 
@@ -899,6 +893,7 @@ def job_monitor(request):
             "post_align": sum(1 for row in monitor_running if row.stage == Stage.POST_ALIGN),
             "total": len(monitor_running),
         },
+        **_status_sync_context(),
         # The queue is this app's own, so these two stay scoped to the reader.
         **_owned(request).aggregate(
             queued=Count("pk", filter=Q(status__in=QUEUED_STATUSES)),
@@ -1108,6 +1103,19 @@ def _filtered_samples(request):
     return queryset
 
 
+def _status_sync_context():
+    """Return the shared stage-status freshness values for dashboard headers."""
+    status_synced_at = (
+        cache.get(sync.LAST_STATUS_SWEEP_KEY) or StageStatus.objects.aggregate(at=Max("synced_at"))["at"]
+    )
+    status_period = settings.CELERY_BEAT_SCHEDULE["sync-stage-statuses"]["schedule"]
+    return {
+        "status_synced_at": status_synced_at,
+        "status_refresh": _humanised_seconds(status_period),
+        "status_stale": _is_stale(status_synced_at, status_period * 3),
+    }
+
+
 def _dashboard_context(request):
     queryset = _sorted(_filtered_samples(request), request)
     stage_filters = [
@@ -1115,14 +1123,6 @@ def _dashboard_context(request):
     ]
 
     metadata_synced_at = Sample.objects.aggregate(at=Max("synced_at"))["at"]
-    # When the sweep last *looked*, not when a row last changed: the sweep only writes rows
-    # OCS actually moved, so Max(synced_at) stops advancing over a quiet pipeline and would
-    # report healthy data as hours stale. The rows' own timestamps are the fallback for a
-    # flushed cache, and read older than the truth rather than newer.
-    status_synced_at = (
-        cache.get(sync.LAST_STATUS_SWEEP_KEY) or StageStatus.objects.aggregate(at=Max("synced_at"))["at"]
-    )
-    status_period = settings.CELERY_BEAT_SCHEDULE["sync-stage-statuses"]["schedule"]
 
     # The tab, and only the tab. The advanced-filter menus are built from this rather than
     # the whole mirror so they offer values that can actually return rows, and rather than
@@ -1160,7 +1160,7 @@ def _dashboard_context(request):
         # How often the two sweeps run, for the freshness clock tooltip. Otherwise
         # "3 minutes old" gives no way to tell stale from simply not-due-yet.
         "metadata_refresh": "nightly at 03:00",
-        "status_refresh": _humanised_seconds(status_period),
+        **_status_sync_context(),
         "batch_prefixes": _prefix_counts(),
         "selected_prefix": request.GET.get("batch_prefix", ""),
         "studies": _study_options(),
@@ -1186,12 +1186,6 @@ def _dashboard_context(request):
         + sum(1 for row in stage_filters if row["selected"]),
         # Shown in the header so nobody has to guess how current the table is.
         "metadata_synced_at": metadata_synced_at,
-        "status_synced_at": status_synced_at,
-        # A clock that only says "4 hours old" leaves the reader to work out whether that is
-        # normal. This says whether it is: stale means the sweep has missed several turns,
-        # which in practice means the beat scheduler or the worker is not running. The
-        # thing a staleness indicator should actually be able to tell you.
-        "status_stale": _is_stale(status_synced_at, status_period * 3),
     }
 
 
@@ -1387,10 +1381,28 @@ def _selected_config(request):
 def _checkout_context(request):
     """Build the cart page with staged samples and the selected manifest."""
     items = list(_cart_items(request))
+    excluded_fastq_names = set(request.GET.getlist("exclude_fastq_names"))
+    posted_fastq_names = set(request.POST.getlist("fastq_names"))
+    if posted_fastq_names:
+        excluded_fastq_names = {
+            item.sample.fastq_name for item in items if item.sample.fastq_name not in posted_fastq_names
+        }
+    page_size = _page_size(request, "checkout_page_size")
+    page = Paginator(items, page_size).get_page(request.GET.get("checkout_page"))
+    selected_fastq_names = [
+        item.sample.fastq_name for item in items if item.sample.fastq_name not in excluded_fastq_names
+    ]
     config = _selected_config(request)
 
     return {
-        "cart_items": items,
+        "cart_items": list(page.object_list),
+        "cart_page": page,
+        "cart_page_size": page_size,
+        "checkout_excluded_fastq_names": excluded_fastq_names,
+        "checkout_selected_fastq_names": selected_fastq_names,
+        "checkout_page_param": "checkout_page",
+        "checkout_page_size_param": "checkout_page_size",
+        "page_size_options": PAGE_SIZE_OPTIONS,
         # Fixed, not the user's dashboard choice. See columns.CHECKOUT_COLUMNS.
         "columns": columns.CHECKOUT_COLUMN_LIST,
         "config": config,

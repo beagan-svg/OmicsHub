@@ -35,19 +35,22 @@
         </div>
       </div>
     </div>
-    <form method="post" action="{% url 'web_ui:refresh-status' %}">
-      {% csrf_token %}
-      <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      {% for row in running %}
-      <input type="hidden" name="fastq_names" value="{{ row.sample.fastq_name }}">
-      {% endfor %}
-      <button class="btn btn-sm btn-outline-secondary btn-icon" type="submit"
-              aria-label="Sync running jobs from AWS" title="Sync running jobs from AWS"
-              data-bs-toggle="tooltip" data-bs-placement="top">
-        <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
-        <span class="visually-hidden">Sync running jobs from AWS</span>
-      </button>
-    </form>
+    <div class="d-flex align-items-center gap-2">
+      {% include "partials/sync_status.html" %}
+      <form method="post" action="{% url 'web_ui:refresh-status' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        {% for row in running %}
+        <input type="hidden" name="fastq_names" value="{{ row.sample.fastq_name }}">
+        {% endfor %}
+        <button class="btn btn-sm btn-outline-secondary btn-icon" type="submit"
+                aria-label="Sync running jobs from AWS" title="Sync running jobs from AWS"
+                data-bs-toggle="tooltip" data-bs-placement="top">
+          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+          <span class="visually-hidden">Sync running jobs from AWS</span>
+        </button>
+      </form>
+    </div>
   </div>
   <div class="table-responsive table-scroll">
     <table class="table align-middle mb-0">
@@ -65,18 +68,18 @@
           <td class="mono">{{ row.sample.fastq_name }}</td>
           <td><span class="tag">{{ row.stage }}</span></td>
           <td><span class="tag tag--accent">{{ row.sample.modality }}</span></td>
-          <td>{% include "_state.html" with status=row.status %}</td>
+          <td>{% include "partials/status_badge.html" with status=row.status %}</td>
           <td class="mono">
-            {% include "_copy_id.html" with value=row.demand_id label="Demand ID" %}
+            {% include "partials/copy_value.html" with value=row.demand_id label="Demand ID" %}
           </td>
           <td class="text-secondary monitor-duration"
               data-started-at="{{ row.started_at|date:'c' }}"
               data-duration>{{ row.duration_display|default:"—" }}</td>
-          <td>{% include "_source.html" with queued_here=row.queued_here %}</td>
+          <td>{% include "partials/submission_source_badge.html" with queued_here=row.queued_here %}</td>
         </tr>
         {% empty %}
         <tr><td colspan="7">
-          {% include "_empty.html" with icon="activity" title="Nothing is running." hint="Stages appear here while OCS is working on them, whoever submitted them." %}
+          {% include "partials/empty_state.html" with icon="activity" title="Nothing is running." hint="Stages appear here while OCS is working on them, whoever submitted them." %}
         </td></tr>
         {% endfor %}
       </tbody>
@@ -85,7 +88,7 @@
   <div class="card-body is-toolbar dashboard-footer">
     <span class="text-secondary">Showing the most recent {{ row_limit }} running stages.</span>
     <div class="dashboard-footer__pager">
-      {% include "_sample_pager.html" with page=running_page page_size=running_page_size page_param="running_page" page_size_param="running_page_size" pager_label="Running job pages" %}
+      {% include "partials/table_pager.html" with page=running_page page_size=running_page_size page_param="running_page" page_size_param="running_page_size" pager_label="Running job pages" %}
     </div>
   </div>
 </div>
@@ -93,19 +96,22 @@
 <div class="card">
   <div class="card-header monitor-table-header">
     <span><i class="bi bi-check2-all" aria-hidden="true"></i> Recently finished</span>
-    <form method="post" action="{% url 'web_ui:refresh-status' %}">
-      {% csrf_token %}
-      <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      {% for row in finished %}
-      <input type="hidden" name="fastq_names" value="{{ row.sample.fastq_name }}">
-      {% endfor %}
-      <button class="btn btn-sm btn-outline-secondary btn-icon" type="submit"
-              aria-label="Sync finished jobs from AWS" title="Sync finished jobs from AWS"
-              data-bs-toggle="tooltip" data-bs-placement="top">
-        <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
-        <span class="visually-hidden">Sync finished jobs from AWS</span>
-      </button>
-    </form>
+    <div class="d-flex align-items-center gap-2">
+      {% include "partials/sync_status.html" %}
+      <form method="post" action="{% url 'web_ui:refresh-status' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        {% for row in finished %}
+        <input type="hidden" name="fastq_names" value="{{ row.sample.fastq_name }}">
+        {% endfor %}
+        <button class="btn btn-sm btn-outline-secondary btn-icon" type="submit"
+                aria-label="Sync finished jobs from AWS" title="Sync finished jobs from AWS"
+                data-bs-toggle="tooltip" data-bs-placement="top">
+          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+          <span class="visually-hidden">Sync finished jobs from AWS</span>
+        </button>
+      </form>
+    </div>
   </div>
   <div class="table-responsive table-scroll">
     <table class="table align-middle mb-0">
@@ -126,17 +132,17 @@
           <td class="mono">{{ row.sample.fastq_name }}</td>
           <td><span class="tag">{{ row.stage }}</span></td>
           <td><span class="tag tag--accent">{{ row.sample.modality }}</span></td>
-          <td>{% include "_state.html" with status=row.status %}</td>
+          <td>{% include "partials/status_badge.html" with status=row.status %}</td>
           <td class="mono">
-            {% include "_copy_id.html" with value=row.demand_id label="Demand ID" %}
+            {% include "partials/copy_value.html" with value=row.demand_id label="Demand ID" %}
           </td>
           <td class="text-secondary">{{ row.duration_display|default:"—" }}</td>
           <td class="text-secondary">{{ row.last_update_time|date:"Y-m-d H:i"|default:"—" }}</td>
-          <td>{% include "_source.html" with queued_here=row.queued_here %}</td>
+          <td>{% include "partials/submission_source_badge.html" with queued_here=row.queued_here %}</td>
         </tr>
         {% empty %}
         <tr><td colspan="8">
-          {% include "_empty.html" with icon="check2-all" title="OCS has not finished anything yet." %}
+          {% include "partials/empty_state.html" with icon="check2-all" title="OCS has not finished anything yet." %}
         </td></tr>
         {% endfor %}
       </tbody>
@@ -145,7 +151,7 @@
   <div class="card-body is-toolbar dashboard-footer">
     <span class="text-secondary">Showing the most recent {{ row_limit }} finished stages.</span>
     <div class="dashboard-footer__pager">
-      {% include "_sample_pager.html" with page=finished_page page_size=finished_page_size page_param="finished_page" page_size_param="finished_page_size" pager_label="Finished job pages" %}
+      {% include "partials/table_pager.html" with page=finished_page page_size=finished_page_size page_param="finished_page" page_size_param="finished_page_size" pager_label="Finished job pages" %}
     </div>
   </div>
 </div>

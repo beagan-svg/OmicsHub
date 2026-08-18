@@ -7,9 +7,9 @@ apart on how a value is rendered. Expects `sample` and `column`.
 <td class="col--{{ column.kind }}{% if column.kind == 'mono' or column.kind == 'copy' %} mono{% endif %}"
     {% if column.kind == "status" %}data-live-stage-status="{{ sample.fastq_name }}|{{ column.key|slice:'7:' }}"{% endif %}>
   {% if column.kind == "status" %}
-    {% include "_state.html" with status=value %}
+    {% include "partials/status_badge.html" with status=value %}
   {% elif column.kind == "copy" %}
-    {% include "_copy_id.html" with value=value label=column.label %}
+    {% include "partials/copy_value.html" with value=value label=column.label %}
   {% elif value and column.kind != "mono" %}
     {% comment %}
     Free text truncates rather than pushing the identifier columns out of the panel. The

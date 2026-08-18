@@ -28,17 +28,13 @@
       {% endfor %}
     </div>
 
-      <span class="ms-auto d-flex align-items-center gap-2">
-      <span class="state" data-state="{% if status_stale %}warn{% else %}done{% endif %}"
-            title="Stage status last synced {{ status_synced_at|timesince|default:'never' }} ago, and refreshes {{ status_refresh }}."
-            tabindex="0" data-bs-toggle="tooltip" data-bs-placement="left">
-        {% if status_stale %}Stale · {{ status_synced_at|since_short }}{% else %}Sync {{ status_synced_at|since_short }}{% endif %}
-      </span>
-        <button class="btn btn-sm btn-outline-secondary" type="submit" form="refresh-locations-form"
+    <span class="ms-auto d-flex align-items-center gap-2">
+      {% include "partials/sync_status.html" %}
+      <button class="btn btn-sm btn-outline-secondary" type="submit" form="refresh-locations-form"
               data-bs-toggle="tooltip" title="Re-read this page's rows from OCS now">
-          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh
-        </button>
-      </span>
+        <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh
+      </button>
+    </span>
   </div>
 
   <div class="card-body is-toolbar">
@@ -50,7 +46,7 @@
                data-submit-on-enter data-submit-form="locations-filter-form">
       </div>
       <div class="col-auto">
-        {% include "_study_filter.html" with filter_form_id="locations-filter-form" %}
+        {% include "partials/study_set_filter.html" with filter_form_id="locations-filter-form" %}
       </div>
       <div class="col-auto">
         <label class="visually-hidden" for="locations-stage-filter">Stage</label>
@@ -74,7 +70,7 @@
         <button class="btn btn-sm btn-primary" type="submit" form="locations-filter-form">Apply filters</button>
       </div>
       <div class="col-auto ms-auto">
-        {% include "_column_menu.html" with form_id="location-columns-form" %}
+        {% include "partials/column_menu.html" with form_id="location-columns-form" %}
       </div>
       <div class="col-auto">
         <button class="btn btn-sm btn-outline-secondary" type="submit" form="locations-export-form"
@@ -85,7 +81,7 @@
     </form>
 
     {% url 'web_ui:data-locations' as data_locations_url %}
-    {% include "_sample_advanced_filters.html" with filter_form_id="locations-filter-form" disclosure_id="locations-advanced-filters" id_prefix="locations-" reset_url=data_locations_url %}
+    {% include "partials/sample_advanced_filters.html" with filter_form_id="locations-filter-form" disclosure_id="locations-advanced-filters" id_prefix="locations-" reset_url=data_locations_url %}
   </div>
 
   <div class="table-responsive table-scroll">
@@ -117,12 +113,12 @@
           {% if column.key == "stage" %}
           <td><span class="stage-chip">{{ row.stage.label }}</span></td>
           {% elif column.key == "status" %}
-          <td data-live-stage-status="{{ row.fastq_name }}|{{ row.stage.value }}">{% include "_state.html" with status=row.status %}</td>
+          <td data-live-stage-status="{{ row.fastq_name }}|{{ row.stage.value }}">{% include "partials/status_badge.html" with status=row.status %}</td>
           {% else %}
           {% with value=row.column_values|mapping_value:column.key %}
           <td class="{% if column.kind == 'mono' or column.kind == 'copy' %}font-monospace{% endif %}">
             {% if column.kind == "copy" and value %}
-              {% include "_copy_id.html" with value=value label=column.label %}
+              {% include "partials/copy_value.html" with value=value label=column.label %}
             {% elif column.kind == "list" %}
               {{ value|join:", "|default:"—" }}
             {% elif value %}
@@ -135,7 +131,7 @@
           <td class="location-uri">
             {% if row.s3_uri %}
               <span class="font-monospace" title="{{ row.s3_uri }}">{{ row.s3_uri }}</span>
-              {% include "_copy_id.html" with value=row.s3_uri label="S3 location" %}
+              {% include "partials/copy_value.html" with value=row.s3_uri label="S3 location" %}
             {% elif row.file_store_id %}
               <span class="text-muted">File-store record has no S3 location</span>
             {% else %}
@@ -167,7 +163,7 @@
   <div class="card-body is-toolbar d-flex flex-wrap gap-2 align-items-center">
     <button class="btn btn-sm btn-outline-secondary" type="button" id="clear-location-selection">Clear selection</button>
     <span class="text-secondary"><span id="location-selection-count">0</span> selected</span>
-    {% include "_sample_pager.html" with pager_label="Data location pages" %}
+    {% include "partials/table_pager.html" with pager_label="Data location pages" %}
   </div>
   {% endif %}
 </div>

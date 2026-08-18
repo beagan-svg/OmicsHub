@@ -46,7 +46,7 @@
           <td class="mono">{{ entry.sample.fastq_name }}</td>
           <td><span class="tag">{{ entry.stage }}</span></td>
           <td><span class="tag tag--accent">{{ entry.modality }}</span></td>
-          <td>{% include "_state.html" with status=entry.status %}</td>
+          <td>{% include "partials/status_badge.html" with status=entry.status %}</td>
           <td class="command">{{ entry.command }}</td>
           <td class="text-secondary">{{ entry.error_message|default:"—" }}</td>
           <td class="text-secondary">{{ entry.created_at|date:"Y-m-d H:i" }}</td>
@@ -74,7 +74,7 @@
         </tr>
         {% empty %}
         <tr><td colspan="8">
-          {% include "_empty.html" with icon="check2-circle" title="No failures." hint="Everything submitted so far either finished or is still running." %}
+          {% include "partials/empty_state.html" with icon="check2-circle" title="No failures." hint="Everything submitted so far either finished or is still running." %}
         </td></tr>
         {% endfor %}
       </tbody>
@@ -104,8 +104,8 @@
           <td class="mono">{{ entry.sample.fastq_name }}</td>
           <td><span class="tag">{{ entry.stage }}</span></td>
           <td><span class="tag tag--accent">{{ entry.modality }}</span></td>
-          <td>{% include "_state.html" with status=entry.status %}</td>
-          <td>{% include "_copy_id.html" with value=entry.demand_id label="Demand ID" %}</td>
+          <td>{% include "partials/status_badge.html" with status=entry.status %}</td>
+          <td>{% include "partials/copy_value.html" with value=entry.demand_id label="Demand ID" %}</td>
           <td class="text-secondary">{{ entry.error_message|default:"—" }}</td>
           <td class="text-secondary">{{ entry.submitted_at|date:"Y-m-d H:i" }}</td>
           <td class="text-end text-nowrap">
@@ -127,7 +127,7 @@
         </tr>
         {% empty %}
         <tr><td colspan="8">
-          {% include "_empty.html" with icon="check2-circle" title="No running job failures." hint="OmicsHub submissions accepted by OCS have not failed." %}
+          {% include "partials/empty_state.html" with icon="check2-circle" title="No running job failures." hint="OmicsHub submissions accepted by OCS have not failed." %}
         </td></tr>
         {% endfor %}
       </tbody>

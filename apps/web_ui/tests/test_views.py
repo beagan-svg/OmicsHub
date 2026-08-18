@@ -516,7 +516,7 @@ class TestSubmitReview:
         )
 
         assert response.status_code == 200
-        assert response.templates[0].name == "_submit_modal.html"
+        assert response.templates[0].name == "partials/submission_review_modal.html"
         assert b'id="submit-modal"' in response.content
         assert b'id="checkout-form"' not in response.content
 
@@ -950,13 +950,13 @@ class TestJobMonitor:
     def test_the_row_count_does_not_grow_with_the_number_of_jobs(
         self, logged_in, make_sample, django_assert_num_queries
     ):
-        """Use one query for each monitor table plus the navigation failure badge."""
+        """Use bounded queries for the monitor tables, freshness label, and failure badge."""
         for index in range(6):
             sample = make_sample(f"MANY-{index}")
             sample.stage_statuses.create(stage=Stage.ALIGN, status="IN_PROGRESS", demand_id=f"demand-{index}")
         logged_in.get(reverse("web_ui:job-monitor"))
 
-        with django_assert_num_queries(7):
+        with django_assert_num_queries(8):
             logged_in.get(reverse("web_ui:job-monitor"))
 
 

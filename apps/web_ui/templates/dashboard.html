@@ -57,11 +57,7 @@
       </div>
 
       <span class="ms-auto d-flex align-items-center gap-2">
-        <span class="state" data-state="{% if status_stale %}warn{% else %}done{% endif %}"
-              tabindex="0" data-bs-toggle="tooltip" data-bs-placement="left"
-              title="Stage status last synced {{ status_synced_at|timesince|default:'never' }} ago, and refreshes {{ status_refresh }}. Sample metadata last synced {{ metadata_synced_at|timesince|default:'never' }} ago, and refreshes {{ metadata_refresh }}.{% if status_stale %} This is well past its schedule. The sync worker may not be running.{% endif %}">
-          {% if status_stale %}Stale · {{ status_synced_at|since_short }}{% else %}Sync {{ status_synced_at|since_short }}{% endif %}
-        </span>
+        {% include "partials/sync_status.html" with include_metadata=True %}
         <button class="btn btn-sm btn-outline-secondary" type="submit" form="refresh-status-form"
                 data-bs-toggle="tooltip" title="Re-read this page's rows from OCS now">
           <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh
@@ -79,7 +75,7 @@
                  data-submit-on-enter data-submit-form="filter-form">
         </div>
         <div class="col-auto">
-          {% include "_study_filter.html" with filter_form_id="filter-form" %}
+          {% include "partials/study_set_filter.html" with filter_form_id="filter-form" %}
         </div>
         {% if selected_prefix %}
         <input type="hidden" name="batch_prefix" value="{{ selected_prefix }}" form="filter-form">
@@ -110,7 +106,7 @@
         </div>
 
         <div class="col-auto ms-auto">
-          {% include "_column_menu.html" %}
+          {% include "partials/column_menu.html" %}
         </div>
         <div class="col-auto">
           <button class="btn btn-sm btn-outline-secondary" type="submit"
@@ -123,7 +119,7 @@
       </div>
 
       {% url 'web_ui:dashboard' as dashboard_url %}
-      {% include "_sample_advanced_filters.html" with filter_form_id="filter-form" disclosure_id="advanced-filters" id_prefix="" reset_url=dashboard_url %}
+      {% include "partials/sample_advanced_filters.html" with filter_form_id="filter-form" disclosure_id="advanced-filters" id_prefix="" reset_url=dashboard_url %}
     </div>
 
     {% comment %}
@@ -193,7 +189,7 @@
             <td><input type="checkbox" class="form-check-input select-sample" name="fastq_names"
                        value="{{ sample.fastq_name }}"
                        aria-label="Select {{ sample.fastq_name }}"></td>
-            {% for column in columns %}{% include "_cell.html" %}{% endfor %}
+            {% for column in columns %}{% include "partials/sample_table_cell.html" %}{% endfor %}
           </tr>
           {% empty %}
           {% comment %}
@@ -203,7 +199,7 @@
           {% endcomment %}
           {% url 'web_ui:dashboard' as clear_url %}
           <tr><td colspan="{{ columns|length|add:1 }}">
-            {% include "_empty.html" with icon="search" title="No samples match these filters." hint="Widen a filter, or sync the batch you are looking for." action_url=clear_url action_label="Clear filters" %}
+            {% include "partials/empty_state.html" with icon="search" title="No samples match these filters." hint="Widen a filter, or sync the batch you are looking for." action_url=clear_url action_label="Clear filters" %}
           </td></tr>
           {% endfor %}
         </tbody>
@@ -243,7 +239,7 @@
       {% endcomment %}
       <span class="text-secondary" id="cart-feedback" aria-live="polite"></span>
       <div class="dashboard-footer__pager">
-        {% include "_sample_pager.html" with pager_label="Sample pages" %}
+        {% include "partials/table_pager.html" with pager_label="Sample pages" %}
       </div>
     </div>
     {% endif %}
@@ -270,8 +266,8 @@ returns them to it.
 </form>
 
 {% if plan %}
-  {% include "_submit_modal.html" %}
-  {% include "_final_modal.html" %}
+  {% include "partials/submission_review_modal.html" %}
+  {% include "partials/submission_confirmation_modal.html" %}
 {% endif %}
 {% endblock %}
 

@@ -57,7 +57,7 @@ def test_job_monitor_refreshes_tables_without_reloading_document():
     assert "Sync monitor data from AWS" not in text
     assert 'aria-label="Sync running jobs from AWS"' in tables
     assert 'aria-label="Sync finished jobs from AWS"' in tables
-    assert tables.count('data-bs-toggle="tooltip"') == 2
+    assert tables.count('include "partials/sync_status.html"') == 2
     assert tables.count('data-bs-placement="top"') == 2
     assert "initTooltips();" in text
     assert "setInterval(updateDurations, 1000)" in text
@@ -76,7 +76,7 @@ def test_job_monitor_has_a_running_stage_filter():
 def test_pages_poll_database_without_replacing_sample_interactions():
     dashboard = (TEMPLATES / "dashboard.html").read_text()
     locations = (TEMPLATES / "data_locations.html").read_text()
-    cell = (TEMPLATES / "_cell.html").read_text()
+    cell = (TEMPLATES / "partials/sample_table_cell.html").read_text()
     queue = (TEMPLATES / "queue.html").read_text()
     failures = (TEMPLATES / "failed_jobs.html").read_text()
     base = (TEMPLATES / "base.html").read_text()
@@ -97,7 +97,7 @@ def test_pages_poll_database_without_replacing_sample_interactions():
 
 def test_job_monitor_demand_ids_are_copyable():
     text = (TEMPLATES / "partials/job_monitor_tables.html").read_text()
-    assert '{% include "_copy_id.html" with value=row.demand_id label="Demand ID" %}' in text
+    assert '{% include "partials/copy_value.html" with value=row.demand_id label="Demand ID" %}' in text
     assert "data-copy-demand-id" not in text
     assert "navigator.clipboard.writeText" not in text
     assert ">Duration<" in text
@@ -255,7 +255,7 @@ def test_shell_icons_are_hidden_and_toggles_expose_their_state():
     assert filters, "no advanced-filters toggle"
     assert "aria-expanded=" in filters.group()
 
-    menu = (TEMPLATES / "_column_menu.html").read_text()
+    menu = (TEMPLATES / "partials/column_menu.html").read_text()
     dropdown = re.search(r'<button[^>]*data-bs-toggle="dropdown"[^>]*>', menu)
     assert dropdown, "no column-menu dropdown toggle"
     for attribute in ('data-bs-auto-close="outside"', 'aria-expanded="false"'):

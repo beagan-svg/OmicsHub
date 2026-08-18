@@ -80,7 +80,7 @@
               <code>{{ entry.command }}</code>
             </details>
           </td>
-          <td>{% include "_state.html" with status=entry.status %}</td>
+          <td>{% include "partials/status_badge.html" with status=entry.status %}</td>
           <td class="text-secondary">{{ entry.created_at|date:"Y-m-d H:i" }}</td>
           <td class="text-end">
             {% if entry.status == "PENDING" %}
@@ -95,7 +95,7 @@
         {% empty %}
         {% url 'web_ui:dashboard' as samples_url %}
         <tr><td colspan="{% if user.is_staff %}8{% else %}7{% endif %}">
-          {% include "_empty.html" with icon="list-ol" title="The queue is empty." hint="Pick samples and add them to your cart, then submit from checkout." action_url=samples_url action_label="Go to samples" %}
+          {% include "partials/empty_state.html" with icon="list-ol" title="The queue is empty." hint="Pick samples and add them to your cart, then submit from checkout." action_url=samples_url action_label="Go to samples" %}
         </td></tr>
         {% endfor %}
       </tbody>
