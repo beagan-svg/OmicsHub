@@ -271,6 +271,16 @@ def test_more_filters_use_the_page_apply_button():
         assert text.count(">Apply filters<") == 1, name
 
 
+def test_advanced_filters_accept_multiple_values():
+    """Batch, organism, and library prep filters submit repeated values."""
+    text = (TEMPLATES / "partials/sample_advanced_filters.html").read_text()
+    assert text.count("partials/multi_value_filter.html") == 3
+    partial = (TEMPLATES / "partials/multi_value_filter.html").read_text()
+    assert "data-study-toggle" in partial
+    assert 'type="checkbox" name="{{ field_name }}"' in partial
+    assert "value in selected_values" in partial
+
+
 def test_dashboard_table_is_captioned_and_scoped(dashboard_html):
     """A wide table needs to name itself, and every `th` needs to say what it heads."""
     assert re.search(r'<caption class="visually-hidden">', dashboard_html)

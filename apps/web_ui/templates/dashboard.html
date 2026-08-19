@@ -277,17 +277,20 @@ returns them to it.
   const boxes = () => document.querySelectorAll(".select-sample");
   const selectionCount = document.getElementById("sample-selection-count");
   const updateSelectionCount = () => {
+    if (!selectAll || !selectionCount) return;
     const count = [...boxes()].filter((box) => box.checked).length;
     selectionCount.textContent = `${count} sample${count === 1 ? "" : "s"} selected`;
     selectAll.checked = count > 0 && count === boxes().length;
     selectAll.indeterminate = count > 0 && count < boxes().length;
   };
-  selectAll.addEventListener("change", (e) => {
-    boxes().forEach((b) => { b.checked = e.target.checked; });
+  if (selectAll && selectionCount) {
+    selectAll.addEventListener("change", (e) => {
+      boxes().forEach((b) => { b.checked = e.target.checked; });
+      updateSelectionCount();
+    });
+    boxes().forEach((box) => box.addEventListener("change", updateSelectionCount));
     updateSelectionCount();
-  });
-  boxes().forEach((box) => box.addEventListener("change", updateSelectionCount));
-  updateSelectionCount();
+  }
 
   // --- adding to the cart ----------------------------------------------------------------
   // Adds without leaving the page, so the confirmation appears beside the button rather than

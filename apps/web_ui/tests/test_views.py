@@ -219,6 +219,38 @@ class TestDashboard:
         assert b"A-1" in response.content
         assert b"B-1" not in response.content
 
+    def test_multiple_advanced_filters_work_on_both_dashboards(self, logged_in, make_sample):
+        make_sample(
+            "A-1",
+            batch_name_from_vendor="MTX-1",
+            organism_common_name="mouse",
+            library_prep_method_name="Prep-1",
+        )
+        make_sample(
+            "B-1",
+            batch_name_from_vendor="RTX-2",
+            organism_common_name="human",
+            library_prep_method_name="Prep-2",
+        )
+        make_sample(
+            "C-1",
+            batch_name_from_vendor="RFX-3",
+            organism_common_name="rat",
+            library_prep_method_name="Prep-3",
+        )
+        filters = [
+            ("batch_name_from_vendor", "MTX-1"),
+            ("batch_name_from_vendor", "RTX-2"),
+            ("organism_common_name", "mouse"),
+            ("organism_common_name", "human"),
+            ("library_prep_method_name", "Prep-1"),
+            ("library_prep_method_name", "Prep-2"),
+        ]
+
+        for page_name in ("dashboard", "data-locations"):
+            response = logged_in.get(reverse(f"web_ui:{page_name}"), filters)
+            assert {sample.fastq_name for sample in response.context["page"].object_list} == {"A-1", "B-1"}
+
     def test_searches_fastq_load_and_vendor_batch_names(self, logged_in, make_sample):
         make_sample("FASTQ-1", load_name="LOAD-1", batch_name_from_vendor="MTX-22068")
         make_sample("FASTQ-2", load_name="LOAD-2", batch_name_from_vendor="RTX-34056")

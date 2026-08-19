@@ -296,6 +296,8 @@ class TestCheckoutPage:
 
         assert b"Config driving this submission" in response.content
         assert b"config.jsonc" in response.content
+        assert b"(active)" not in response.content
+        assert b"(uploaded " in response.content
 
 
 class TestConfigDrivesTheSubmission:

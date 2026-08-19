@@ -1,0 +1,34 @@
+<div class="col-md-4">
+  <label class="label d-block mb-1" for="{{ filter_id }}">{{ label }}</label>
+  <div class="dropdown">
+    <button id="{{ filter_id }}" class="btn btn-sm btn-outline-secondary dropdown-toggle filter-menu-toggle" type="button"
+            data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
+            data-study-toggle>
+      <span data-study-summary>{% if selected_values %}{{ selected_values|length }} selected{% else %}All{% endif %}</span>
+    </button>
+    <div class="dropdown-menu study-filter-menu" data-filter-label="{{ menu_title|lower }}">
+      <div class="study-filter__head">
+        <div>
+          <div class="study-filter__title">{{ menu_title }}</div>
+          <div class="small text-muted" data-study-menu-summary>
+            {% if selected_values %}{{ selected_values|length }} selected{% else %}All {{ menu_title|lower }}{% endif %}
+          </div>
+        </div>
+        <div class="study-filter__actions">
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-study-action>Select all</button>
+        </div>
+      </div>
+      <div class="study-filter__options">
+        {% for value in values %}
+        <label class="dropdown-item rounded d-flex align-items-center gap-2">
+          <input class="form-check-input mt-0 study-filter__option" type="checkbox" name="{{ field_name }}" value="{{ value }}"
+                 form="{{ filter_form_id }}" {% if value in selected_values %}checked{% endif %}>
+          <span>{{ value }}</span>
+        </label>
+        {% empty %}
+        <span class="dropdown-item-text text-muted">No {{ menu_title|lower }} available</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>

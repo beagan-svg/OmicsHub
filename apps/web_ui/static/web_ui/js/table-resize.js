@@ -33,7 +33,8 @@
 
     table.querySelectorAll("col").forEach((column) => {
       const key = column.dataset.columnKey;
-      const width = key && widths[key] ? widths[key] : initialWidths.get(column);
+      const savedWidth = key && widths[key];
+      const width = savedWidth ? Math.max(minimumWidth, savedWidth) : initialWidths.get(column);
       column.style.width = `${width}px`;
     });
     tableWidth = [...table.querySelectorAll("col")].reduce(
@@ -51,8 +52,6 @@
       const key = header.dataset.columnKey;
       const column = columns.get(key);
       if (!column) return;
-
-      if (widths[key]) column.style.width = `${widths[key]}px`;
 
       const handle = document.createElement("button");
       handle.type = "button";

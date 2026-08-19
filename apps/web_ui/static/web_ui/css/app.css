@@ -1066,6 +1066,17 @@ main.container-fluid {
 .disclosure[data-open="true"] .disclosure__inner {
   opacity: 1;
   transform: none;
+  overflow: visible;
+}
+
+.disclosure[data-open="true"] {
+  position: relative;
+  z-index: 4;
+}
+
+.disclosure[data-open="true"] .dropdown {
+  position: relative;
+  z-index: 5;
 }
 
 
@@ -1154,6 +1165,29 @@ a:focus-visible {
   min-height: 36px;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.filter-menu-toggle {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+  width: 100%;
+}
+
+.btn-outline-secondary.filter-menu-toggle.show,
+.btn-outline-secondary.filter-menu-toggle:active {
+  background: var(--panel);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.stage-filter-select {
+  border-color: var(--line-strong);
+}
+
+.stage-filter-select::picker-icon {
+  color: var(--ink-tertiary);
 }
 
 
@@ -1679,6 +1713,14 @@ a:focus-visible {
   padding: 0 6px;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
+}
+
+.checkout-config-picker {
+  width: min(100%, 52rem);
+}
+
+.checkout-config-picker .form-select {
+  min-width: 0;
 }
 
 @media (pointer: coarse) {

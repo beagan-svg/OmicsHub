@@ -39,12 +39,11 @@
   <div class="card-body">
     <form method="get">
       <label class="form-label" for="config-picker">Config driving this submission</label>
-      <div class="d-flex gap-2" style="max-width: 32rem;">
+      <div class="d-flex gap-2 checkout-config-picker">
         <select class="form-select" id="config-picker" name="config_id">
           {% for option in configs %}
           <option value="{{ option.pk }}" {% if config and option.pk == config.pk %}selected{% endif %}>
-            {{ option.name }}{% if option.is_active %} (active){% endif %}
-            (uploaded {{ option.uploaded_at|date:"Y-m-d H:i" }})
+            {{ option.name }} (uploaded {{ option.uploaded_at|date:"j M Y" }})
           </option>
           {% endfor %}
         </select>

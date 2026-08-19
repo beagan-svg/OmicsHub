@@ -159,15 +159,15 @@ def data_locations(request):
             "selected_studies": request.GET.getlist("study"),
             "location_stages": columns.LOCATION_STAGES,
             "selected_location_stage": selected_location_stage,
-            "filters": {field: request.GET.get(field, "") for field in FILTER_FIELDS},
+            "filters": {field: request.GET.getlist(field) for field in FILTER_FIELDS},
             "stage_filters": stage_filters,
-            "batches": _batch_options(request.GET.get("batch_name_from_vendor", ""), scope),
+            "batches": _batch_options(request.GET.getlist("batch_name_from_vendor"), scope),
             "organisms": _scoped_distinct(scope, "organism_common_name"),
             "library_preps": _scoped_distinct(scope, "library_prep_method_name"),
             "statuses": [NOT_COMPLETED, *_scoped_statuses(scope)],
-            "filters_open": any(request.GET.get(field) for field in FILTER_FIELDS)
+            "filters_open": any(request.GET.getlist(field) for field in FILTER_FIELDS)
             or any(row["selected"] for row in stage_filters),
-            "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.get(field))
+            "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.getlist(field))
             + sum(1 for row in stage_filters if row["selected"])
             + bool(request.GET.getlist("study")),
             **_status_sync_context(),
@@ -1067,9 +1067,9 @@ def _filtered_samples(request):
     queryset = Sample.objects.prefetch_related("stage_statuses")
 
     for field in FILTER_FIELDS:
-        value = request.GET.get(field)
-        if value:
-            queryset = queryset.filter(**{field: value})
+        values = request.GET.getlist(field)
+        if values:
+            queryset = queryset.filter(**{f"{field}__in": values})
 
     search = request.GET.get("fastq_name")
     if search:
@@ -1153,7 +1153,7 @@ def _dashboard_context(request):
         "default_column_keys": columns.DEFAULT_COLUMNS,
         "visible_column_keys": request.user.visible_columns or columns.DEFAULT_COLUMNS,
         "search": request.GET.get("fastq_name") or "",
-        "filters": {field: request.GET.get(field, "") for field in FILTER_FIELDS},
+        "filters": {field: request.GET.getlist(field) for field in FILTER_FIELDS},
         "stage_filters": stage_filters,
         # Which column the table is ordered by, so the header can show the arrow.
         "sort": request.GET.get("sort") if request.GET.get("sort") in SORTABLE else DEFAULT_SORT,
@@ -1174,17 +1174,17 @@ def _dashboard_context(request):
         # Scoped to the selected tab. On the MTX tab the batch menu lists MTX batches and
         # nothing else. Offering RTX batches there produces a filter combination that can
         # only ever return an empty table.
-        "batches": _batch_options(request.GET.get("batch_name_from_vendor", ""), scope),
+        "batches": _batch_options(request.GET.getlist("batch_name_from_vendor"), scope),
         "organisms": _scoped_distinct(scope, "organism_common_name"),
         "library_preps": _scoped_distinct(scope, "library_prep_method_name"),
         "statuses": [NOT_COMPLETED, *_scoped_statuses(scope)],
-        "filters_open": any(request.GET.get(field) for field in FILTER_FIELDS)
+        "filters_open": any(request.GET.getlist(field) for field in FILTER_FIELDS)
         or any(row["selected"] for row in stage_filters),
         # How many advanced filters are narrowing the table. The panel that holds them is
         # collapsed by default, so without a count on its own button the only way to learn
         # that four of them are active is to open it and read six menus. Status belongs
         # where the control is, not one disclosure away from it.
-        "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.get(field))
+        "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.getlist(field))
         + sum(1 for row in stage_filters if row["selected"]),
         # Shown in the header so nobody has to guess how current the table is.
         "metadata_synced_at": metadata_synced_at,
@@ -1203,11 +1203,12 @@ def batch_sort_key(name: str) -> tuple[int, str]:
     return (int(digits) if digits else -1, name)
 
 
-def _batch_options(selected: str, scope) -> list[str]:
+def _batch_options(selected: Sequence[str], scope) -> list[str]:
     """Return vendor batches for the filter menu, newest first."""
     batches = _scoped_distinct(scope, "batch_name_from_vendor")
-    if selected and selected not in batches:
-        batches.append(selected)
+    for value in selected:
+        if value not in batches:
+            batches.append(value)
     return sorted(batches, key=batch_sort_key, reverse=True)
 
 
