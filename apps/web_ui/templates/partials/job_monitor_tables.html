@@ -27,7 +27,7 @@
       <div class="monitor-stage-filter" role="group" aria-label="Filter running jobs by stage">
         <div class="btn-group btn-group-sm btn-group--scrollable" role="group">
           {% for option in running_stage_options %}
-          <a class="btn {% if option.value == running_stage %}btn-secondary{% else %}btn-outline-secondary{% endif %}"
+          <a class="btn {% if option.value == running_stage %}active{% endif %}"
              href="{{ option.url }}" {% if option.value == running_stage %}aria-current="page"{% endif %}>
             {{ option.label }}
           </a>
