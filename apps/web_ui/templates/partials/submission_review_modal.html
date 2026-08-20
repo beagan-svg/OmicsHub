@@ -157,23 +157,25 @@
               <span><i class="bi bi-slash-circle" aria-hidden="true"></i> Not Being Submitted</span>
               <span class="count">{{ plan.reportable_skips|length }}</span>
             </div>
-            <table class="table table-sm mb-0" id="incomplete-samples-list">
-              <caption class="visually-hidden">
-                Staged samples that this submission will skip, and why.
-              </caption>
-              <thead>
-                <tr><th scope="col">Fastq Name</th><th scope="col">Reason</th><th scope="col">Detail</th></tr>
-              </thead>
-              <tbody>
-                {% for skip in plan.reportable_skips %}
-                <tr>
-                  <td class="mono">{{ skip.sample.fastq_name }}</td>
-                  <td><span class="tag">{{ skip.reason }}</span></td>
-                  <td class="text-secondary">{{ skip.detail }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+            <div class="table-responsive">
+              <table class="table table-sm mb-0" id="incomplete-samples-list">
+                <caption class="visually-hidden">
+                  Staged samples that this submission will skip, and why.
+                </caption>
+                <thead>
+                  <tr><th scope="col">Fastq Name</th><th scope="col">Reason</th><th scope="col">Detail</th></tr>
+                </thead>
+                <tbody>
+                  {% for skip in plan.reportable_skips %}
+                  <tr>
+                    <td class="mono">{{ skip.sample.fastq_name }}</td>
+                    <td><span class="tag">{{ skip.reason }}</span></td>
+                    <td class="text-secondary">{{ skip.detail }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </div>
           {% endif %}
 

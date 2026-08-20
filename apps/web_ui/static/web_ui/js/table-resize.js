@@ -26,23 +26,28 @@
     const lastColumn = [...columns.values()].at(-1);
     const minimumTableWidth = table.parentElement.clientWidth;
     const widths = readWidths(tableName);
-    const initialWidths = new Map(
-      [...table.querySelectorAll("col")].map((column) => [column, column.getBoundingClientRect().width]),
-    );
-    let tableWidth;
+    const cols = [...table.querySelectorAll("col")];
+    // A <col> generates no box of its own, so Safari measures every one of them as zero.
+    // The matching header cell lays out to the same width and is a real box in every
+    // engine, so the starting widths come from there.
+    const headerCells = [...table.querySelectorAll("thead tr:first-child th")];
 
-    table.querySelectorAll("col").forEach((column) => {
+    cols.forEach((column, index) => {
       const key = column.dataset.columnKey;
       const savedWidth = key && widths[key];
-      const width = savedWidth ? Math.max(minimumWidth, savedWidth) : initialWidths.get(column);
+      const width = savedWidth
+        ? Math.max(minimumWidth, savedWidth)
+        : headerCells[index].getBoundingClientRect().width;
       column.style.width = `${width}px`;
     });
-    tableWidth = [...table.querySelectorAll("col")].reduce(
-      (total, column) => total + Number.parseFloat(column.style.width),
-      0,
-    );
+
+    // From here every col carries an explicit width, and reading that back is the only way
+    // to size one that works on Safari too. Everything below measures through this.
+    const columnWidth = (column) => Number.parseFloat(column.style.width);
+
+    let tableWidth = cols.reduce((total, column) => total + columnWidth(column), 0);
     if (lastColumn && tableWidth < minimumTableWidth) {
-      lastColumn.style.width = `${Number.parseFloat(lastColumn.style.width) + minimumTableWidth - tableWidth}px`;
+      lastColumn.style.width = `${columnWidth(lastColumn) + minimumTableWidth - tableWidth}px`;
       tableWidth = minimumTableWidth;
     }
     table.style.tableLayout = "fixed";
@@ -62,7 +67,7 @@
       header.append(handle);
 
       const setWidth = (width) => {
-        const currentWidth = column.getBoundingClientRect().width;
+        const currentWidth = columnWidth(column);
         let nextWidth = Math.max(minimumWidth, Math.round(width));
         const nextTableWidth = tableWidth + nextWidth - currentWidth;
         if (column === lastColumn && nextTableWidth < minimumTableWidth) {
@@ -75,7 +80,7 @@
       };
 
       const adjust = (amount) => {
-        setWidth(column.getBoundingClientRect().width + amount);
+        setWidth(columnWidth(column) + amount);
         saveWidths(tableName, widths);
       };
 
@@ -89,7 +94,7 @@
       handle.addEventListener("pointerdown", (event) => {
         event.preventDefault();
         const startX = event.clientX;
-        const startWidth = column.getBoundingClientRect().width;
+        const startWidth = columnWidth(column);
         document.documentElement.classList.add("is-resizing-columns");
 
         const move = (moveEvent) => setWidth(startWidth + moveEvent.clientX - startX);

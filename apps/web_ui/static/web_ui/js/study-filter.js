@@ -12,7 +12,7 @@ document.querySelectorAll("[data-study-toggle]").forEach((toggle) => {
     const allOptions = options();
     const selected = allOptions.filter((option) => option.checked).length;
     const allSelected = allOptions.length > 0 && selected === allOptions.length;
-    if (summary) summary.textContent = selected ? `${selected} selected` : "all";
+    if (summary) summary.textContent = selected ? `${selected} selected` : "All";
     if (menuSummary) menuSummary.textContent = selected ? `${selected} selected` : `All ${filterLabel}`;
     if (action) {
       action.textContent = allSelected ? "Select none" : "Select all";

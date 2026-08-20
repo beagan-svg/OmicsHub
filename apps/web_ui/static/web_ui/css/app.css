@@ -395,7 +395,15 @@ main.container-fluid {
     flex-wrap: wrap;
   }
 
+  /* The primary action takes its own row rather than share one with the cart count and
+     the checkout link. */
+  .dashboard-footer__cart-actions .btn-primary {
+    flex: 1 1 100%;
+  }
+
   .dashboard-footer__left {
+    /* Without wrap this and the full-width cart actions inside it have nowhere to go. */
+    flex-wrap: wrap;
     width: 100%;
     gap: 8px 16px;
   }
@@ -1026,6 +1034,19 @@ main.container-fluid {
   border-radius: calc(var(--radius) - 2px) !important;
 }
 
+/* For filter rows with enough options to outgrow a phone. min-width lifts the flex item's
+   min-content floor so the group can shrink; the overflow then keeps the spill inside it
+   instead of widening the page. Opt-in, because overflow would clip a group's dropdown. */
+.btn-group--scrollable {
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  /* Room for the 2px focus ring at its 2px offset, which the overflow would otherwise clip. */
+  padding: 4px;
+}
+
+.btn-group--scrollable > .btn { flex: none; }
+
 .btn-group > .btn:hover { background: var(--panel); color: var(--ink); }
 
 .btn-group > .btn.active {
@@ -1077,6 +1098,13 @@ main.container-fluid {
 .disclosure[data-open="true"] .dropdown {
   position: relative;
   z-index: 5;
+}
+
+/* Each .dropdown above is its own stacking context at the same z-index, so a menu cannot
+   paint past its siblings from the inside: the filters after the open one would cover it.
+   Lift the whole wrapper while its menu is open. */
+.disclosure[data-open="true"] .dropdown:has(> .dropdown-menu.show) {
+  z-index: 6;
 }
 
 
@@ -1729,13 +1757,19 @@ a:focus-visible {
 
 @media (max-width: 767.98px) {
   .pager {
+    /* The three parts do not fit one phone-width line. Lifting the range onto its own row
+       leaves the rows selector and the prev/next controls a clean second one. */
+    flex-wrap: wrap;
     width: 100%;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px 8px;
   }
 
-  .pager__range { order: 2; }
-  .pager__controls { order: 3; }
+  .pager__range {
+    order: -1;
+    width: 100%;
+    text-align: center;
+  }
 }
 
 
@@ -1812,6 +1846,10 @@ a:focus-visible {
     padding-bottom: 8px;
   }
 
+  /* .btn-icon is always paired with .btn, so the min-height above already squares it off;
+     only its fixed width needs lifting. .theme-toggle is not a .btn and needs both. */
+  .btn-icon { width: 2.75rem; }
+  .theme-toggle { width: 2.75rem; height: 2.75rem; }
 
   .form-check-input { width: 1.25rem; height: 1.25rem; }
 

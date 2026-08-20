@@ -43,7 +43,7 @@
   <input type="hidden" name="next" value="{{ request.get_full_path }}">
   <div class="card">
     <div class="card-body is-toolbar d-flex flex-wrap gap-2 align-items-center">
-      <div class="btn-group btn-group-sm" role="group" aria-label="Vendor family">
+      <div class="btn-group btn-group-sm btn-group--scrollable" role="group" aria-label="Vendor family">
         <a class="btn {% if not selected_prefix %}active{% endif %}"
            {% if not selected_prefix %}aria-current="page"{% endif %}
            href="?{% with_params batch_prefix="" %}">All</a>
