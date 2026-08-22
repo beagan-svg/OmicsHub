@@ -161,7 +161,10 @@ def data_locations(request):
             # in the model, since changing a TextChoices label needs a migration for what
             # is otherwise only a display string.
             "location_stages": [
-                {"value": stage.value, "label": "Post-Alignment" if stage == Stage.POST_ALIGN else stage.label}
+                {
+                    "value": stage.value,
+                    "label": "Post-Alignment" if stage == Stage.POST_ALIGN else stage.label,
+                }
                 for stage in columns.LOCATION_STAGES
             ],
             "selected_location_stage": selected_location_stage,
