@@ -28,7 +28,7 @@
       <form method="post" action="{% url 'web_ui:toggle-queue-pause' %}">
         {% csrf_token %}
         <button class="btn btn-sm btn-outline-secondary" type="submit">
-          {% if queue_paused %}Resume queue{% else %}Pause queue{% endif %}
+          {% if queue_paused %}Resume Queue{% else %}Pause Queue{% endif %}
         </button>
       </form>
     </div>
@@ -49,9 +49,9 @@
 
 <section class="card" aria-labelledby="queue-jobs-title">
   <div class="card-header">
-    <span id="queue-jobs-title">Queued jobs</span>
+    <span id="queue-jobs-title">Queued Jobs</span>
     <span class="text-secondary">
-      {{ entries|length }} {% if entries|length == 1 %}job{% else %}jobs{% endif %} in queue
+      {{ entries|length }} {% if entries|length == 1 %}Job{% else %}Jobs{% endif %} in Queue
     </span>
   </div>
   <div class="table-responsive">
@@ -95,7 +95,7 @@
         {% empty %}
         {% url 'web_ui:dashboard' as samples_url %}
         <tr><td colspan="{% if user.is_staff %}8{% else %}7{% endif %}">
-          {% include "partials/empty_state.html" with icon="list-ol" title="The queue is empty." hint="Pick samples and add them to your cart, then submit from checkout." action_url=samples_url action_label="Go to samples" %}
+          {% include "partials/empty_state.html" with icon="list-ol" title="The queue is empty." hint="Select fastq samples and add them to cart, then submit jobs from checkout." action_url=samples_url action_label="Go to Samples" %}
         </td></tr>
         {% endfor %}
       </tbody>

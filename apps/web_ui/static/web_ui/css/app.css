@@ -1203,6 +1203,19 @@ a:focus-visible {
   width: 100%;
 }
 
+/* Names the picked value(s) rather than counting them, so this can run long or list
+   several; truncate rather than push the toggle wider, and carry the full text in its
+   title (set alongside this in JS/templates) for whatever the ellipsis hides. */
+.filter-menu-toggle__summary {
+  display: inline-block;
+  max-width: 22ch;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
 .btn-outline-secondary.filter-menu-toggle.show,
 .btn-outline-secondary.filter-menu-toggle:active {
   background: var(--panel);

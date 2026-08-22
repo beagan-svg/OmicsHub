@@ -63,7 +63,7 @@
               <a class="nav-link {{ checkout_active }}" href="{% url 'web_ui:checkout' %}"
                  {% if checkout_active %}aria-current="page"{% endif %}>
                 <i class="bi bi-bag" aria-hidden="true"></i> Checkout
-                {% if cart_count %}<span class="count">{{ cart_count }}<span class="visually-hidden"> in cart</span></span>{% endif %}
+                {% if cart_count %}<span class="count">{{ cart_count }}<span class="visually-hidden"> in Cart</span></span>{% endif %}
               </a>
             </li>
             {% active_class 'queue' as queue_active %}

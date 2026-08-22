@@ -336,7 +336,7 @@ class TestDashboard:
         assert b"Batch Name From Vendor" in response.content
         assert b"Library Prep Method" in response.content
         assert "studies" in [column.key for column in response.context["all_columns"]]
-        assert b"More filters" in response.content
+        assert b"More Filters" in response.content
 
     def test_data_locations_filters_by_multiple_studies(self, logged_in, make_sample):
         for fastq_name, study in (("A-1", "StudyA"), ("B-1", "StudyB"), ("C-1", "StudyC")):
@@ -838,6 +838,29 @@ class TestJobMonitor:
 
         assert len(response.context["running"]) == 2
         assert response.context["running_stage"] == ""
+
+    def test_finished_stage_filter_shows_only_post_alignment_jobs(self, logged_in, make_sample):
+        alignment = make_sample("FINISHED-ALIGN-1")
+        alignment.stage_statuses.create(stage=Stage.ALIGN, status="COMPLETED", demand_id="demand-align-fin")
+        post_alignment = make_sample("FINISHED-POST-1")
+        post_alignment.stage_statuses.create(
+            stage=Stage.POST_ALIGN, status="COMPLETED", demand_id="demand-post-fin"
+        )
+
+        response = logged_in.get(reverse("web_ui:job-monitor"), {"finished_stage": Stage.POST_ALIGN})
+
+        assert [row.sample.fastq_name for row in response.context["finished"]] == ["FINISHED-POST-1"]
+        assert response.context["finished_stage"] == Stage.POST_ALIGN
+
+    def test_invalid_finished_stage_shows_all_finished_jobs(self, logged_in, make_sample):
+        for name, stage in (("FINISHED-ALIGN-2", Stage.ALIGN), ("FINISHED-POST-2", Stage.POST_ALIGN)):
+            sample = make_sample(name)
+            sample.stage_statuses.create(stage=stage, status="COMPLETED", demand_id=f"demand-{name}")
+
+        response = logged_in.get(reverse("web_ui:job-monitor"), {"finished_stage": "export"})
+
+        assert len(response.context["finished"]) == 2
+        assert response.context["finished_stage"] == ""
 
     def test_monitor_poll_returns_only_the_table_fragment(self, logged_in, make_sample):
         sample = make_sample("POLL-1")

@@ -9,7 +9,7 @@
         </div>
         <div class="monitor-summary__stage">
           <span class="monitor-summary__number">{{ counts.post_align }}</span>
-          <span>Post-alignment</span>
+          <span>Post-Alignment</span>
         </div>
       </div>
     </div>
@@ -24,16 +24,7 @@
   <div class="card-header monitor-table-header">
     <div class="monitor-table-header__title">
       <span><i class="bi bi-activity" aria-hidden="true"></i> Running</span>
-      <div class="monitor-stage-filter" role="group" aria-label="Filter running jobs by stage">
-        <div class="btn-group btn-group-sm btn-group--scrollable" role="group">
-          {% for option in running_stage_options %}
-          <a class="btn {% if option.value == running_stage %}active{% endif %}"
-             href="{{ option.url }}" {% if option.value == running_stage %}aria-current="page"{% endif %}>
-            {{ option.label }}
-          </a>
-          {% endfor %}
-        </div>
-      </div>
+      {% include "partials/monitor_stage_filter.html" with stage_options=running_stage_options selected_stage=running_stage aria_label="Filter running jobs by stage" %}
     </div>
     <div class="d-flex align-items-center gap-2">
       {% include "partials/sync_status.html" %}
@@ -86,7 +77,6 @@
     </table>
   </div>
   <div class="card-body is-toolbar dashboard-footer">
-    <span class="text-secondary">Showing the most recent {{ row_limit }} running stages.</span>
     <div class="dashboard-footer__pager">
       {% include "partials/table_pager.html" with page=running_page page_size=running_page_size page_param="running_page" page_size_param="running_page_size" pager_label="Running job pages" %}
     </div>
@@ -95,7 +85,10 @@
 
 <div class="card">
   <div class="card-header monitor-table-header">
-    <span><i class="bi bi-check2-all" aria-hidden="true"></i> Recently finished</span>
+    <div class="monitor-table-header__title">
+      <span><i class="bi bi-check2-all" aria-hidden="true"></i> Recently finished</span>
+      {% include "partials/monitor_stage_filter.html" with stage_options=finished_stage_options selected_stage=finished_stage aria_label="Filter finished jobs by stage" %}
+    </div>
     <div class="d-flex align-items-center gap-2">
       {% include "partials/sync_status.html" %}
       <form method="post" action="{% url 'web_ui:refresh-status' %}">

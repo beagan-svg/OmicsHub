@@ -16,7 +16,7 @@
     <div class="dropdown">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
               data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-        <i class="bi bi-cloud-download" aria-hidden="true"></i> Sync batch
+        <i class="bi bi-cloud-download" aria-hidden="true"></i> Sync Batch
       </button>
       <div class="dropdown-menu dropdown-menu-end p-3" style="width: 20rem;">
         <form method="post" action="{% url 'web_ui:sync' %}">
@@ -68,10 +68,10 @@
     <div class="card-body is-toolbar">
       <div class="row g-2 align-items-center">
         <div class="col-sm-4 col-lg-3">
-          <label class="visually-hidden" for="fastq-search">Search FASTQ, Load, or Batch Name</label>
+          <label class="visually-hidden" for="fastq-search">Search Fastq, Load, Batch Name</label>
           <input type="search" name="fastq_name" id="fastq-search" value="{{ search }}"
                  class="form-control form-control-sm"
-                 placeholder="Search FASTQ, Load, or Batch Name" form="filter-form"
+                 placeholder="Search Fastq, Load, Batch Name" form="filter-form"
                  data-submit-on-enter data-submit-form="filter-form">
         </div>
         <div class="col-auto">
@@ -94,7 +94,7 @@
                   data-disclosure="advanced-filters"
                   aria-controls="advanced-filters"
                   aria-expanded="{% if filters_open %}true{% else %}false{% endif %}">
-            <i class="bi bi-funnel" aria-hidden="true"></i> More filters
+            <i class="bi bi-funnel" aria-hidden="true"></i> More Filters
             {% if active_filter_count %}<span class="count">{{ active_filter_count }}<span class="visually-hidden"> filters active</span></span>{% endif %}
           </button>
         </div>
@@ -102,7 +102,7 @@
           <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:dashboard' %}">Clear</a>
         </div>
         <div class="col-auto">
-          <button class="btn btn-sm btn-primary" type="submit" form="filter-form">Apply filters</button>
+          <button class="btn btn-sm btn-primary" type="submit" form="filter-form">Apply Filters</button>
         </div>
 
         <div class="col-auto ms-auto">
@@ -214,16 +214,16 @@
     {% endcomment %}
     <div class="card-body is-toolbar dashboard-footer">
       <div class="dashboard-footer__left">
-        <span class="text-secondary" id="sample-selection-count" aria-live="polite">0 samples selected</span>
+        <span class="text-secondary" id="sample-selection-count" aria-live="polite">0 Fastq Samples Selected</span>
         <div class="dashboard-footer__cart-actions">
           <span class="text-secondary">
             <i class="bi bi-bag" aria-hidden="true"></i>
-            <span id="cart-count">{{ cart_count }}</span> in cart
+            <span id="cart-count">{{ cart_count }}</span> in Cart
           </span>
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:checkout' %}">Go to checkout</a>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:checkout' %}">Go to Checkout</a>
           <button class="btn btn-sm btn-primary" type="submit" id="add-to-cart"
                   formaction="{% url 'web_ui:cart-add' %}">
-            <i class="bi bi-plus-lg" aria-hidden="true"></i> Add selected to cart
+            <i class="bi bi-plus-lg" aria-hidden="true"></i> Add Selected to Cart
           </button>
         </div>
       </div>
@@ -279,7 +279,7 @@ returns them to it.
   const updateSelectionCount = () => {
     if (!selectAll || !selectionCount) return;
     const count = [...boxes()].filter((box) => box.checked).length;
-    selectionCount.textContent = `${count} sample${count === 1 ? "" : "s"} selected`;
+    selectionCount.textContent = `${count} Fastq Sample${count === 1 ? "" : "s"} Selected`;
     selectAll.checked = count > 0 && count === boxes().length;
     selectAll.indeterminate = count > 0 && count < boxes().length;
   };

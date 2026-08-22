@@ -2,7 +2,9 @@
   <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
           data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
           data-study-toggle>
-    Study Set: <span data-study-summary>{% if selected_studies %}{{ selected_studies|length }} selected{% else %}All{% endif %}</span>
+    Study Set:
+    <span class="filter-menu-toggle__summary" data-study-summary
+          title="{% if selected_studies %}{{ selected_studies|join:", " }}{% endif %}">{% if selected_studies %}{{ selected_studies|join:", " }}{% else %}All{% endif %}</span>
   </button>
   <div class="dropdown-menu study-filter-menu" data-filter-label="study sets">
     <div class="study-filter__head">

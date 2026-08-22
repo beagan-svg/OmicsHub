@@ -4,7 +4,8 @@
     <button id="{{ filter_id }}" class="btn btn-sm btn-outline-secondary dropdown-toggle filter-menu-toggle" type="button"
             data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
             data-study-toggle>
-      <span data-study-summary>{% if selected_values %}{{ selected_values|length }} selected{% else %}All{% endif %}</span>
+      <span class="filter-menu-toggle__summary" data-study-summary
+            title="{% if selected_values %}{{ selected_values|join:", " }}{% endif %}">{% if selected_values %}{{ selected_values|join:", " }}{% else %}All{% endif %}</span>
     </button>
     <div class="dropdown-menu study-filter-menu" data-filter-label="{{ menu_title|lower }}">
       <div class="study-filter__head">

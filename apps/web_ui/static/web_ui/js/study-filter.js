@@ -10,9 +10,17 @@ document.querySelectorAll("[data-study-toggle]").forEach((toggle) => {
 
   const updateSummary = () => {
     const allOptions = options();
-    const selected = allOptions.filter((option) => option.checked).length;
+    const checked = allOptions.filter((option) => option.checked);
+    const selected = checked.length;
     const allSelected = allOptions.length > 0 && selected === allOptions.length;
-    if (summary) summary.textContent = selected ? `${selected} selected` : "All";
+    if (summary) {
+      // The toggle names what's picked rather than counting it, so it reads as a filter
+      // state ("RTX-38026") and not a tally. Long lists just truncate; the title carries
+      // the rest.
+      const names = checked.map((option) => option.value).join(", ");
+      summary.textContent = selected ? names : "All";
+      summary.title = names;
+    }
     if (menuSummary) menuSummary.textContent = selected ? `${selected} selected` : `All ${filterLabel}`;
     if (action) {
       action.textContent = allSelected ? "Select none" : "Select all";

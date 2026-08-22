@@ -74,7 +74,7 @@ FINISHED_OCS_STATUSES = ("COMPLETED", "ARCHIVED", "FAILED", "ABORTED", "STRANDED
 
 # The mirror holds every stage OCS has run for half a million samples. The monitor shows
 # the most recent, and says so on the page rather than implying it is the whole picture.
-MONITOR_ROWS = 200
+MONITOR_ROWS = 1000
 
 # What the submit modal may change about one planned command. `probe_set` is here because a
 # library prep the config does not list has no probe set to look up, and the modal asks for
@@ -157,7 +157,13 @@ def data_locations(request):
             "search": request.GET.get("fastq_name") or "",
             "studies": _study_options(),
             "selected_studies": request.GET.getlist("study"),
-            "location_stages": columns.LOCATION_STAGES,
+            # Stage.POST_ALIGN's own label is "Post-alignment": overridden here rather than
+            # in the model, since changing a TextChoices label needs a migration for what
+            # is otherwise only a display string.
+            "location_stages": [
+                {"value": stage.value, "label": "Post-Alignment" if stage == Stage.POST_ALIGN else stage.label}
+                for stage in columns.LOCATION_STAGES
+            ],
             "selected_location_stage": selected_location_stage,
             "filters": {field: request.GET.getlist(field) for field in FILTER_FIELDS},
             "stage_filters": stage_filters,
@@ -853,6 +859,9 @@ def job_monitor(request):
     running_stage = request.GET.get("running_stage")
     if running_stage not in {Stage.ALIGN, Stage.POST_ALIGN}:
         running_stage = ""
+    finished_stage = request.GET.get("finished_stage")
+    if finished_stage not in {Stage.ALIGN, Stage.POST_ALIGN}:
+        finished_stage = ""
 
     stages = (
         StageStatus.objects.select_related("sample")
@@ -863,14 +872,15 @@ def job_monitor(request):
     running_stages = stages.filter(status__in=RUNNING_OCS_STATUSES)
     if running_stage:
         running_stages = running_stages.filter(stage=running_stage)
-    running = list(running_stages.order_by(F("started_at").desc(nulls_last=True))[:MONITOR_ROWS])
+    # Unbounded, unlike finished below: what's actually running is capped by OCS's own
+    # concurrency limit, not by how long the mirror has been recording history.
+    running = list(running_stages.order_by(F("started_at").desc(nulls_last=True)))
     # Newest first and capped: the mirror holds every stage OCS has ever finished for
     # half a million samples, and this page answers "what happened lately".
-    finished = list(
-        stages.filter(status__in=FINISHED_OCS_STATUSES).order_by(F("last_update_time").desc(nulls_last=True))[
-            :MONITOR_ROWS
-        ]
-    )
+    finished_stages = stages.filter(status__in=FINISHED_OCS_STATUSES)
+    if finished_stage:
+        finished_stages = finished_stages.filter(stage=finished_stage)
+    finished = list(finished_stages.order_by(F("last_update_time").desc(nulls_last=True))[:MONITOR_ROWS])
     monitor_running, monitor_finished = _collapse_multiome_monitor_rows(running, finished)
     monitor_fastq_names = list(dict.fromkeys(row.sample.fastq_name for row in [*running, *finished]))
     running_page_size = _page_size(request, "running_page_size")
@@ -889,7 +899,13 @@ def job_monitor(request):
         "monitor_fastq_names": monitor_fastq_names,
         "row_limit": MONITOR_ROWS,
         "running_stage": running_stage,
-        "running_stage_options": _monitor_stage_options(request),
+        "running_stage_options": _monitor_stage_options(
+            request, param="running_stage", page_param="running_page"
+        ),
+        "finished_stage": finished_stage,
+        "finished_stage_options": _monitor_stage_options(
+            request, param="finished_stage", page_param="finished_page"
+        ),
         "counts": {
             "align": sum(1 for row in monitor_running if row.stage == Stage.ALIGN),
             "post_align": sum(1 for row in monitor_running if row.stage == Stage.POST_ALIGN),
@@ -910,17 +926,17 @@ def job_monitor(request):
     return render(request, template, context)
 
 
-def _monitor_stage_options(request):
-    """Build the Running table's stage filter links."""
-    options = [("", "All"), (Stage.ALIGN, "Alignment"), (Stage.POST_ALIGN, "Post-alignment")]
+def _monitor_stage_options(request, *, param, page_param):
+    """Build a monitor table's stage filter links."""
+    options = [("", "All"), (Stage.ALIGN, "Alignment"), (Stage.POST_ALIGN, "Post-Alignment")]
     result = []
     for value, label in options:
         query = request.GET.copy()
-        query.pop("running_page", None)
+        query.pop(page_param, None)
         if value:
-            query["running_stage"] = value
+            query[param] = value
         else:
-            query.pop("running_stage", None)
+            query.pop(param, None)
         result.append({"label": label, "value": value, "url": f"?{query.urlencode()}"})
     return result
 

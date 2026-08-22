@@ -48,7 +48,7 @@
               <span>
                 <i class="bi bi-question-circle" aria-hidden="true"></i>
                 Unknown Library Prep for
-                {% if group.stage == "align" %}Alignment{% else %}Post-alignment{% endif %}
+                {% if group.stage == "align" %}Alignment{% else %}Post-Alignment{% endif %}
                 <span class="tag">{{ group.library_prep_method_name }}</span>
                 <span class="tag tag--accent">{{ group.modality }}</span>
               </span>
@@ -90,7 +90,7 @@
               <span>
                 <i class="bi bi-input-cursor-text" aria-hidden="true"></i>
                 Missing {{ group.field|field_label|lower }} for
-                {% if group.stage == "align" %}Alignment{% else %}Post-alignment{% endif %}
+                {% if group.stage == "align" %}Alignment{% else %}Post-Alignment{% endif %}
                 <span class="tag">{{ group.library_prep_method_name }}</span>
               </span>
               <span class="state" data-state="warn">Needs a value</span>
@@ -143,7 +143,7 @@
 
           <div class="card mb-3">
             <div class="card-header">
-              <span>Post-alignment <span class="count">{{ postalign_entries|length }}</span></span>
+              <span>Post-Alignment <span class="count">{{ postalign_entries|length }}</span></span>
               <span class="text-secondary">Completed alignment, proceeding to post-alignment</span>
             </div>
             <div class="card-body">

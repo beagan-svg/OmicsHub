@@ -15,7 +15,7 @@
           <div class="{% if stage_filters|length == 3 %}col-md-4{% else %}col-md-3{% endif %}">
             <label class="label d-block mb-1" for="{{ id_prefix }}filter-{{ row.stage.value }}-status">{{ row.stage.label }}</label>
             <select name="{{ row.stage.value }}_status" id="{{ id_prefix }}filter-{{ row.stage.value }}-status" class="form-select form-select-sm stage-filter-select" form="{{ filter_form_id }}">
-              <option value="">Any status</option>
+              <option value="">Any Status</option>
               {% for value in statuses %}
               <option value="{{ value }}" {% if value == row.selected %}selected{% endif %}>{{ value }}</option>
               {% endfor %}

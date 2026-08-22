@@ -65,12 +65,16 @@ def test_job_monitor_refreshes_tables_without_reloading_document():
     assert "window.location.reload" not in text
 
 
-def test_job_monitor_has_a_running_stage_filter():
+def test_job_monitor_has_running_and_finished_stage_filters():
     text = (TEMPLATES / "partials/job_monitor_tables.html").read_text()
-    assert 'aria-label="Filter running jobs by stage"' in text
-    assert 'class="monitor-stage-filter__label"' not in text
-    assert "{{ option.label }}" in text
+    filter_partial = (TEMPLATES / "partials/monitor_stage_filter.html").read_text()
+    assert text.count('include "partials/monitor_stage_filter.html"') == 2
+    assert 'aria_label="Filter running jobs by stage"' in text
+    assert 'aria_label="Filter finished jobs by stage"' in text
     assert "running_stage_options" in text
+    assert "finished_stage_options" in text
+    assert 'class="monitor-stage-filter__label"' not in filter_partial
+    assert "{{ option.label }}" in filter_partial
 
 
 def test_pages_poll_database_without_replacing_sample_interactions():
@@ -265,10 +269,10 @@ def test_shell_icons_are_hidden_and_toggles_expose_their_state():
 def test_more_filters_use_the_page_apply_button():
     """The advanced panel edits fields; the page toolbar submits them."""
     filters = (TEMPLATES / "partials/sample_advanced_filters.html").read_text()
-    assert ">Apply filters<" not in filters
+    assert ">Apply Filters<" not in filters
     for name in ("dashboard.html", "data_locations.html"):
         text = (TEMPLATES / name).read_text()
-        assert text.count(">Apply filters<") == 1, name
+        assert text.count(">Apply Filters<") == 1, name
 
 
 def test_advanced_filters_accept_multiple_values():
