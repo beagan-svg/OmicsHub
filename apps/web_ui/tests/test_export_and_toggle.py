@@ -9,13 +9,7 @@ import pytest
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.sample_catalog.models import (
-    MULTIOME_ATAC_PREP,
-    MULTIOME_GEX_PREP,
-    Sample,
-    Stage,
-    StageStatus,
-)
+from apps.sample_catalog.models import Sample, Stage, StageStatus
 from apps.web_ui import columns
 
 pytestmark = pytest.mark.django_db
@@ -175,8 +169,8 @@ class TestExport:
 
 class TestPairingInSubmission:
     def test_submitting_one_half_pulls_in_the_other(self, logged_in, active_config):
-        make("NW-MX32013-2", "MTX-32013", prep=MULTIOME_GEX_PREP, load="3492_A01")
-        make("NW-AT36013-2", "ATX-36013", prep=MULTIOME_ATAC_PREP, load="3492_A01")
+        make("NW-MX32013-2", "MTX-32013", prep="10xMultX_GEX", load="3492_A01")
+        make("NW-AT36013-2", "ATX-36013", prep="10xATAC_Mult", load="3492_A01")
 
         response = logged_in.post(
             reverse("web_ui:submit-review"), {"fastq_names": ["NW-MX32013-2"]}, follow=True

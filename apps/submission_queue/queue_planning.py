@@ -19,7 +19,7 @@ from __future__ import annotations
 import shlex
 from dataclasses import dataclass
 
-from apps.sample_catalog.models import MULTIOME_ATAC_PREP, Sample, Stage
+from apps.sample_catalog.models import BatchPrefix, Sample, Stage
 from apps.workflow_engine import command_builder
 from apps.workflow_engine.command_builder import COMPLETE_STATUS_KEY, ConfigurationError
 
@@ -33,7 +33,6 @@ class SkipReason:
     # A multiome half whose partner is not ready. Distinct from INGEST_INCOMPLETE because
     # this sample's own ingest may be finished. It is waiting on the other half.
     PAIR_INGEST_INCOMPLETE = "pair_ingest_incomplete"
-    PAIR_MISSING = "pair_missing"
     ALIGNMENT_IN_PROGRESS = "alignment_in_progress"
     # Only reachable by forcing post-alignment: the stage was asked for by name and its
     # prerequisite is not met, so nothing runs rather than the alignment running instead.
@@ -90,28 +89,6 @@ class Plan:
     # These samples are submitted with their partners, not as separate rows, so they are kept
     # apart from `skipped` rather than filtered out of it at each place that reads it.
     covered_by_pair: list[Sample]
-
-    @property
-    def unpaired_multiome(self) -> list[SkippedSample]:
-        """Return ATAC halves with no GEX partner in this submission.
-
-        Everything about a multiome ATAC half is decided by its pair, so the one thing worth
-        saying about one that has no pair is that it has no pair. Kept separate from
-        `skipped` so the modal can say it as a line of prose instead of a table row whose
-        Reason column reads like a configuration fault.
-        """
-        return [
-            skip
-            for skip in self.skipped
-            if skip.reason == SkipReason.PAIR_MISSING
-            and skip.sample.library_prep_method_name == MULTIOME_ATAC_PREP
-        ]
-
-    @property
-    def reportable_skips(self) -> list[SkippedSample]:
-        """Return fastq samples in the "Not Being Submitted" section."""
-        unpaired = {id(skip) for skip in self.unpaired_multiome}
-        return [skip for skip in self.skipped if id(skip) not in unpaired]
 
     @property
     def needs_modality(self) -> list[SkippedSample]:
@@ -202,19 +179,37 @@ def build_plan(
     entries: list[PlannedEntry] = []
     skipped: list[SkippedSample] = []
     covered_by_pair: list = []
+    # select_command_config's result only depends on (modality, stage, library prep,
+    # organism), not on which sample asked, so a submission spanning many samples but
+    # few distinct combinations would otherwise re-scan the same manifest section once
+    # per sample instead of once per combination it actually contains.
+    command_config_cache: dict[tuple[str, str, str, str], tuple[dict | None, ConfigurationError | None]] = {}
 
-    # A multiome experiment is aligned as one job over both halves, so the pair has to be
-    # resolvable from the samples in hand. Callers pass both halves. The dashboard and the
-    # API each expand the selection through `with_multiome_partners` first. This is what
-    # lets this be a dict lookup rather than a query per sample.
-    pair_index = {
-        (sample.load_name, sample.library_prep_method_name): sample
-        for sample in samples
-        if sample.load_name and sample.multiome_partner_prep
+    # Two samples sharing a load_name are one multiome job, aligned together , nothing
+    # about their library prep decides that. load_name alone is not quite enough on its
+    # own either: 262 load_names in the real mirror are shared by unrelated samples, so a
+    # group only counts as a real pair once it actually has one MTX and one ATX side, the
+    # one thing about a load_name's samples that a coincidence would not produce. Callers
+    # pass every sample in the job; the dashboard and the API each expand the selection
+    # through `with_multiome_partners` first. This is what lets this be a dict lookup
+    # rather than a query per sample.
+    groups_by_load = {}
+    for sample in samples:
+        if sample.load_name:
+            groups_by_load.setdefault(sample.load_name, []).append(sample)
+    # Each group's representative is decided once here, not once per sample: with the
+    # dict keyed by fastq_name instead, `_pair_block` and `_aligned_through_partner`
+    # would each have to re-scan the group to find it, an O(group size) scan repeated
+    # for every sample in that same group.
+    load_groups = {
+        load_name: (group, _group_representative(group))
+        for load_name, group in groups_by_load.items()
+        if any(s.batch_prefix == BatchPrefix.MTX for s in group)
+        and any(s.batch_prefix == BatchPrefix.ATX for s in group)
     }
 
     for sample in samples:
-        pair_block = _pair_block(sample=sample, pair_index=pair_index, config=config, force=force)
+        pair_block = _pair_block(sample=sample, load_groups=load_groups, config=config, force=force)
         if pair_block is not None:
             skipped.append(pair_block)
             continue
@@ -228,7 +223,7 @@ def build_plan(
         #
         # Alignment only. Post-alignment runs per half, so an ATAC sample whose next stage
         # is post-align is planned like any other sample.
-        if _aligned_through_partner(sample=sample, pair_index=pair_index, config=config, force=force):
+        if _aligned_through_partner(sample=sample, load_groups=load_groups, config=config, force=force):
             covered_by_pair.append(sample)
             continue
 
@@ -262,15 +257,23 @@ def build_plan(
             skipped.append(_explain_skip(sample=sample, config=config, force=force))
             continue
 
-        try:
-            command_config = command_builder.select_command_config(
-                config=config,
-                modality=sample_modality,
-                stage=stage,
-                library_prep_method_name=sample.library_prep_method_name,
-                organism_common_name=sample.organism_common_name,
-            )
-        except ConfigurationError as error:
+        cache_key = (sample_modality, stage, sample.library_prep_method_name, sample.organism_common_name)
+        if cache_key not in command_config_cache:
+            try:
+                command_config_cache[cache_key] = (
+                    command_builder.select_command_config(
+                        config=config,
+                        modality=sample_modality,
+                        stage=stage,
+                        library_prep_method_name=sample.library_prep_method_name,
+                        organism_common_name=sample.organism_common_name,
+                    ),
+                    None,
+                )
+            except ConfigurationError as error:
+                command_config_cache[cache_key] = (None, error)
+        command_config, error = command_config_cache[cache_key]
+        if error is not None:
             skipped.append(
                 SkippedSample(
                     sample=sample,
@@ -431,15 +434,28 @@ def build_plan(
     return Plan(entries=entries, skipped=skipped, covered_by_pair=covered_by_pair)
 
 
-def _aligned_through_partner(*, sample, pair_index: dict, config: dict, force: str | None) -> bool:
-    """Return whether an ATAC half uses its GEX partner's alignment.
+def _group_representative(group: list[Sample]) -> Sample:
+    """Return the sample that represents a shared load_name's job.
 
-    Reached only after `_pair_block` has confirmed the partner is present and ingested, so
-    the remaining question is which stage this sample is due for.
+    The one resolving to the MTX workflow, if any: ATX has no workflow of its own, and
+    an ATX sample's own `modality` already resolves to MTX too, so `batch_prefix` , not
+    `modality` , is what actually distinguishes the two sides here. Falls back to the
+    first sample when neither side is MTX, for a deterministic pick.
     """
-    if sample.library_prep_method_name != MULTIOME_ATAC_PREP:
+    return next((s for s in group if s.batch_prefix == BatchPrefix.MTX), group[0])
+
+
+def _aligned_through_partner(*, sample, load_groups: dict, config: dict, force: str | None) -> bool:
+    """Return whether this sample's alignment is covered by another sample sharing its load.
+
+    Reached only after `_pair_block` has confirmed the representative is present and
+    ingested, so the remaining question is which stage this sample is due for.
+    """
+    entry = load_groups.get(sample.load_name)
+    if entry is None:
         return False
-    if not pair_index.get((sample.load_name, sample.multiome_partner_prep)):
+    _group, representative = entry
+    if sample.fastq_name == representative.fastq_name:
         return False
     return _next_stage(sample=sample, config=config, force=force) == Stage.ALIGN
 
@@ -479,45 +495,37 @@ def _next_stage(*, sample, config: dict, force: str | None) -> str | None:
     return None
 
 
-def _pair_block(*, sample, pair_index: dict, config: dict, force: str | None) -> SkippedSample | None:
-    """Return why this multiome half cannot be aligned, or None.
+def _pair_block(*, sample, load_groups: dict, config: dict, force: str | None) -> SkippedSample | None:
+    """Return why this shared-load job cannot yet align, or None.
 
-    Alignment of a multiome sample runs cellranger-arc over the GEX and ATAC halves
-    together, so it cannot start until *both* have finished ingest. A pair where only one
-    side has ingested would produce a run with nothing to align against.
-
-    Only gates alignment. Once alignment is complete the two halves have already been
-    processed as one, so post-alignment needs nothing from the partner.
+    Two (or more) samples sharing a load_name align together as one job, so it cannot
+    start until every sample in the group has finished ingest. Only the sample
+    representing the group (`_group_representative`) is checked; the others are either
+    covered by it (`_aligned_through_partner`) or, if the group has no other member,
+    plan as an ordinary sample , sharing a load with nobody is not an error.
     """
-    partner_prep = sample.multiome_partner_prep
-    if partner_prep is None:
+    entry = load_groups.get(sample.load_name)
+    if entry is None:
+        return None
+    group, representative = entry
+    if sample.fastq_name != representative.fastq_name:
         return None
 
     already_aligned = _is_complete(sample, Stage.ALIGN, config)
     if already_aligned and force != Stage.ALIGN:
         return None
 
-    partner = pair_index.get((sample.load_name, partner_prep)) if sample.load_name else None
-    if partner is None:
-        return SkippedSample(
-            sample=sample,
-            reason=SkipReason.PAIR_MISSING,
-            detail=(
-                f"No {partner_prep} half found for load {sample.load_name!r}. A multiome "
-                "sample is aligned with its pair, so both halves must be synced first."
-            ),
-            stage=Stage.ALIGN,
-        )
-
-    if not _is_complete(partner, Stage.INGEST, config):
-        return SkippedSample(
-            sample=sample,
-            reason=SkipReason.PAIR_INGEST_INCOMPLETE,
-            detail=(
-                f"Waiting on its pair: {partner.fastq_name} ingest is {partner.stage_status(Stage.INGEST)}."
-            ),
-            stage=Stage.ALIGN,
-        )
+    for partner in group:
+        if partner.fastq_name == sample.fastq_name:
+            continue
+        if not _is_complete(partner, Stage.INGEST, config):
+            return SkippedSample(
+                sample=sample,
+                reason=SkipReason.PAIR_INGEST_INCOMPLETE,
+                detail=f"Waiting on its pair: {partner.fastq_name} ingest is "
+                f"{partner.stage_status(Stage.INGEST)}.",
+                stage=Stage.ALIGN,
+            )
 
     return None
 

@@ -581,20 +581,26 @@ class TestCartJourney:
         assert "covered-by-pair-note" in modal
         assert "ATAC-1" in modal
 
-    def test_a_multiome_half_with_no_partner_is_called_out_separately(
+    def test_a_multiome_half_with_no_partner_plans_as_an_ordinary_sample(
         self, logged_in, active_config, make_sample, review
     ):
+        """No load_name partner means no pair was intended; this sample plans exactly
+        like any other , including a plain "library prep unconfigured" skip if its own
+        prep is not one the active config's MTX workflow lists, with no multiome-specific
+        message layered on top."""
         make_sample(
-            "LONELY-GEX",
-            batch_name_from_vendor="MTX-501",
+            "LONELY-ATAC",
+            batch_name_from_vendor="ATX-501",
             load_name="LOAD_ALONE",
-            library_prep_method_name="10xMultX_GEX",
+            library_prep_method_name="10xATAC_Mult",
         )
 
-        response = review(["LONELY-GEX"])
+        response = review(["LONELY-ATAC"])
 
-        assert [skip.sample.fastq_name for skip in response.context["plan"].skipped] == ["LONELY-GEX"]
-        assert b"No 10xMultX_ATAC half found" in response.content
+        plan = response.context["plan"]
+        assert [skip.sample.fastq_name for skip in plan.skipped] == ["LONELY-ATAC"]
+        assert plan.skipped[0].reason == "library_prep_unconfigured"
+        assert b"No MTX pair found for" not in response.content
 
 
 # --- 5. checkout and submission -----------------------------------------------------------
@@ -789,8 +795,8 @@ class TestSubmissionJourney:
 
         plan = response.context["plan"]
         html = messages_in(response)
-        assert len(plan.reportable_skips) == 3
-        for skip in plan.reportable_skips:
+        assert len(plan.skipped) == 3
+        for skip in plan.skipped:
             assert skip.detail, f"{skip.sample.fastq_name} was skipped with no explanation"
             assert skip.sample.fastq_name in html
             assert skip.detail.split(":")[0][:40] in html

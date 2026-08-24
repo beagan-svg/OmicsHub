@@ -1,17 +1,18 @@
 """Match the GEX and ATAC fastq samples in a multiome pair.
 
-A multiome experiment is sequenced as two halves, a GEX library and an ATAC library.
+A multiome experiment is sequenced as two halves, a GEX library and an ATAC library,
 that arrive as separate fastq entries under different vendor batches (MTX-32013 and
 ATX-36013, say). They are the same biological sample and are aligned together, so
 submitting one without the other produces a run that cannot complete.
 
-The two halves are matched on `load_name`, which is the one field they share: batch name,
-amplification name and fastq name all differ between them.
+The two halves are matched on `load_name` and vendor batch prefix (MTX/ATX), not on
+library prep name , a vendor's naming for the two halves varies, so the prep name is
+not a reliable signal, and load_name alone is not enough either (see MULTIOME_PREFIXES).
 """
 
 from __future__ import annotations
 
-from apps.sample_catalog.models import MULTIOME_PREPS, Sample
+from apps.sample_catalog.models import MULTIOME_PREFIXES, Sample
 
 
 def with_multiome_partners(samples) -> tuple[list[Sample], list[Sample]]:
@@ -27,22 +28,22 @@ def with_multiome_partners(samples) -> tuple[list[Sample], list[Sample]]:
     # half of a pair can contribute a partner, so anything else is filtered out first.
     wanted: set[tuple[str, str]] = set()
     for sample in samples:
-        partner_prep = sample.multiome_partner_prep
-        if partner_prep and sample.load_name:
-            wanted.add((sample.load_name, partner_prep))
+        partner_prefix = sample.multiome_partner_prefix
+        if partner_prefix and sample.load_name:
+            wanted.add((sample.load_name, partner_prefix))
 
     if not wanted:
         return samples, []
 
     candidates = Sample.objects.filter(
         load_name__in={load_name for load_name, _ in wanted},
-        library_prep_method_name__in=MULTIOME_PREPS,
+        batch_prefix__in=MULTIOME_PREFIXES,
     ).prefetch_related("stage_statuses")
 
     partners = [
         candidate
         for candidate in candidates
-        if (candidate.load_name, candidate.library_prep_method_name) in wanted
+        if (candidate.load_name, candidate.batch_prefix) in wanted
         and candidate.fastq_name not in selected_names
     ]
     return samples + partners, partners

@@ -4,14 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from apps.sample_catalog.models import (
-    MULTIOME_ATAC_PREP,
-    MULTIOME_GEX_PREP,
-    NOT_COMPLETED,
-    Sample,
-    Stage,
-    StageStatus,
-)
+from apps.sample_catalog.models import NOT_COMPLETED, Sample, Stage, StageStatus
 from apps.submission_queue import queue_planning as planning
 
 pytestmark = pytest.mark.django_db
@@ -52,8 +45,8 @@ class TestPairIngestGate:
         submission: it read as a sample dropped for a configuration fault, when in fact it
         is going in, through its pair.
         """
-        gex = make("GEX-1", "MTX-32013", MULTIOME_GEX_PREP)
-        atac = make("ATAC-1", "ATX-36013", MULTIOME_ATAC_PREP)
+        gex = make("GEX-1", "MTX-32013", "10xRSeq_Mult")
+        atac = make("ATAC-1", "ATX-36013", "10xATAC_Mult")
 
         plan = plan_for([gex, atac], config)
 
@@ -63,8 +56,8 @@ class TestPairIngestGate:
 
     def test_a_half_waits_when_its_partner_has_not_ingested(self, config):
         """The GEX half is ready on its own, but arc has nothing to align against."""
-        gex = make("GEX-1", "MTX-32013", MULTIOME_GEX_PREP)
-        atac = make("ATAC-1", "ATX-36013", MULTIOME_ATAC_PREP, ingest=NOT_COMPLETED)
+        gex = make("GEX-1", "MTX-32013", "10xRSeq_Mult")
+        atac = make("ATAC-1", "ATX-36013", "10xATAC_Mult", ingest=NOT_COMPLETED)
 
         plan = plan_for([gex, atac], config)
 
@@ -75,45 +68,31 @@ class TestPairIngestGate:
         # The ATAC half is held back by its own ingest, which is a different reason.
         assert blocked["ATAC-1"].reason == planning.SkipReason.INGEST_INCOMPLETE
 
-    def test_a_half_with_no_partner_at_all_is_blocked(self, config):
-        """Both halves must exist; aligning one alone would produce a broken run."""
-        gex = make("GEX-1", "MTX-32013", MULTIOME_GEX_PREP)
+    def test_a_lone_gex_half_plans_as_an_ordinary_mtx_sample(self, config):
+        """Most MTX samples are not part of any multiome pair at all; only a real ATAC
+        partner sharing this load , not merely the MTX prefix , changes how it plans."""
+        gex = make("GEX-1", "MTX-32013", "10xRSeq_Mult")
 
         plan = plan_for([gex], config)
 
-        assert not plan.entries
-        assert plan.skipped[0].reason == planning.SkipReason.PAIR_MISSING
-        assert MULTIOME_ATAC_PREP in plan.skipped[0].detail
+        assert [entry.sample.fastq_name for entry in plan.entries] == ["GEX-1"]
 
     def test_pairs_are_matched_on_load_name(self, config):
-        """Same preps, different loads , these are two experiments, not one pair."""
-        gex = make("GEX-1", "MTX-32013", MULTIOME_GEX_PREP, load="3492_A01")
-        other = make("ATAC-9", "ATX-36013", MULTIOME_ATAC_PREP, load="9999_Z09")
+        """Different loads are two experiments, not one pair, even with matching preps.
+
+        Neither has a partner at its own load, so both plan as ordinary samples , which,
+        for an ATAC prep with no MTX alignment command config of its own, means the same
+        "library prep unconfigured" skip any other sample with that prep would get. No
+        multiome-specific handling is needed for this to fall out correctly.
+        """
+        gex = make("GEX-1", "MTX-32013", "10xRSeq_Mult", load="3492_A01")
+        other = make("ATAC-9", "ATX-36013", "10xATAC_Mult", load="9999_Z09")
 
         plan = plan_for([gex, other], config)
 
-        reasons = {skip.sample.fastq_name: skip.reason for skip in plan.skipped}
-        assert reasons["GEX-1"] == planning.SkipReason.PAIR_MISSING
-        assert reasons["ATAC-9"] == planning.SkipReason.PAIR_MISSING
-
-    def test_an_atac_half_with_no_partner_is_reported_apart_from_the_skips(self, config):
-        """The one thing worth saying about a pairless ATAC half is that it has no pair.
-
-        Everything else about it is decided by a GEX half that is not here, so it is kept
-        out of "Not Being Submitted" , where it would sit beside genuine configuration
-        faults , and reported as its own note.
-        """
-        gex = make("GEX-1", "MTX-32013", MULTIOME_GEX_PREP, load="3492_A01")
-        lone_atac = make("ATAC-9", "ATX-36013", MULTIOME_ATAC_PREP, load="9999_Z09")
-
-        plan = plan_for([gex, lone_atac], config)
-
-        assert [skip.sample.fastq_name for skip in plan.unpaired_multiome] == ["ATAC-9"]
-        reported = [skip.sample.fastq_name for skip in plan.reportable_skips]
-        assert "ATAC-9" not in reported
-        # The GEX half missing its partner is a different matter: the user chose that one,
-        # and it stays in the table.
-        assert "GEX-1" in reported
+        assert [entry.sample.fastq_name for entry in plan.entries] == ["GEX-1"]
+        assert [skip.sample.fastq_name for skip in plan.skipped] == ["ATAC-9"]
+        assert plan.skipped[0].reason == planning.SkipReason.LIBRARY_PREP_UNCONFIGURED
 
     def test_a_non_multiome_sample_is_unaffected(self, config):
         """The gate must not touch the 99% of the mirror that has no pair."""
@@ -125,20 +104,21 @@ class TestPairIngestGate:
 
     def test_post_alignment_does_not_wait_on_the_partner(self, config):
         """Once aligned, the halves have already been processed together."""
-        gex = make("GEX-1", "MTX-32013", MULTIOME_GEX_PREP, align="COMPLETED")
+        gex = make("GEX-1", "MTX-32013", "10xRSeq_Mult", align="COMPLETED")
 
         plan = plan_for([gex], config)
 
         assert [entry.stage for entry in plan.entries] == [Stage.POST_ALIGN]
 
-    def test_forcing_alignment_still_respects_the_pair(self, config):
-        """Force overrides "already complete", not "there is nothing to align with"."""
-        gex = make("GEX-1", "MTX-32013", MULTIOME_GEX_PREP, align="COMPLETED")
+    def test_forcing_alignment_still_waits_on_the_partners_ingest(self, config):
+        """Force overrides "already complete", not "the pair is not ready yet"."""
+        gex = make("GEX-1", "MTX-32013", "10xRSeq_Mult", align="COMPLETED")
+        atac = make("ATAC-1", "ATX-36013", "10xATAC_Mult", ingest=NOT_COMPLETED)
 
-        plan = plan_for([gex], config, force=Stage.ALIGN)
+        plan = plan_for([gex, atac], config, force=Stage.ALIGN)
 
-        assert not plan.entries
-        assert plan.skipped[0].reason == planning.SkipReason.PAIR_MISSING
+        blocked = {skip.sample.fastq_name: skip for skip in plan.skipped}
+        assert blocked["GEX-1"].reason == planning.SkipReason.PAIR_INGEST_INCOMPLETE
 
 
 class TestSelectionExpansion:
@@ -147,8 +127,8 @@ class TestSelectionExpansion:
         from apps.workflow_engine.models import WorkflowConfig
 
         WorkflowConfig.objects.create(name="c.jsonc", raw="{}", data=config, uploaded_by=user, is_active=True)
-        make("GEX-1", "MTX-32013", MULTIOME_GEX_PREP)
-        make("ATAC-1", "ATX-36013", MULTIOME_ATAC_PREP)
+        make("GEX-1", "MTX-32013", "10xRSeq_Mult")
+        make("ATAC-1", "ATX-36013", "10xATAC_Mult")
         client.force_login(user)
 
         response = client.post(

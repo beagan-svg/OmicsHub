@@ -8,13 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from apps.sample_catalog.models import (
-    MULTIOME_ATAC_PREP,
-    MULTIOME_GEX_PREP,
-    BatchPrefix,
-    Modality,
-    Sample,
-)
+from apps.sample_catalog.models import BatchPrefix, Modality, Sample
 
 
 def make(fastq_name: str, batch: str, prep: str = "10xV4", load: str = "") -> Sample:
@@ -103,14 +97,17 @@ def test_modality_is_filterable_in_sql():
 
 
 @pytest.mark.django_db
-def test_multiome_partner_prep():
-    gex = make("fq-gex", "MTX-32013", prep=MULTIOME_GEX_PREP, load="3492_A01")
-    atac = make("fq-atac", "ATX-36013", prep=MULTIOME_ATAC_PREP, load="3492_A01")
+def test_multiome_partner_prefix():
+    """The partner is decided by batch prefix, not library prep name: a vendor's prep
+    naming for the two halves varies (real synced data has used more than one pair of
+    names), but MTX/ATX is the pairing OCS itself already treats as meaningful."""
+    gex = make("fq-gex", "MTX-32013", prep="10xRSeq_Mult", load="3492_A01")
+    atac = make("fq-atac", "ATX-36013", prep="10xATAC_Mult", load="3492_A01")
     plain = make("fq-plain", "10X120", prep="10xV4", load="3492_A01")
 
-    assert gex.multiome_partner_prep == MULTIOME_ATAC_PREP
-    assert atac.multiome_partner_prep == MULTIOME_GEX_PREP
-    assert plain.multiome_partner_prep is None
+    assert gex.multiome_partner_prefix == BatchPrefix.ATX
+    assert atac.multiome_partner_prefix == BatchPrefix.MTX
+    assert plain.multiome_partner_prefix is None
 
 
 @pytest.mark.django_db

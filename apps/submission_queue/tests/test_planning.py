@@ -117,9 +117,14 @@ class TestModality:
         assert not plan.needs_modality
 
     def test_atx_plans_as_mtx(self, config, make_sample):
-        """The ATAC half of a multiome pair runs the MTX workflow."""
-        plan = plan_for(make_sample(batch_name_from_vendor="ATX-36013"), config)
+        """The ATAC half of a multiome pair aligns through its GEX partner, which
+        resolves to the MTX workflow , ATX has no workflow of its own."""
+        atac = make_sample("ATAC-1", batch_name_from_vendor="ATX-36013", load_name="LOAD_1")
+        gex = make_sample("GEX-1", batch_name_from_vendor="MTX-32013", load_name="LOAD_1")
 
+        plan = build_plan(samples=[atac, gex], config=config, email=EMAIL)
+
+        assert [entry.sample.fastq_name for entry in plan.entries] == ["GEX-1"]
         assert plan.entries[0].modality == "MTX"
 
     def test_a_modality_the_config_cannot_run_is_flagged(self, config, make_sample):

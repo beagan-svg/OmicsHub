@@ -47,11 +47,13 @@ def prefixes_for_workflows(workflow_names) -> set[str]:
     return {str(prefix) for prefix in wanted}
 
 
-# The multiome pair: one library prep on each side, matched on load_name. Any sample whose
-# prep is not one of these has no partner.
-MULTIOME_GEX_PREP = "10xMultX_GEX"
-MULTIOME_ATAC_PREP = "10xMultX_ATAC"
-MULTIOME_PREPS = (MULTIOME_GEX_PREP, MULTIOME_ATAC_PREP)
+# The multiome pair: MTX (GEX) and ATX (ATAC) batches sharing a load_name. Not the
+# library prep name , a vendor's naming for the two halves varies (real synced data has
+# used "10xRSeq_Mult"/"10xATAC_Mult" as well as "10xMultX_GEX"/"10xMultX_ATAC") , and not
+# load_name alone either: 262 load_names in the real mirror are shared by unrelated
+# samples, so requiring one MTX and one ATX side is what tells a real pair apart from a
+# coincidence.
+MULTIOME_PREFIXES = (BatchPrefix.MTX, BatchPrefix.ATX)
 
 
 class Stage(models.TextChoices):
@@ -150,20 +152,21 @@ class Sample(models.Model):
             # one aggregate that groups by it groups by three columns, which a single-column
             # index cannot serve.
             models.Index(fields=["batch_prefix"]),
-            # The multiome partner lookup: find the other prep sharing this load_name.
-            models.Index(fields=["load_name", "library_prep_method_name"]),
+            # The multiome partner lookup: find the other batch prefix sharing this load_name.
+            models.Index(fields=["load_name", "batch_prefix"]),
         ]
 
     def __str__(self):
         return self.fastq_name
 
     @property
-    def multiome_partner_prep(self) -> str | None:
-        """Return the library prep on the other half of this sample pair, if present."""
-        if self.library_prep_method_name == MULTIOME_GEX_PREP:
-            return MULTIOME_ATAC_PREP
-        if self.library_prep_method_name == MULTIOME_ATAC_PREP:
-            return MULTIOME_GEX_PREP
+    def multiome_partner_prefix(self) -> str | None:
+        """Return the batch prefix (MTX or ATX) that would complete this sample's
+        multiome pair, or None if this sample's own prefix is neither."""
+        if self.batch_prefix == BatchPrefix.MTX:
+            return BatchPrefix.ATX
+        if self.batch_prefix == BatchPrefix.ATX:
+            return BatchPrefix.MTX
         return None
 
     def stage_record(self, stage: str):

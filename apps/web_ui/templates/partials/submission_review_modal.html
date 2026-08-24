@@ -151,11 +151,11 @@
             </div>
           </div>
 
-          {% if plan.reportable_skips %}
+          {% if plan.skipped %}
           <div class="card" id="incomplete-samples-warning">
             <div class="card-header">
               <span><i class="bi bi-slash-circle" aria-hidden="true"></i> Not Being Submitted</span>
-              <span class="count">{{ plan.reportable_skips|length }}</span>
+              <span class="count">{{ plan.skipped|length }}</span>
             </div>
             <div class="table-responsive">
               <table class="table table-sm mb-0" id="incomplete-samples-list">
@@ -166,7 +166,7 @@
                   <tr><th scope="col">Fastq Name</th><th scope="col">Reason</th><th scope="col">Detail</th></tr>
                 </thead>
                 <tbody>
-                  {% for skip in plan.reportable_skips %}
+                  {% for skip in plan.skipped %}
                   <tr>
                     <td class="mono">{{ skip.sample.fastq_name }}</td>
                     <td><span class="tag">{{ skip.reason }}</span></td>
@@ -195,27 +195,6 @@
               {% for sample in plan.covered_by_pair %}<span class="mono">{{ sample.fastq_name }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}.
               A multiome pair runs as one alignment, so its ATAC half has no command of its
               own.
-            </span>
-          </p>
-          {% endif %}
-
-          {% if plan.unpaired_multiome %}
-          {% comment %}
-          The ATAC halves of a multiome pair are submitted through their GEX partner, so they
-          are not listed above. There is nothing to say about one that is going in. The
-          exception is a half whose partner is not here: that one is not going in, and the
-          only useful thing to say about it is which pair is missing. A note rather than a
-          table row, because "no MTX pair" is not the same kind of fact as "the config has no
-          reference for marmoset", and filing it under the same Reason column read as though
-          the sample had been dropped for a configuration fault.
-          {% endcomment %}
-          <p class="note mt-3" id="unpaired-multiome-note">
-            <i class="bi bi-link-45deg" aria-hidden="true"></i>
-            <span>
-              No MTX pair found for
-              {% for skip in plan.unpaired_multiome %}<span class="mono">{{ skip.sample.fastq_name }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}.
-              A multiome ATAC half is aligned with its GEX half, so it is left out until both
-              are synced.
             </span>
           </p>
           {% endif %}

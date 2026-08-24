@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from apps.sample_catalog.models import MULTIOME_ATAC_PREP, MULTIOME_GEX_PREP, Sample
+from apps.sample_catalog.models import BatchPrefix, Sample
 from apps.sample_catalog.multiome_pairing import with_multiome_partners
 
 
@@ -20,8 +20,11 @@ def make(fastq_name: str, batch: str, prep: str, load: str) -> Sample:
 
 @pytest.fixture
 def pair(db):
-    gex = make("NW-MX32013-2", "MTX-32013", MULTIOME_GEX_PREP, "3492_A01")
-    atac = make("NW-AT36013-2", "ATX-36013", MULTIOME_ATAC_PREP, "3492_A01")
+    # Deliberately mismatched, non-canonical prep names: pairing is keyed on batch
+    # prefix and load_name, not on the library prep name, which a vendor names however
+    # it likes for either half.
+    gex = make("NW-MX32013-2", "MTX-32013", "10xRSeq_Mult", "3492_A01")
+    atac = make("NW-AT36013-2", "ATX-36013", "10xATAC_Mult", "3492_A01")
     return gex, atac
 
 
@@ -67,10 +70,11 @@ def test_a_non_multiome_sample_has_no_partner(db):
 
 @pytest.mark.django_db
 def test_a_sample_sharing_a_load_name_is_not_dragged_in(pair):
-    """load_name is not unique on its own, so the prep has to match too.
+    """load_name is not unique on its own, so the batch prefix has to match too.
 
     262 load_names in the real mirror are shared by more than one sample; matching on
-    load_name alone would sweep unrelated samples into someone's submission.
+    load_name alone would sweep unrelated samples into someone's submission. An RTX
+    sample sharing a load with a real MTX/ATX pair is not itself part of that pair.
     """
     gex, _ = pair
     make("UNRELATED-1", "10X120", "10xV4", "3492_A01")
@@ -83,7 +87,7 @@ def test_a_sample_sharing_a_load_name_is_not_dragged_in(pair):
 @pytest.mark.django_db
 def test_a_half_with_no_partner_is_left_alone(db):
     """The ATAC side may not have synced yet; that is not an error here."""
-    lonely = make("NW-MX99999-1", "MTX-99999", MULTIOME_GEX_PREP, "9999_Z01")
+    lonely = make("NW-MX99999-1", "MTX-99999", "10xRSeq_Mult", "9999_Z01")
 
     samples, added = with_multiome_partners([lonely])
 
@@ -95,9 +99,9 @@ def test_a_half_with_no_partner_is_left_alone(db):
 def test_partners_are_found_in_one_query(pair, django_assert_num_queries):
     """One query for the whole selection, not one per sample."""
     gex, _ = pair
-    make("NW-MX32013-3", "MTX-32013", MULTIOME_GEX_PREP, "3492_B01")
-    make("NW-AT36013-3", "ATX-36013", MULTIOME_ATAC_PREP, "3492_B01")
-    selection = list(Sample.objects.filter(library_prep_method_name=MULTIOME_GEX_PREP))
+    make("NW-MX32013-3", "MTX-32013", "10xRSeq_Mult", "3492_B01")
+    make("NW-AT36013-3", "ATX-36013", "10xATAC_Mult", "3492_B01")
+    selection = list(Sample.objects.filter(batch_prefix=BatchPrefix.MTX))
 
     with django_assert_num_queries(2):  # the candidate lookup + its prefetch
         with_multiome_partners(selection)
