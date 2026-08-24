@@ -16,6 +16,12 @@
   const total = boxes.length + locked;
   const saved = new Set(boxes.filter((box) => box.checked).map((box) => box.value));
 
+  // Built once rather than re-queried per group on every filter keystroke: search()
+  // used to run group.querySelectorAll("[data-column-option]") for each group, every
+  // time the reader typed a character.
+  const optionsByGroup = new Map(groups.map((group) => [group, []]));
+  options.forEach((option) => optionsByGroup.get(option.closest("[data-column-group]"))?.push(option));
+
   const chosen = () => new Set(boxes.filter((box) => box.checked).map((box) => box.value));
   const sameAsSaved = (now) => now.size === saved.size && [...now].every((key) => saved.has(key));
 
@@ -33,7 +39,7 @@
       option.hidden = query !== "" && !option.dataset.columnLabel.includes(query);
     });
     groups.forEach((group) => {
-      group.hidden = ![...group.querySelectorAll("[data-column-option]")].some((option) => !option.hidden);
+      group.hidden = !optionsByGroup.get(group).some((option) => !option.hidden);
     });
     empty.hidden = groups.some((group) => !group.hidden);
   };

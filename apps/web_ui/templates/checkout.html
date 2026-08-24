@@ -212,19 +212,26 @@
     return url;
   }
 
-  function setHiddenSelection(name, selected) {
-    const input = [...(selectedNames?.querySelectorAll("[data-selected-fastq]") || [])]
-      .find((candidate) => candidate.value === name);
-    if (selected && !input) {
-      const hidden = document.createElement("input");
-      hidden.type = "hidden";
-      hidden.name = "fastq_names";
-      hidden.value = name;
-      hidden.dataset.selectedFastq = "";
-      selectedNames.append(hidden);
-    } else if (!selected && input) {
-      input.remove();
-    }
+  function syncHiddenSelections() {
+    // One pass building a lookup, then one pass over the rows, rather than a fresh
+    // querySelectorAll + find over every existing hidden input for each row changed:
+    // "select all" on a large cart would otherwise turn this into O(rows²) DOM work.
+    const existingByValue = new Map(
+      [...(selectedNames?.querySelectorAll("[data-selected-fastq]") || [])].map((input) => [input.value, input]),
+    );
+    document.querySelectorAll(".select-cart-sample").forEach((box) => {
+      const existing = existingByValue.get(box.value);
+      if (box.checked && !existing) {
+        const hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = "fastq_names";
+        hidden.value = box.value;
+        hidden.dataset.selectedFastq = "";
+        selectedNames.append(hidden);
+      } else if (!box.checked && existing) {
+        existing.remove();
+      }
+    });
   }
 
   function updatePaginationLinks() {
@@ -237,17 +244,34 @@
   // tristate-select.js's job (shared with the dashboard's sample table); this only reacts
   // to a row's own "change", which fires whether the reader clicked it directly or
   // tristate-select.js flipped it on their behalf via "select all".
+  //
+  // Kept in memory rather than re-read from the URL on every "change": "select all" on a
+  // large cart dispatches one "change" per row, and re-parsing the URL plus rewriting it
+  // with history.replaceState on every single one of those would be a lot of avoidable
+  // work for what is, in the end, one exclude list. Everything below is queued as a
+  // microtask for the same reason update() is in tristate-select.js: however many rows
+  // changed in this pass collapse into one write and one hidden-input sync.
+  let excludedNames = excludedNamesFromUrl();
+  let flushQueued = false;
+  const queueFlush = () => {
+    if (flushQueued) return;
+    flushQueued = true;
+    queueMicrotask(() => {
+      flushQueued = false;
+      writeExcludedNamesToUrl(excludedNames);
+      syncHiddenSelections();
+      updatePaginationLinks();
+    });
+  };
+
   document.querySelectorAll(".select-cart-sample").forEach((box) => {
     box.addEventListener("change", () => {
-      const excludedNames = excludedNamesFromUrl();
       if (box.checked) {
         excludedNames.delete(box.value);
       } else {
         excludedNames.add(box.value);
       }
-      writeExcludedNamesToUrl(excludedNames);
-      setHiddenSelection(box.value, box.checked);
-      updatePaginationLinks();
+      queueFlush();
     });
   });
 
@@ -255,7 +279,6 @@
     window.location.assign(preserveExcludedNames(new URL(event.target.value, window.location.href)));
   });
 
-  updateSelectAllState();
   updatePaginationLinks();
 
   // Remember what each menu started on, so Reset has something to go back to.
@@ -340,77 +363,82 @@
 
   bindCommandEditors(document);
 
-  // Swaps the review modal for the confirmation modal in place, the same way the cart
-  // form below swaps in the review modal: fetch the next step's markup, then hide the
-  // current modal and show the new one once Bootstrap has finished tearing the old one
-  // down. A plain form submit here would reload the whole page, which flashes the
+  // Fetches one step of the cart -> review -> confirm flow, swaps its modal in, and
+  // shows it , hiding `previousModal` first if there is one, once Bootstrap has
+  // finished tearing it down. Shared by both AJAX steps below, which differ only in
+  // which form they intercept, what the button says while loading, which modal id gets
+  // replaced, and (for the first step) what the new modal needs wired up before it
+  // opens. A plain form submit here would reload the whole page, which flashes the
   // background as the page unloads and reloads instead of transitioning modal to modal.
-  function bindReviewSubmit(modalElement) {
-    const form = modalElement.querySelector("form");
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const button = event.submitter || form.querySelector("#review-commands");
-      const originalLabel = button.innerHTML;
-      button.disabled = true;
-      button.innerHTML = "Building commands…";
+  async function submitModalStep({ form, button, stepName, loadingLabel, nextModalId, previousModal, onInserted }) {
+    const originalLabel = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = loadingLabel;
 
-      try {
-        const response = await fetch(form.action, {
-          method: "POST",
-          body: new FormData(form),
-          headers: { "X-Requested-With": "XMLHttpRequest" },
-        });
-        if (!response.ok) throw new Error(`Confirm request failed: ${response.status}`);
-        const html = await response.text();
+    try {
+      const response = await fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+      });
+      if (!response.ok) throw new Error(`${stepName} request failed: ${response.status}`);
+      const html = await response.text();
 
-        document.getElementById("final-modal")?.remove();
-        document.body.insertAdjacentHTML("beforeend", html);
-        const finalModalElement = document.getElementById("final-modal");
+      document.getElementById(nextModalId)?.remove();
+      document.body.insertAdjacentHTML("beforeend", html);
+      const nextModalElement = document.getElementById(nextModalId);
+      onInserted?.(nextModalElement);
 
-        modalElement.addEventListener(
+      if (previousModal) {
+        previousModal.addEventListener(
           "hidden.bs.modal",
-          () => new bootstrap.Modal(finalModalElement).show(),
+          () => new bootstrap.Modal(nextModalElement).show(),
           { once: true },
         );
-        bootstrap.Modal.getInstance(modalElement).hide();
-      } finally {
-        button.disabled = false;
-        button.innerHTML = originalLabel;
+        bootstrap.Modal.getInstance(previousModal).hide();
+      } else {
+        new bootstrap.Modal(nextModalElement).show();
       }
+    } finally {
+      button.disabled = false;
+      button.innerHTML = originalLabel;
+    }
+  }
+
+  function bindReviewSubmit(modalElement) {
+    const form = modalElement.querySelector("form");
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitModalStep({
+        form,
+        button: event.submitter || form.querySelector("#review-commands"),
+        stepName: "Confirm",
+        loadingLabel: "Building commands…",
+        nextModalId: "final-modal",
+        previousModal: modalElement,
+      });
     });
   }
 
   document.getElementById("submit-modal") && bindReviewSubmit(document.getElementById("submit-modal"));
 
-  checkoutForm.addEventListener("submit", async (event) => {
+  checkoutForm.addEventListener("submit", (event) => {
     if (event.submitter?.id !== "submit-selected") return;
 
     event.preventDefault();
-    const button = event.submitter;
-    const originalLabel = button.innerHTML;
-    button.disabled = true;
-    button.innerHTML = "Reviewing…";
-
-    try {
-      const response = await fetch(checkoutForm.action, {
-        method: "POST",
-        body: new FormData(checkoutForm),
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-      });
-      const html = await response.text();
-      if (!response.ok) throw new Error(`Review request failed: ${response.status}`);
-
-      document.getElementById("submit-modal")?.remove();
-      document.body.insertAdjacentHTML("beforeend", html);
-      const modalElement = document.getElementById("submit-modal");
-      submitForm = modalElement.querySelector("form");
-      bindCommandEditors(modalElement);
-      bindReviewSubmit(modalElement);
-      new bootstrap.Modal(modalElement).show();
-    } finally {
-      button.disabled = false;
-      button.innerHTML = originalLabel;
-    }
+    submitModalStep({
+      form: checkoutForm,
+      button: event.submitter,
+      stepName: "Review",
+      loadingLabel: "Reviewing…",
+      nextModalId: "submit-modal",
+      previousModal: null,
+      onInserted: (modalElement) => {
+        submitForm = modalElement.querySelector("form");
+        bindCommandEditors(modalElement);
+        bindReviewSubmit(modalElement);
+      },
+    });
   });
 
   {% if open_modal %}

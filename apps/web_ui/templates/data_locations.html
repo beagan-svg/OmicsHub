@@ -80,8 +80,7 @@
       </div>
     </form>
 
-    {% url 'web_ui:data-locations' as data_locations_url %}
-    {% include "partials/sample_advanced_filters.html" with filter_form_id="locations-filter-form" disclosure_id="locations-advanced-filters" id_prefix="locations-" reset_url=data_locations_url %}
+    {% include "partials/sample_advanced_filters.html" with filter_form_id="locations-filter-form" disclosure_id="locations-advanced-filters" id_prefix="locations-" %}
   </div>
 
   <div class="table-responsive table-scroll">

@@ -118,8 +118,7 @@
         </div>
       </div>
 
-      {% url 'web_ui:dashboard' as dashboard_url %}
-      {% include "partials/sample_advanced_filters.html" with filter_form_id="filter-form" disclosure_id="advanced-filters" id_prefix="" reset_url=dashboard_url %}
+      {% include "partials/sample_advanced_filters.html" with filter_form_id="filter-form" disclosure_id="advanced-filters" id_prefix="" %}
     </div>
 
     {% comment %}
@@ -351,8 +350,15 @@ returns them to it.
         navCartBadge?.classList.toggle("d-none", !data.cart_count);
         if (response.ok && data.added) {
           // The samples are staged now, so leaving them ticked invites adding them twice.
-          // Harmless, but it reads as though the first press did nothing.
-          boxes().forEach((b) => { b.checked = false; });
+          // Harmless, but it reads as though the first press did nothing. Dispatching
+          // "change" rather than just setting .checked is what tells tristate-select.js
+          // to bring #select-all-samples back out of its checked/indeterminate state too;
+          // setting the property alone fires no event, and it would otherwise still show
+          // this now-empty selection as fully or partially selected.
+          boxes().forEach((b) => {
+            b.checked = false;
+            b.dispatchEvent(new Event("change", { bubbles: true }));
+          });
         }
       } catch {
         cartFeedback.textContent = "Could not reach the server. Nothing was added.";

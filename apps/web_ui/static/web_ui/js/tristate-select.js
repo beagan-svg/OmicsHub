@@ -16,20 +16,41 @@ document.querySelectorAll("[data-tristate-group]").forEach((selectAll) => {
     selectAll.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
   };
 
-  rows().forEach((box) => box.addEventListener("change", update));
+  // Toggling every row through "select all" dispatches one "change" per row (see the
+  // header comment), and each dispatch would otherwise re-scan every row in the group to
+  // recompute this same checked/indeterminate state , O(rows) work done once per row
+  // toggled, so O(rows²) for a full select-all on a large table. Queuing it as a
+  // microtask instead collapses however many rows changed in this pass into a single
+  // recompute, since microtasks run once after the current synchronous work finishes,
+  // not once per event.
+  let updateQueued = false;
+  const queueUpdate = () => {
+    if (updateQueued) return;
+    updateQueued = true;
+    queueMicrotask(() => {
+      updateQueued = false;
+      update();
+    });
+  };
+
+  rows().forEach((box) => box.addEventListener("change", queueUpdate));
 
   selectAll.addEventListener("change", () => {
-    // Captured once: a row's own "change" listener can be `update` itself (added below),
-    // which reads and rewrites selectAll.checked as each row is dispatched. Comparing
-    // against the live property here would compare each row against whatever the
-    // previous row's dispatch just left it at, not against the click that started this.
+    // Captured once rather than read fresh inside the loop below, in case a row's own
+    // "change" listener (a page's, not this file's) ever reaches back and touches
+    // selectAll.checked itself , comparing against a live property could then compare
+    // each row against whatever an earlier row's dispatch left it at, not the click that
+    // started this.
     const target = selectAll.checked;
     rows().forEach((box) => {
       if (box.checked === target) return;
       box.checked = target;
       box.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    update();
+    // queueUpdate, not update: every dispatched row above already queued the same
+    // microtask, so calling the synchronous version here on top would recompute the
+    // checked/indeterminate state twice for one click.
+    queueUpdate();
   });
 
   update();

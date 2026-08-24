@@ -152,7 +152,6 @@ def data_locations(request):
             # nothing useful for them is worse than not offering one.
             "sort": request.GET.get("sort") if request.GET.get("sort") in SORTABLE else DEFAULT_SORT,
             "dir": "asc" if request.GET.get("dir") == "asc" else "desc",
-            "sortable_keys": ["fastq_name"],
             "columns": columns.visible_location_columns(request.user),
             "all_columns": columns.LOCATION_COLUMNS,
             "column_groups": columns.LOCATION_COLUMN_GROUPS,
@@ -676,9 +675,9 @@ def submit_review(request):
     context = _submission_context(request)
     if context is None:
         return redirect("web_ui:checkout")
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return render(request, "partials/submission_review_modal.html", context)
-    return render(request, "checkout.html", {**context, "open_modal": "submit"})
+    return _render_submission_step(
+        request, context, partial="partials/submission_review_modal.html", modal="submit"
+    )
 
 
 @login_required
@@ -740,9 +739,22 @@ def submit_commands(request):
     context = _submission_context(request)
     if context is None:
         return redirect("web_ui:checkout")
+    return _render_submission_step(
+        request, context, partial="partials/submission_confirmation_modal.html", modal="final"
+    )
+
+
+def _render_submission_step(request, context, *, partial, modal):
+    """Render one step of the multi-step submission flow.
+
+    An AJAX request (both submission steps' modals fetch this way) gets just the partial
+    to swap in; a plain form post — the JavaScript-off fallback — gets the full checkout
+    page with that step's modal already open, since there is no earlier page to swap it
+    into.
+    """
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return render(request, "partials/submission_confirmation_modal.html", context)
-    return render(request, "checkout.html", {**context, "open_modal": "final"})
+        return render(request, partial, context)
+    return render(request, "checkout.html", {**context, "open_modal": modal})
 
 
 @login_required
@@ -1418,6 +1430,29 @@ SORTABLE = {
 DEFAULT_SORT = "batch_name_from_vendor"
 DEFAULT_DIRECTION = "desc"
 
+# A name like "NY-MX22056-9" shares every digit with "NY-MX22056-10" but the last, so a
+# text sort puts "-10" before "-2". Each of these annotations extracts just the digits
+# from the named field into one integer instead: a fixed prefix stays in the more
+# significant place and the trailing index in the less significant one, which orders
+# correctly without parsing the name into parts. Keyed by the annotation name so `_sorted`
+# can build only the one(s) a given sort actually needs, rather than every field this
+# table could ever be sorted by.
+NUMERIC_SORT_SOURCE_FIELDS = {
+    "batch_number": "batch_name_from_vendor",
+    "fastq_number": "fastq_name",
+}
+
+
+def _numeric_sort_annotation(source_field: str) -> Cast:
+    """Return the digits of `source_field` as one integer, or NULL if it has none."""
+    return Cast(
+        NullIf(
+            Func(F(source_field), Value(r"\D"), Value(""), Value("g"), function="regexp_replace"),
+            Value(""),
+        ),
+        output_field=BigIntegerField(),
+    )
+
 
 def _sorted(queryset, request):
     """Return table rows ordered by the selected sort, newest batch first by default.
@@ -1431,46 +1466,21 @@ def _sorted(queryset, request):
     direction = request.GET.get("dir") or DEFAULT_DIRECTION
     descending = direction != "asc"
 
-    queryset = queryset.annotate(
-        batch_number=Cast(
-            NullIf(
-                Func(
-                    F("batch_name_from_vendor"),
-                    Value(r"\D"),
-                    Value(""),
-                    Value("g"),
-                    function="regexp_replace",
-                ),
-                Value(""),
-            ),
-            output_field=BigIntegerField(),
-        ),
-        # Same idea as batch_number: "NY-MX22056-9" and "NY-MX22056-10" share every digit
-        # but the last, so a text sort puts -10 before -2. Digits-only as one integer keeps
-        # a fixed prefix in the more significant place and the trailing index in the less
-        # significant one, which orders correctly without parsing the name into parts.
-        fastq_number=Cast(
-            NullIf(
-                Func(
-                    F("fastq_name"),
-                    Value(r"\D"),
-                    Value(""),
-                    Value("g"),
-                    function="regexp_replace",
-                ),
-                Value(""),
-            ),
-            output_field=BigIntegerField(),
-        ),
-    )
+    parts = SORTABLE[field]
+    numeric_annotations = {
+        name: _numeric_sort_annotation(source)
+        for name, source in NUMERIC_SORT_SOURCE_FIELDS.items()
+        if name in parts
+    }
+    if numeric_annotations:
+        queryset = queryset.annotate(**numeric_annotations)
 
     # nulls_last on every part, because Postgres sorts NULL first under DESC and a batch
     # name with no digits in it has a NULL `batch_number`. Left to the default, `MTX-PILOT`
     # sat at the top of the table and the bottom of the filter menu, which sorts the same
     # names in Python. See `batch_sort_key`.
     ordering = [
-        F(part).desc(nulls_last=True) if descending else F(part).asc(nulls_last=True)
-        for part in SORTABLE[field]
+        F(part).desc(nulls_last=True) if descending else F(part).asc(nulls_last=True) for part in parts
     ]
     # A unique tiebreaker, or rows shift between pages when the sort key repeats.
     ordering.append(F("fastq_name").desc() if descending else F("fastq_name").asc())
@@ -1575,8 +1585,13 @@ def _selected_config(request):
     return WorkflowConfig.objects.filter(is_active=True).first()
 
 
-def _checkout_context(request):
-    """Build the cart page with staged samples and the selected manifest."""
+def _checkout_context(request, config=None):
+    """Build the cart page with staged samples and the selected manifest.
+
+    `config` lets a caller that already looked it up (`_submission_context`, mid
+    submission flow) pass it straight through instead of this running the same
+    `WorkflowConfig` query a second time.
+    """
     items = list(_cart_items(request))
     excluded_fastq_names = set(request.GET.getlist("exclude_fastq_names"))
     posted_fastq_names = set(request.POST.getlist("fastq_names"))
@@ -1589,7 +1604,8 @@ def _checkout_context(request):
     selected_fastq_names = [
         item.sample.fastq_name for item in items if item.sample.fastq_name not in excluded_fastq_names
     ]
-    config = _selected_config(request)
+    if config is None:
+        config = _selected_config(request)
 
     return {
         "cart_items": list(page.object_list),
@@ -1603,7 +1619,10 @@ def _checkout_context(request):
         # Fixed, not the user's dashboard choice. See columns.CHECKOUT_COLUMNS.
         "columns": columns.CHECKOUT_COLUMN_LIST,
         "config": config,
-        "configs": list(WorkflowConfig.objects.select_related("uploaded_by")),
+        # The picker only ever shows a name and an upload date; .only() skips fetching
+        # every config's full `data` (the whole parsed manifest) and `raw` (the whole
+        # uploaded file text) on every checkout-flow request.
+        "configs": list(WorkflowConfig.objects.only("name", "uploaded_at")),
         "modalities": modality.available_modalities(config.data) if config else [],
     }
 
@@ -1669,7 +1688,7 @@ def _submission_context(request):
         )
 
     return {
-        **_checkout_context(request),
+        **_checkout_context(request, config=config),
         "plan": plan,
         "unconfigured_groups": unconfigured_groups,
         # Placeholders the config cannot fill for this prep. Asked for in the modal, and
