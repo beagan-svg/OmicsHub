@@ -40,7 +40,7 @@ from django.views.decorators.http import require_GET, require_POST
 from apps.ocs_integration import dynamodb, s3
 from apps.sample_catalog import multiome_pairing as pairing
 from apps.sample_catalog import ocs_sync as sync
-from apps.sample_catalog.models import MULTIOME_PREPS, NOT_COMPLETED, BatchPrefix, Sample, Stage, StageStatus
+from apps.sample_catalog.models import NOT_COMPLETED, BatchPrefix, Sample, Stage, StageStatus
 from apps.submission_queue import queue_entries as enqueue_service
 from apps.submission_queue import queue_planning as planning
 from apps.submission_queue import tasks
@@ -959,16 +959,18 @@ def _collapse_multiome_monitor_rows(
     """Represent a multiome MTX/ATX pair as one MTX monitor row.
 
     OCS mirrors a status for each FASTQ half, but the two halves share one alignment
-    operation. A running half takes precedence over a finished half, and the MTX/GEX half
-    is the representative whenever both statuses are in the same state.
+    operation and the same load_name, whatever their library prep names happen to be.
+    load_name is what ties them together, so grouping on it alone catches every pair
+    regardless of prep naming convention. A running half takes precedence over a
+    finished half, and the MTX half is the representative whenever both statuses are
+    in the same state.
     """
     selected: dict[tuple[str, str | int], StageStatus] = {}
     order: list[tuple[str, str | int]] = []
 
     for row in [*running, *finished]:
         sample = row.sample
-        is_multiome = sample.library_prep_method_name in MULTIOME_PREPS and sample.load_name
-        key = (row.stage, sample.load_name) if is_multiome else ("sample", row.pk)
+        key = (row.stage, sample.load_name) if sample.load_name else ("sample", row.pk)
         current = selected.get(key)
         if current is None:
             selected[key] = row

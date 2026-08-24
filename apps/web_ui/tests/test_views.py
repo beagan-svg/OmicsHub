@@ -947,7 +947,7 @@ class TestJobMonitor:
 
     def test_monitor_tables_paginate_with_the_shared_page_size(self, logged_in, make_sample):
         for index in range(30):
-            sample = make_sample(f"RUNNING-PAGE-{index:02d}")
+            sample = make_sample(f"RUNNING-PAGE-{index:02d}", load_name=f"LOAD-{index:02d}")
             sample.stage_statuses.create(
                 stage=Stage.ALIGN,
                 status="IN_PROGRESS",
@@ -984,6 +984,33 @@ class TestJobMonitor:
         assert response.context["running"][0].sample.modality == "MTX"
         assert response.context["counts"]["total"] == 1
         assert set(response.context["monitor_fastq_names"]) == {gex.fastq_name, atac.fastq_name}
+
+    def test_a_shared_load_collapses_regardless_of_library_prep_name(self, logged_in, make_sample):
+        """The pairing that matters is one load_name aligning as one OCS job; the prep
+        name is just whatever the vendor happened to call it, not the tie that binds
+        the two rows together."""
+        mtx = make_sample(
+            "NW-MX32019-1",
+            batch_name_from_vendor="MTX-32019",
+            library_prep_method_name="10xRSeq_Mult",
+            load_name="3698_C05",
+        )
+        atx = make_sample(
+            "NW-AT36019-1",
+            batch_name_from_vendor="ATX-36019",
+            library_prep_method_name="10xATAC_Mult",
+            load_name="3698_C05",
+        )
+        for sample in (mtx, atx):
+            sample.stage_statuses.create(
+                stage=Stage.ALIGN, status="IN_PROGRESS", demand_id=f"{sample.pk}-demand"
+            )
+
+        response = logged_in.get(reverse("web_ui:job-monitor"))
+
+        assert len(response.context["running"]) == 1
+        assert response.context["running"][0].sample == mtx
+        assert response.context["running"][0].sample.modality == "MTX"
 
     def test_a_demand_submitted_outside_omicshub_is_shown_and_labelled(self, logged_in, make_sample):
         """The whole point: no queue entry holds this demand id, and it still appears."""
