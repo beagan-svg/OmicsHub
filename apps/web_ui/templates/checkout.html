@@ -362,6 +362,48 @@
 
   bindCommandEditors(document);
 
+  // Swaps the review modal for the confirmation modal in place, the same way the cart
+  // form below swaps in the review modal: fetch the next step's markup, then hide the
+  // current modal and show the new one once Bootstrap has finished tearing the old one
+  // down. A plain form submit here would reload the whole page, which flashes the
+  // background as the page unloads and reloads instead of transitioning modal to modal.
+  function bindReviewSubmit(modalElement) {
+    const form = modalElement.querySelector("form");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = event.submitter || form.querySelector("#review-commands");
+      const originalLabel = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = "Building commands…";
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: new FormData(form),
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        if (!response.ok) throw new Error(`Confirm request failed: ${response.status}`);
+        const html = await response.text();
+
+        document.getElementById("final-modal")?.remove();
+        document.body.insertAdjacentHTML("beforeend", html);
+        const finalModalElement = document.getElementById("final-modal");
+
+        modalElement.addEventListener(
+          "hidden.bs.modal",
+          () => new bootstrap.Modal(finalModalElement).show(),
+          { once: true },
+        );
+        bootstrap.Modal.getInstance(modalElement).hide();
+      } finally {
+        button.disabled = false;
+        button.innerHTML = originalLabel;
+      }
+    });
+  }
+
+  document.getElementById("submit-modal") && bindReviewSubmit(document.getElementById("submit-modal"));
+
   checkoutForm.addEventListener("submit", async (event) => {
     if (event.submitter?.id !== "submit-selected") return;
 
@@ -385,6 +427,7 @@
       const modalElement = document.getElementById("submit-modal");
       submitForm = modalElement.querySelector("form");
       bindCommandEditors(modalElement);
+      bindReviewSubmit(modalElement);
       new bootstrap.Modal(modalElement).show();
     } finally {
       button.disabled = false;

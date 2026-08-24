@@ -685,6 +685,20 @@ class TestSubmitReview:
 class TestSubmitCommands:
     """Step 2 , the confirmation modal."""
 
+    def test_ajax_confirm_returns_only_the_modal(self, logged_in, active_config, make_sample):
+        make_sample("READY-1")
+
+        response = logged_in.post(
+            reverse("web_ui:submit-commands"),
+            {"fastq_names": ["READY-1"]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        assert response.status_code == 200
+        assert response.templates[0].name == "partials/submission_confirmation_modal.html"
+        assert b'id="final-modal"' in response.content
+        assert b'id="checkout-form"' not in response.content
+
     def test_shows_the_command_without_a_notification_email_editor(
         self, logged_in, active_config, make_sample, user
     ):

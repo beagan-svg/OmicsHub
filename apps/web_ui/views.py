@@ -740,6 +740,8 @@ def submit_commands(request):
     context = _submission_context(request)
     if context is None:
         return redirect("web_ui:checkout")
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return render(request, "partials/submission_confirmation_modal.html", context)
     return render(request, "checkout.html", {**context, "open_modal": "final"})
 
 
