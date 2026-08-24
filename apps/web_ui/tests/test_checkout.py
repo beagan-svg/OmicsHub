@@ -169,6 +169,23 @@ class TestCartAddFeedback:
         assert 'id="cart-feedback"' in content
         assert 'id="cart-count"' in content
 
+    def test_the_nav_cart_badge_exists_even_when_empty_so_js_can_update_it(self, logged_in, make_sample):
+        """The dashboard's JS writes this count in after an AJAX add; it can only do that
+        if the element is already in the page, so it has to render at zero too."""
+        content = logged_in.get(reverse("web_ui:dashboard")).content.decode()
+
+        assert 'class="count d-none" id="nav-cart-badge"' in content
+        assert 'id="nav-cart-count">0<' in content
+
+    def test_the_nav_cart_badge_is_visible_once_something_is_in_the_cart(self, logged_in, make_sample):
+        make_sample("READY-1")
+        logged_in.post(reverse("web_ui:cart-add"), {"fastq_names": ["READY-1"]})
+
+        content = logged_in.get(reverse("web_ui:dashboard")).content.decode()
+
+        assert 'class="count " id="nav-cart-badge"' in content
+        assert 'id="nav-cart-count">1<' in content
+
     def test_carts_are_per_user(self, logged_in, client, make_sample, user, django_user_model):
         make_sample("READY-1")
         logged_in.post(reverse("web_ui:cart-add"), {"fastq_names": ["READY-1"]})

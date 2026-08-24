@@ -63,7 +63,15 @@
               <a class="nav-link {{ checkout_active }}" href="{% url 'web_ui:checkout' %}"
                  {% if checkout_active %}aria-current="page"{% endif %}>
                 <i class="bi bi-bag" aria-hidden="true"></i> Checkout
-                {% if cart_count %}<span class="count">{{ cart_count }}<span class="visually-hidden"> in Cart</span></span>{% endif %}
+                {% comment %}
+                Always rendered, just hidden at zero: the dashboard's own "Add Selected to
+                Cart" updates this count live after an AJAX add, and it can only do that by
+                writing into an element that already exists rather than by re-rendering the
+                whole nav from the server.
+                {% endcomment %}
+                <span class="count {% if not cart_count %}d-none{% endif %}" id="nav-cart-badge">
+                  <span id="nav-cart-count">{{ cart_count }}</span><span class="visually-hidden"> in Cart</span>
+                </span>
               </a>
             </li>
             {% active_class 'queue' as queue_active %}
@@ -278,6 +286,7 @@
   <script src="{% static_v 'web_ui/js/study-filter.js' %}"></script>
   <script src="{% static_v 'web_ui/js/column-menu.js' %}"></script>
   <script src="{% static_v 'web_ui/js/table-resize.js' %}"></script>
+  <script src="{% static_v 'web_ui/js/tristate-select.js' %}"></script>
   <script src="{% static_v 'web_ui/js/live-status.js' %}"></script>
   <script src="{% static_v 'web_ui/js/live-fragments.js' %}"></script>
   {% block extra_js %}{% endblock %}

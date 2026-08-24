@@ -685,6 +685,16 @@ main.container-fluid {
   60%      { box-shadow: 0 0 0 4px rgb(from currentColor r g b / 0); }
 }
 
+/* Plain inline text, not a pill: "Added 2 samples to the cart" and "Select at least one
+   sample" read identically as secondary-colour text otherwise, and a reader has to parse
+   the sentence to tell which one they got. Not .text-secondary for its neutral state,
+   because that utility is !important and would outrank the two colours below regardless
+   of selector order. An unset data-state (an "already in the cart" / "no longer in the
+   mirror" note with nothing added or wrong) stays this neutral default. */
+#cart-feedback { color: var(--ink-secondary); }
+#cart-feedback[data-state="done"] { color: var(--state-done-ink); }
+#cart-feedback[data-state="fail"] { color: var(--state-fail-ink); }
+
 
 .tag {
   display: inline-flex;

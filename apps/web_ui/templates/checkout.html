@@ -115,6 +115,7 @@
           <tr>
             <th scope="col" style="width:2rem">
               <input type="checkbox" class="form-check-input" id="select-all-cart"
+                     data-tristate-group="checkout-cart"
                      aria-label="Select all staged samples on this page">
             </th>
             {% for column in columns %}<th scope="col" class="col--{{ column.kind }}">{{ column.label }}</th>{% endfor %}
@@ -128,7 +129,7 @@
             the common case is submitting all of it and unticking the exceptions.
             {% endcomment %}
             <td><input type="checkbox" class="form-check-input select-cart-sample"
-                       value="{{ item.sample.fastq_name }}"
+                       value="{{ item.sample.fastq_name }}" data-tristate-row="checkout-cart"
                        {% if item.sample.fastq_name not in checkout_excluded_fastq_names %}checked{% endif %}
                        aria-label="Submit {{ item.sample.fastq_name }}"></td>
             {% for column in columns %}{% include "partials/sample_table_cell.html" with sample=item.sample %}{% endfor %}
@@ -191,7 +192,6 @@
 {% block extra_js %}
 <script>
   const checkoutForm = document.getElementById("checkout-form");
-  const selectAllCart = document.getElementById("select-all-cart");
   const selectedNames = document.getElementById("checkout-selected-names");
 
   function excludedNamesFromUrl() {
@@ -233,15 +233,10 @@
     });
   }
 
-  function updateSelectAllState() {
-    const boxes = [...document.querySelectorAll(".select-cart-sample")];
-    const selectedCount = boxes.filter((box) => box.checked).length;
-    if (selectAllCart) {
-      selectAllCart.checked = boxes.length > 0 && selectedCount === boxes.length;
-      selectAllCart.indeterminate = selectedCount > 0 && selectedCount < boxes.length;
-    }
-  }
-
+  // Checked/indeterminate bookkeeping and "select all" toggling every row is
+  // tristate-select.js's job (shared with the dashboard's sample table); this only reacts
+  // to a row's own "change", which fires whether the reader clicked it directly or
+  // tristate-select.js flipped it on their behalf via "select all".
   document.querySelectorAll(".select-cart-sample").forEach((box) => {
     box.addEventListener("change", () => {
       const excludedNames = excludedNamesFromUrl();
@@ -252,25 +247,8 @@
       }
       writeExcludedNamesToUrl(excludedNames);
       setHiddenSelection(box.value, box.checked);
-      updateSelectAllState();
       updatePaginationLinks();
     });
-  });
-
-  selectAllCart?.addEventListener("change", () => {
-    const excludedNames = excludedNamesFromUrl();
-    document.querySelectorAll(".select-cart-sample").forEach((box) => {
-      box.checked = selectAllCart.checked;
-      setHiddenSelection(box.value, box.checked);
-      if (box.checked) {
-        excludedNames.delete(box.value);
-      } else {
-        excludedNames.add(box.value);
-      }
-    });
-    writeExcludedNamesToUrl(excludedNames);
-    updateSelectAllState();
-    updatePaginationLinks();
   });
 
   document.querySelector(".checkout-pager select")?.addEventListener("change", (event) => {

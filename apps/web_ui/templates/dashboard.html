@@ -148,6 +148,7 @@
           <tr>
             <th scope="col" style="width:2rem">
               <input type="checkbox" class="form-check-input" id="select-all-samples"
+                     data-tristate-group="dashboard-samples"
                      aria-label="Select all samples on this page">
             </th>
             {% comment %}
@@ -187,7 +188,7 @@
             row to a human, so it is what identifies it here.
             {% endcomment %}
             <td><input type="checkbox" class="form-check-input select-sample" name="fastq_names"
-                       value="{{ sample.fastq_name }}"
+                       value="{{ sample.fastq_name }}" data-tristate-row="dashboard-samples"
                        aria-label="Select {{ sample.fastq_name }}"></td>
             {% for column in columns %}{% include "partials/sample_table_cell.html" %}{% endfor %}
           </tr>
@@ -220,7 +221,13 @@
             <i class="bi bi-bag" aria-hidden="true"></i>
             <span id="cart-count">{{ cart_count }}</span> in Cart
           </span>
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:checkout' %}">Go to Checkout</a>
+          <a class="btn btn-sm btn-outline-secondary" id="go-to-checkout" href="{% url 'web_ui:checkout' %}">Go to Checkout</a>
+          {% comment %}
+          Not disabled here: with JavaScript off, nothing would ever flip it back, and the
+          button still has to submit the form normally in that case. The JS below disables
+          it (and re-enables it) from the live selection count instead; the server-side
+          "select at least one" error is the fallback for whoever never got that far.
+          {% endcomment %}
           <button class="btn btn-sm btn-primary" type="submit" id="add-to-cart"
                   formaction="{% url 'web_ui:cart-add' %}">
             <i class="bi bi-plus-lg" aria-hidden="true"></i> Add Selected to Cart
@@ -237,7 +244,7 @@
       aria-live, so it is announced rather than only seen; polite, because it is a
       confirmation and interrupts nothing.
       {% endcomment %}
-      <span class="text-secondary" id="cart-feedback" aria-live="polite"></span>
+      <span id="cart-feedback" aria-live="polite"></span>
       <div class="dashboard-footer__pager">
         {% include "partials/table_pager.html" with pager_label="Sample pages" %}
       </div>
@@ -273,21 +280,35 @@ returns them to it.
 
 {% block extra_js %}
 <script>
-  const selectAll = document.getElementById("select-all-samples");
+  // Checked/indeterminate bookkeeping and "select all" toggling every row is
+  // tristate-select.js's job (shared with checkout's cart table); this only reacts to a
+  // row's own "change", which fires whether the reader clicked it directly or
+  // tristate-select.js flipped it on their behalf via "select all".
   const boxes = () => document.querySelectorAll(".select-sample");
   const selectionCount = document.getElementById("sample-selection-count");
+  const addToCart = document.getElementById("add-to-cart");
+  const goToCheckout = document.getElementById("go-to-checkout");
+  const cartFeedback = document.getElementById("cart-feedback");
+  const cartCount = document.getElementById("cart-count");
+  const navCartCount = document.getElementById("nav-cart-count");
+  const navCartBadge = document.getElementById("nav-cart-badge");
+
   const updateSelectionCount = () => {
-    if (!selectAll || !selectionCount) return;
+    if (!selectionCount) return;
     const count = [...boxes()].filter((box) => box.checked).length;
     selectionCount.textContent = `${count} Fastq Sample${count === 1 ? "" : "s"} Selected`;
-    selectAll.checked = count > 0 && count === boxes().length;
-    selectAll.indeterminate = count > 0 && count < boxes().length;
+    if (addToCart) {
+      addToCart.disabled = count === 0;
+      addToCart.title = count === 0 ? "Select at least one sample first" : "";
+    }
+    if (goToCheckout) {
+      // Nothing here adds the ticked boxes to the cart, so leaving with a live selection
+      // silently drops it. Said on the link a reader would otherwise take without knowing.
+      goToCheckout.title =
+        count === 0 ? "" : `${count} selected sample${count === 1 ? "" : "s"} will not be added unless you click "Add Selected to Cart" first.`;
+    }
   };
-  if (selectAll && selectionCount) {
-    selectAll.addEventListener("change", (e) => {
-      boxes().forEach((b) => { b.checked = e.target.checked; });
-      updateSelectionCount();
-    });
+  if (selectionCount) {
     boxes().forEach((box) => box.addEventListener("change", updateSelectionCount));
     updateSelectionCount();
   }
@@ -299,19 +320,18 @@ returns them to it.
   //
   // The button still submits the form normally with JavaScript off; this only takes over
   // once it is running, and the view answers either way.
-  const addToCart = document.getElementById("add-to-cart");
-  const cartFeedback = document.getElementById("cart-feedback");
-  const cartCount = document.getElementById("cart-count");
-
   if (addToCart) {
     addToCart.addEventListener("click", async (event) => {
       event.preventDefault();
       const form = document.getElementById("submission-form");
       const body = new FormData(form);
+      const originalLabel = addToCart.innerHTML;
       // formaction is what normally redirects this form at the cart; posting it directly
       // means the URL has to be named here instead.
       addToCart.disabled = true;
+      addToCart.innerHTML = "Adding…";
       cartFeedback.textContent = "";
+      delete cartFeedback.dataset.state;
 
       try {
         const response = await fetch("{% url 'web_ui:cart-add' %}", {
@@ -319,18 +339,31 @@ returns them to it.
         });
         const data = await response.json();
         cartFeedback.textContent = data.message;
+        // Success and failure read identically as plain secondary-colour text otherwise;
+        // this is the only thing telling a reader which one they got without parsing the
+        // sentence themselves. "Already in the cart" with nothing newly added is neither,
+        // so it stays the neutral default rather than reading as a success.
+        if (data.error) cartFeedback.dataset.state = "fail";
+        else if (data.added) cartFeedback.dataset.state = "done";
+        else delete cartFeedback.dataset.state;
         cartCount.textContent = data.cart_count;
+        if (navCartCount) navCartCount.textContent = data.cart_count;
+        navCartBadge?.classList.toggle("d-none", !data.cart_count);
         if (response.ok && data.added) {
           // The samples are staged now, so leaving them ticked invites adding them twice.
-          // harmless, but it reads as though the first press did nothing.
-          selectAll.checked = false;
+          // Harmless, but it reads as though the first press did nothing.
           boxes().forEach((b) => { b.checked = false; });
-          updateSelectionCount();
         }
       } catch {
         cartFeedback.textContent = "Could not reach the server. Nothing was added.";
+        cartFeedback.dataset.state = "fail";
       } finally {
-        addToCart.disabled = false;
+        addToCart.innerHTML = originalLabel;
+        // Recomputes disabled/title from the boxes as they now stand, rather than
+        // hard-coding addToCart back to enabled: a failed add leaves the selection alone
+        // and a successful one just cleared it, and either way this is the one place that
+        // already knows which state that implies.
+        updateSelectionCount();
       }
     });
   }
