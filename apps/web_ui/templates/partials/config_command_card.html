@@ -1,0 +1,29 @@
+<div class="card mb-2">
+  <div class="card-header">
+    <div class="d-flex align-items-center gap-2">
+      <span>{{ command_config.name }}</span>
+      {% for prep in command_config.match.library_preps %}<span class="tag">{{ prep }}</span>{% endfor %}
+    </div>
+    <span class="mono text-secondary">{{ command_config.command|join:" " }}</span>
+  </div>
+  <div class="card-body">
+    <p class="text-secondary" style="margin-bottom: 8px;">Spacing: <span class="mono">{{ command_config.spacing }}s</span></p>
+    <table class="table align-middle mb-0">
+      <caption class="visually-hidden">Arguments this command passes to OCS.</caption>
+      <thead>
+        <tr><th scope="col" style="width: 220px">Flag</th><th scope="col">Value</th></tr>
+      </thead>
+      <tbody>
+        {% for argument in command_config.arguments %}
+        <tr>
+          <td class="mono" style="width: 220px">{{ argument.flag }}</td>
+          <td>
+            <span class="mono">{{ argument.value }}</span>
+            {% if argument.description %}<div class="text-secondary" style="font-size: var(--text-sm);">{{ argument.description }}</div>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

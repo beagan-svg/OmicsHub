@@ -40,9 +40,10 @@ urlpatterns = [
     path("failed/", views.failed_jobs, name="failed"),
     path("failed/<int:pk>/retry/", views.retry_job, name="retry"),
     path("failed/<int:pk>/delete/", views.delete_job, name="delete-job"),
-    # Settings is where the config lives now. The old /configs/ path is kept so links and
+    # Configs is where the config lives. The old /settings/ path is kept so links and
     # bookmarks from before the rename still land somewhere, rather than 404ing.
-    path("settings/", views.configs, name="configs"),
-    path("configs/", RedirectView.as_view(pattern_name="web_ui:configs", permanent=False)),
-    path("settings/<int:pk>/activate/", views.activate_config, name="activate-config"),
+    path("configs/", views.configs, name="configs"),
+    path("settings/", RedirectView.as_view(pattern_name="web_ui:configs", permanent=False)),
+    path("configs/<int:pk>/", views.config_detail, name="config-detail"),
+    path("configs/<int:pk>/activate/", views.activate_config, name="activate-config"),
 ]

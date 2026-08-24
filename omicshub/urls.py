@@ -1,8 +1,9 @@
 from django.conf import settings
 from django.contrib import admin
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.views import LoginView
 from django.urls import include, path
 
+from apps.accounts import views as accounts_views
 from apps.accounts.forms import LoginForm
 from omicshub.health import health
 
@@ -26,7 +27,7 @@ urlpatterns = [
     # password-reset flow, which needs mail settings and templates this project has not.
     path("accounts/", include("apps.accounts.urls")),
     path("accounts/login/", LoginView.as_view(authentication_form=LoginForm), name="login"),
-    path("accounts/logout/", LogoutView.as_view(), name="logout"),
+    path("accounts/logout/", accounts_views.logout_view, name="logout"),
     path("api-auth/", include("rest_framework.urls")),
     path("api/", include("apps.sample_catalog.urls")),
     path("api/", include("apps.workflow_engine.urls")),

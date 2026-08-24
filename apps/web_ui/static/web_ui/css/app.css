@@ -180,6 +180,10 @@ h1 { font-size: var(--text-2xl); letter-spacing: -0.018em; }
 h2 { font-size: var(--text-lg); letter-spacing: -0.014em; }
 h3 { font-size: var(--text-md); }
 
+/* An h3 used as a real section break inside a card, not just bold body text at the
+   same size as everything around it. */
+h3.subsection-heading { font-size: var(--text-lg); letter-spacing: -0.014em; }
+
 
 .text-secondary { color: var(--ink-secondary) !important; }
 .text-muted { color: var(--ink-tertiary) !important; }
@@ -946,7 +950,8 @@ main.container-fluid {
 }
 
 .monitor-table-header__title,
-.monitor-stage-filter {
+.monitor-stage-filter,
+.tab-strip {
   align-items: center;
   display: flex;
   gap: 10px;

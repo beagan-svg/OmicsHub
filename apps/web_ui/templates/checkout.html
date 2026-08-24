@@ -51,6 +51,14 @@
         <input type="hidden" name="exclude_fastq_names" value="{{ fastq_name }}">
         {% endfor %}
         <button class="btn btn-outline-secondary text-nowrap" type="submit">Use this</button>
+        {% if config %}
+        <a class="btn btn-outline-secondary btn-icon" href="{% url 'web_ui:config-detail' config.pk %}"
+           aria-label="View {{ config.name }}'s contents" title="View {{ config.name }}'s contents"
+           data-bs-toggle="tooltip" data-bs-placement="top">
+          <i class="bi bi-eye" aria-hidden="true"></i>
+          <span class="visually-hidden">View {{ config.name }}'s contents</span>
+        </a>
+        {% endif %}
       </div>
       <div class="form-text">
         Chooses the reference, chemistry and command for every sample below.

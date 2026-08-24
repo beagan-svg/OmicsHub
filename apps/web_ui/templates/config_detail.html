@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}{{ config.name }} | OmicsHub{% endblock %}
+
+{% block page_head %}
+<div class="page-head">
+  <div class="page-head__text">
+    <h1 class="mono">{{ config.name }}</h1>
+    <p class="page-head__desc">
+      Uploaded by {{ config.uploaded_by }} on {{ config.uploaded_at|date:"Y-m-d H:i" }}.
+      {% if config.is_active %}
+        <span class="state" data-state="done">Active</span>
+      {% else %}
+        <span class="state" data-state="queued">Inactive</span>
+      {% endif %}
+    </p>
+  </div>
+  <div class="page-head__actions">
+    {% if user.is_staff %}
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:configs' %}">
+      <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to Configs
+    </a>
+    {% else %}
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:checkout' %}">
+      <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to Checkout
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  {% include "partials/monitor_stage_filter.html" with stage_options=view_options selected_stage=view aria_label="Config view" %}
+</div>
+
+{% if view == "raw" %}
+<div class="card">
+  <div class="card-header">
+    <span><i class="bi bi-file-earmark-code" aria-hidden="true"></i> Raw config</span>
+  </div>
+  <div class="card-body">
+    <pre class="mono" style="margin: 0; max-height: 70vh; overflow: auto; white-space: pre-wrap;">{{ config.raw }}</pre>
+  </div>
+</div>
+
+{% else %}
+
+<div class="card mb-3">
+  <div class="card-header">
+    <span><i class="bi bi-diagram-3" aria-hidden="true"></i> References</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <caption class="visually-hidden">Which Cell Ranger reference each organism, modality, and library prep method resolves to.</caption>
+      <thead>
+        <tr>
+          <th scope="col">Organism Common Name</th><th scope="col">Modality</th>
+          <th scope="col">Library Prep Method</th><th scope="col">References Name on OCS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in reference_rows %}
+        <tr>
+          <td>{{ row.organism }}</td>
+          <td>{% if row.modality == "All" %}<span class="text-secondary">All</span>{% else %}<span class="tag tag--accent">{{ row.modality }}</span>{% endif %}</td>
+          <td>{% include "partials/value_or_all.html" with value=row.library_prep %}</td>
+          <td class="mono">{{ row.reference }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">{% include "partials/empty_state.html" with icon="diagram-3" title="This config defines no references." %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <span><i class="bi bi-eyedropper" aria-hidden="true"></i> Probe Sets &amp; Chemistry</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <h3 class="subsection-heading">Probe sets</h3>
+        <table class="table align-middle mb-0">
+          <caption class="visually-hidden">The Flex probe set for each organism and library prep method.</caption>
+          <thead><tr><th scope="col">Organism</th><th scope="col">Library Prep Method</th><th scope="col">Probe Set</th></tr></thead>
+          <tbody>
+            {% for row in probe_set_rows %}
+            <tr>
+              <td>{{ row.organism }}</td>
+              <td>{% include "partials/value_or_all.html" with value=row.library_prep %}</td>
+              <td class="mono">{{ row.probe_set }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-secondary">This config defines no probe sets.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="col-md-6">
+        <h3 class="subsection-heading">Chemistry by library prep method</h3>
+        <table class="table align-middle mb-0">
+          <caption class="visually-hidden">The 10x chemistry each library prep method uses.</caption>
+          <thead><tr><th scope="col">Library Prep Method</th><th scope="col">Chemistry</th></tr></thead>
+          <tbody>
+            {% for prep, chemistry in chemistry_rows.items %}
+            <tr><td class="mono">{{ prep }}</td><td class="mono">{{ chemistry }}</td></tr>
+            {% empty %}
+            <tr><td colspan="2" class="text-secondary">This config defines no chemistry mappings.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <span><i class="bi bi-diagram-2" aria-hidden="true"></i> Workflows</span>
+  </div>
+  <div class="card-body">
+    {% if workflow_rows %}
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+      {% include "partials/button_tabs.html" with tab_group="config-modality" tab_options=modality_tab_options selected_tab=workflow_rows.0.modality aria_label="Modality" %}
+      {% for workflow in workflow_rows %}
+      {% comment %}
+        Each modality's stage toggle needs to render in this header row, next to the
+        modality tabs, but its content renders in its own block further down - so this
+        wrapper and the one at the top of that block both carry the same data-tab-group/
+        data-tab-panel pair, and tabs.js shows or hides both together.
+      {% endcomment %}
+      <div class="ms-auto" data-tab-group="config-modality" data-tab-panel="{{ workflow.modality }}" {% if not forloop.first %}hidden{% endif %}>
+        {% include "partials/button_tabs.html" with tab_group="config-stage-"|add:workflow.modality tab_options=stage_tab_options selected_tab="alignment" aria_label="Alignment stage" %}
+      </div>
+      {% endfor %}
+    </div>
+    {% for workflow in workflow_rows %}
+    <div data-tab-group="config-modality" data-tab-panel="{{ workflow.modality }}" {% if not forloop.first %}hidden{% endif %}>
+      <div data-tab-group="config-stage-{{ workflow.modality }}" data-tab-panel="alignment">
+        {% for command_config in workflow.alignment_configs %}
+        {% include "partials/config_command_card.html" with command_config=command_config %}
+        {% empty %}
+        <p class="text-secondary">This config defines no alignment commands for {{ workflow.modality }}.</p>
+        {% endfor %}
+      </div>
+      <div data-tab-group="config-stage-{{ workflow.modality }}" data-tab-panel="post_alignment" hidden>
+        {% for command_config in workflow.post_alignment_configs %}
+        {% include "partials/config_command_card.html" with command_config=command_config %}
+        {% empty %}
+        <p class="text-secondary">This config defines no post-alignment commands for {{ workflow.modality }}.</p>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="text-secondary">This config defines no workflows.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span><i class="bi bi-sliders" aria-hidden="true"></i> Job Settings &amp; Status Mapping</span>
+  </div>
+  <div class="card-body">
+    <table class="table align-middle mb-0">
+      <tbody>
+        <tr>
+          <td style="width: 260px">Concurrent job limit</td>
+          <td class="mono">{{ job_settings.limit }}</td>
+        </tr>
+        <tr>
+          <td>At the limit</td>
+          <td>
+            OmicsHub counts in-progress alignment and post-alignment demands in OCS's DynamoDB demand
+            registry. When that count reaches {{ job_settings.limit }}, the Celery task that submits
+            queued commands holds for {{ job_settings.poll_interval_hours|default:1 }} hour(s), then
+            recounts and resumes submitting rather than dropping the queued command.
+          </td>
+        </tr>
+        {% for row in status_mapping_rows %}
+        <tr>
+          <td>"{{ row.label }}" means status is</td>
+          <td>
+            {% for status in row.statuses %}<span class="tag">{{ status }}</span>{% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

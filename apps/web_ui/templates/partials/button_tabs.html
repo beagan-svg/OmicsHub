@@ -1,0 +1,10 @@
+<div class="tab-strip" role="group" aria-label="{{ aria_label }}" data-tabs="{{ tab_group }}">
+  <div class="btn-group btn-group-sm btn-group--scrollable" role="group">
+    {% for option in tab_options %}
+    <button type="button" class="btn {% if option.value == selected_tab %}active{% endif %}"
+            data-tab-value="{{ option.value }}" aria-pressed="{% if option.value == selected_tab %}true{% else %}false{% endif %}">
+      {{ option.label }}
+    </button>
+    {% endfor %}
+  </div>
+</div>

@@ -50,7 +50,7 @@
       <tbody>
         {% for config in configs %}
         <tr>
-          <td class="mono">{{ config.name }}</td>
+          <td class="mono"><a href="{% url 'web_ui:config-detail' config.pk %}">{{ config.name }}</a></td>
           <td class="text-secondary">{{ config.uploaded_by }}</td>
           <td class="text-secondary">{{ config.uploaded_at|date:"Y-m-d H:i" }}</td>
           <td>
