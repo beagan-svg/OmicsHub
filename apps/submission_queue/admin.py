@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.db.models import Exists, OuterRef
 
-from apps.submission_queue.models import QueueEntry
+from apps.submission_queue.models import CartItem, QueueEntry
 
 
 @admin.register(QueueEntry)
@@ -39,3 +39,21 @@ class QueueEntryAdmin(admin.ModelAdmin):
             pk__in=list(requeueable_entries.values_list("pk", flat=True))
         ).update(status=QueueEntry.Status.PENDING, error_message="")
         self.message_user(request, f"Returned {requeued} entries to the queue.")
+
+
+@admin.register(CartItem)
+class CartItemAdmin(admin.ModelAdmin):
+    """Visibility into staged carts; nothing here is meant to be hand-edited."""
+
+    list_display = ["user", "sample", "added_at"]
+    list_filter = [("user", admin.RelatedOnlyFieldListFilter)]
+    list_select_related = ["user", "sample"]
+    search_fields = ["user__username", "sample__fastq_name"]
+    readonly_fields = ["added_at"]
+    autocomplete_fields = ["user", "sample"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

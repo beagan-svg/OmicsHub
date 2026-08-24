@@ -153,7 +153,10 @@
           <td colspan="{{ columns|length|add:4 }}"><div class="location-contents-panel"></div></td>
         </tr>
         {% empty %}
-        <tr><td colspan="{{ columns|length|add:4 }}" class="text-center text-muted py-5">No samples match these filters.</td></tr>
+        {% url 'web_ui:data-locations' as clear_url %}
+        <tr><td colspan="{{ columns|length|add:4 }}">
+          {% include "partials/empty_state.html" with icon="search" title="No samples match these filters." hint="Widen a filter, or sync the batch you are looking for." action_url=clear_url action_label="Clear filters" %}
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>

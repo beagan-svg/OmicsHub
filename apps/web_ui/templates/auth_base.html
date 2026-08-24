@@ -76,6 +76,14 @@
 
     <div class="card">
       <div class="card-body p-4">
+        {% comment %}
+        No dismiss button: this page has no Bootstrap JS bundle (it is meant to stay
+        light), so a data-bs-dismiss button here would render but never respond to a
+        click. The message is one-shot and the reader is about to navigate away anyway.
+        {% endcomment %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.level_tag }}">{{ message }}</div>
+        {% endfor %}
         {% block heading %}{% endblock %}
         {% block subheading %}{% endblock %}
 

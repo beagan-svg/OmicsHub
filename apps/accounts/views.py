@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
@@ -29,3 +29,15 @@ def signup(request):
         form = SignupForm()
 
     return render(request, "registration/signup.html", {"form": form})
+
+
+@require_http_methods(["POST"])
+def logout_view(request):
+    """Sign the user out and say so.
+
+    Stock `LogoutView` clears the session silently: the sign-in form it lands on looks
+    identical whether the click did anything or not. One line here is the difference.
+    """
+    logout(request)
+    messages.info(request, "You've been signed out.")
+    return redirect(settings.LOGOUT_REDIRECT_URL)

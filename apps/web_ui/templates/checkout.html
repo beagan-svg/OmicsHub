@@ -62,9 +62,11 @@
   <div class="card-body is-toolbar d-flex flex-wrap align-items-center gap-2 border-top">
     <span class="label">Workflows</span>
     {% for value in modalities %}<span class="tag tag--accent">{{ value }}</span>{% endfor %}
+    {% if user.is_staff %}
     <a class="btn btn-sm btn-outline-secondary ms-auto" href="{% url 'web_ui:configs' %}">
       <i class="bi bi-upload" aria-hidden="true"></i> Upload a new config
     </a>
+    {% endif %}
   </div>
   {% endif %}
   {% else %}
@@ -153,7 +155,8 @@
         <button class="btn btn-sm btn-outline-secondary" type="submit" formaction="{% url 'web_ui:cart-remove' %}">
           Remove selected
         </button>
-        <button class="btn btn-sm btn-outline-danger" type="submit" formaction="{% url 'web_ui:cart-clear' %}">
+        <button class="btn btn-sm btn-outline-danger" type="submit" formaction="{% url 'web_ui:cart-clear' %}"
+                onclick="return confirm('Empty your cart? Every staged fastq sample will be removed, not just the selected ones.');">
           Empty cart
         </button>
       </div>
@@ -356,7 +359,9 @@
 
     event.preventDefault();
     const button = event.submitter;
+    const originalLabel = button.innerHTML;
     button.disabled = true;
+    button.innerHTML = "Reviewing…";
 
     try {
       const response = await fetch(checkoutForm.action, {
@@ -375,6 +380,7 @@
       new bootstrap.Modal(modalElement).show();
     } finally {
       button.disabled = false;
+      button.innerHTML = originalLabel;
     }
   });
 

@@ -66,7 +66,8 @@
               <form method="post" action="{% url 'web_ui:delete-job' entry.pk %}">
                 {% csrf_token %}
                 <button class="btn btn-sm btn-outline-danger" type="submit"
-                        aria-label="Delete {{ entry.stage }} job for {{ entry.sample.fastq_name }}">Delete</button>
+                        aria-label="Delete {{ entry.stage }} job for {{ entry.sample.fastq_name }}"
+                        onclick="return confirm('Delete the failed {{ entry.stage|escapejs }} entry for {{ entry.sample.fastq_name|escapejs }}? This cannot be undone.');">Delete</button>
               </form>
             </div>
           </td>
@@ -119,7 +120,8 @@
               <form method="post" action="{% url 'web_ui:delete-job' entry.pk %}">
                 {% csrf_token %}
                 <button class="btn btn-sm btn-outline-danger" type="submit"
-                        aria-label="Delete {{ entry.stage }} job for {{ entry.sample.fastq_name }}">Delete</button>
+                        aria-label="Delete {{ entry.stage }} job for {{ entry.sample.fastq_name }}"
+                        onclick="return confirm('Delete the failed {{ entry.stage|escapejs }} entry for {{ entry.sample.fastq_name|escapejs }}? This cannot be undone.');">Delete</button>
               </form>
             </div>
           </td>

@@ -65,8 +65,12 @@
             <form method="post" action="{% url 'web_ui:activate-config' config.pk %}">
               {% csrf_token %}
               {# One "Activate" per row; the label says which config it activates. #}
-              <button class="btn btn-sm btn-outline-secondary" type="submit"
-                      aria-label="Activate {{ config.name }}">Activate</button>
+              {# btn-primary, not the neutral secondary style: this changes what every #}
+              {# user's next submission builds from, so it should not read the same as #}
+              {# a routine action. #}
+              <button class="btn btn-sm btn-primary" type="submit"
+                      aria-label="Activate {{ config.name }}"
+                      onclick="return confirm('Activate {{ config.name|escapejs }}? Every submission that does not explicitly pick a config will use this one starting now.');">Activate</button>
             </form>
             {% endif %}
           </td>

@@ -157,6 +157,12 @@ class TestSignedOut:
         assert not account.is_staff and not account.is_superuser
         assert client.get(reverse("admin:index")).status_code in (302, 403)
 
+    def test_logging_out_says_so(self, logged_in):
+        response = logged_in.post(reverse("logout"), follow=True)
+
+        assert b"You&#x27;ve been signed out." in response.content
+        assert response.wsgi_request.user.is_authenticated is False
+
 
 # --- 2. dashboard filters ----------------------------------------------------------------
 
@@ -915,6 +921,23 @@ class TestQueueAndFailures:
         assert b"Deleted the failed entry for READY-1" in response.content
         assert not QueueEntry.objects.filter(pk=entry.pk).exists()
 
+    def test_delete_confirms_first_but_retry_does_not(self, logged_in, queued_entry):
+        """Delete is irreversible; Retry is not, so only Delete asks first."""
+        entry = queued_entry("READY-1")
+        QueueEntry.objects.filter(pk=entry.pk).update(status=QueueEntry.Status.FAILED)
+
+        response = logged_in.get(reverse("web_ui:failed"))
+        text = response.content.decode()
+
+        retry_button = text[
+            text.index('aria-label="Retry') : text.index("</button>", text.index('aria-label="Retry'))
+        ]
+        delete_button = text[
+            text.index('aria-label="Delete') : text.index("</button>", text.index('aria-label="Delete'))
+        ]
+        assert "onclick" not in retry_button
+        assert "return confirm(" in delete_button
+
     def test_a_live_entry_cannot_be_deleted(self, logged_in, queued_entry):
         entry = queued_entry("READY-1")
 
@@ -1063,6 +1086,24 @@ class TestSettingsPage:
 
         assert response.status_code == 200
         assert b"This field is required" in response.content
+
+    def test_activate_is_a_primary_button_that_confirms_the_global_effect(
+        self, staff_client, config, staff_user
+    ):
+        """Activating changes every user's default, so it should not look or act like
+        a routine secondary action."""
+        WorkflowConfig.objects.create(
+            name="spare.jsonc", raw="{}", data=config, uploaded_by=staff_user, is_active=False
+        )
+
+        response = staff_client.get(reverse("web_ui:configs"))
+        text = response.content.decode()
+        label_index = text.index('aria-label="Activate spare.jsonc')
+        activate_button = text[text.rindex("<button", 0, label_index) : text.index("</button>", label_index)]
+
+        assert "btn-primary" in activate_button
+        assert "return confirm(" in activate_button
+        assert "Every submission" in activate_button
 
     def test_activating_a_config_stands_the_previous_one_down(
         self, staff_client, active_config, config, staff_user

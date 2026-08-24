@@ -87,7 +87,8 @@
             <form method="post" action="{% url 'web_ui:delete-queue-entry' entry.pk %}">
               {% csrf_token %}
               <button class="btn btn-sm btn-outline-danger" type="submit"
-                      aria-label="Delete {{ entry.stage }} for {{ entry.sample.fastq_name }}">Delete</button>
+                      aria-label="Delete {{ entry.stage }} for {{ entry.sample.fastq_name }}"
+                      onclick="return confirm('Delete the queued {{ entry.stage|escapejs }} job for {{ entry.sample.fastq_name|escapejs }}? It will not be submitted.');">Delete</button>
             </form>
             {% endif %}
           </td>

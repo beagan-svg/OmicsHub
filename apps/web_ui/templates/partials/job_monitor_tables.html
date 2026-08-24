@@ -35,10 +35,10 @@
         <input type="hidden" name="fastq_names" value="{{ row.sample.fastq_name }}">
         {% endfor %}
         <button class="btn btn-sm btn-outline-secondary btn-icon" type="submit"
-                aria-label="Sync running jobs from AWS" title="Sync running jobs from AWS"
+                aria-label="Sync this page's running jobs from AWS" title="Sync this page's running jobs from AWS"
                 data-bs-toggle="tooltip" data-bs-placement="top">
           <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
-          <span class="visually-hidden">Sync running jobs from AWS</span>
+          <span class="visually-hidden">Sync this page's running jobs from AWS</span>
         </button>
       </form>
     </div>
@@ -98,10 +98,10 @@
         <input type="hidden" name="fastq_names" value="{{ row.sample.fastq_name }}">
         {% endfor %}
         <button class="btn btn-sm btn-outline-secondary btn-icon" type="submit"
-                aria-label="Sync finished jobs from AWS" title="Sync finished jobs from AWS"
+                aria-label="Sync this page's finished jobs from AWS" title="Sync this page's finished jobs from AWS"
                 data-bs-toggle="tooltip" data-bs-placement="top">
           <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
-          <span class="visually-hidden">Sync finished jobs from AWS</span>
+          <span class="visually-hidden">Sync this page's finished jobs from AWS</span>
         </button>
       </form>
     </div>
@@ -114,7 +114,7 @@
       <thead>
         <tr>
           <th scope="col">Fastq Name</th><th scope="col">Stage</th>
-          <th scope="col">Modality</th><th scope="col">Result</th><th scope="col">Demand ID</th>
+          <th scope="col">Modality</th><th scope="col">Status</th><th scope="col">Demand ID</th>
           <th scope="col">Duration</th><th scope="col">Finished</th>
           <th scope="col">Submitted from</th>
         </tr>

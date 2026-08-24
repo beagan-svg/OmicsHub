@@ -55,8 +55,8 @@ def test_job_monitor_refreshes_tables_without_reloading_document():
     text = (TEMPLATES / "job_monitor.html").read_text()
     tables = (TEMPLATES / "partials/job_monitor_tables.html").read_text()
     assert "Sync monitor data from AWS" not in text
-    assert 'aria-label="Sync running jobs from AWS"' in tables
-    assert 'aria-label="Sync finished jobs from AWS"' in tables
+    assert 'aria-label="Sync this page\'s running jobs from AWS"' in tables
+    assert 'aria-label="Sync this page\'s finished jobs from AWS"' in tables
     assert tables.count('include "partials/sync_status.html"') == 2
     assert tables.count('data-bs-placement="top"') == 2
     assert "initTooltips();" in text
@@ -75,6 +75,15 @@ def test_job_monitor_has_running_and_finished_stage_filters():
     assert "finished_stage_options" in text
     assert 'class="monitor-stage-filter__label"' not in filter_partial
     assert "{{ option.label }}" in filter_partial
+
+
+def test_running_and_finished_tables_name_their_status_column_the_same_way():
+    """Both columns render the identical status_badge component; the header word
+    should not silently differ between the two tables."""
+    text = (TEMPLATES / "partials/job_monitor_tables.html").read_text()
+
+    assert text.count(">Status</th>") == 2
+    assert ">Result</th>" not in text
 
 
 def test_pages_poll_database_without_replacing_sample_interactions():

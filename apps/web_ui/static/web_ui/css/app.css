@@ -325,7 +325,7 @@ main.container-fluid {
   background: transparent;
   border-bottom: 1px solid var(--line);
   padding: 12px 16px;
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--ink);
   display: flex;
@@ -460,18 +460,18 @@ main.container-fluid {
 
 .column-resize-handle::after {
   position: absolute;
-  top: 25%;
+  top: 15%;
   right: 3px;
-  bottom: 25%;
+  bottom: 15%;
   width: 1px;
-  background: var(--accent);
+  background: var(--line-strong);
   content: "";
-  opacity: 0;
 }
 
 .column-resize-handle:hover::after,
 .column-resize-handle:focus-visible::after {
-  opacity: 1;
+  background: var(--accent);
+  width: 2px;
 }
 
 .table[data-resizable-table] { min-width: 100%; }
@@ -755,7 +755,10 @@ main.container-fluid {
 .copy-id__icon {
   flex: none;
   font-size: var(--text-sm);
-  opacity: 0;
+  /* Faint but present at rest, not invisible: a control with zero static mark cannot be
+     discovered by hovering something that gives no reason to hover it, and never shows
+     up at all on touch, which has no hover state. */
+  opacity: 0.45;
   color: var(--ink-tertiary);
   transition: opacity var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
 }
@@ -1167,8 +1170,12 @@ a:focus-visible {
 }
 
 .study-filter__title {
+  font-size: var(--text-xs);
   font-weight: 600;
+  letter-spacing: 0.06em;
   line-height: 1.2;
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
 }
 
 .study-filter__actions {
