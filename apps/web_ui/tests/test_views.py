@@ -376,6 +376,51 @@ class TestDashboard:
         assert all(row["show_selector"] for row in response.context["location_rows"])
         assert b'class="form-check-input select-location"' in response.content
 
+    def test_data_locations_shows_batch_name_from_vendor(self, logged_in, make_sample):
+        make_sample("A-1", batch_name_from_vendor="RFX-38026")
+
+        response = logged_in.get(reverse("web_ui:data-locations"))
+
+        assert "batch_name_from_vendor" in [column.key for column in response.context["columns"]]
+        assert b"RFX-38026" in response.content
+
+    def test_fastq_name_sorts_by_the_number_in_it_not_the_text(self, logged_in, make_sample):
+        """Alphabetically "-10" comes before "-2" (the character '1' < '2'); the numbers
+        they name go the other way. Names sharing every digit but the last one are exactly
+        where a plain text sort gets it wrong."""
+        make_sample("NY-MX22056-2")
+        make_sample("NY-MX22056-9")
+        make_sample("NY-MX22056-10")
+
+        ascending = logged_in.get(reverse("web_ui:data-locations"), {"sort": "fastq_name", "dir": "asc"})
+        descending = logged_in.get(reverse("web_ui:data-locations"), {"sort": "fastq_name", "dir": "desc"})
+
+        def order(response):
+            seen = []
+            for row in response.context["location_rows"]:
+                if row["fastq_name"] not in seen:
+                    seen.append(row["fastq_name"])
+            return seen
+
+        assert order(ascending) == ["NY-MX22056-2", "NY-MX22056-9", "NY-MX22056-10"]
+        assert order(descending) == ["NY-MX22056-10", "NY-MX22056-9", "NY-MX22056-2"]
+
+    def test_fastq_name_header_is_a_sort_link(self, logged_in, make_sample):
+        make_sample("A-1")
+
+        response = logged_in.get(reverse("web_ui:data-locations"), {"sort": "fastq_name", "dir": "desc"})
+
+        assert b'aria-sort="descending"' in response.content
+        assert b"Sort by Fastq Name" in response.content
+
+    def test_data_locations_empty_state_matches_the_dashboard_pattern(self, logged_in):
+        """No samples in the mirror at all, so every filter combination is empty."""
+        response = logged_in.get(reverse("web_ui:data-locations"))
+
+        assert b"No samples match these filters." in response.content
+        assert b"Clear filters" in response.content
+        assert b"bi-search" in response.content
+
     def test_data_location_contents_loads_one_s3_folder(self, logged_in, monkeypatch, make_sample):
         sample = make_sample("A-1", align="COMPLETED")
         StageStatus.objects.filter(sample=sample, stage=Stage.ALIGN).update(file_store_id="store-1")

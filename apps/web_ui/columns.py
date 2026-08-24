@@ -120,6 +120,7 @@ DEFAULT_COLUMNS = [
 
 LOCATION_COLUMNS = [
     Column("load_name", "Load Name", "mono", "sample"),
+    Column("batch_name_from_vendor", "Batch Name From Vendor", group="sample"),
     Column("studies", "Study Set", "list", "sample"),
     Column("modality", "Workflow", group="sample"),
     Column("organism_common_name", "Organism Common Name", group="sample"),
@@ -130,8 +131,8 @@ LOCATION_COLUMNS = [
 LOCATION_COLUMN_KEYS = {column.key for column in LOCATION_COLUMNS}
 LOCATION_DEFAULT_COLUMNS = [column.key for column in LOCATION_COLUMNS]
 LOCATION_COLUMN_GROUPS = [
-    ColumnGroup("sample", "Sample fields", LOCATION_COLUMNS[:5]),
-    ColumnGroup("stage", "Stage fields", LOCATION_COLUMNS[5:]),
+    ColumnGroup("sample", "Sample fields", LOCATION_COLUMNS[:6]),
+    ColumnGroup("stage", "Stage fields", LOCATION_COLUMNS[6:]),
 ]
 LOCATION_STAGES = [Stage.INGEST, Stage.ALIGN, Stage.POST_ALIGN]
 

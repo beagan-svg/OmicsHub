@@ -98,7 +98,16 @@
       <thead>
         <tr>
           <th scope="col" style="width:2rem"><input type="checkbox" class="form-check-input" id="select-all-locations" aria-label="Select all samples on this page"></th>
-          <th scope="col" data-column-key="fastq_name">Fastq Name</th>
+          <th scope="col" data-column-key="fastq_name" {% if sort == "fastq_name" %}aria-sort="{% if dir == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
+            <a class="sort-link" href="?{% sort_query "fastq_name" %}" title="Sort by Fastq Name">
+              Fastq Name
+              {% if sort == "fastq_name" %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill" aria-hidden="true"></i>
+              {% else %}
+                <i class="bi bi-caret-down-fill opacity-25" aria-hidden="true"></i>
+              {% endif %}
+            </a>
+          </th>
           {% for column in columns %}<th scope="col" data-column-key="{{ column.key }}">{{ column.label }}</th>{% endfor %}
           <th scope="col" data-column-key="s3_uri">S3 Location</th>
           <th scope="col" data-column-key="contents">Contents</th>

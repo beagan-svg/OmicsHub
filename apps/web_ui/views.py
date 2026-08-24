@@ -146,6 +146,13 @@ def data_locations(request):
             "page_size": page_size,
             "page_size_options": PAGE_SIZE_OPTIONS,
             "location_rows": location_rows,
+            # Which column the table is ordered by, so the header can show the arrow. Only
+            # fastq_name is exposed here, not every key `_sorted` accepts: the rest of this
+            # table's columns are not asked for as sortable, and offering a link that does
+            # nothing useful for them is worse than not offering one.
+            "sort": request.GET.get("sort") if request.GET.get("sort") in SORTABLE else DEFAULT_SORT,
+            "dir": "asc" if request.GET.get("dir") == "asc" else "desc",
+            "sortable_keys": ["fastq_name"],
             "columns": columns.visible_location_columns(request.user),
             "all_columns": columns.LOCATION_COLUMNS,
             "column_groups": columns.LOCATION_COLUMN_GROUPS,
@@ -1244,7 +1251,7 @@ def _page_size(request, parameter: str = "page_size") -> int:
 # rather than trusting the parameter: order_by takes a field path, and an arbitrary one
 # lets a caller sort by (and so probe) any related column.
 SORTABLE = {
-    "fastq_name": ("fastq_name",),
+    "fastq_name": ("fastq_number", "fastq_name"),
     "batch_name_from_vendor": ("batch_number", "batch_name_from_vendor"),
     "batch_name": ("batch_name",),
     "load_name": ("load_name",),
@@ -1264,8 +1271,8 @@ DEFAULT_DIRECTION = "desc"
 def _sorted(queryset, request):
     """Return table rows ordered by the selected sort, newest batch first by default.
 
-    Batch names sort by the number inside them. Use `batch_sort_key`, which applies the same
-        rule applied to the filter menu in Python.
+    Batch names and fastq names both sort by the number inside them, not the text. See
+    `batch_sort_key`, which applies the same rule to the batch filter menu in Python.
     """
     field = request.GET.get("sort") or DEFAULT_SORT
     if field not in SORTABLE:
@@ -1286,7 +1293,24 @@ def _sorted(queryset, request):
                 Value(""),
             ),
             output_field=BigIntegerField(),
-        )
+        ),
+        # Same idea as batch_number: "NY-MX22056-9" and "NY-MX22056-10" share every digit
+        # but the last, so a text sort puts -10 before -2. Digits-only as one integer keeps
+        # a fixed prefix in the more significant place and the trailing index in the less
+        # significant one, which orders correctly without parsing the name into parts.
+        fastq_number=Cast(
+            NullIf(
+                Func(
+                    F("fastq_name"),
+                    Value(r"\D"),
+                    Value(""),
+                    Value("g"),
+                    function="regexp_replace",
+                ),
+                Value(""),
+            ),
+            output_field=BigIntegerField(),
+        ),
     )
 
     # nulls_last on every part, because Postgres sorts NULL first under DESC and a batch
