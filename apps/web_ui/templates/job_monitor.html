@@ -25,12 +25,19 @@
 {% endblock %}
 
 {% block content %}
+{% comment %}
+Deliberately outside #monitor-live-data: that region's innerHTML is replaced wholesale
+every 30 seconds (see refreshTables below), which would wipe whatever the reader has
+typed into the credential form, or is in the middle of validating, on every poll.
+{% endcomment %}
+{% include "partials/monitor_credentials.html" %}
 <div id="monitor-live-data">
   {% include "partials/job_monitor_tables.html" %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static_v 'web_ui/js/job-log-credentials.js' %}"></script>
 <script>
 (() => {
   const liveData = document.getElementById("monitor-live-data");
@@ -61,6 +68,29 @@
       .forEach((element) => bootstrap.Tooltip.getOrCreateInstance(element));
   };
 
+  // A demand's log panel a reader has open must survive this wholesale innerHTML swap
+  // the same way updateDurations/initTooltips already re-apply after it -- otherwise
+  // whatever they're reading silently collapses on the next 30-second poll.
+  const openLogPanels = () =>
+    [...liveData.querySelectorAll('[data-job-log-panel][data-open="true"]')]
+      .map((panel) => ({
+        demandId: panel.dataset.demandId,
+        body: panel.querySelector("[data-job-log-body]")?.innerHTML || "",
+      }));
+
+  const restoreLogPanels = (openPanels) => {
+    openPanels.forEach(({demandId, body}) => {
+      const panel = liveData.querySelector(`[data-job-log-panel][data-demand-id="${demandId}"]`);
+      const toggle = liveData.querySelector(`[data-job-log-toggle][data-demand-id="${demandId}"]`);
+      if (panel) {
+        panel.dataset.open = "true";
+        const panelBody = panel.querySelector("[data-job-log-body]");
+        if (panelBody) panelBody.innerHTML = body;
+      }
+      if (toggle) toggle.setAttribute("aria-expanded", "true");
+    });
+  };
+
   let refreshInFlight = false;
   const refreshTables = async () => {
     if (refreshInFlight || document.hidden) return;
@@ -70,9 +100,14 @@
         headers: {"X-Requested-With": "XMLHttpRequest"},
       });
       if (!response.ok) return;
-      liveData.innerHTML = await response.text();
+      const tableHtml = await response.text();
+      const reopen = openLogPanels();
+      liveData.dispatchEvent(new CustomEvent("joblog:before-refresh", {bubbles: true}));
+      liveData.innerHTML = tableHtml;
       initTooltips();
       updateDurations();
+      restoreLogPanels(reopen);
+      liveData.dispatchEvent(new CustomEvent("joblog:refreshed", {bubbles: true}));
     } catch {
       // Keep the last successful table when the refresh request cannot reach Django.
     } finally {
@@ -82,7 +117,11 @@
 
   updateDurations();
   initTooltips();
-  window.setInterval(updateDurations, 1000);
+  const refreshDurationsAtMinuteBoundary = () => {
+    updateDurations();
+    window.setTimeout(refreshDurationsAtMinuteBoundary, 60000 - (Date.now() % 60000) + 100);
+  };
+  refreshDurationsAtMinuteBoundary();
   window.setInterval(refreshTables, 30000);
 })();
 </script>

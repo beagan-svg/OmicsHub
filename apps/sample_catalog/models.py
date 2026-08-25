@@ -210,6 +210,7 @@ class StageStatus(models.Model):
     sample = models.ForeignKey(Sample, on_delete=models.CASCADE, related_name="stage_statuses")
     stage = models.CharField(max_length=20, choices=Stage.choices)
     demand_id = models.CharField(max_length=64, blank=True)
+    execution_arn = models.CharField(max_length=2048, blank=True)
     # No choices: these are OCS's own status labels, and the config decides which of them
     # count as complete. Enumerating them here would mean a migration whenever OCS adds one.
     status = models.CharField(max_length=32)
@@ -243,6 +244,7 @@ class StageStatus(models.Model):
             # together. This table runs about four rows per sample, so without this every
             # filtered load sequential-scans it.
             models.Index(fields=["stage", "status"]),
+            models.Index(fields=["demand_id"]),
         ]
 
     def __str__(self):

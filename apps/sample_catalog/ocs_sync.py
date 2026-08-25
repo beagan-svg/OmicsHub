@@ -27,6 +27,9 @@ BULK_BATCH_SIZE = 500
 # Fastq names per lookup when mapping history rows back to mirror rows.
 SAMPLE_LOOKUP_CHUNK = 5000
 
+# Post-alignment requests identify their input with this request parameter prefix.
+ALIGNMENT_RESULT_KEY_PREFIX = "FASTQ_ALIGN_RESULT_"
+
 # The stages this app tracks, derived from the enum so the two can never disagree. OCS
 # records demand types beyond these, including "transfer", "workflow", and "null", which the dashboard
 # has no column for. Export is tracked: it is shown but never submitted.
@@ -248,11 +251,15 @@ def sync_all_stage_statuses(batch_prefixes: set[str]) -> dict[str, int]:
     # fastq-history row when it produces output, so IN_PROGRESS, FAILED and ABORTED jobs
     # appear here and nowhere else.
     demands = {}
+    post_align_demands_by_file_store_id: dict[str, list[dict]] = {}
     for page in dynamodb.scan_demands():
         for demand in page:
             demands[demand["demand_id"]] = demand
             for fastq_name in dynamodb.demand_fastq_names(demand):
                 offer(fastq_name, demand["demand_type"], demand)
+            if demand.get("demand_type", "").lower() == Stage.POST_ALIGN:
+                for file_store_id in _alignment_result_file_store_ids(demand):
+                    post_align_demands_by_file_store_id.setdefault(file_store_id, []).append(demand)
 
     # History covers post-alignment and ingest demands that do not name their fastqs. It also
     # confirms completed alignments.
@@ -273,6 +280,8 @@ def sync_all_stage_statuses(batch_prefixes: set[str]) -> dict[str, int]:
             identifier = dynamodb.file_store_id(row)
             if identifier:
                 file_store_ids[(row["fastq_name"], stage, demand_id)] = identifier
+                for post_align_demand in post_align_demands_by_file_store_id.get(identifier, []):
+                    offer(row["fastq_name"], Stage.POST_ALIGN, post_align_demand)
 
     fastq_names = {fastq_name for fastq_name, _ in latest}
     sample_ids = _sample_ids(fastq_names)
@@ -338,6 +347,16 @@ def sync_all_stage_statuses(batch_prefixes: set[str]) -> dict[str, int]:
     }
     logger.info("Refreshed stage status: %s", result)
     return result
+
+
+def _alignment_result_file_store_ids(demand: dict[str, Any]) -> list[str]:
+    """Return alignment file-store IDs named by a post-alignment request."""
+    params = demand.get("request", {}).get("execution_parameters", {}).get("params", {})
+    return [
+        key.removeprefix(ALIGNMENT_RESULT_KEY_PREFIX).lower()
+        for key in params
+        if key.startswith(ALIGNMENT_RESULT_KEY_PREFIX)
+    ]
 
 
 def _reconcile_submitted_failures(demands: dict[str, dict]) -> int:
@@ -490,6 +509,7 @@ def stage_status_fields(demand_id: str, demand: dict, file_store_id: str = "") -
     """
     return {
         "demand_id": demand_id,
+        "execution_arn": demand.get("request", {}).get("execution_metadata", {}).get("arn", ""),
         "status": demand_status(demand),
         "last_update_time": _parse_time(demand["last_update_time"]),
         "started_at": _optional_time(demand, "start_time"),
@@ -512,6 +532,7 @@ def submitted_stage_status_fields(demand_id: str) -> dict:
     """
     return {
         "demand_id": demand_id,
+        "execution_arn": "",
         "status": "SUBMITTED",
         "last_update_time": dt.datetime.now(dt.UTC),
         "started_at": None,
@@ -525,6 +546,7 @@ def submitted_stage_status_fields(demand_id: str) -> dict:
 #: it here fails the suite rather than silently never being updated on conflict.
 STAGE_STATUS_FIELDS = (
     "demand_id",
+    "execution_arn",
     "status",
     "last_update_time",
     "started_at",

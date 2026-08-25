@@ -51,6 +51,7 @@
           <th scope="col">Fastq Name</th><th scope="col">Stage</th>
           <th scope="col">Modality</th><th scope="col">Status</th><th scope="col">Demand ID</th>
           <th scope="col">Duration</th><th scope="col">Submitted from</th>
+          <th scope="col" class="text-center">Logs</th>
         </tr>
       </thead>
       <tbody>
@@ -67,9 +68,13 @@
               data-started-at="{{ row.started_at|date:'c' }}"
               data-duration>{{ row.duration_display|default:"—" }}</td>
           <td>{% include "partials/submission_source_badge.html" with queued_here=row.queued_here %}</td>
+          <td class="text-center">
+            {% include "partials/job_log_toggle.html" with demand_id=row.demand_id running=True %}
+          </td>
         </tr>
+        {% include "partials/job_log_panel_row.html" with demand_id=row.demand_id colspan=8 %}
         {% empty %}
-        <tr><td colspan="7">
+        <tr><td colspan="8">
           {% include "partials/empty_state.html" with icon="activity" title="Nothing is running." hint="Stages appear here while OCS is working on them, whoever submitted them." %}
         </td></tr>
         {% endfor %}
@@ -88,6 +93,23 @@
     <div class="monitor-table-header__title">
       <span><i class="bi bi-check2-all" aria-hidden="true"></i> Recently finished</span>
       {% include "partials/monitor_stage_filter.html" with stage_options=finished_stage_options selected_stage=finished_stage aria_label="Filter finished jobs by stage" %}
+      {% comment %}
+      A visually-hidden label alone left two controls both saying just "All" side by
+      side, with nothing sighted telling them apart short of opening the second one.
+      pager__size already solves exactly this (a visible word next to a select) for the
+      Rows-per-page control, so this reuses it rather than inventing a second pattern.
+      {% endcomment %}
+      <label class="pager__size">
+        <span>Status</span>
+        <select class="form-select form-select-sm" id="finished-status-filter"
+                aria-label="Filter finished jobs by status" onchange="window.location.href = this.value">
+        {% for option in finished_status_options %}
+        <option value="{{ option.url }}" {% if option.value == finished_status %}selected{% endif %}>
+          {{ option.label }}
+        </option>
+        {% endfor %}
+        </select>
+      </label>
     </div>
     <div class="d-flex align-items-center gap-2">
       {% include "partials/sync_status.html" %}
@@ -117,6 +139,7 @@
           <th scope="col">Modality</th><th scope="col">Status</th><th scope="col">Demand ID</th>
           <th scope="col">Duration</th><th scope="col">Finished</th>
           <th scope="col">Submitted from</th>
+          <th scope="col" class="text-center">Logs</th>
         </tr>
       </thead>
       <tbody>
@@ -132,9 +155,13 @@
           <td class="text-secondary">{{ row.duration_display|default:"—" }}</td>
           <td class="text-secondary">{{ row.last_update_time|date:"Y-m-d H:i"|default:"—" }}</td>
           <td>{% include "partials/submission_source_badge.html" with queued_here=row.queued_here %}</td>
+          <td class="text-center">
+            {% include "partials/job_log_toggle.html" with demand_id=row.demand_id running=False %}
+          </td>
         </tr>
+        {% include "partials/job_log_panel_row.html" with demand_id=row.demand_id colspan=9 %}
         {% empty %}
-        <tr><td colspan="8">
+        <tr><td colspan="9">
           {% include "partials/empty_state.html" with icon="check2-all" title="OCS has not finished anything yet." %}
         </td></tr>
         {% endfor %}

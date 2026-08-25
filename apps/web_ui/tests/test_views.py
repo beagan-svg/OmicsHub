@@ -921,6 +921,60 @@ class TestJobMonitor:
         assert len(response.context["finished"]) == 2
         assert response.context["finished_stage"] == ""
 
+    def test_finished_status_filter_shows_only_matching_jobs(self, logged_in, make_sample):
+        done = make_sample("FINISHED-DONE-1")
+        done.stage_statuses.create(stage=Stage.ALIGN, status="COMPLETED", demand_id="demand-done")
+        failed = make_sample("FINISHED-FAILED-1")
+        failed.stage_statuses.create(stage=Stage.ALIGN, status="FAILED", demand_id="demand-failed")
+
+        response = logged_in.get(reverse("web_ui:job-monitor"), {"finished_status": "FAILED"})
+
+        assert [row.sample.fastq_name for row in response.context["finished"]] == ["FINISHED-FAILED-1"]
+        assert response.context["finished_status"] == "FAILED"
+
+    def test_finished_status_and_stage_filters_combine(self, logged_in, make_sample):
+        """Both filters narrow the same table at once, not one replacing the other."""
+        align_failed = make_sample("FINISHED-ALIGN-FAILED")
+        align_failed.stage_statuses.create(stage=Stage.ALIGN, status="FAILED", demand_id="demand-af")
+        postalign_failed = make_sample("FINISHED-POST-FAILED")
+        postalign_failed.stage_statuses.create(stage=Stage.POST_ALIGN, status="FAILED", demand_id="demand-pf")
+        align_done = make_sample("FINISHED-ALIGN-DONE")
+        align_done.stage_statuses.create(stage=Stage.ALIGN, status="COMPLETED", demand_id="demand-ad")
+
+        response = logged_in.get(
+            reverse("web_ui:job-monitor"), {"finished_stage": Stage.ALIGN, "finished_status": "FAILED"}
+        )
+
+        assert [row.sample.fastq_name for row in response.context["finished"]] == ["FINISHED-ALIGN-FAILED"]
+
+    def test_invalid_finished_status_shows_all_finished_jobs(self, logged_in, make_sample):
+        for name, status in (("FINISHED-A", "COMPLETED"), ("FINISHED-B", "FAILED")):
+            sample = make_sample(name, load_name=f"LOAD-{name}")
+            sample.stage_statuses.create(stage=Stage.ALIGN, status=status, demand_id=f"demand-{name}")
+
+        response = logged_in.get(reverse("web_ui:job-monitor"), {"finished_status": "not-a-real-status"})
+
+        assert len(response.context["finished"]) == 2
+        assert response.context["finished_status"] == ""
+
+    def test_finished_limit_applies_to_alignment_workflow_stages(self, logged_in, make_sample):
+        make_sample("FINISHED-INGEST")
+        export = make_sample("FINISHED-EXPORT")
+        export.stage_statuses.create(stage=Stage.EXPORT, status="COMPLETED", demand_id="demand-export")
+        for index in range(1001):
+            sample = make_sample(f"FINISHED-ALIGN-{index:04d}", load_name=f"LOAD-{index}")
+            sample.stage_statuses.create(
+                stage=Stage.ALIGN,
+                status="COMPLETED",
+                demand_id=f"demand-align-{index}",
+            )
+
+        response = logged_in.get(reverse("web_ui:job-monitor"))
+
+        assert response.context["finished"].paginator.count == 1000
+        assert len(response.context["finished"]) == 50
+        assert {row.stage for row in response.context["finished"]} == {Stage.ALIGN}
+
     def test_monitor_poll_returns_only_the_table_fragment(self, logged_in, make_sample):
         sample = make_sample("POLL-1")
         sample.stage_statuses.create(stage=Stage.ALIGN, status="IN_PROGRESS", demand_id="poll-demand")

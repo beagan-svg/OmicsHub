@@ -28,7 +28,7 @@ from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import BigIntegerField, Count, Exists, F, Func, Max, OuterRef, Q, Value
+from django.db.models import BigIntegerField, Count, Exists, F, Func, Max, OuterRef, Q, Subquery, Value
 from django.db.models.functions import Cast, NullIf
 from django.http import Http404, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -37,7 +37,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.views.decorators.http import require_GET, require_POST
 
-from apps.ocs_integration import dynamodb, s3
+from apps.ocs_integration import dynamodb, log_credentials, s3
 from apps.sample_catalog import multiome_pairing as pairing
 from apps.sample_catalog import ocs_sync as sync
 from apps.sample_catalog.models import NOT_COMPLETED, BatchPrefix, Sample, Stage, StageStatus
@@ -886,6 +886,9 @@ def job_monitor(request):
     finished_stage = request.GET.get("finished_stage")
     if finished_stage not in {Stage.ALIGN, Stage.POST_ALIGN}:
         finished_stage = ""
+    finished_status = request.GET.get("finished_status")
+    if finished_status not in FINISHED_OCS_STATUSES:
+        finished_status = ""
 
     stages = (
         StageStatus.objects.select_related("sample")
@@ -899,12 +902,7 @@ def job_monitor(request):
     # Unbounded, unlike finished below: what's actually running is capped by OCS's own
     # concurrency limit, not by how long the mirror has been recording history.
     running = list(running_stages.order_by(F("started_at").desc(nulls_last=True)))
-    # Newest first and capped: the mirror holds every stage OCS has ever finished for
-    # half a million samples, and this page answers "what happened lately".
-    finished_stages = stages.filter(status__in=FINISHED_OCS_STATUSES)
-    if finished_stage:
-        finished_stages = finished_stages.filter(stage=finished_stage)
-    finished = list(finished_stages.order_by(F("last_update_time").desc(nulls_last=True))[:MONITOR_ROWS])
+    finished = list(_finished_stages_queryset(stages, finished_stage, finished_status))
     monitor_running, monitor_finished = _collapse_multiome_monitor_rows(running, finished)
     monitor_fastq_names = list(dict.fromkeys(row.sample.fastq_name for row in [*running, *finished]))
     running_page_size = _page_size(request, "running_page_size")
@@ -923,12 +921,19 @@ def job_monitor(request):
         "monitor_fastq_names": monitor_fastq_names,
         "row_limit": MONITOR_ROWS,
         "running_stage": running_stage,
-        "running_stage_options": _monitor_stage_options(
-            request, param="running_stage", page_param="running_page"
+        "running_stage_options": _monitor_filter_options(
+            request, options=_MONITOR_STAGE_OPTIONS, param="running_stage", page_param="running_page"
         ),
         "finished_stage": finished_stage,
-        "finished_stage_options": _monitor_stage_options(
-            request, param="finished_stage", page_param="finished_page"
+        "finished_stage_options": _monitor_filter_options(
+            request, options=_MONITOR_STAGE_OPTIONS, param="finished_stage", page_param="finished_page"
+        ),
+        "finished_status": finished_status,
+        "finished_status_options": _monitor_filter_options(
+            request,
+            options=_MONITOR_FINISHED_STATUS_OPTIONS,
+            param="finished_status",
+            page_param="finished_page",
         ),
         "counts": {
             "align": sum(1 for row in monitor_running if row.stage == Stage.ALIGN),
@@ -950,9 +955,130 @@ def job_monitor(request):
     return render(request, template, context)
 
 
-def _monitor_stage_options(request, *, param, page_param):
-    """Build a monitor table's stage filter links."""
-    options = [("", "All"), (Stage.ALIGN, "Alignment"), (Stage.POST_ALIGN, "Post-Alignment")]
+def _finished_stages_queryset(stages, finished_stage, finished_status):
+    """Newest-first, capped finished stages -- shared so nothing else re-derives this cap.
+
+    The mirror holds every stage OCS has ever finished for half a million samples; this
+    answers "what happened lately" the same way for job_monitor's own display and for
+    the log-viewer authorization check, so the two can never drift apart.
+    """
+    finished_stages = stages.filter(
+        stage__in=(Stage.ALIGN, Stage.POST_ALIGN),
+        status__in=FINISHED_OCS_STATUSES,
+    )
+    if finished_stage:
+        finished_stages = finished_stages.filter(stage=finished_stage)
+    if finished_status:
+        finished_stages = finished_stages.filter(status=finished_status)
+    return finished_stages.order_by(F("last_update_time").desc(nulls_last=True))[:MONITOR_ROWS]
+
+
+def _monitor_demand_is_visible(request, demand_id: str) -> bool:
+    """Return whether the log viewer may fetch this demand's logs."""
+    stages = StageStatus.objects.exclude(demand_id="")
+    if stages.filter(demand_id=demand_id, status__in=RUNNING_OCS_STATUSES).exists():
+        return True
+
+    recent_finished_ids = _finished_stages_queryset(stages, "", "").values("pk")
+    if stages.filter(pk__in=Subquery(recent_finished_ids), demand_id=demand_id).exists():
+        return True
+
+    return (
+        _owned(request)
+        .filter(
+            demand_id=demand_id,
+            status=QueueEntry.Status.FAILED,
+        )
+        .exists()
+    )
+
+
+@login_required
+@require_POST
+def job_credentials_submit(request):
+    """Validate pasted temporary AWS credentials and cache them for this session only.
+
+    Never touches settings.AWS_PROFILE or any other AWS identity: a failure here means
+    the log viewer does not work for this session, not that another identity is tried.
+    """
+    access_key = request.POST.get("access_key", "").strip()
+    secret_key = request.POST.get("secret_key", "").strip()
+    session_token = request.POST.get("session_token", "").strip()
+    try:
+        identity = log_credentials.validate_credentials(request, access_key, secret_key, session_token)
+    except log_credentials.CredentialError as exc:
+        return JsonResponse({"status": "invalid", "code": exc.code, "message": str(exc)}, status=400)
+    return JsonResponse({"status": "valid", "account": identity.account, "arn": identity.arn})
+
+
+@login_required
+@require_POST
+def job_credentials_clear(request):
+    """Drop this session's cached credentials, if any."""
+    log_credentials.clear_credentials(request)
+    return JsonResponse({"status": "cleared"})
+
+
+@login_required
+@require_GET
+def job_credentials_status(request):
+    """Report whether this session already has validated credentials cached.
+
+    Read-only: makes no AWS call, just reports what's already in this session's own
+    cache entry, so a page reload doesn't force re-pasting credentials that are still
+    good server-side. "required" here means no cached entry, not that AWS rejected
+    anything -- only job_credentials_submit and job_demand_logs ever talk to AWS.
+    """
+    identity = log_credentials.get_identity(request)
+    if identity is None:
+        return JsonResponse({"status": "required"})
+    return JsonResponse({"status": "valid", "account": identity.account, "arn": identity.arn})
+
+
+@login_required
+@require_GET
+def job_demand_logs(request, demand_id):
+    """Return recent container log lines for one demand, using this session's credentials.
+
+    Only a demand id currently visible on the Monitor page (running, recently finished,
+    or failed) can be looked up -- this is checked before the cached credentials are
+    ever used for anything, so the log viewer cannot become a general AWS Batch/Logs
+    lookup for arbitrary demand ids.
+    """
+    if not _monitor_demand_is_visible(request, demand_id):
+        return JsonResponse({"status": "not_visible"}, status=403)
+    stage_statuses = list(StageStatus.objects.filter(demand_id=demand_id).values("status", "execution_arn"))
+    execution_arn = next((stage["execution_arn"] for stage in stage_statuses if stage["execution_arn"]), "")
+    failed = (
+        any(stage["status"] == "FAILED" for stage in stage_statuses)
+        or QueueEntry.objects.filter(demand_id=demand_id, status=QueueEntry.Status.FAILED).exists()
+    )
+    if not failed and not execution_arn:
+        return JsonResponse(
+            {
+                "status": "aws_error",
+                "code": "MissingExecutionArn",
+                "message": "This demand has no stored execution record yet.",
+            },
+            status=502,
+        )
+    try:
+        events = log_credentials.fetch_job_logs(request, demand_id, execution_arn, failed=failed)
+    except log_credentials.NoCredentials:
+        return JsonResponse({"status": "no_credentials"}, status=401)
+    except log_credentials.CredentialError as exc:
+        status = 401 if exc.rejected else 502
+        return JsonResponse({"status": "aws_error", "code": exc.code, "message": str(exc)}, status=status)
+    return JsonResponse({"status": "ok", "events": events})
+
+
+def _monitor_filter_options(request, *, options, param, page_param):
+    """Build one monitor table filter's query-string links.
+
+    Shared by the stage filter and the finished-status filter: both are just an ("",
+    "All") option plus a fixed list of values, differing only in which values and which
+    query param they set.
+    """
     result = []
     for value, label in options:
         query = request.GET.copy()
@@ -963,6 +1089,18 @@ def _monitor_stage_options(request, *, param, page_param):
             query.pop(param, None)
         result.append({"label": label, "value": value, "url": f"?{query.urlencode()}"})
     return result
+
+
+_MONITOR_STAGE_OPTIONS = [("", "All"), (Stage.ALIGN, "Alignment"), (Stage.POST_ALIGN, "Post-Alignment")]
+# The other three FINISHED_OCS_STATUSES (ARCHIVED, STRANDED, ABANDONED) are real but rare
+# terminal states; offering all six turns "did it work or not" into a menu to parse. These
+# three answer that question.
+_MONITOR_FINISHED_STATUS_OPTIONS = [
+    ("", "All"),
+    ("COMPLETED", "Completed"),
+    ("FAILED", "Failed"),
+    ("ABORTED", "Aborted"),
+]
 
 
 def _collapse_multiome_monitor_rows(

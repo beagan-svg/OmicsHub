@@ -166,7 +166,7 @@ def scan_demands(page_size: int = 1000):
         # different answer for any demand OCS retried or backdated.
         ProjectionExpression=(
             "demand_id,#s,demand_type,start_time,#d,last_update_time,"
-            "#r.execution_parameters.params.FASTQ_NAMES"
+            "#r.execution_parameters.params,#r.execution_metadata.arn"
         ),
         # "status", "request" and "duration" are all DynamoDB reserved words.
         ExpressionAttributeNames={"#s": "status", "#r": "request", "#d": "duration"},

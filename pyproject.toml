@@ -17,6 +17,7 @@ dependencies = [
     "whitenoise>=6.8",
     "gunicorn>=23.0",
     "sentry-sdk[django]>=2.19",
+    "cryptography>=43.0",
 ]
 
 [tool.setuptools]
@@ -32,6 +33,8 @@ dev = [
     "mypy>=1.13",
     "pytest>=8.3",
     "pytest-django>=4.9",
+    "pytest-playwright>=0.5",
+    "playwright>=1.47",
     "ruff>=0.8",
 ]
 

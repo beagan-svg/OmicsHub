@@ -1,0 +1,13 @@
+<button type="button"
+        class="btn btn-sm btn-outline-secondary btn-icon job-log-toggle"
+        data-disclosure="log-panel-{{ demand_id }}"
+        data-job-log-toggle
+        data-demand-id="{{ demand_id }}"
+        aria-controls="log-panel-{{ demand_id }}"
+        aria-expanded="false"
+        disabled
+        aria-label="Show container logs for demand {{ demand_id }}"
+        data-tooltip="Show container logs">
+  <i class="bi bi-eye" aria-hidden="true"></i>
+  <span class="visually-hidden">Show container logs for demand {{ demand_id }}</span>
+</button>

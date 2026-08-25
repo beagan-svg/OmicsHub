@@ -153,6 +153,21 @@ OCS_CLI_PATH = env("OCS_CLI_PATH", default="ocs")
 # Timeout for a single `ocs` submission call, in seconds.
 OCS_CLI_TIMEOUT = env.int("OCS_CLI_TIMEOUT", default=300)
 
+# --- Job log viewer (user-supplied temporary AWS credentials) --------------
+# A user pastes their own short-lived STS credentials into the Monitor page to view a
+# demand's container logs. Those credentials are never the AWS_PROFILE identity above:
+# they're held only in apps/ocs_integration/log_credentials.py's own cache entry,
+# encrypted with this key. Deliberately separate from Django's SECRET_KEY so rotating
+# one never silently orphans (or, worse, weakens) the other.
+CREDENTIAL_ENCRYPTION_KEY = env("CREDENTIAL_ENCRYPTION_KEY")
+# Safety-net cache lifetime, not a claimed credential expiration: AWS's GetCallerIdentity
+# never reports one, so the UI never tells a user "your credentials expire in 5 hours" —
+# it only ever shows an AWS-reported expiration when one truly exists, or says plainly
+# that it cannot be determined. This is purely how long an unused cache entry may live
+# before it is dropped regardless. Eviction happens sooner, immediately, the moment AWS
+# itself rejects the credentials (expired or otherwise) on any call.
+LOG_VIEWER_CREDENTIAL_TTL_SECONDS = env.int("LOG_VIEWER_CREDENTIAL_TTL_SECONDS", default=5 * 60 * 60)
+
 # --- Celery ---------------------------------------------------------------
 CELERY_BROKER_URL = env("CELERY_BROKER_URL")
 CELERY_TASK_TIME_LIMIT = 900
@@ -298,6 +313,13 @@ if SENTRY_DSN:
         send_default_pii=False,
         # ...and this catches the addresses that are inside the messages themselves.
         before_send=scrub_event,
+        # Off because a stack frame's local variables are captured verbatim otherwise. The
+        # job-log viewer briefly holds a user's pasted AWS credentials in local variables
+        # (apps/ocs_integration/log_credentials.py); an unrelated bug three frames up from
+        # there raising uncaught must not be able to hand that value to Sentry. This trades
+        # away locals for every error, everywhere, not only that module, because a
+        # module-scoped guarantee is not one this code can actually make on its own.
+        include_local_variables=False,
         # Error monitoring only. Performance tracing is a separate decision with a separate
         # cost, and turning it on by accident is how a free tier disappears in a day.
         traces_sample_rate=0.0,

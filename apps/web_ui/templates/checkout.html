@@ -205,38 +205,35 @@
     window.history.replaceState(null, "", url);
   }
 
-  function preserveExcludedNames(url) {
-    const excludedNames = excludedNamesFromUrl();
+  function preserveExcludedNames(url, excludedNames = excludedNamesFromUrl()) {
     url.searchParams.delete("exclude_fastq_names");
     [...excludedNames].sort().forEach((name) => url.searchParams.append("exclude_fastq_names", name));
     return url;
   }
 
-  function syncHiddenSelections() {
-    // One pass building a lookup, then one pass over the rows, rather than a fresh
-    // querySelectorAll + find over every existing hidden input for each row changed:
-    // "select all" on a large cart would otherwise turn this into O(rows²) DOM work.
-    const existingByValue = new Map(
-      [...(selectedNames?.querySelectorAll("[data-selected-fastq]") || [])].map((input) => [input.value, input]),
-    );
-    document.querySelectorAll(".select-cart-sample").forEach((box) => {
-      const existing = existingByValue.get(box.value);
-      if (box.checked && !existing) {
-        const hidden = document.createElement("input");
-        hidden.type = "hidden";
-        hidden.name = "fastq_names";
-        hidden.value = box.value;
-        hidden.dataset.selectedFastq = "";
-        selectedNames.append(hidden);
-      } else if (!box.checked && existing) {
-        existing.remove();
-      }
-    });
+  const hiddenSelections = new Map(
+    [...(selectedNames?.querySelectorAll("[data-selected-fastq]") || [])].map((input) => [input.value, input]),
+  );
+
+  function syncHiddenSelection(box) {
+    const existing = hiddenSelections.get(box.value);
+    if (box.checked && !existing) {
+      const hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.name = "fastq_names";
+      hidden.value = box.value;
+      hidden.dataset.selectedFastq = "";
+      selectedNames.append(hidden);
+      hiddenSelections.set(box.value, hidden);
+    } else if (!box.checked && existing) {
+      existing.remove();
+      hiddenSelections.delete(box.value);
+    }
   }
 
   function updatePaginationLinks() {
     document.querySelectorAll(".checkout-pager a").forEach((link) => {
-      link.href = preserveExcludedNames(new URL(link.href, window.location.href));
+      link.href = preserveExcludedNames(new URL(link.href, window.location.href), excludedNames);
     });
   }
 
@@ -245,13 +242,9 @@
   // to a row's own "change", which fires whether the reader clicked it directly or
   // tristate-select.js flipped it on their behalf via "select all".
   //
-  // Kept in memory rather than re-read from the URL on every "change": "select all" on a
-  // large cart dispatches one "change" per row, and re-parsing the URL plus rewriting it
-  // with history.replaceState on every single one of those would be a lot of avoidable
-  // work for what is, in the end, one exclude list. Everything below is queued as a
-  // microtask for the same reason update() is in tristate-select.js: however many rows
-  // changed in this pass collapse into one write and one hidden-input sync.
+  // Keep the exclusion set in memory and flush it once after a batch of checkbox changes.
   let excludedNames = excludedNamesFromUrl();
+  const changedBoxes = new Set();
   let flushQueued = false;
   const queueFlush = () => {
     if (flushQueued) return;
@@ -259,7 +252,8 @@
     queueMicrotask(() => {
       flushQueued = false;
       writeExcludedNamesToUrl(excludedNames);
-      syncHiddenSelections();
+      changedBoxes.forEach(syncHiddenSelection);
+      changedBoxes.clear();
       updatePaginationLinks();
     });
   };
@@ -271,6 +265,7 @@
       } else {
         excludedNames.add(box.value);
       }
+      changedBoxes.add(box);
       queueFlush();
     });
   });

@@ -60,8 +60,12 @@ def test_job_monitor_refreshes_tables_without_reloading_document():
     assert tables.count('include "partials/sync_status.html"') == 2
     assert tables.count('data-bs-placement="top"') == 2
     assert "initTooltips();" in text
-    assert "setInterval(updateDurations, 1000)" in text
+    assert "refreshDurationsAtMinuteBoundary();" in text
+    assert "setTimeout(refreshDurationsAtMinuteBoundary" in text
     assert "setInterval(refreshTables, 30000)" in text
+    assert 'liveData.dispatchEvent(new CustomEvent("joblog:before-refresh"' in text
+    assert 'liveData.dispatchEvent(new CustomEvent("joblog:refreshed", {bubbles: true}))' in text
+    assert "const tableHtml = await response.text();" in text
     assert "window.location.reload" not in text
 
 
@@ -75,6 +79,15 @@ def test_job_monitor_has_running_and_finished_stage_filters():
     assert "finished_stage_options" in text
     assert 'class="monitor-stage-filter__label"' not in filter_partial
     assert "{{ option.label }}" in filter_partial
+
+
+def test_job_monitor_finished_table_also_filters_by_status():
+    """A dropdown, like the Data Locations Stage filter, not another button group ,
+    a reader picks a status, not compares six pill buttons."""
+    text = (TEMPLATES / "partials/job_monitor_tables.html").read_text()
+    assert 'aria-label="Filter finished jobs by status"' in text
+    assert "finished_status_options" in text
+    assert "<select" in text
 
 
 def test_running_and_finished_tables_name_their_status_column_the_same_way():
@@ -106,6 +119,8 @@ def test_pages_poll_database_without_replacing_sample_interactions():
     assert "details[open]" in fragments
     assert "detail.open = true" in fragments
     assert 'data-live-detail="{{ entry.sample.fastq_name }}"' in queue
+    assert 'region.dispatchEvent(new CustomEvent("joblog:before-refresh"' in fragments
+    assert 'region.dispatchEvent(new CustomEvent("joblog:refreshed", {bubbles: true}))' in fragments
 
 
 def test_job_monitor_demand_ids_are_copyable():

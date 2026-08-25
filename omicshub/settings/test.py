@@ -7,6 +7,9 @@ os.environ.setdefault("DATABASE_URL", "postgres://omicshub:omicshub@localhost:54
 os.environ.setdefault("CELERY_BROKER_URL", "memory://")
 os.environ.setdefault("OCS_ENV_BASE", "test")
 os.environ.setdefault("OCS_AWS_REGION", "us-west-2")
+# Obviously-fake, valid-format Fernet key: real key material must never appear in test
+# settings, but Fernet(key) itself must not raise, so this is a deterministic throwaway.
+os.environ["CREDENTIAL_ENCRYPTION_KEY"] = "2fPuizO90Xj1avGhT1E3AAVDfKZT1T1cgccHh5p_6a8="
 
 # Assigned, not `setdefault`: a developer with a real DSN in their .env would otherwise
 # have the suite initialise Sentry and report their own test failures as production errors.

@@ -136,6 +136,7 @@ def make_sample(db):
                     stage=stage,
                     status=status,
                     demand_id=f"demand-{stage}",
+                    execution_arn=f"arn:aws:states:us-west-2:123456789012:execution:test:{stage}",
                 )
         return sample
 

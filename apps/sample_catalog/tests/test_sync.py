@@ -94,6 +94,43 @@ def test_stage_status_joins_history_to_the_demand_registry(ocs):
     assert (status.stage, status.status, status.demand_id) == (Stage.INGEST, "COMPLETED", "d-1")
 
 
+def test_post_alignment_demand_joins_through_alignment_file_store_id(swept):
+    file_store_id = "a" * 40
+    sample = Sample.objects.create(fastq_name="NY-MX22068-2", **sync.sample_fields(METADATA))
+    alignment_demand = {
+        "demand_id": "alignment-demand",
+        "demand_type": "align",
+        "status": "COMPLETED",
+        "last_update_time": when(2),
+    }
+    post_alignment_demand = {
+        "demand_id": "post-alignment-demand",
+        "demand_type": "post-align",
+        "status": "FAILED",
+        "last_update_time": when(1),
+        "request": {
+            "execution_parameters": {
+                "params": {f"FASTQ_ALIGN_RESULT_{file_store_id.upper()}": "alignment-output"}
+            }
+        },
+    }
+
+    swept(
+        [
+            {
+                "fastq_name": sample.fastq_name,
+                "demand_type_and_id": "align#alignment-demand",
+                "last_update_time": when(2),
+                "input_output_gfs_pairs": [{"outputs": [f"gfs://{file_store_id}"]}],
+            }
+        ],
+        [alignment_demand, post_alignment_demand],
+    )
+
+    status = StageStatus.objects.get(sample=sample, stage=Stage.POST_ALIGN)
+    assert (status.status, status.demand_id) == ("FAILED", "post-alignment-demand")
+
+
 def test_the_newest_demand_wins_for_a_stage(ocs):
     """A retried stage has several demands; only the most recent describes it."""
     ocs.history["NY-MX22068-2"] = [

@@ -90,6 +90,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --group dev
 
+      - name: Install Playwright browsers
+        run: uv run playwright install --with-deps chromium
+
       - name: Check the lock file matches pyproject.toml
         run: uv lock --check
 
@@ -109,6 +112,7 @@ jobs:
       - name: Check production settings
         env:
           DJANGO_SETTINGS_MODULE: omicshub.settings.prod
+          CREDENTIAL_ENCRYPTION_KEY: 2fPuizO90Xj1avGhT1E3AAVDfKZT1T1cgccHh5p_6a8=
           ALLOWED_HOSTS: localhost
           CSRF_TRUSTED_ORIGINS: https://localhost
           SECURE_SSL_REDIRECT: "True"
@@ -126,5 +130,13 @@ jobs:
         # health probe. The remaining dynamic manifest and view code is being typed in stages.
         run: uv run mypy apps/sample_catalog/models.py apps/workflow_engine/models.py apps/submission_queue/models.py apps/ocs_integration/cli.py docker_tools/healthcheck.py
 
-      - name: Test
-        run: uv run python -m pytest -q
+      - name: Test Django suite
+        run: uv run python -m pytest -q --ignore=apps/web_ui/tests/playwright
+
+      - name: Test browser flows
+        env:
+          # pytest-playwright's synchronous browser fixture runs an event loop while the
+          # live-server fixtures create test records. This setting is limited to these
+          # browser tests and is not used by application code or the Django suite.
+          DJANGO_ALLOW_ASYNC_UNSAFE: "true"
+        run: uv run python -m pytest -q apps/web_ui/tests/playwright

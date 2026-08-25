@@ -20,6 +20,12 @@
 {% endblock %}
 
 {% block content %}
+{% comment %}
+Outside #failures-live-data on purpose, same reason as job_monitor.html: that region's
+innerHTML is replaced wholesale by live-fragments.js on every poll, which would wipe
+whatever the reader has typed into the credential form.
+{% endcomment %}
+{% include "partials/monitor_credentials.html" %}
 <div id="failures-live-data" data-live-fragment data-live-fragment-url="{% url 'web_ui:failed' %}">
 <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center">
@@ -95,7 +101,9 @@
           <th scope="col">FASTQ Name</th><th scope="col">Stage</th>
           <th scope="col">Workflow</th><th scope="col">Status</th>
           <th scope="col">Demand ID</th><th scope="col">OCS Failure Message</th>
-          <th scope="col">Submitted At</th><th scope="col"><span class="visually-hidden">Actions</span></th>
+          <th scope="col">Submitted At</th>
+          <th scope="col" class="text-center">Logs</th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
         </tr>
       </thead>
       <tbody>
@@ -108,6 +116,9 @@
           <td>{% include "partials/copy_value.html" with value=entry.demand_id label="Demand ID" %}</td>
           <td class="text-secondary">{{ entry.error_message|default:"—" }}</td>
           <td class="text-secondary">{{ entry.submitted_at|date:"Y-m-d H:i" }}</td>
+          <td class="text-center">
+            {% include "partials/job_log_toggle.html" with demand_id=entry.demand_id running=False %}
+          </td>
           <td class="text-end text-nowrap">
             <div class="d-flex gap-1 justify-content-end">
               {% if entry.can_retry %}
@@ -126,8 +137,9 @@
             </div>
           </td>
         </tr>
+        {% include "partials/job_log_panel_row.html" with demand_id=entry.demand_id colspan=9 %}
         {% empty %}
-        <tr><td colspan="8">
+        <tr><td colspan="9">
           {% include "partials/empty_state.html" with icon="check2-circle" title="No running job failures." hint="OmicsHub submissions accepted by OCS have not failed." %}
         </td></tr>
         {% endfor %}
@@ -136,4 +148,7 @@
   </div>
 </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static_v 'web_ui/js/job-log-credentials.js' %}"></script>
 {% endblock %}
