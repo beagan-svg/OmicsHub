@@ -1,31 +1,36 @@
-[build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "omicshub"
 version = "0.1.0"
-description = "Backend for queueing and submitting OCS alignment and post-alignment jobs"
+description = "Django app for browsing OCS fastq samples and submitting workflow commands"
 requires-python = ">=3.12"
 dependencies = [
     "django>=5.2,<6.0",
     "djangorestframework>=3.15",
     "django-environ>=0.11",
     "psycopg[binary]>=3.2",
-    "boto3>=1.35",
+    "boto3~=1.35.12",
     "celery[redis]>=5.4",
     "whitenoise>=6.8",
     "gunicorn>=23.0",
     "sentry-sdk[django]>=2.19",
     "cryptography>=43.0",
+    # Runtime dependencies for the pinned OCS CLI source installed by Dockerfile.
+    "aibs-informatics-aws-utils>=1.0.1,<2.0.0",
+    "aibs-informatics-core>=1.0.5,<2.0.0",
+    "pydantic~=2.11.2",
+    "pytz",
+    "pyyaml~=6.0",
+    "requests",
+    "typing-inspect",
+    "python-on-whales~=0.72.0",
+    "dateparser",
+    "rich",
+    "tabulate",
+    "typer>=0.16.0,<1.0",
 ]
 
-[tool.setuptools]
-# This is a Django project, not an importable library. `apps/` and `omicshub/` are found
-# through the working directory, never installed. Pinning discovery to nothing is what
-# lets the Dockerfile run `pip install .` to resolve the dependencies above without
-# setuptools trying to package the app tree, and without the list being repeated there.
-py-modules = []
+[tool.uv]
+package = false
 
 [dependency-groups]
 dev = [

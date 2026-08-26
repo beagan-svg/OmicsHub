@@ -1,6 +1,6 @@
 # Lint, migration and test checks for every push and pull request.
 #
-# The suite needs a real Postgres — apps/queueing claims work with SELECT ... FOR UPDATE
+# The suite needs PostgreSQL because queue claims use SELECT ... FOR UPDATE
 # SKIP LOCKED, which SQLite does not implement, and one test opens a second connection
 # under django_db(transaction=True) to prove two workers cannot claim the same entry. So
 # this runs against a Postgres service container rather than trying to fake it.
@@ -10,28 +10,15 @@ on:
   push:
   pull_request:
 
-# A second push to the same branch makes the first run's answer worthless. Cancel it rather
-# than pay for both and read the stale one.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   DJANGO_SETTINGS_MODULE: omicshub.settings.test
-      # omicshub/settings/test.py fills these in with os.environ.setdefault, so the suite runs
-  # without them — they are set here anyway so the workflow says out loud what it depends
-  # on, and so a change to those defaults shows up as a CI failure to look at rather than
-  # as a silent switch to a different database.
-  #
-  # Fake values, and only fake values. SECRET_KEY has no default in base.py and has to come
-  # from somewhere; nothing signed by this one ever leaves the runner.
   SECRET_KEY: ci-only-not-a-real-secret-with-enough-length-for-django-checks-12345
   DATABASE_URL: postgres://omicshub:omicshub@127.0.0.1:5432/omicshub
-  # memory://, not the Redis service. The tests that touch the broker patch it, and pointing
-  # this at a real Redis would make the health-check tests reach for workers that do not
-  # exist on a runner and answer differently than they do on a developer's machine.
   CELERY_BROKER_URL: memory://
-  CACHE_URL: redis://127.0.0.1:6379/0
   OCS_ENV_BASE: test
   OCS_AWS_REGION: us-west-2
 
@@ -40,8 +27,6 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      # 16, matching compose.yaml's postgres image, so CI cannot pass on a version the
-      # deployment does not run.
       postgres:
         image: postgres:16
         env:
@@ -50,25 +35,8 @@ jobs:
           POSTGRES_DB: omicshub
         ports:
           - 5432:5432
-        # Without this the steps start before Postgres finishes first-run initialisation and
-        # every test errors on connection refused.
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      # 7, matching compose.yaml. The suite does not currently need it: omicshub/settings/
-      # test.py forces a locmem cache and the memory:// broker above, precisely so the tests
-      # run on a laptop with nothing installed. It is here so that the day a test does need
-      # Redis — a cache backend test, or the capacity hold exercised across processes — it
-      # works without anyone having to come back and edit this file first.
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -81,7 +49,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      # uv is the project's dependency manager, so CI uses the same lockfile as local development.
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -95,6 +62,12 @@ jobs:
 
       - name: Check the lock file matches pyproject.toml
         run: uv lock --check
+
+      - name: Check the production requirements export
+        run: |
+          uv export --frozen --no-dev --no-emit-project --no-header --format requirements-txt \
+            --output-file /tmp/requirements.lock
+          diff -u requirements.lock /tmp/requirements.lock
 
       - name: Lint
         run: uv run ruff check .
@@ -125,10 +98,8 @@ jobs:
         # and does not need a live database, AWS account, or Celery worker.
         run: uv run python manage.py check --deploy
 
-      - name: Type check stable application boundaries
-        # The first typing gate covers models, the OCS command boundary, and the container
-        # health probe. The remaining dynamic manifest and view code is being typed in stages.
-        run: uv run mypy apps/sample_catalog/models.py apps/workflow_engine/models.py apps/submission_queue/models.py apps/ocs_integration/cli.py docker_tools/healthcheck.py
+      - name: Type check
+        run: uv run mypy apps omicshub docker_tools
 
       - name: Test Django suite
         run: uv run python -m pytest -q --ignore=apps/web_ui/tests/playwright

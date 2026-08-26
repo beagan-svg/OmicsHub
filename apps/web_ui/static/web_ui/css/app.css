@@ -981,6 +981,11 @@ main.container-fluid {
   gap: 10px;
 }
 
+.monitor-logs-column {
+  width: 4rem;
+  white-space: nowrap;
+}
+
 @media (max-width: 700px) {
   .monitor-table-header {
     align-items: flex-start;
@@ -1823,18 +1828,6 @@ a:focus-visible {
 
 
 
-.stat { display: flex; flex-direction: column-reverse; gap: 2px; }
-
-.stat__value {
-  font-size: var(--text-3xl);
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-
-
-
 .empty {
   padding: 40px 16px;
   text-align: center;
@@ -1940,13 +1933,11 @@ a:focus-visible {
   max-width: 28rem;
 }
 
-.location-uri > .font-monospace {
-  display: inline-block;
-  max-width: calc(100% - 2.5rem);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: middle;
+.location-contents-column {
+  max-width: 5.5rem;
+  min-width: 5.5rem;
   white-space: nowrap;
+  width: 5.5rem;
 }
 
 .location-contents-row > td {
@@ -1989,10 +1980,6 @@ a:focus-visible {
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 12px;
-}
-
-.location-download-error {
-  flex-basis: 100%;
 }
 
 .location-list {
@@ -2192,30 +2179,29 @@ a:focus-visible {
   border-bottom: 0;
 }
 
-.job-log-toggle {
+.table-icon-tooltip {
   position: relative;
 }
 
-.job-log-toggle::after {
+.table-icon-tooltip::after {
   background: #20242a;
   border-radius: 4px;
   color: #fff;
   content: attr(data-tooltip);
   font-size: var(--text-xs);
-  left: 50%;
   opacity: 0;
   padding: 5px 8px;
   pointer-events: none;
   position: absolute;
+  right: 0;
   bottom: calc(100% + 8px);
-  transform: translateX(-50%);
   transition: opacity 120ms ease;
   visibility: hidden;
   white-space: nowrap;
   z-index: 10;
 }
 
-.job-log-toggle:hover::after {
+.table-icon-tooltip:hover::after {
   opacity: 1;
   visibility: visible;
 }

@@ -49,9 +49,10 @@
       <thead>
         <tr>
           <th scope="col">Fastq Name</th><th scope="col">Stage</th>
-          <th scope="col">Modality</th><th scope="col">Status</th><th scope="col">Demand ID</th>
+          <th scope="col">Modality</th><th scope="col">Organism Common Name</th>
+          <th scope="col">Library Prep Method</th><th scope="col">Status</th><th scope="col">Demand ID</th>
           <th scope="col">Duration</th><th scope="col">Submitted from</th>
-          <th scope="col" class="text-center">Logs</th>
+          <th scope="col" class="text-center monitor-logs-column">Logs</th>
         </tr>
       </thead>
       <tbody>
@@ -60,6 +61,8 @@
           <td class="mono">{{ row.sample.fastq_name }}</td>
           <td><span class="tag">{{ row.stage }}</span></td>
           <td><span class="tag tag--accent">{{ row.sample.modality }}</span></td>
+          <td>{{ row.sample.organism_common_name }}</td>
+          <td>{{ row.sample.library_prep_method_name }}</td>
           <td>{% include "partials/status_badge.html" with status=row.status %}</td>
           <td class="mono">
             {% include "partials/copy_value.html" with value=row.demand_id label="Demand ID" %}
@@ -68,13 +71,13 @@
               data-started-at="{{ row.started_at|date:'c' }}"
               data-duration>{{ row.duration_display|default:"—" }}</td>
           <td>{% include "partials/submission_source_badge.html" with queued_here=row.queued_here %}</td>
-          <td class="text-center">
+          <td class="text-center monitor-logs-column">
             {% include "partials/job_log_toggle.html" with demand_id=row.demand_id running=True %}
           </td>
         </tr>
-        {% include "partials/job_log_panel_row.html" with demand_id=row.demand_id colspan=8 %}
+        {% include "partials/job_log_panel_row.html" with demand_id=row.demand_id colspan=10 %}
         {% empty %}
-        <tr><td colspan="8">
+        <tr><td colspan="10">
           {% include "partials/empty_state.html" with icon="activity" title="Nothing is running." hint="Stages appear here while OCS is working on them, whoever submitted them." %}
         </td></tr>
         {% endfor %}
@@ -136,10 +139,11 @@
       <thead>
         <tr>
           <th scope="col">Fastq Name</th><th scope="col">Stage</th>
-          <th scope="col">Modality</th><th scope="col">Status</th><th scope="col">Demand ID</th>
+          <th scope="col">Modality</th><th scope="col">Organism Common Name</th>
+          <th scope="col">Library Prep Method</th><th scope="col">Status</th><th scope="col">Demand ID</th>
           <th scope="col">Duration</th><th scope="col">Finished</th>
           <th scope="col">Submitted from</th>
-          <th scope="col" class="text-center">Logs</th>
+          <th scope="col" class="text-center monitor-logs-column">Logs</th>
         </tr>
       </thead>
       <tbody>
@@ -148,6 +152,8 @@
           <td class="mono">{{ row.sample.fastq_name }}</td>
           <td><span class="tag">{{ row.stage }}</span></td>
           <td><span class="tag tag--accent">{{ row.sample.modality }}</span></td>
+          <td>{{ row.sample.organism_common_name }}</td>
+          <td>{{ row.sample.library_prep_method_name }}</td>
           <td>{% include "partials/status_badge.html" with status=row.status %}</td>
           <td class="mono">
             {% include "partials/copy_value.html" with value=row.demand_id label="Demand ID" %}
@@ -155,13 +161,13 @@
           <td class="text-secondary">{{ row.duration_display|default:"—" }}</td>
           <td class="text-secondary">{{ row.last_update_time|date:"Y-m-d H:i"|default:"—" }}</td>
           <td>{% include "partials/submission_source_badge.html" with queued_here=row.queued_here %}</td>
-          <td class="text-center">
+          <td class="text-center monitor-logs-column">
             {% include "partials/job_log_toggle.html" with demand_id=row.demand_id running=False %}
           </td>
         </tr>
-        {% include "partials/job_log_panel_row.html" with demand_id=row.demand_id colspan=9 %}
+        {% include "partials/job_log_panel_row.html" with demand_id=row.demand_id colspan=11 %}
         {% empty %}
-        <tr><td colspan="9">
+        <tr><td colspan="11">
           {% include "partials/empty_state.html" with icon="check2-all" title="OCS has not finished anything yet." %}
         </td></tr>
         {% endfor %}

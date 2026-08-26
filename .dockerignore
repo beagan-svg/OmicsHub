@@ -1,45 +1,39 @@
-# Build context. Everything the image needs is listed in the Dockerfile; the point of this
-# file is that nothing else reaches the daemon — most importantly credentials.
-
-# Never. .env.docker holds the database password and names the AWS profile; an image layer is
-# permanent and pushable, so a secret that lands in one is a secret that has leaked.
+# Credentials and local configuration
 .env
 .env.*
 !.env.docker.example
 
-# Built on the host, for the host. Copying a macOS venv into a Linux image gives broken
-# binaries that shadow the ones pip installs.
+# Local Python and tool state
 .venv/
 venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.code-review-graph/
 
-# Regenerated inside the image by the web container's start command.
-staticfiles/
-
-# Local state, not application code. celerybeat-schedule.db is the one that matters: the
-# beat container regenerates its schedule at /tmp on start, and a stale copy of the host's
-# baked into the image is state from another machine.
+# Runtime output
 *.db
 **/*.db
 logs/
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.ruff_cache/
-.git/
-.DS_Store
+staticfiles/
 
-# Editor and agent scratch. Nothing in the image reads them, and .git in particular is the
-# largest thing here after vendor/ — every byte is uploaded to the daemon on every build.
+# Development-only files
+.git/
 .github/
-.claude/
-.impeccable/
 .idea/
 .vscode/
+.claude/
+.impeccable/
+.DS_Store
+apps/*/tests/
+deploy/
+docs/
+skills/
+README.md
+RELEASE.md
 
-# Kept deliberately, because the build or the running container needs them and an over-broad
-# rule above would be easy to write:
-#   pyproject.toml, requirements.lock   dependency install, before the source copy
-#   vendor/gcs/                         the `ocs` CLI packages; see docker_tools/vendor_gcs.sh
-#   docker_tools/                       healthcheck.py runs inside the web container
-#   apps/, omicshub/, manage.py         the application
-#   workflow_manifests/                 the sample workflow manifest
+# Required build inputs remain in the context:
+# requirements.lock, apps/, omicshub/, docker_tools/, and vendor/gcs/.

@@ -193,7 +193,7 @@ def build_plan(
     # pass every sample in the job; the dashboard and the API each expand the selection
     # through `with_multiome_partners` first. This is what lets this be a dict lookup
     # rather than a query per sample.
-    groups_by_load = {}
+    groups_by_load: dict[str, list[Sample]] = {}
     for sample in samples:
         if sample.load_name:
             groups_by_load.setdefault(sample.load_name, []).append(sample)
@@ -270,15 +270,15 @@ def build_plan(
                     ),
                     None,
                 )
-            except ConfigurationError as error:
-                command_config_cache[cache_key] = (None, error)
-        command_config, error = command_config_cache[cache_key]
-        if error is not None:
+            except ConfigurationError as caught_error:
+                command_config_cache[cache_key] = (None, caught_error)
+        command_config, config_error = command_config_cache[cache_key]
+        if config_error is not None:
             skipped.append(
                 SkippedSample(
                     sample=sample,
                     reason=SkipReason.LIBRARY_PREP_UNCONFIGURED,
-                    detail=str(error),
+                    detail=str(config_error),
                     stage=stage,
                     modality=sample_modality,
                 )

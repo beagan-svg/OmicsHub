@@ -319,8 +319,14 @@ class TestDashboard:
 
         assert response.status_code == 200
         assert b"s3://bucket/results" in response.content
+        assert response.content.count(b">s3://bucket/results</span>") == 1
         assert b"store-1" not in response.content
         assert b"demand-align" not in response.content
+        assert (
+            b'class="btn btn-sm btn-outline-secondary location-contents-toggle table-icon-tooltip"'
+            in response.content
+        )
+        assert b'data-tooltip="View contents"' in response.content
 
     def test_data_locations_uses_sample_filters_and_default_fields(self, logged_in, make_sample):
         make_sample("A-1", batch_name_from_vendor="MTX-10", organism_common_name="mouse")
@@ -860,6 +866,29 @@ class TestJobMonitor:
         assert b"RUNNING-1" in response.content
         assert b"demand-123" in response.content
         assert response.context["counts"]["align"] == 1
+
+    def test_running_and_finished_stages_show_sample_metadata(self, logged_in, make_sample):
+        running = make_sample(
+            "RUNNING-METADATA",
+            load_name="LOAD-RUNNING",
+            organism_common_name="mouse",
+            library_prep_method_name="10xV4",
+        )
+        running.stage_statuses.create(stage=Stage.ALIGN, status="IN_PROGRESS", demand_id="demand-running")
+        finished = make_sample(
+            "FINISHED-METADATA",
+            load_name="LOAD-FINISHED",
+            organism_common_name="human",
+            library_prep_method_name="10xFXv2",
+        )
+        finished.stage_statuses.create(stage=Stage.ALIGN, status="COMPLETED", demand_id="demand-finished")
+
+        response = logged_in.get(reverse("web_ui:job-monitor"))
+
+        assert b"mouse" in response.content
+        assert b"10xV4" in response.content
+        assert b"human" in response.content
+        assert b"10xFXv2" in response.content
 
     def test_running_stage_filter_shows_only_alignment_jobs(self, logged_in, make_sample):
         alignment = make_sample("RUNNING-ALIGN-1")

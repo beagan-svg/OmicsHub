@@ -74,7 +74,6 @@
       "aria-label",
       `${open ? "Collapse" : "Expand"} the AWS credentials panel`
     );
-    credentialsToggle.title = `${open ? "Collapse" : "Expand"} the AWS credentials panel`;
     credentialsIcon.classList.toggle("bi-eye", open);
     credentialsIcon.classList.toggle("bi-eye-slash", !open);
   };
@@ -260,12 +259,12 @@
     body.appendChild(message);
   };
 
-  const fetchLogsFor = async (demandId, body) => {
+  const fetchLogsFor = async (demandId, body, showLoading = true) => {
     cancelLogRequest(demandId);
     const controller = new AbortController();
     const request = {controller, body};
     activeLogRequests.set(demandId, request);
-    renderMessage(body, "Loading…");
+    if (showLoading) renderMessage(body, "Loading…");
     try {
       const response = await fetch(logsUrlFor(demandId), {
         headers: {"X-Requested-With": "XMLHttpRequest"},
@@ -333,7 +332,7 @@
       const targetPanel = toggle && document.getElementById(toggle.getAttribute("aria-controls"));
       const body = targetPanel?.querySelector("[data-job-log-body]");
       if (valid && targetPanel?.dataset.open === "true" && body) {
-        fetchLogsFor(demandId, body);
+        fetchLogsFor(demandId, body, false);
       }
       retryAfterRefresh.delete(demandId);
     });

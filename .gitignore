@@ -1,76 +1,52 @@
-# Python
+# Python build and cache files
 __pycache__/
 *.py[cod]
-*$py.class
 *.so
 .Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
 
-# Django
+# Dependency and tool state
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Django runtime files
 *.log
 *.pot
-*.pyc
-local_settings.py
 db.sqlite3
 db.sqlite3-journal
 media/
 staticfiles/
+celerybeat-schedule*
 
-# Virtual Environment
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Project specific
-*.env
-*.bak
-tests/html/
-tests/scripts/
-data/
-logs/*.log
-
-# Collected static files: rebuilt by collectstatic on every deploy, never edited by hand.
-staticfiles/
-
-# Local env file (matches .env, .env.local, etc.)
+# Local configuration and credentials
 .env
 .env.*
 !.env.docker.example
 
-# The virtualenv actually in use. `venv/` above is a leftover from an earlier layout.
-.venv/
-
-# celery beat's schedule database: regenerated from CELERY_BEAT_SCHEDULE on every start.
-celerybeat-schedule*
-
-# Vendored ocs CLI packages, populated by docker_tools/vendor_gcs.sh from a checkout outside
-# this repo. Copied in rather than committed; becomes a submodule once git is set up.
+# Generated Docker build input
 vendor/
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bak
+*~
+.DS_Store
+Thumbs.db
+
+# Local review tools and scratch files
+.code-review-graph/
+.claude/
+.impeccable/
+tasks/
+tests/html/
+tests/scripts/
+data/

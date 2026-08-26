@@ -27,9 +27,9 @@ Reusable template fragments live in `apps/web_ui/templates/partials/` and use na
 
 ## Runtime and deployment files
 
-`Dockerfile` builds the application image. It installs the project and the vendored OCS packages, then runs the image as a non-root user.
+`Dockerfile` builds the application image. It installs the locked dependencies and vendored OCS packages, copies the Django source, and runs the image as a non-root user.
 
-`compose.yaml` defines the local Docker stack. The web container runs migrations and collectstatic before Gunicorn. The other application containers run the OCS submission worker, catalog sync worker, and Celery scheduler.
+`compose.yaml` defines the local Docker stack. A one-shot container runs migrations before the web process, workers, and Celery Beat start. The web container runs `collectstatic` before Gunicorn.
 
 `.env.docker.example` documents required Docker settings. `.env.docker` is local configuration and is ignored by Git. AWS credentials are mounted into the containers from the path in `AWS_CREDENTIALS_FILE`.
 
@@ -39,13 +39,11 @@ Reusable template fragments live in `apps/web_ui/templates/partials/` and use na
 
 ## Configuration and build inputs
 
-`workflow_manifests/` contains example workflow manifests used by operators and tests. A manifest is uploaded and stored in `WorkflowConfig` before it can drive submissions.
+`workflow_manifests/` contains an example workflow manifest for operators. A manifest is uploaded and stored in `WorkflowConfig` before it can drive submissions.
 
-`vendor/gcs/` contains the OCS package source required by the Docker build. Treat it as a build input, not as OmicsHub application code. Do not add application logic there.
+`vendor/gcs/` contains the pinned OCS package source prepared by `docker_tools/vendor_gcs.sh`. Treat it as generated build input, not as OmicsHub application code. Do not add application logic there.
 
-`.github/workflows/` contains CI and Docker image checks. CI validates `uv.lock`, Ruff, migrations, production settings, and tests.
-
-CI type checks the stable model, OCS CLI, and container health boundaries. The manifest and view layers contain untyped JSON and request data, so they are being added to the type check in stages.
+`.github/workflows/` contains CI and Docker image checks. CI validates dependency locks, Ruff, typing, migrations, production settings, tests, and a build from the pinned OCS source.
 
 `uv.lock` contains runtime and development dependency pins. Update it with `uv lock` after changing `pyproject.toml`.
 

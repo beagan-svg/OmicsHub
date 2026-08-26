@@ -6,23 +6,15 @@
 # its default environment file. Without the flag the credential mount path is empty.
 name: omicshub
 
-# Everything the four application processes share. They run the same image and differ only
-# by command, so anything that is not the command belongs here.
 x-app: &app
   build:
     context: .
   image: omicshub:local
-  # Secrets and host-specific paths. Not in this file, which is meant to be readable.
   env_file: .env.docker
   environment:
-    # Service names, not localhost: inside the network these resolve to the containers.
-    # Set here rather than in .env.docker because they are a property of this topology,
-    # and a stale environment file pointing at localhost would half-work and confuse.
     DATABASE_URL: postgres://omicshub:${POSTGRES_PASSWORD}@postgres:5432/omicshub
     CELERY_BROKER_URL: redis://redis-broker:6379/0
     CACHE_URL: redis://redis-cache:6379/0
-    # Keep the host path used for the bind source out of the container environment.
-    # Application code should use the mounted path, not a host-specific path.
     AWS_CREDENTIALS_FILE: /run/aws/credentials
     AWS_SHARED_CREDENTIALS_FILE: /run/aws/credentials
     AWS_REGION: ${OCS_AWS_REGION}
@@ -38,14 +30,9 @@ x-app: &app
       condition: service_healthy
   restart: unless-stopped
 
-# Beat only publishes scheduled tasks. It does not call AWS, so keep the credential mount
-# off that container while sharing the same application image and settings.
 x-aws-app: &aws-app
   <<: *app
   volumes:
-    # Read-only, and a bind mount rather than anything baked into the image: these are
-    # long-lived keys against the production OCS account, and an image layer holding them
-    # would be permanent and pushable.
     - ${AWS_CREDENTIALS_FILE}:/run/aws/credentials:ro
 
 services:
@@ -57,17 +44,9 @@ services:
       POSTGRES_DB: omicshub
     volumes:
       - pgdata:/var/lib/postgresql/data
-    # Bound to the loopback address, not 0.0.0.0. The host publishes a VS Code tunnel for
-    # the web port only; the database should not be reachable from the network as well.
-    #
-    # The host side is settable because a machine that has been running this stack by hand
-    # already has something on 5432. Move the published port to run both stacks.
-    # side by side. The container side is fixed: it is what DATABASE_URL above resolves to.
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      # Without this the app containers start before Postgres finishes its first-run
-      # initialisation and die on connection refused.
       test: ["CMD-SHELL", "pg_isready -U omicshub -d omicshub"]
       interval: 5s
       timeout: 3s
@@ -96,46 +75,29 @@ services:
       retries: 10
     restart: unless-stopped
 
+  migrate:
+    <<: *app
+    command: python manage.py migrate --noinput
+    restart: "no"
+
   web-ui:
     <<: *aws-app
-    # migrate before serving, and only here: one web container means one migrator, so no
-    # two processes race to apply the same migration. collectstatic runs at start rather
-    # than at build because whitenoise's manifest storage needs the real settings, and
-    # supplying a full set of dummy env vars to a build step is worse than three seconds
-    # of startup.
-    #
-    # --access-logfile - and --error-logfile - put both streams on the container's stdout.
-    # Gunicorn's default is no access log at all and an error log on stderr, so as it stood
-    # there was no record anywhere of which requests this deployment served. A log agent
-    # collects a container's output and nothing else, so a log written to a file inside the
-    # container is a log nobody will ever read.
-    #
-    # --max-requests recycles a worker after that many requests, with --max-requests-jitter
-    # spreading the recycles so they do not all land at once and take the service down for
-    # the moment they take to come back. This bounds the cost of a slow leak: the sweeps
-    # hold half a million metadata rows in memory at a time, and a worker that has grown is
-    # replaced rather than being something anyone has to notice.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-broker:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     command: >
-      sh -c "python manage.py migrate --noinput
-      && python manage.py collectstatic --noinput
-      && gunicorn omicshub.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+      sh -c "python manage.py collectstatic --noinput
+      && exec gunicorn omicshub.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
       --access-logfile - --error-logfile -
       --max-requests 512 --max-requests-jitter 64"
     ports:
       - "127.0.0.1:${WEB_PORT:-8000}:8000"
-    # Only the web service gets one: the healthcheck asks /healthz/, and the other three
-    # containers run the same image but serve no HTTP, so the same check on them would
-    # report a permanent failure that means nothing.
-    #
-    # /healthz/ reports readiness. It returns 503 when the broker or the submissions
-    # worker is down, not only when this container is. That is deliberate: a web container
-    # that renders pages while no submission can reach OCS is the exact failure mode.
-    # health.py was written for, and it should be visible in `docker compose ps` rather
-    # than only to whoever opens the endpoint. `restart: unless-stopped` reacts to the
-    # process exiting, not to health status, so an
-    # unhealthy web container stays up and keeps serving while it says what is wrong.
-    #
-    # start_period covers migrate and collectstatic, which run before gunicorn binds.
     healthcheck:
       test: ["CMD", "python", "/app/docker_tools/healthcheck.py"]
       interval: 30s
@@ -145,14 +107,33 @@ services:
 
   ocs-submission-worker:
     <<: *aws-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-broker:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     # One process, one queue, and it must stay that way. The global OCS job limit and the
     # config's `spacing` between submissions are both enforced by this being the only thing
     # submitting; a second replica or a higher concurrency submits the same demand twice.
     # Do not `docker compose up --scale ocs-submission-worker=N`.
     command: celery -A omicshub worker --queues ocs-submissions --concurrency 1 --loglevel info
+    stop_grace_period: 330s
 
   catalog-sync-worker:
     <<: *aws-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-broker:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     # Catalog synchronization tasks read fastq metadata, fastq history, and demand registry
     # data to keep the dashboard current. This worker is separate from submissions so a long
     # metadata sweep cannot sit in front of a queued job.
@@ -160,6 +141,15 @@ services:
 
   celery-scheduler:
     <<: *app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-broker:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     # The schedule file is regenerated from CELERY_BEAT_SCHEDULE on start, so it is state
     # nobody needs kept. Use /tmp rather than a volume and keep it out of the read-only app tree.
     command: celery -A omicshub beat --loglevel info --schedule /tmp/celerybeat-schedule

@@ -8,6 +8,8 @@ no live credentials, and nothing here captures a screenshot or trace containing 
 
 from __future__ import annotations
 
+from threading import Event
+
 import pytest
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
@@ -170,15 +172,24 @@ class TestFullCredentialFlow:
     def test_open_panel_re_fetches_after_a_poll_refresh_instead_of_reverting(
         self, credentials_form, monkeypatch, running_demand
     ):
-        """A table poll preserves an open panel without requesting logs again."""
+        """A table poll keeps the old logs visible until refreshed logs arrive."""
         stub_valid_sts(monkeypatch)
-        monkeypatch.setattr(
-            log_credentials,
-            "fetch_job_logs",
-            lambda request, demand_id, execution_arn, **kwargs: [
-                {"timestamp": 1700000000000, "message": "still real logs"}
-            ],
-        )
+        first_request_started = Event()
+        retry_started = Event()
+        release_requests = Event()
+        requests = 0
+
+        def fetch_logs(request, demand_id, execution_arn, **kwargs):
+            nonlocal requests
+            requests += 1
+            if requests == 1:
+                first_request_started.set()
+            else:
+                retry_started.set()
+            release_requests.wait(timeout=5)
+            return [{"timestamp": 1700000001000, "message": "refreshed logs"}]
+
+        monkeypatch.setattr(log_credentials, "fetch_job_logs", fetch_logs)
         page = credentials_form
         open_credentials(page)
         page.fill("#jlc-paste", paste_block())
@@ -187,9 +198,11 @@ class TestFullCredentialFlow:
 
         toggle = page.locator("[data-job-log-toggle]").first
         toggle.click()
-        page.wait_for_selector(".job-log-viewer")
+        assert first_request_started.wait(timeout=2)
+        page.locator("[data-job-log-body]").first.evaluate(
+            "body => { body.innerHTML = '<div class=\"job-log-viewer\">preserved logs</div>'; }"
+        )
 
-        # Preserve the open panel body across the same table replacement used by polling.
         page.evaluate("""
             async () => {
                 const region = document.getElementById('monitor-live-data');
@@ -201,19 +214,28 @@ class TestFullCredentialFlow:
                 const response = await fetch(window.location.href, {
                     headers: {"X-Requested-With": "XMLHttpRequest"},
                 });
+                region.dispatchEvent(new CustomEvent('joblog:before-refresh', {bubbles: true}));
                 region.innerHTML = await response.text();
                 openPanels.forEach(({demandId, body}) => {
                     const panel = region.querySelector(`[data-job-log-panel][data-demand-id="${demandId}"]`);
+                    const toggle = region.querySelector(
+                        `[data-job-log-toggle][data-demand-id="${demandId}"]`
+                    );
                     if (panel) {
                         panel.dataset.open = "true";
                         panel.querySelector('[data-job-log-body]').innerHTML = body;
                     }
+                    if (toggle) toggle.setAttribute('aria-expanded', 'true');
                 });
+                region.dispatchEvent(new CustomEvent('joblog:refreshed', {bubbles: true}));
             }
         """)
 
-        page.wait_for_selector(".job-log-viewer")
-        assert "still real logs" in page.locator(".job-log-viewer").inner_text()
+        assert retry_started.wait(timeout=2)
+        assert "preserved logs" in page.locator(".job-log-viewer").inner_text()
+        assert "Loading…" not in page.locator("[data-job-log-body]").first.inner_text()
+        release_requests.set()
+        page.wait_for_selector(".job-log-viewer:has-text('refreshed logs')")
         assert "Provide AWS credentials" not in page.content()
 
     def test_eye_icon_still_opens_after_the_table_html_is_replaced(self, credentials_form, monkeypatch):
@@ -373,13 +395,41 @@ class TestMonitorTableLayout:
             table_height["visibleRowsHeight"] + table_height["headerHeight"] + 4
         )
 
+    def test_log_actions_use_a_compact_centered_column(self, credentials_form):
+        page = credentials_form
+        headers = page.locator("th.monitor-logs-column:visible")
+        cells = page.locator("tbody tr:not(.job-log-row) td.monitor-logs-column")
+
+        assert headers.count() > 0
+        assert cells.count() > 0
+        for index in range(headers.count()):
+            header_box = headers.nth(index).bounding_box()
+            assert header_box["width"] == pytest.approx(64, abs=1)
+
+        for index in range(cells.count()):
+            cell_box = cells.nth(index).bounding_box()
+            button_box = cells.nth(index).locator("button").bounding_box()
+            assert cell_box["width"] == pytest.approx(64, abs=1)
+            assert button_box["x"] + button_box["width"] / 2 == pytest.approx(
+                cell_box["x"] + cell_box["width"] / 2,
+                abs=1,
+            )
+
+    def test_hidden_log_tooltip_does_not_extend_the_table_scroll_area(self, credentials_form):
+        wrapper = credentials_form.locator(".table-responsive:visible").first
+        overflow = wrapper.evaluate("""element => {
+            const tableWidth = element.querySelector('table').getBoundingClientRect().width;
+            return element.scrollWidth - Math.ceil(tableWidth);
+        }""")
+        assert overflow <= 1
+
     def test_clicking_finished_status_does_not_navigate(self, finished_credentials_form):
         page = finished_credentials_form
         navigations = []
         page.on("framenavigated", lambda frame: navigations.append(frame.url))
 
         finished_table = self.finished_table(page)
-        status = finished_table.locator("tbody tr:not(.job-log-row) td:nth-child(4) .state").first
+        status = finished_table.locator("tbody tr:not(.job-log-row)").first.locator(".state")
         status.click()
         page.wait_for_timeout(100)
 

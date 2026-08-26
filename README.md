@@ -17,10 +17,9 @@ from one OmicsHub image.
 Install these tools on the machine that will run OmicsHub:
 
 - Docker Desktop, or Docker Engine with the Docker Compose plugin
+- Git
 - AWS CLI
 - An AWS profile that can read the OCS DynamoDB tables and submit OCS demands
-- A local genomics-cloud-services checkout until the OCS packages become a Git submodule
-  or a published package dependency
 
 The app reads AWS credentials from the credentials file you specify. It does not read access
 keys from .env.docker. Compose runs separate Redis containers for task messages and cache data.
@@ -58,6 +57,7 @@ Give the AWS profile access to these tables. The `<env>` value comes from `OCS_E
 - <env>-fastq-metadata
 - <env>-fastq-history
 - <env>-demand-registry
+- <env>-file-store
 
 Give the same profile permission to send alignment and post-alignment demands through the
 `ocs` CLI.
@@ -76,6 +76,7 @@ and set these values:
 ~~~dotenv
 SECRET_KEY=replace-with-a-long-random-value
 POSTGRES_PASSWORD=replace-with-a-database-password
+CREDENTIAL_ENCRYPTION_KEY=replace-with-a-fernet-key
 AWS_CREDENTIALS_FILE=/Users/you/.omicshub/credentials
 AWS_PROFILE=omicshub
 OCS_ENV_BASE=prod
@@ -91,17 +92,19 @@ Run the setup command again:
 docker_tools/setup_docker.sh
 ~~~
 
-The script checks the settings, copies the OCS packages into vendor/gcs/, builds the Docker
-image, and starts the stack. It waits for the dashboard health check before it exits.
+The script checks the settings, downloads the pinned genomics-cloud-services revision into
+vendor/gcs/, builds the Docker image, and starts the stack. It waits for the dashboard health
+check before it exits.
 
-If the genomics-cloud-services checkout is not at the default location, set GCS_SRC:
+Set GCS_SRC to reuse a local genomics-cloud-services Git checkout that contains the pinned
+revision:
 
 ~~~bash
 GCS_SRC=/path/to/genomics-cloud-services docker_tools/setup_docker.sh
 ~~~
 
-The script stops when any of these four OCS packages is missing:
-gcs-core, gcs-api-client, gcs-docker-tools, or gcs-cli.
+The script exports gcs-core, gcs-api-client, gcs-docker-tools, and gcs-cli from the pinned
+revision. Local edits in the external checkout are not copied into the image.
 
 ### Open the dashboard
 
@@ -134,8 +137,8 @@ Do not run docker compose down -v unless you intend to delete the PostgreSQL vol
 
 ## Docker containers and data flow
 
-Docker Compose starts seven containers: four from the OmicsHub image, one PostgreSQL
-container, and two Redis containers:
+Docker Compose starts eight containers: five from the OmicsHub image, one PostgreSQL
+container, and two Redis containers. The migration container exits after applying migrations.
 
 ~~~text
                            Docker Compose
@@ -145,15 +148,14 @@ container, and two Redis containers:
    PostgreSQL              Redis broker              Redis cache
     pgdata volume           Celery tasks              Holds and cache
        │                        │                        │
-       └───────────────┬────────┴────────┬───────────────┘
-                       │                 │
-                    web-ui          Celery Beat
-                 Django/Gunicorn     Scheduled tasks
-                       │                 │
-              ┌────────┴────────┐        │
-              │                 │        │
-      catalog-sync-worker  ocs-submission-worker
-      OCS sync tasks        OCS submission tasks
+       └────────────────────────┼────────────────────────┘
+                                │
+                            migration
+                                │
+               ┌────────────────┼────────────────┐
+               │                │                │
+            web-ui          Celery Beat        workers
+         Django/Gunicorn   Scheduled tasks   sync and submission
 ~~~
 
 The browser connects to the web container through the host port:
@@ -179,22 +181,23 @@ from the build context. Compose mounts the host credentials file read-only at
 
 ### Container startup
 
-`web-ui` runs these commands before it starts Gunicorn:
+The migration and web containers run these commands in order:
 
 ~~~text
-python manage.py migrate
+migration: python manage.py migrate
         ↓
-python manage.py collectstatic
+web-ui: python manage.py collectstatic
         ↓
-gunicorn omicshub.wsgi:application
+web-ui: gunicorn omicshub.wsgi:application
 ~~~
 
 `collectstatic` copies CSS and JavaScript from the app static directories into
 `/app/staticfiles/`. Gunicorn serves the application from the web container.
 
-Compose starts PostgreSQL and both Redis services first. The application containers start after
-those services pass their health checks. The web health check then checks PostgreSQL, the cache,
-the Celery broker, the submission-worker heartbeat, and the active workflow manifest.
+Compose starts PostgreSQL and both Redis services first. The migration container runs after
+those services pass their health checks. The web process, workers, and Celery Beat start only
+after migrations succeed. The web health check then checks PostgreSQL, the cache, the Celery
+broker, the submission-worker heartbeat, and the active workflow manifest.
 
 ### Data flows
 
@@ -243,9 +246,13 @@ The app keeps OCS access in `apps/ocs_integration/`.
 | <env>-fastq-metadata | Load fastq sample metadata. |
 | <env>-fastq-history | Load the stage history for each fastq sample. |
 | <env>-demand-registry | Load demand status and count IN_PROGRESS demands. |
+| <env>-file-store | Resolve a file-store ID to its current S3 location. |
 
 `apps/ocs_integration/cli.py` runs the `ocs` command for submissions. The Celery submission
 worker passes the AWS profile from the environment to that process.
+
+The application AWS profile also needs `dynamodb:BatchGetItem` for the file-store table and
+`s3:ListBucket` and `s3:GetObject` for the registered file-store buckets.
 
 Set `OCS_ENV_BASE=prod` to read tables such as `prod-fastq-metadata`. Change this value before
 connecting to another OCS environment.
@@ -269,7 +276,7 @@ Read docs/PROJECT_MAP.md for the directory ownership map:
 | docker_tools/ | Docker setup, container health checks, and OCS package preparation. |
 | deploy/launchd/ | Optional macOS startup files for Docker Desktop. |
 | workflow_manifests/ | Example JSONC workflow manifests. |
-| vendor/gcs/ | OCS package source copied in before a Docker build. It is build input, not app code. |
+| vendor/gcs/ | Pinned OCS package source prepared before a Docker build. It is generated build input, not app code. |
 
 ## Workflow manifests
 
@@ -289,23 +296,14 @@ file does not change that manifest until a staff user uploads and activates it.
 Check a manifest before activating it:
 
 ~~~bash
-python manage.py check_config_coverage workflow_manifests/workflow_manifest.jsonc
+docker compose --env-file .env.docker exec web-ui \
+  python manage.py check_config_coverage workflow_manifests/workflow_manifest.jsonc
 ~~~
 
 The command checks whether the manifest can build commands for fastq samples in PostgreSQL.
 
-Upload and activate a manifest through the API:
-
-~~~bash
-curl -X POST \
-  -H "Authorization: Bearer <token>" \
-  -F file=@workflow_manifests/workflow_manifest.jsonc \
-  http://127.0.0.1:8001/api/configs/
-
-curl -X POST \
-  -H "Authorization: Bearer <token>" \
-  http://127.0.0.1:8001/api/configs/<id>/activate/
-~~~
+Staff users upload and activate manifests from `/configs/`. The API uses Django session
+authentication and CSRF protection. It does not accept bearer tokens.
 
 OmicsHub checks the JSONC file before storing it. The parser removes comments and expands
 pipe-delimited organism keys. The database uses one active manifest at a time.
@@ -363,7 +361,7 @@ queue entry. It rejects invalid command input before sending the command.
 | /data-locations/ | View file-store and S3 locations and download selected files. |
 | /jobs/ | View running and recently finished jobs. |
 | /failed/ | Retry or delete this user's failed submissions and running failures. |
-| /settings/ | Upload and activate a workflow manifest as a staff user. |
+| /configs/ | Upload and activate a workflow manifest as a staff user. |
 
 The cart is stored in PostgreSQL. A selection survives logout and can contain fastq samples
 added during separate visits.
@@ -473,10 +471,21 @@ launchctl bootout gui/$UID/org.alleninstitute.omicshub.stack
 
 ## Local development and tests
 
-The production app runs in Docker. Sync the development dependencies from `uv.lock` for local checks:
+The production app runs in Docker. Sync the development dependencies and install Chromium
+for local checks:
 
 ~~~bash
 uv sync --group dev
+uv run playwright install chromium
+~~~
+
+Start an isolated PostgreSQL test database and point Django at it:
+
+~~~bash
+docker run -d --rm --name omicshub-test-postgres \
+  -e POSTGRES_USER=omicshub -e POSTGRES_PASSWORD=omicshub -e POSTGRES_DB=omicshub \
+  -p 127.0.0.1:55432:5432 postgres:16
+export DATABASE_URL=postgres://omicshub:omicshub@127.0.0.1:55432/omicshub
 ~~~
 
 Run formatting, linting, type checking, and tests:
@@ -484,13 +493,19 @@ Run formatting, linting, type checking, and tests:
 ~~~bash
 uv run --group dev ruff format .
 uv run --group dev ruff check .
-uv run --group dev mypy apps/sample_catalog/models.py apps/workflow_engine/models.py apps/submission_queue/models.py \
-  apps/ocs_integration/cli.py docker_tools/healthcheck.py
-uv run --group dev pytest -q
+uv run --group dev mypy apps omicshub docker_tools
+uv run --group dev pytest -q --ignore=apps/web_ui/tests/playwright
+DJANGO_ALLOW_ASYNC_UNSAFE=true uv run --group dev pytest -q apps/web_ui/tests/playwright
 ~~~
 
 The tests use PostgreSQL. They replace the DynamoDB client and ocs process with test fakes,
 so the test suite does not contact AWS or submit jobs.
+
+Stop the test database after the checks finish:
+
+~~~bash
+docker stop omicshub-test-postgres
+~~~
 
 ## Release checks
 

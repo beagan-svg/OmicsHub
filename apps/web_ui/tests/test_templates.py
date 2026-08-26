@@ -90,6 +90,16 @@ def test_job_monitor_finished_table_also_filters_by_status():
     assert "<select" in text
 
 
+def test_credential_instructions_are_a_hover_tooltip_on_the_panel_toggle():
+    text = (TEMPLATES / "partials/monitor_credentials.html").read_text()
+
+    assert "data-job-log-credentials-toggle" in text
+    assert "Paste temporary AWS credentials to view container logs." in text
+    assert 'data-bs-toggle="tooltip"' in text
+    assert 'data-bs-trigger="hover"' in text
+    assert "Paste your own temporary AWS credentials" not in text
+
+
 def test_running_and_finished_tables_name_their_status_column_the_same_way():
     """Both columns render the identical status_badge component; the header word
     should not silently differ between the two tables."""
@@ -97,6 +107,15 @@ def test_running_and_finished_tables_name_their_status_column_the_same_way():
 
     assert text.count(">Status</th>") == 2
     assert ">Result</th>" not in text
+
+
+def test_running_and_finished_tables_show_sample_metadata():
+    text = (TEMPLATES / "partials/job_monitor_tables.html").read_text()
+
+    assert text.count(">Organism Common Name</th>") == 2
+    assert text.count(">Library Prep Method</th>") == 2
+    assert text.count("{{ row.sample.organism_common_name }}") == 2
+    assert text.count("{{ row.sample.library_prep_method_name }}") == 2
 
 
 def test_pages_poll_database_without_replacing_sample_interactions():

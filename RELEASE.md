@@ -1,9 +1,8 @@
 # Releasing OmicsHub
 
-A release updates four application processes: the web process, the OCS submission worker,
-the catalog sync worker, and Celery Scheduler. They use the same PostgreSQL database, Redis instance, and
-settings module. The web process also runs migrations and `collectstatic` before Gunicorn
-starts.
+A release updates the web process, two Celery workers, and Celery Beat. They use one PostgreSQL
+database and separate Redis broker and cache services. A one-shot container applies migrations
+before the application processes start. The web process runs `collectstatic` before Gunicorn.
 
 Use these steps for the Compose stack. Run every application process in Docker.
 
@@ -22,6 +21,8 @@ cannot start with an incomplete environment.
 | `OCS_ENV_BASE` | base | prefixes every DynamoDB table name; `prod` means the real account |
 | `OCS_AWS_REGION` | base | |
 | `CELERY_BROKER_URL` | base | |
+| `CACHE_URL` | prod | Redis endpoint for application cache data |
+| `CREDENTIAL_ENCRYPTION_KEY` | base | Fernet key for temporary log-viewer credentials |
 | `ALLOWED_HOSTS` | prod | comma-separated; no default in prod, unlike dev |
 | `CSRF_TRUSTED_ORIGINS` | prod | with scheme, or every POST from the tunnel fails CSRF |
 
@@ -29,7 +30,6 @@ These settings have defaults:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CACHE_URL` | required in production | Redis endpoint for application cache data. |
 | `CACHE_KEY_PREFIX` | `omicshub` | Prefix for keys written by this deployment. |
 | `CACHE_TIMEOUT` | `300` | Default cache lifetime in seconds. |
 | `OCS_CLI_PATH` | `ocs` | the executable used for alignment and post-alignment submissions |
@@ -37,6 +37,10 @@ These settings have defaults:
 | `AWS_SHARED_CREDENTIALS_FILE` | empty | the app-scoped credentials file; see the README |
 | `OCS_CLI_TIMEOUT` | `300` | seconds for one `ocs` call |
 | `CONN_MAX_AGE` | `60` | seconds a database connection is reused |
+| `LOG_VIEWER_CREDENTIAL_TTL_SECONDS` | `18000` | maximum cache lifetime for temporary log credentials |
+| `SENTRY_DSN` | empty | enables Sentry when set |
+| `SENTRY_RELEASE` | `GIT_SHA` or empty | source revision reported to Sentry |
+| `ENVIRONMENT` | `production` | deployment name reported to Sentry |
 | `STAGE_STATUS_SYNC_SECONDS` | `300` | how often the stage-status sweep runs |
 | `ADMIN_URL` | `admin` | the path where Django mounts the admin |
 | `DEBUG` | `False` | production settings keep debug pages off |
@@ -86,16 +90,16 @@ starts the full stack.
 docker_tools/setup_docker.sh
 ```
 
-The compose `web-ui` service runs `migrate` and then `collectstatic` before gunicorn binds,
-from one container, so nothing races to apply the same migration. Off compose, run them
-yourself, in this order, from one host:
+The Compose migration service exits successfully before the web process, workers, or Beat
+start. The web process then runs `collectstatic` before Gunicorn binds. Outside Compose, run
+these commands in order from one host:
 
 ```bash
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 ```
 
-Then restart, in this order:
+Then restart the application processes. Compose enforces the migration dependency.
 
 1. **`web-ui`**: serves the pages and API.
 2. **`catalog-sync-worker`**: runs the scheduled synchronization tasks. Restarting it mid-sweep is safe;
@@ -213,10 +217,9 @@ Run these checks after the stack starts.
 
 ## Starting after a host reboot
 
-Compose restarts a container that dies; it does not survive the host restarting. Install
-the LaunchAgent in `deploy/launchd/` so a reboot brings the stack back. The README's
-*Starting the stack at login* section has the two commands and the caveat that it needs a
-GUI login before Docker Desktop, and therefore the stack, can start.
+`restart: unless-stopped` restarts containers after the Docker daemon starts. On macOS,
+install the LaunchAgent in `deploy/launchd/` so Docker Desktop and this Compose project start
+after login.
 
 After an unattended reboot, run the readiness, worker-log, and page checks above.
 

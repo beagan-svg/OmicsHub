@@ -109,7 +109,7 @@
           </th>
           {% for column in columns %}<th scope="col" data-column-key="{{ column.key }}">{{ column.label }}</th>{% endfor %}
           <th scope="col" data-column-key="s3_uri">S3 Location</th>
-          <th scope="col" data-column-key="contents">Contents</th>
+          <th scope="col" class="text-center location-contents-column" data-column-key="contents">Contents</th>
         </tr>
       </thead>
       <tbody>
@@ -136,9 +136,8 @@
           {% endwith %}
           {% endif %}
           {% endfor %}
-          <td class="location-uri">
+          <td class="location-uri mono">
             {% if row.s3_uri %}
-              <span class="font-monospace" title="{{ row.s3_uri }}">{{ row.s3_uri }}</span>
               {% include "partials/copy_value.html" with value=row.s3_uri label="S3 location" %}
             {% elif row.file_store_id %}
               <span class="text-muted">File-store record has no S3 location</span>
@@ -146,13 +145,12 @@
               <span class="text-muted">No file store</span>
             {% endif %}
           </td>
-          <td>
+          <td class="text-center location-contents-column">
             {% if row.s3_uri %}
-            <button class="btn btn-sm btn-outline-secondary location-contents-toggle"
+            <button class="btn btn-sm btn-outline-secondary location-contents-toggle table-icon-tooltip"
                     type="button" data-contents-url="{% url 'web_ui:data-location-contents' row.sample_id row.stage.value %}"
-                    aria-expanded="false" aria-label="View contents">
+                    aria-expanded="false" aria-label="View contents" data-tooltip="View contents">
               <i class="bi bi-folder2" data-contents-icon aria-hidden="true"></i>
-              <span data-contents-label>View contents</span>
             </button>
             {% else %}—{% endif %}
           </td>
@@ -214,11 +212,11 @@
 
   const setContentsButtonState = (button, open) => {
     button.setAttribute("aria-expanded", String(open));
-    button.setAttribute("aria-label", open ? "Hide contents" : "View contents");
+    const label = open ? "Hide contents" : "View contents";
+    button.setAttribute("aria-label", label);
+    button.dataset.tooltip = label;
     const icon = button.querySelector("[data-contents-icon]");
-    const label = button.querySelector("[data-contents-label]");
     if (icon) icon.className = open ? "bi bi-folder2-open" : "bi bi-folder2";
-    if (label) label.textContent = open ? "Hide contents" : "View contents";
   };
 
   const contentsCache = new Map();

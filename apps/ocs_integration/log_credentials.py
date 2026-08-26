@@ -336,7 +336,7 @@ def _resolve_log_stream(session: boto3.Session, job_id: str) -> str | None:
 
 def _tail_log_stream(session: boto3.Session, log_stream: str, *, limit: int) -> list[dict[str, Any]]:
     logs_client = session.client("logs", region_name=settings.OCS_AWS_REGION)
-    events = []
+    events: list[dict[str, Any]] = []
     next_token = None
     while len(events) < limit:
         request = {
