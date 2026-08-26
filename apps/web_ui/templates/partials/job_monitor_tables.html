@@ -72,7 +72,7 @@
               data-duration>{{ row.duration_display|default:"—" }}</td>
           <td>{% include "partials/submission_source_badge.html" with queued_here=row.queued_here %}</td>
           <td class="text-center monitor-logs-column">
-            {% include "partials/job_log_toggle.html" with demand_id=row.demand_id running=True %}
+            {% include "partials/job_log_toggle.html" with demand_id=row.demand_id stage=row.stage running=True %}
           </td>
         </tr>
         {% include "partials/job_log_panel_row.html" with demand_id=row.demand_id colspan=10 %}
@@ -160,7 +160,7 @@
           <td class="text-secondary">{{ row.last_update_time|date:"Y-m-d H:i"|default:"—" }}</td>
           <td>{% include "partials/submission_source_badge.html" with queued_here=row.queued_here %}</td>
           <td class="text-center monitor-logs-column">
-            {% include "partials/job_log_toggle.html" with demand_id=row.demand_id running=False %}
+            {% include "partials/job_log_toggle.html" with demand_id=row.demand_id stage=row.stage running=False %}
           </td>
         </tr>
         {% include "partials/job_log_panel_row.html" with demand_id=row.demand_id colspan=11 %}

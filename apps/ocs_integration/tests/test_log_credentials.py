@@ -293,7 +293,7 @@ def test_never_falls_back_to_the_apps_own_aws_identity(request_, monkeypatch):
     with pytest.raises(log_credentials.CredentialError):
         log_credentials.validate_credentials(request_, "", "", "")
     with pytest.raises(log_credentials.NoCredentials):
-        log_credentials.fetch_job_logs(request_, "some-demand-id", "execution-arn")
+        log_credentials.fetch_job_logs(request_, "some-demand-id", "execution-arn", "align")
 
     assert dynamodb_calls == []
     assert s3_client_calls == []
@@ -376,7 +376,7 @@ def _validated():
 
 def test_fetch_job_logs_without_credentials_raises_no_credentials(request_):
     with pytest.raises(log_credentials.NoCredentials):
-        log_credentials.fetch_job_logs(request_, "some-demand-id", "execution-arn")
+        log_credentials.fetch_job_logs(request_, "some-demand-id", "execution-arn", "align")
 
 
 def test_failed_demand_resolves_workflow_and_execution_from_temporary_session():
@@ -482,7 +482,7 @@ def test_fetch_job_logs_walks_nested_executions_to_find_the_job(request_, monkey
     monkeypatch.setattr(log_credentials, "_session", lambda *a: fake_session)
     log_credentials.validate_credentials(request_, FAKE_ACCESS_KEY, FAKE_SECRET_KEY, FAKE_SESSION_TOKEN)
 
-    events = log_credentials.fetch_job_logs(request_, "demand-1", outer_arn)
+    events = log_credentials.fetch_job_logs(request_, "demand-1", outer_arn, "align")
 
     assert events == [{"timestamp": 1, "message": "hello"}, {"timestamp": 2, "message": "world"}]
     sfn_stub.assert_no_pending_responses()
@@ -532,11 +532,59 @@ def test_read_log_stream_returns_events_from_all_pages():
     )
     logs_stub.activate()
 
-    assert log_credentials._read_log_stream(FakeSession({"logs": logs_client}), "stream-1") == [
+    assert log_credentials._read_log_stream(FakeSession({"logs": logs_client}), "stream-1", "post-align") == [
         {"timestamp": 1, "message": "start"},
         {"timestamp": 2, "message": "finish"},
     ]
     logs_stub.assert_no_pending_responses()
+
+
+def test_read_log_stream_limits_alignment_to_first_and_last_200():
+    class LogsClient:
+        def get_log_events(self, **request):
+            start = 1 if "nextToken" not in request else int(request["nextToken"])
+            events = [{"timestamp": index, "message": str(index)} for index in range(start, start + 100)]
+            next_token = start + 100
+            return {
+                "events": events,
+                "nextForwardToken": str(next_token) if next_token <= 500 else str(start),
+            }
+
+    class Session:
+        def client(self, service_name, **kwargs):
+            assert service_name == "logs"
+            return LogsClient()
+
+    events = log_credentials._read_log_stream(Session(), "stream-1", "align")
+
+    assert len(events) == 400
+    assert events[0]["message"] == "1"
+    assert events[199]["message"] == "200"
+    assert events[200]["message"] == "301"
+    assert events[-1]["message"] == "500"
+
+
+def test_read_log_stream_limits_post_alignment_to_400_lines():
+    class LogsClient:
+        def get_log_events(self, **request):
+            start = 1 if "nextToken" not in request else int(request["nextToken"])
+            return {
+                "events": [
+                    {"timestamp": index, "message": str(index)} for index in range(start, start + 100)
+                ],
+                "nextForwardToken": str(start + 100),
+            }
+
+    class Session:
+        def client(self, service_name, **kwargs):
+            assert service_name == "logs"
+            return LogsClient()
+
+    events = log_credentials._read_log_stream(Session(), "stream-1", "post-align")
+
+    assert len(events) == 400
+    assert events[0]["message"] == "1"
+    assert events[-1]["message"] == "400"
 
 
 def test_batch_job_lookup_reads_all_execution_history_pages():
@@ -611,7 +659,7 @@ def test_fetch_job_logs_finds_batch_job_in_failed_task_cause(request_, monkeypat
 
     monkeypatch.setattr(log_credentials, "_resolve_failed_execution_arn", resolve_failed_execution)
     log_credentials.validate_credentials(request_, FAKE_ACCESS_KEY, FAKE_SECRET_KEY, FAKE_SESSION_TOKEN)
-    assert log_credentials.fetch_job_logs(request_, "demand-failed", execution_arn, failed=True) == [
+    assert log_credentials.fetch_job_logs(request_, "demand-failed", execution_arn, "align", failed=True) == [
         {"timestamp": 1, "message": "failed"}
     ]
     assert resolved == [("demand-failed", "123456789012")]
@@ -631,7 +679,9 @@ def test_fetch_job_logs_evicts_credentials_on_aws_rejection(request_, monkeypatc
     log_credentials.validate_credentials(request_, FAKE_ACCESS_KEY, FAKE_SECRET_KEY, FAKE_SESSION_TOKEN)
     assert log_credentials.get_identity(request_) is not None
     with pytest.raises(log_credentials.CredentialError) as exc:
-        log_credentials.fetch_job_logs(request_, "demand-1", "arn:aws:states:us-west-2:1:execution:x:1")
+        log_credentials.fetch_job_logs(
+            request_, "demand-1", "arn:aws:states:us-west-2:1:execution:x:1", "align"
+        )
 
     assert exc.value.rejected is True
     # The whole point of "disable log access as soon as AWS rejects them": this session's
@@ -675,7 +725,7 @@ def test_fetch_job_logs_only_ever_calls_the_allowlisted_operations(request_, mon
     )
     monkeypatch.setattr(log_credentials, "_session", lambda *a: fake_session)
     log_credentials.validate_credentials(request_, FAKE_ACCESS_KEY, FAKE_SECRET_KEY, FAKE_SESSION_TOKEN)
-    log_credentials.fetch_job_logs(request_, "demand-1", outer_arn)
+    log_credentials.fetch_job_logs(request_, "demand-1", outer_arn, "align")
 
     services_used = {name for name, _ in fake_session.client_calls}
     assert services_used == {"sts", "stepfunctions", "batch", "logs"}

@@ -117,7 +117,7 @@ whatever the reader has typed into the credential form.
           <td class="text-secondary">{{ entry.error_message|default:"—" }}</td>
           <td class="text-secondary">{{ entry.submitted_at|date:"Y-m-d H:i" }}</td>
           <td class="text-center">
-            {% include "partials/job_log_toggle.html" with demand_id=entry.demand_id running=False %}
+            {% include "partials/job_log_toggle.html" with demand_id=entry.demand_id stage=entry.stage running=False %}
           </td>
           <td class="text-end text-nowrap">
             <div class="d-flex gap-1 justify-content-end">

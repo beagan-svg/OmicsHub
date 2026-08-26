@@ -18,7 +18,8 @@
   const submitUrl = panel.dataset.submitUrl;
   const clearUrl = panel.dataset.clearUrl;
   const logsUrlTemplate = panel.dataset.logsUrlTemplate;
-  const logsUrlFor = (demandId) => logsUrlTemplate.replace("DEMAND_ID", encodeURIComponent(demandId));
+  const logsUrlFor = (demandId, stage) =>
+    `${logsUrlTemplate.replace("DEMAND_ID", encodeURIComponent(demandId))}?stage=${encodeURIComponent(stage)}`;
 
   // Whether THIS session currently has AWS-validated credentials, per the server -- never
   // the credential values themselves, which never reach this script at all. Every log
@@ -259,14 +260,14 @@
     body.appendChild(message);
   };
 
-  const fetchLogsFor = async (demandId, body, showLoading = true) => {
+  const fetchLogsFor = async (demandId, stage, body, showLoading = true) => {
     cancelLogRequest(demandId);
     const controller = new AbortController();
     const request = {controller, body};
     activeLogRequests.set(demandId, request);
     if (showLoading) renderMessage(body, "Loading…");
     try {
-      const response = await fetch(logsUrlFor(demandId), {
+      const response = await fetch(logsUrlFor(demandId, stage), {
         headers: {"X-Requested-With": "XMLHttpRequest"},
         signal: controller.signal,
       });
@@ -311,6 +312,7 @@
     const toggle = event.target.closest("[data-job-log-toggle]");
     if (!toggle || toggle.disabled) return;
     const demandId = toggle.dataset.demandId;
+    const stage = toggle.dataset.stage;
     const targetPanel = document.getElementById(toggle.getAttribute("aria-controls"));
     if (!targetPanel) return;
     const body = targetPanel.querySelector("[data-job-log-body]");
@@ -318,7 +320,7 @@
     // adds the fetch-and-render behavior, and only when the panel is opening.
     window.requestAnimationFrame(() => {
       if (targetPanel.dataset.open === "true" && body) {
-        fetchLogsFor(demandId, body);
+        fetchLogsFor(demandId, stage, body);
       } else {
         cancelLogRequest(demandId);
       }
@@ -332,7 +334,7 @@
       const targetPanel = toggle && document.getElementById(toggle.getAttribute("aria-controls"));
       const body = targetPanel?.querySelector("[data-job-log-body]");
       if (valid && targetPanel?.dataset.open === "true" && body) {
-        fetchLogsFor(demandId, body, false);
+        fetchLogsFor(demandId, toggle.dataset.stage, body, false);
       }
       retryAfterRefresh.delete(demandId);
     });

@@ -157,7 +157,7 @@ class TestLogAuthorizationBoundary:
         sample = make_sample("RUN-1", align="IN_PROGRESS")
         demand_id = sample.stage_statuses.get(stage=Stage.ALIGN).demand_id
 
-        response = logged_in.get(self._logs_url(demand_id))
+        response = logged_in.get(self._logs_url(demand_id), {"stage": Stage.ALIGN.value})
 
         assert response.status_code == 401
         assert response.json()["status"] == "no_credentials"
@@ -172,7 +172,7 @@ class TestLogAuthorizationBoundary:
         self._with_valid_credentials(logged_in, monkeypatch)
         monkeypatch.setattr(log_credentials, "fetch_job_logs", lambda request, d, execution_arn, **kwargs: [])
 
-        response = logged_in.get(self._logs_url(demand_id))
+        response = logged_in.get(self._logs_url(demand_id), {"stage": Stage.ALIGN.value})
 
         assert response.status_code == 200
         assert response.json() == {"status": "ok", "events": []}
@@ -183,7 +183,7 @@ class TestLogAuthorizationBoundary:
         self._with_valid_credentials(logged_in, monkeypatch)
         monkeypatch.setattr(log_credentials, "fetch_job_logs", lambda request, d, execution_arn, **kwargs: [])
 
-        response = logged_in.get(self._logs_url(demand_id))
+        response = logged_in.get(self._logs_url(demand_id), {"stage": Stage.ALIGN.value})
 
         assert response.status_code == 200
 
@@ -206,7 +206,7 @@ class TestLogAuthorizationBoundary:
         self._with_valid_credentials(logged_in, monkeypatch)
         monkeypatch.setattr(log_credentials, "fetch_job_logs", lambda request, d, execution_arn, **kwargs: [])
 
-        response = logged_in.get(self._logs_url("demand-ingest"))
+        response = logged_in.get(self._logs_url("demand-ingest"), {"stage": Stage.ALIGN.value})
 
         assert response.status_code == 200
 
@@ -232,7 +232,7 @@ class TestLogAuthorizationBoundary:
         )
         self._with_valid_credentials(logged_in, monkeypatch)
 
-        response = logged_in.get(self._logs_url("demand-theirs-failed"))
+        response = logged_in.get(self._logs_url("demand-theirs-failed"), {"stage": Stage.ALIGN.value})
 
         assert response.status_code == 403
         assert response.json()["status"] == "not_visible"
@@ -240,7 +240,7 @@ class TestLogAuthorizationBoundary:
     def test_unknown_demand_id_is_not_visible(self, logged_in, monkeypatch):
         self._with_valid_credentials(logged_in, monkeypatch)
 
-        response = logged_in.get(self._logs_url("no-such-demand"))
+        response = logged_in.get(self._logs_url("no-such-demand"), {"stage": Stage.ALIGN.value})
 
         assert response.status_code == 403
         assert response.json()["status"] == "not_visible"
@@ -259,13 +259,13 @@ class TestLogAuthorizationBoundary:
 
         monkeypatch.setattr(log_credentials, "fetch_job_logs", raise_expired)
 
-        response = logged_in.get(self._logs_url(demand_id))
+        response = logged_in.get(self._logs_url(demand_id), {"stage": Stage.ALIGN.value})
 
         assert response.status_code == 401
         assert response.json()["code"] == "ExpiredToken"
 
     def test_requires_login(self, client):
-        response = client.get(self._logs_url("whatever"))
+        response = client.get(self._logs_url("whatever"), {"stage": Stage.ALIGN.value})
         assert response.status_code == 302
 
 
@@ -299,7 +299,9 @@ class TestNoFallbackToAppIdentity:
         monkeypatch.setattr(dynamodb, "get_demands", lambda ids: dynamodb_calls.append(ids) or {})
         monkeypatch.setattr(s3, "_client", lambda: s3_calls.append(1))
 
-        response = logged_in.get(reverse("web_ui:job-demand-logs", args=[demand_id]))
+        response = logged_in.get(
+            reverse("web_ui:job-demand-logs", args=[demand_id]), {"stage": Stage.ALIGN.value}
+        )
 
         assert response.status_code == 401
         assert dynamodb_calls == []

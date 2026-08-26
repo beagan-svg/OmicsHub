@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
@@ -173,10 +174,11 @@ def fetch_job_logs(
     request,
     demand_id: str,
     execution_arn: str | None,
+    stage: str,
     *,
     failed: bool = False,
 ) -> list[dict[str, Any]]:
-    """Return all log events for one demand's Batch job.
+    """Return bounded log events for one demand's Batch job.
 
     Raises NoCredentials if this session has no cached (or no longer valid) credentials,
     or CredentialError (already redacted) if AWS rejects the request. Callers must check
@@ -200,7 +202,7 @@ def fetch_job_logs(
         log_stream = _resolve_log_stream(session, job_id)
         if log_stream is None:
             raise CredentialError("NotFound", "This job has no log stream yet.")
-        return _read_log_stream(session, log_stream)
+        return _read_log_stream(session, log_stream, stage)
     except CredentialError as exc:
         if exc.rejected:
             clear_credentials(request)
@@ -333,9 +335,13 @@ def _resolve_log_stream(session: boto3.Session, job_id: str) -> str | None:
     )
 
 
-def _read_log_stream(session: boto3.Session, log_stream: str) -> list[dict[str, Any]]:
+def _read_log_stream(session: boto3.Session, log_stream: str, stage: str) -> list[dict[str, Any]]:
+    """Read the beginning and end of an alignment log, or the first 400 post-alignment lines."""
     logs_client = session.client("logs", region_name=settings.OCS_AWS_REGION)
-    events: list[dict[str, Any]] = []
+    first_events: list[dict[str, Any]] = []
+    last_events: deque[dict[str, Any]] = deque(maxlen=200)
+    bounded_events: list[dict[str, Any]] = []
+    event_count = 0
     next_token = None
     while True:
         request = {
@@ -347,9 +353,24 @@ def _read_log_stream(session: boto3.Session, log_stream: str) -> list[dict[str, 
         if next_token:
             request["nextToken"] = next_token
         response = _call(logs_client.get_log_events, **request)
-        events.extend(response["events"])
+        for event in response["events"]:
+            event_count += 1
+            if len(bounded_events) < 400:
+                bounded_events.append(event)
+            if stage == "align":
+                if len(first_events) < 200:
+                    first_events.append(event)
+                last_events.append(event)
+            elif len(bounded_events) == 400:
+                return _format_log_events(bounded_events)
         new_token = response.get("nextForwardToken")
         if not response["events"] or new_token == next_token:
             break
         next_token = new_token
+    if stage == "align" and event_count > 400:
+        return _format_log_events(first_events + list(last_events))
+    return _format_log_events(bounded_events)
+
+
+def _format_log_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{"timestamp": event["timestamp"], "message": event["message"]} for event in events]

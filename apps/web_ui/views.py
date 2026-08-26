@@ -1016,11 +1016,20 @@ def job_demand_logs(request, demand_id):
     """
     if not _monitor_demand_is_visible(request, demand_id):
         return JsonResponse({"status": "not_visible"}, status=403)
-    stage_statuses = list(StageStatus.objects.filter(demand_id=demand_id).values("status", "execution_arn"))
-    execution_arn = next((stage["execution_arn"] for stage in stage_statuses if stage["execution_arn"]), "")
+    stage = request.GET.get("stage")
+    if stage not in {Stage.ALIGN.value, Stage.POST_ALIGN.value}:
+        return JsonResponse({"status": "invalid_stage"}, status=400)
+    stage_status = (
+        StageStatus.objects.filter(demand_id=demand_id, stage=stage)
+        .values("status", "execution_arn")
+        .first()
+    )
+    execution_arn = stage_status["execution_arn"] if stage_status else ""
     failed = (
-        any(stage["status"] == "FAILED" for stage in stage_statuses)
-        or QueueEntry.objects.filter(demand_id=demand_id, status=QueueEntry.Status.FAILED).exists()
+        (stage_status and stage_status["status"] == "FAILED")
+        or QueueEntry.objects.filter(
+            demand_id=demand_id, stage=stage, status=QueueEntry.Status.FAILED
+        ).exists()
     )
     if not failed and not execution_arn:
         return JsonResponse(
@@ -1032,7 +1041,7 @@ def job_demand_logs(request, demand_id):
             status=502,
         )
     try:
-        events = log_credentials.fetch_job_logs(request, demand_id, execution_arn, failed=failed)
+        events = log_credentials.fetch_job_logs(request, demand_id, execution_arn, stage=stage, failed=failed)
     except log_credentials.NoCredentials:
         return JsonResponse({"status": "no_credentials"}, status=401)
     except log_credentials.CredentialError as exc:
