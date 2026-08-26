@@ -175,9 +175,8 @@ def fetch_job_logs(
     execution_arn: str | None,
     *,
     failed: bool = False,
-    limit: int = 200,
 ) -> list[dict[str, Any]]:
-    """Return the first log events for one demand's Batch job.
+    """Return all log events for one demand's Batch job.
 
     Raises NoCredentials if this session has no cached (or no longer valid) credentials,
     or CredentialError (already redacted) if AWS rejects the request. Callers must check
@@ -201,7 +200,7 @@ def fetch_job_logs(
         log_stream = _resolve_log_stream(session, job_id)
         if log_stream is None:
             raise CredentialError("NotFound", "This job has no log stream yet.")
-        return _tail_log_stream(session, log_stream, limit=limit)
+        return _read_log_stream(session, log_stream)
     except CredentialError as exc:
         if exc.rejected:
             clear_credentials(request)
@@ -334,16 +333,16 @@ def _resolve_log_stream(session: boto3.Session, job_id: str) -> str | None:
     )
 
 
-def _tail_log_stream(session: boto3.Session, log_stream: str, *, limit: int) -> list[dict[str, Any]]:
+def _read_log_stream(session: boto3.Session, log_stream: str) -> list[dict[str, Any]]:
     logs_client = session.client("logs", region_name=settings.OCS_AWS_REGION)
     events: list[dict[str, Any]] = []
     next_token = None
-    while len(events) < limit:
+    while True:
         request = {
             "logGroupName": LOG_GROUP,
             "logStreamName": log_stream,
             "startFromHead": True,
-            "limit": limit - len(events),
+            "limit": 10_000,
         }
         if next_token:
             request["nextToken"] = next_token

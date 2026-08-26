@@ -82,10 +82,7 @@ COLUMNS = [
 
 COLUMNS_BY_KEY = {column.key: column for column in COLUMNS}
 
-# The order the chooser reads top to bottom. Forty-odd checkboxes in one undifferentiated
-# list is a scanning problem: the sections are what let someone looking for "Cell Capture"
-# skip four fifths of the menu. The per-stage families get a section each because they
-# answer four different questions about the same stage.
+# Group columns into sections to reduce scanning. Each stage family has its own section.
 GROUP_LABELS = [
     ("identity", "Identification"),
     ("study", "Study & batch"),

@@ -14,8 +14,8 @@ TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 def test_no_multiline_inline_comments():
     """`{# ... #}` is single-line only; spanning lines renders the comment to the page.
 
-    It fails silently , no exception, just prose at the top of the page , so it is worth
-    a test rather than an eye.
+    Django renders a multiline inline comment as page text without raising an exception, so
+    the test must inspect the templates.
     """
     offenders = []
     for path in TEMPLATES.rglob("*.html"):

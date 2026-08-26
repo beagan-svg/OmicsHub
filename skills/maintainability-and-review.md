@@ -31,7 +31,7 @@ diff. Have one owner reconcile findings before editing.
 - Catch only errors the application can handle. Preserve unexpected errors for the worker or
   application error handler.
 - Remove helpers that only rename one call, one-use configuration layers, duplicate validation,
-  unreachable branches, unused imports, stale comments, and fallback paths without a real
+  unreachable branches, unused imports, stale comments, and substitute paths without a real
   supported failure mode.
 - Use short domain names. Prefer `sample`, `stage`, `demand_id`, `file_store_id`, `log_stream`,
   and `s3_uri` over generic names such as `data`, `item`, `result`, or `thing`.

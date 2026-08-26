@@ -60,7 +60,7 @@ class TestScope:
 
 
 class TestNoActiveConfig:
-    """The only thing between an empty prefix set and a prune of the whole mirror."""
+    """An empty prefix set must prevent the task from pruning the mirror."""
 
     def test_the_stage_status_sweep_returns_without_calling_sync(self, calls):
         assert tasks.sync_all_stage_statuses() is None

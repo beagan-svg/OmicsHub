@@ -36,8 +36,8 @@ UNPROCESSED_MAX_RETRIES = 5
 
 # A GFS path is the "gfs://" scheme plus a file store id, which gcs_core defines as the
 # sha1 of the S3 URI, with forty lowercase hex characters. Matching that shape rather than
-# just stripping the scheme keeps a malformed row out of the mirror instead of storing a
-# string nobody can paste into OCS tooling.
+# just stripping the scheme keeps malformed rows out of the mirror instead of storing an
+# invalid OCS file-store ID.
 GFS_PATH = re.compile(r"^gfs://([0-9a-f]{40})$")
 
 # One boto3 resource per thread. See _resource().

@@ -25,8 +25,9 @@ Read the owning implementation, nearby tests, configuration, and relevant guide 
 Use the existing Django, Boto3, Celery, Redis, Docker, and browser patterns. Make the smallest
 complete change that preserves the current behavior.
 
-Do not add a fallback credential source, wrapper, compatibility path, speculative abstraction,
-or broad defensive branch. Do not use temporary log-viewer credentials for synchronization,
+Do not add a substitute credential source, wrapper, compatibility path, speculative abstraction,
+or broad defensive branch. Use conditionals only for known application states or documented
+external responses. Do not use temporary log-viewer credentials for synchronization,
 submission, S3 browsing, or any other operation. Do not expose or persist real credentials.
 
 After editing, inspect the complete diff, run focused tests, run the applicable formatter and

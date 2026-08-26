@@ -51,9 +51,9 @@ testpaths = ["apps"]
 [tool.ruff]
 line-length = 110
 target-version = "py312"
-# Migrations are generated; Django writes long help_text lines into them. vendor/ is a copy
-# of someone else's source, brought in for the Docker build — linting it reports 253 findings
-# nobody here can act on, and drowns out ours.
+# Migrations are generated; Django writes long help_text lines into them. `vendor/` contains
+# external source copied for the Docker build. Excluding it prevents unrelated lint findings
+# from obscuring project findings.
 extend-exclude = ["*/migrations/*", "vendor"]
 
 [tool.ruff.lint]

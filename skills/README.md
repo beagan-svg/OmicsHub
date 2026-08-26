@@ -13,7 +13,7 @@ Read these guides before changing OmicsHub. They record the current architecture
 
 ## Working rules
 
-Keep behavior simple and visible. Extend an existing component or boundary when it already owns the behavior. Do not add a fallback, wrapper, compatibility path, or generic helper without a concrete requirement.
+Keep behavior simple and visible. Extend an existing component or boundary when it already owns the behavior. Do not add a substitute path, wrapper, compatibility path, or generic helper without a concrete requirement. Use conditionals only for known application states or documented external responses.
 
 Keep the app's AWS identity separate from credentials a user supplies for log viewing. Never place credentials, tokens, or copied AWS output in this directory or in tests.
 

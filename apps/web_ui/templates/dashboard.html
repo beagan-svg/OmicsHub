@@ -86,9 +86,7 @@
           transition, so a panel opened by mistake cannot be closed until it has finished
           opening. See `.disclosure` in app.css for what replaced it and why.
 
-          The count is the panel's status shown on the control that hides it. Without it the
-          only way to learn that four filters are narrowing the table is to open the panel
-          and read six menus.
+          The count is shown on the control that opens the filter panel.
           {% endcomment %}
           <button class="btn btn-sm btn-outline-secondary" type="button"
                   data-disclosure="advanced-filters"
@@ -235,10 +233,8 @@
       </div>
 
       {% comment %}
-      What just happened, said next to the control that did it. The page is barely taller
-      than the window. The table scrolls inside its own box, so the message banner at the
-      top of the document sits the better part of a screen above this button, and adding to
-      the cart read as nothing happening at all.
+      Place the confirmation beside the control that triggered it. The page keeps the table
+      in an inner scroll area, so a banner at the top can be outside the user's view.
 
       aria-live, so it is announced rather than only seen; polite, because it is a
       confirmation and interrupts nothing.
@@ -259,9 +255,8 @@
   <input type="hidden" name="next" value="{{ request.get_full_path }}">
 </form>
 {% comment %}
-Carries this page's rows by name rather than re-deriving them from the filters: the refresh
-then covers exactly what the reader is looking at, page and filters included, and `next`
-returns them to it.
+Carries this page's row names so the refresh uses the current page and filters. The `next`
+value returns the user to that view.
 {% endcomment %}
 <form method="post" id="refresh-status-form" action="{% url 'web_ui:refresh-status' %}">
   {% csrf_token %}

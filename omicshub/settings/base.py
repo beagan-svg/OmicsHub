@@ -208,9 +208,9 @@ CELERY_BEAT_SCHEDULE = {
 # --- Logging --------------------------------------------------------------
 # One handler, to stdout, in one format. The containers' output is picked up by a log
 # agent, so a file handler would only put the lines somewhere the agent is not looking, and
-# rotation would be this process's problem rather than the platform's. Chapter 6's advice
-# that logs be "easy to parse by logging agents" is what the fixed field order is for:
-# timestamp, level, pid, logger, correlation id, then the message.
+# rotation would be this process's problem rather than the platform's. The fixed field order
+# makes log lines easy for agents to parse: timestamp, level, pid, logger, correlation ID,
+# then message.
 LOG_LEVEL = env("LOG_LEVEL", default="INFO")
 APP_LOG_LEVEL = env("APP_LOG_LEVEL", default=LOG_LEVEL)
 

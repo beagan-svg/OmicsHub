@@ -109,11 +109,10 @@ class TestValidate:
 
 
 class TestValidateTypes:
-    """Every container the builder indexes into, checked before it is indexed into.
+    """Validate each container before the command builder indexes it.
 
-    An uploaded file is arbitrary JSON, and what is built out of it is the argv handed to
-    `subprocess.run`. A wrong type used to be a 500 through the API and a traceback through
-    the management command , or, for `command`, a command nobody wrote.
+    Invalid types previously caused API 500 responses, management-command tracebacks, or
+    invalid command arguments.
     """
 
     def test_a_command_written_as_a_string_is_refused(self, config):

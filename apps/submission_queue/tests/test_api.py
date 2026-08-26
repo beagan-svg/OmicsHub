@@ -38,7 +38,7 @@ class TestPlan:
         assert response.json()["skipped"][0]["reason"] == "ingest_incomplete"
 
     def test_an_unrecognised_prefix_plans_as_rtx(self, api_client, active_config, make_sample):
-        """No sample is unclassifiable any more , an unknown prefix is simply RTX."""
+        """An unknown batch prefix is classified as RTX."""
         make_sample("ODD-1", batch_name_from_vendor="ZZZ-1", library_prep_method_name="10xV4")
 
         response = api_client.post("/api/queue/plan/", {"fastq_names": ["ODD-1"]}, format="json")

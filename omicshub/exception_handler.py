@@ -4,8 +4,7 @@ Without this a client sees DRF's field-error dict for a validation failure, a ba
 `{"detail": ...}` for a 404, and something else again for a permission error. They all
 become `{"error": {"message": {<field>: [<message>, ...]}}}` instead.
 
-Unrecognised exceptions deliberately fall through to a 500 rather than being wrapped: a
-handler that tidies away every failure is a handler that hides outages.
+Unrecognized exceptions fall through to a 500 response so unexpected outages remain visible.
 """
 
 from rest_framework.views import exception_handler as drf_exception_handler

@@ -35,8 +35,7 @@ def signup(request):
 def logout_view(request):
     """Sign the user out and say so.
 
-    Stock `LogoutView` clears the session silently: the sign-in form it lands on looks
-    identical whether the click did anything or not. One line here is the difference.
+    Display a confirmation because the sign-in page is otherwise identical after logout.
     """
     logout(request)
     messages.info(request, "You've been signed out.")

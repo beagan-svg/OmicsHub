@@ -1,9 +1,4 @@
-"""Add request ids to incoming requests and outgoing responses.
-
-Chapter 7's guidance is that custom middleware is for what has to happen on every single
-request, and to keep it cheap because it runs on every single request. A correlation id
-qualifies on both counts: a `uuid4()` and two contextvar operations.
-"""
+"""Add a request ID to each request and response."""
 
 from __future__ import annotations
 
@@ -16,13 +11,7 @@ from omicshub.logging_filters import (
 
 
 class RequestIDMiddleware:
-    """Assign every request an id and return it in the response.
-
-    Reusing an inbound `X-Request-ID` means the id a proxy or a browser already assigned
-    is the one in our logs, so the trail is unbroken across hops. Echoing it in the
-    response is what makes the id usable in a bug report: the person who hit the failure
-    can read it off the response instead of us matching on timestamps.
-    """
+    """Reuse a valid inbound request ID and include it in the response."""
 
     def __init__(self, get_response):
         self.get_response = get_response

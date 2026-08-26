@@ -497,9 +497,9 @@ def stage_status_fields(demand_id: str, demand: dict, file_store_id: str = "") -
     """Return StageStatus fields for one OCS demand.
 
     Convert a demand to a row in one place for all three writers, the full sweep, the
-    dashboard's targeted refresh, and the submission worker recording what it just sent.
-    Built separately, a field added to one path appears after a sweep and vanishes after a
-    refresh, which is a horrible thing to debug.
+    dashboard's targeted refresh, and the submission worker recording the submitted command.
+    Built separately, a field added to only one path would appear after a sweep but disappear
+    after a targeted refresh.
 
     The demand id is a parameter rather than read off `demand`, because not every source of
     a demand row carries it as a field, and the caller always knows it.

@@ -32,8 +32,8 @@ The application identity is used for:
 - the `ocs` CLI used to submit commands;
 - server-side application operations that use the normal boto3 credential chain.
 
-The application identity is not a credential fallback for the log viewer. A failed log-viewer
-credential validation or log request must fail for that session. It must not retry with
+The application identity is not used by the log viewer. A failed log-viewer credential
+validation or log request must fail for that session. It must not retry with
 `AWS_PROFILE`, the container role, environment credentials, a local profile, or any other
 identity.
 
@@ -109,7 +109,7 @@ the row log buttons. It must not change the application AWS profile or any other
 
 The normal application identity reads the OCS tables through boto3. Table names are built from
 `OCS_ENV_BASE`, such as `prod-fastq-history` and `prod-demand-registry`. The app does not query
-these tables through the AWS CLI or an HTTP workaround.
+these tables through the AWS CLI or an indirect HTTP path.
 
 The local PostgreSQL database is the app’s mirror and authorization boundary for the dashboard.
 AWS synchronization writes known OCS records to PostgreSQL. A page request normally reads the
@@ -200,7 +200,7 @@ VS Code tunnel as the production security boundary.
 
 Do not:
 
-- use the application AWS identity as a log-viewer fallback;
+- use the application AWS identity for log viewing;
 - use pasted temporary credentials for submission, synchronization, S3 data downloads, or any
   request other than an authorized log lookup;
 - store credentials in PostgreSQL, source control, image layers, static files, logs, local
@@ -213,7 +213,7 @@ Do not:
 - run more than one submission worker or use submission-worker concurrency greater than one;
 - assume a rebuild changed a running container without checking its image and health;
 - claim that a temporary credential’s expiry is known when AWS did not report it;
-- add a fallback profile, default session, region, or credential source to make a failed AWS
+- add another profile, default session, region, or credential source to make a failed AWS
   operation appear to work.
 
 ## Required checks for security or deployment changes

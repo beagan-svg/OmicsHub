@@ -1,8 +1,4 @@
-"""The pre-activation dry run.
-
-What it must get right is the difference between "this stage does not run for that prep"
-and "this stage would fail" , the first is normal and the second is the reason to run it.
-"""
+"""Test the distinction between an inapplicable stage and a stage with a failing command."""
 
 from __future__ import annotations
 
@@ -42,7 +38,7 @@ class TestCheckConfigCoverage:
         assert "axolotl" in output
 
     def test_an_unlisted_prep_is_not_reported_as_broken(self, active_config, make_sample):
-        """No command config lists it, so the stage simply does not run. Not a fault."""
+        """An unlisted library prep is not applicable and is not reported as an error."""
         make_sample("ATAC-1", library_prep_method_name="10xATAC_Mult")
 
         output = run()

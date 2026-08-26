@@ -150,7 +150,7 @@ class TestDashboard:
         ]
 
     def test_fastq_name_cannot_be_hidden(self, logged_in, make_sample, user):
-        """Hiding the identifying column leaves a table nobody can read."""
+        """The identifying column remains visible when the user hides other columns."""
         make_sample("READY-1")
 
         logged_in.post(reverse("web_ui:set-columns"), {"columns": ["organism_common_name"]})

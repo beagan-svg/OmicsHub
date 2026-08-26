@@ -437,10 +437,10 @@ def build_plan(
 def _group_representative(group: list[Sample]) -> Sample:
     """Return the sample that represents a shared load_name's job.
 
-    The one resolving to the MTX workflow, if any: ATX has no workflow of its own, and
-    an ATX sample's own `modality` already resolves to MTX too, so `batch_prefix` , not
-    `modality` , is what actually distinguishes the two sides here. Falls back to the
-    first sample when neither side is MTX, for a deterministic pick.
+    Use the sample with the MTX batch prefix when present. ATX has no workflow of its own,
+    and an ATX sample's `modality` also resolves to MTX, so `batch_prefix`, not `modality`,
+    distinguishes the two sides. Use the first sample when neither side is MTX to keep the
+    choice deterministic.
     """
     return next((s for s in group if s.batch_prefix == BatchPrefix.MTX), group[0])
 
@@ -502,7 +502,7 @@ def _pair_block(*, sample, load_groups: dict, config: dict, force: str | None) -
     start until every sample in the group has finished ingest. Only the sample
     representing the group (`_group_representative`) is checked; the others are either
     covered by it (`_aligned_through_partner`) or, if the group has no other member,
-    plan as an ordinary sample , sharing a load with nobody is not an error.
+    plan as an ordinary sample. Sharing a `load_name` alone is not an error.
     """
     entry = load_groups.get(sample.load_name)
     if entry is None:

@@ -18,8 +18,7 @@ from apps.sample_catalog.models import MULTIOME_PREFIXES, Sample
 def with_multiome_partners(samples) -> tuple[list[Sample], list[Sample]]:
     """Return the expanded selection and the partners added to it.
 
-    The second element is what the UI needs: telling someone their 4-sample selection
-    became 8 is the difference between a helpful feature and a surprising one.
+    The second element lets the UI report which partners were added to the selection.
     """
     samples = list(samples)
     selected_names = {sample.fastq_name for sample in samples}

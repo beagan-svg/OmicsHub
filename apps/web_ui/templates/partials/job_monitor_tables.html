@@ -97,10 +97,8 @@
       <span><i class="bi bi-check2-all" aria-hidden="true"></i> Recently finished</span>
       {% include "partials/monitor_stage_filter.html" with stage_options=finished_stage_options selected_stage=finished_stage aria_label="Filter finished jobs by stage" %}
       {% comment %}
-      A visually-hidden label alone left two controls both saying just "All" side by
-      side, with nothing sighted telling them apart short of opening the second one.
-      pager__size already solves exactly this (a visible word next to a select) for the
-      Rows-per-page control, so this reuses it rather than inventing a second pattern.
+      A visually hidden label left both controls displayed as `All`, so users could not
+      distinguish them without opening a menu. Reuse the visible label pattern from `pager__size`.
       {% endcomment %}
       <label class="pager__size">
         <span>Status</span>

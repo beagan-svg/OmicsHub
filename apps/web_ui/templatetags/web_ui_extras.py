@@ -43,9 +43,7 @@ STATUS_STATES = {
     "NOT COMPLETED": "unknown",
 }
 
-# What each status means, in the words someone who visits once a month would need. Shown as
-# the badge's tooltip and its accessible description. Only the statuses whose names do not
-# explain themselves are here; COMPLETED and FAILED need no gloss.
+# Define tooltip and accessible descriptions for statuses whose names are not self-explanatory.
 STATUS_NOTES = {
     "AWAITING_TRIGGER": "Waiting for OCS to start it. Nothing is running yet.",
     "INGEST_COMPLETE": "Ingest finished. This sample is now due for alignment.",
@@ -91,9 +89,8 @@ def field_label(name):
 def since_short(value):
     """Return a short freshness label, such as `just now`, `12m ago`, or `3d ago`.
 
-    `timesince` renders "4 hours, 29 minutes", which is more precision than a freshness
-    indicator can use and long enough that it wraps a toolbar. Nobody reading a staleness
-    clock needs the minutes when the answer is already in hours.
+    The full `timesince` output is too long for the toolbar, so ages of at least one hour
+    omit minute precision.
     """
     if not value:
         return "never"

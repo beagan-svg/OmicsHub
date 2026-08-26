@@ -434,16 +434,9 @@ def sync_samples(request):
 @login_required
 @require_POST
 def refresh_status(request):
-    """Refresh the visible fastq samples' stage status from OCS.
-
-    The beat sweep already keeps the whole mirror within a few minutes of OCS, so this is
-    not how status normally arrives. It exists for the moment someone does not believe the
-    table: one page of samples is small enough to ask DynamoDB about directly, and what
-    comes back is written to the same rows the sweep writes, so the answer is the table's
-    answer rather than a second opinion rendered beside it.
-    """
-    # The page posts the rows it is showing, so this refreshes exactly what the reader is
-    # looking at. Remove duplicate names before querying and reporting the count.
+    """Refresh the visible fastq samples' stage status from OCS."""
+    # The POST body contains the rows currently shown. Deduplicate names before querying
+    # and counting them.
     fastq_names = list(dict.fromkeys(request.POST.getlist("fastq_names")))
     samples = list(Sample.objects.filter(fastq_name__in=fastq_names))
     if not samples:
@@ -493,7 +486,7 @@ def set_columns(request):
         request.user.visible_location_columns = chosen
         request.user.save(update_fields=["visible_location_columns"])
     else:
-        # Fastq name identifies the row; hiding it would leave a table nobody can read.
+        # Keep fastq_name visible because it identifies each row.
         request.user.visible_columns = ["fastq_name", *[key for key in chosen if key != "fastq_name"]]
         request.user.save(update_fields=["visible_columns"])
     return redirect(_safe_next(request))
@@ -521,8 +514,8 @@ def export_csv(request):
     chosen = request.POST.getlist("fastq_names")
     samples = _filtered_samples(request)
     if chosen:
-        # A highlighted selection wins over the filters; without this an export would
-        # quietly widen to every filtered row.
+        # A selected row takes precedence over the filters. Otherwise the export includes
+        # every filtered row.
         samples = samples.filter(fastq_name__in=chosen)
 
     visible = columns.visible_columns(request.user)
@@ -569,25 +562,22 @@ def cart_add(request):
     in_cart = _cart_sample_ids(request.user, samples)
 
     # `ignore_conflicts` rather than trusting the read above. Between that query and this
-    # insert the same user can add the same sample again. A double-clicked button is enough,
-    # and the unique constraint would turn the second request into a 500 rather than the
-    # no-op it should be. The constraint stays; this is how the race lands on it quietly.
+    # A concurrent insert can trigger the unique constraint, so use ignore_conflicts to make
+    # the operation idempotent.
     CartItem.objects.bulk_create(
         [CartItem(user=request.user, sample=sample) for sample in samples if sample.pk not in in_cart],
         ignore_conflicts=True,
     )
 
-    # Counted from what is actually stored, not from what was handed to bulk_create: with
-    # ignore_conflicts the returned list includes rows that were silently dropped, so
-    # trusting its length would report samples as added that were already there.
+    # Count rows stored in the database, not rows passed to bulk_create. With ignore_conflicts,
+    # the input list can include rows that already exist.
     added = len(_cart_sample_ids(request.user, samples)) - len(in_cart)
     return _cart_add_result(
         request,
         added=added,
         already=len(in_cart),
-        # A page listing a sample the mirror no longer holds means someone else re-synced the
-        # batch while this one sat open. Silently dropping it would leave a selection that
-        # never arrived and no reason why.
+        # If a sample disappeared during a resync, count it as missing so the response
+        # explains why it was not added.
         missing=len(fastq_names) - len(samples),
     )
 
@@ -693,8 +683,7 @@ def command_preview(request):
     if sample is None:
         return JsonResponse({"error": f"No sample named {fastq_name!r}."}, status=404)
 
-    # A multiome half is planned against its partner, so previewing one alone would report
-    # `pair_missing` rather than the command it will actually get.
+    # Plan a multiome half with its partner so the preview shows the command for the pair.
     samples, _ = pairing.with_multiome_partners([sample])
 
     form = SubmissionForm(request.POST)
@@ -723,8 +712,7 @@ def command_preview(request):
                 }
             )
 
-    # No entry means this combination of choices produces nothing to run. Say which reason,
-    # so the editor can show it rather than silently leaving the old command on screen.
+    # Return the skip reason so the editor can replace the stale command.
     for skip in plan.skipped:
         if skip.sample.fastq_name == fastq_name:
             return JsonResponse({"error": skip.detail, "reason": skip.reason}, status=409)
@@ -747,10 +735,8 @@ def submit_commands(request):
 def _render_submission_step(request, context, *, partial, modal):
     """Render one step of the multi-step submission flow.
 
-    An AJAX request (both submission steps' modals fetch this way) gets just the partial
-    to swap in; a plain form post — the JavaScript-off fallback — gets the full checkout
-    page with that step's modal already open, since there is no earlier page to swap it
-    into.
+    An AJAX request gets the modal partial. A regular form post gets the full checkout page
+    with the requested modal already open.
     """
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return render(request, partial, context)
@@ -780,9 +766,8 @@ def submit_confirm(request):
             forced=bool(context["submission"]["force"]),
             batch_processing=context["submission"]["batch_processing"],
         )
-        # Only what reached the queue leaves the cart. A sample skipped because ingest is still
-        # running stays staged so it can be submitted once it is ready,
-        # which is the whole reason the cart outlives a single visit to this page.
+        # Only samples added to the queue leave the cart. Samples skipped while ingest is
+        # running remain staged for a later submission.
         queued_names = {entry.sample.fastq_name for entry in result.created}
         queued_names |= {entry.sample.fastq_name for entry in result.already_queued}
         if queued_names:
@@ -899,8 +884,7 @@ def job_monitor(request):
     running_stages = stages.filter(status__in=RUNNING_OCS_STATUSES)
     if running_stage:
         running_stages = running_stages.filter(stage=running_stage)
-    # Unbounded, unlike finished below: what's actually running is capped by OCS's own
-    # concurrency limit, not by how long the mirror has been recording history.
+    # OCS limits the number of running stages. Finished stages use a separate display cap.
     running = list(running_stages.order_by(F("started_at").desc(nulls_last=True)))
     finished = list(_finished_stages_queryset(stages, finished_stage, finished_status))
     monitor_running, monitor_finished = _collapse_multiome_monitor_rows(running, finished)
@@ -956,12 +940,7 @@ def job_monitor(request):
 
 
 def _finished_stages_queryset(stages, finished_stage, finished_status):
-    """Newest-first, capped finished stages -- shared so nothing else re-derives this cap.
-
-    The mirror holds every stage OCS has ever finished for half a million samples; this
-    answers "what happened lately" the same way for job_monitor's own display and for
-    the log-viewer authorization check, so the two can never drift apart.
-    """
+    """Return the newest finished alignment and post-alignment stages up to the display limit."""
     finished_stages = stages.filter(
         stage__in=(Stage.ALIGN, Stage.POST_ALIGN),
         status__in=FINISHED_OCS_STATUSES,
@@ -996,11 +975,7 @@ def _monitor_demand_is_visible(request, demand_id: str) -> bool:
 @login_required
 @require_POST
 def job_credentials_submit(request):
-    """Validate pasted temporary AWS credentials and cache them for this session only.
-
-    Never touches settings.AWS_PROFILE or any other AWS identity: a failure here means
-    the log viewer does not work for this session, not that another identity is tried.
-    """
+    """Validate temporary AWS credentials and cache them for this session."""
     access_key = request.POST.get("access_key", "").strip()
     secret_key = request.POST.get("secret_key", "").strip()
     session_token = request.POST.get("session_token", "").strip()
@@ -1022,13 +997,7 @@ def job_credentials_clear(request):
 @login_required
 @require_GET
 def job_credentials_status(request):
-    """Report whether this session already has validated credentials cached.
-
-    Read-only: makes no AWS call, just reports what's already in this session's own
-    cache entry, so a page reload doesn't force re-pasting credentials that are still
-    good server-side. "required" here means no cached entry, not that AWS rejected
-    anything -- only job_credentials_submit and job_demand_logs ever talk to AWS.
-    """
+    """Return the cached credential status without making an AWS request."""
     identity = log_credentials.get_identity(request)
     if identity is None:
         return JsonResponse({"status": "required"})
@@ -1075,9 +1044,8 @@ def job_demand_logs(request, demand_id):
 def _monitor_filter_options(request, *, options, param, page_param):
     """Build one monitor table filter's query-string links.
 
-    Shared by the stage filter and the finished-status filter: both are just an ("",
-    "All") option plus a fixed list of values, differing only in which values and which
-    query param they set.
+    Shared by the stage and finished-status filters. Both provide an empty `All` option and
+    a fixed list of values.
     """
     result = []
     for value, label in options:
@@ -1240,7 +1208,7 @@ def activate_config(request, pk):
 
 
 # What a manifest's own flags mean, independent of any one uploaded config. A flag not
-# listed here (a modality-specific or future flag) still renders, just without a note.
+# listed here (a modality-specific flag) still renders without a note.
 ARGUMENT_DESCRIPTIONS = {
     "--reference-names": (
         "OmicsHub selects this value from the References table by matching the fastq "
@@ -1335,14 +1303,7 @@ def _command_config_rows(command_configs: list[dict]) -> list[dict]:
 
 @login_required
 def config_detail(request, pk):
-    """Show one uploaded config's contents, raw or organized by section.
-
-    Read-only, so open to any signed-in user: choosing which config drives your own
-    submission already has no staff gate (`_selected_config`, checkout's picker), and
-    reading one before you pick it is the same access, not a bigger one. Uploading and
-    activating stay staff-only because those change the shared default everyone else
-    falls back to, not just the reader's own choice.
-    """
+    """Show one uploaded config as raw text or organized sections."""
     config = get_object_or_404(WorkflowConfig, pk=pk)
     view = request.GET.get("view")
     if view not in {"raw", "pretty"}:
@@ -1454,7 +1415,7 @@ def _dashboard_context(request):
     metadata_synced_at = Sample.objects.aggregate(at=Max("synced_at"))["at"]
 
     # The tab, and only the tab. The advanced-filter menus are built from this rather than
-    # the whole mirror so they offer values that can actually return rows, and rather than
+    # the whole mirror so they offer values that can return rows, and rather than
     # from the fully-filtered queryset so choosing an organism does not empty the batch menu.
     prefix = request.GET.get("batch_prefix")
     scope = Sample.objects.all()
@@ -1487,7 +1448,7 @@ def _dashboard_context(request):
         "dir": "asc" if request.GET.get("dir") == "asc" else "desc",
         "sortable_keys": list(SORTABLE),
         # How often the two sweeps run, for the freshness clock tooltip. Otherwise
-        # "3 minutes old" gives no way to tell stale from simply not-due-yet.
+        # "3 minutes old" does not distinguish stale data from a sweep that is not yet due.
         "metadata_refresh": "nightly at 03:00",
         **_status_sync_context(),
         "batch_prefixes": _prefix_counts(),
@@ -1495,7 +1456,7 @@ def _dashboard_context(request):
         "studies": _study_options(),
         "selected_studies": request.GET.getlist("study"),
         "modalities": modality.available_modalities(config.data) if config else [],
-        # Filter options come from what is actually in the mirror, so a dropdown never
+        # Filter options come from the mirror, so a dropdown never
         # offers a value that would return nothing. That is what keeps the batch menu
         # short: OCS has nearly two thousand batches, the mirror only the synced ones.
         # Scoped to the selected tab. On the MTX tab the batch menu lists MTX batches and
@@ -1507,13 +1468,11 @@ def _dashboard_context(request):
         "statuses": [NOT_COMPLETED, *_scoped_statuses(scope)],
         "filters_open": any(request.GET.getlist(field) for field in FILTER_FIELDS)
         or any(row["selected"] for row in stage_filters),
-        # How many advanced filters are narrowing the table. The panel that holds them is
-        # collapsed by default, so without a count on its own button the only way to learn
-        # that four of them are active is to open it and read six menus. Status belongs
-        # where the control is, not one disclosure away from it.
+        # Show the active-filter count on the collapsed panel button so users can see the
+        # current filter state without opening the panel.
         "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.getlist(field))
         + sum(1 for row in stage_filters if row["selected"]),
-        # Shown in the header so nobody has to guess how current the table is.
+        # Display the mirror's synchronization timestamp in the header.
         "metadata_synced_at": metadata_synced_at,
     }
 
@@ -1781,9 +1740,8 @@ def _submission_context(request):
         messages.error(request, "Select at least one sample to submit.")
         return None
 
-    # A multiome pair has to go together: the GEX and ATAC halves are aligned as one, so
-    # submitting half of one is a run that cannot finish. Said out loud rather than done
-    # quietly, because the user is about to see more samples than they ticked.
+    # Add the missing multiome partners and notify the user because both halves are required
+    # for one run.
     samples, added_partners = pairing.with_multiome_partners(samples)
     if added_partners:
         names = ", ".join(sample.fastq_name for sample in added_partners)
@@ -1871,7 +1829,7 @@ def _batch_groups(plan, stage: str, config: dict) -> list[dict]:
                 "entry": entry,
                 "options": command_builder.available_command_configs(config, entry.modality, stage),
                 # Passing the command config narrows the editor to the fields this command
-                # actually substitutes. There is no Reference menu above a post-QC command, which
+                # substitutes. There is no Reference menu above a post-QC command, which
                 # names no genome and could not have used the value.
                 "fields": command_builder.placeholder_fields(
                     config,
@@ -1905,8 +1863,8 @@ def _sample_overrides(request) -> dict[str, dict]:
     rather than a single blob, so a browser submitting the form without JavaScript
         still carries exactly what the user changed.
 
-        The command textarea always posts, and a hand-edited command outranks the menus, so an
-        untouched one would outrank a reference the user had just chosen. The editor posts the
+        The command textarea always posts, and a hand-edited command outranks the menus. An
+        untouched textarea should not override a reference the user chose. The editor posts the
         command it rendered alongside it; if what came back is that same string the textarea
         was not touched, and it is dropped so the menus decide.
     """
@@ -1993,12 +1951,7 @@ def _command_config_choices(request) -> dict[tuple[str, str], str]:
 
 
 def _safe_next(request, fallback="web_ui:dashboard"):
-    """Return the safe redirect target after a POST.
-
-    `next` is attacker-controllable and resolve_url returns an unrecognised string
-    unchanged, so an absolute URL would redirect straight off-site. This is the same guard
-    django.contrib.auth.views.LoginView applies to its own next parameter.
-    """
+    """Return the validated local redirect target after a POST."""
     target = request.POST.get("next")
     if target and url_has_allowed_host_and_scheme(
         target, allowed_hosts={request.get_host()}, require_https=request.is_secure()

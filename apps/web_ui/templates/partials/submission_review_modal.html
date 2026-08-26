@@ -14,8 +14,8 @@
 
         <div class="modal-body">
           {% comment %}
-          The two "unknown" panels are the only things here that block progress, so they lead
-          and they are the only things on this surface allowed to carry a warning colour.
+          Only the two `unknown` panels block submission. Show them first and use the warning
+          color only for those panels.
           {% endcomment %}
           {% if plan.needs_modality %}
           <div class="card mb-3">
@@ -183,10 +183,9 @@
           {% comment %}
           Samples this submission pulled in on its own. A multiome pair is aligned as one
           run, so ticking the GEX half submits the ATAC half with it. It appears in no
-          table here, because it is neither a command of its own nor a skip. Said in the
-          modal rather than only in the flash message behind it: the message sits at the top
-          of the page while the reader is inside this dialog, so "you ticked four samples and
-          eight are going in" was being said where nobody was looking.
+          table here, because it is neither a command of its own nor a skip. Show this message
+          in the modal because the flash-message area is outside the dialog and may not be
+          visible while the user reviews the submission.
           {% endcomment %}
           <p class="note mt-3" id="covered-by-pair-note">
             <i class="bi bi-link-45deg" aria-hidden="true"></i>

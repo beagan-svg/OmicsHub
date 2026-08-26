@@ -19,11 +19,9 @@ EMAIL = "bicore@alleninstitute.org"
 def _clear_cache():
     """Clear process-wide cache values between tests.
 
-        Django rolls the database back between tests; nothing rolls the cache back. Two things
-    live there now: the submission worker's capacity hold and the timestamp of the last
-    stage-status sweep. Both are read as "has this already happened", so a value left
-        by one test silently changes the answer for the next. That is exactly the kind of
-        order-dependent failure that only appears when someone runs a subset.
+    Django rolls the database back between tests, but the cache persists. The cache stores
+    the submission worker's capacity hold and the last stage-status sweep timestamp. A
+    value left by one test can affect the next test and create an order-dependent failure.
     """
     cache.clear()
     yield

@@ -34,8 +34,7 @@ def main() -> int:
             print(f"{URL} returned {response.status}", file=sys.stderr)
             return 1
     except urllib.error.HTTPError as error:
-        # 503 is the interesting one: the body names which dependency is down, and Docker
-        # keeps the last healthcheck output, so printing it is how the reason survives.
+        # Include the 503 response body so Docker healthcheck failures show the dependency error.
         body = error.read(2000).decode("utf-8", "replace")
         print(f"{URL} returned {error.code}: {body}", file=sys.stderr)
         return 1

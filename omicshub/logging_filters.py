@@ -149,8 +149,8 @@ def _attach_request_id(headers=None, **kwargs) -> None:
 def _adopt_request_id(task=None, task_id=None, **kwargs) -> None:
     """Use the queuing request id when logging a Celery task.
 
-    Fall back to the task id for beat-triggered work. Scheduled sweeps have no request id, so
-    the task id correlates each run with its own log records.
+    Use the task ID for Beat-triggered work because scheduled sweeps have no request ID.
+    The task ID correlates each scheduled run with its log records.
     """
     published = getattr(getattr(task, "request", None), CELERY_HEADER, None)
     set_request_id(published or task_id)

@@ -1,8 +1,7 @@
 """Stage timings and demand ids , the fields the dashboard reports a run's cost from.
 
-These pin the two things that were actually broken: the registry projection did not ask
-DynamoDB for `start_time` or `duration`, so neither could ever reach the mirror, and the
-numbers DynamoDB returns are `Decimal`, which will not write to an integer column.
+These tests cover two previous failures: the registry projection omitted `start_time` and
+`duration`, and DynamoDB returned `Decimal` values for integer columns.
 """
 
 from __future__ import annotations

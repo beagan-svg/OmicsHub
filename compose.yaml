@@ -116,9 +116,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    # One process, one queue, and it must stay that way. The global OCS job limit and the
-    # config's `spacing` between submissions are both enforced by this being the only thing
-    # submitting; a second replica or a higher concurrency submits the same demand twice.
+    # The global OCS job limit and configured submission spacing depend on a single submission
+    # process. A second replica or higher concurrency could submit the same demand twice.
     # Do not `docker compose up --scale ocs-submission-worker=N`.
     command: celery -A omicshub worker --queues ocs-submissions --concurrency 1 --loglevel info
     stop_grace_period: 330s

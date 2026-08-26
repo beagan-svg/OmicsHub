@@ -10,12 +10,12 @@ when it is available. Inspect the relevant CLI command, runner, API client model
 and infrastructure policy before inventing a command or AWS call. Use `--help` on the installed
 CLI to confirm current syntax.
 
-Use this order for an operation:
+Use this order to identify the correct operation and its owning boundary:
 
-1. Existing OCS CLI command.
-2. Existing repository helper or client.
-3. Read-only Boto3 or AWS CLI inspection when the OCS source maps the resource.
-4. A mutation only when the user explicitly requests it and the target is unambiguous.
+1. Inspect the existing OCS CLI command.
+2. Inspect the existing repository helper or client.
+3. Use read-only Boto3 or AWS CLI inspection when the OCS source maps the resource.
+4. Perform a mutation only when the user explicitly requests it and the target is unambiguous.
 
 Keep the AWS account/profile and OCS environment separate. Verify both independently. Set the
 region explicitly when the shell does not provide one. Never copy access keys, secret keys,
@@ -70,7 +70,7 @@ The normal application AWS identity handles catalog synchronization, OCS submiss
 locations, and the file-store lookup. The Monitor log viewer uses a separate session-specific
 Boto3 session built from user-supplied temporary credentials. It must not call
 `boto3.setup_default_session()`, set process-wide AWS variables, select the app profile, or
-become a fallback for application AWS calls.
+handle application AWS calls.
 
 The log session may validate with STS, resolve a visible demand through the required DynamoDB
 and Step Functions calls, describe its Batch job, and read its CloudWatch stream. Store its
@@ -100,7 +100,7 @@ environment, CLI parsing, API behavior, infrastructure state, or missing data. P
 first concrete error and redact secrets. Verify account, region, environment, workflow, image
 digest, execution, Batch job, and log stream independently.
 
-Do not switch accounts, change OCS environments, or use the app identity as a workaround. If
+Do not switch accounts, change OCS environments, or use another identity to bypass an error. If
 OCS cannot provide an execution record, report that condition and use the mapped AWS lookup only
 when the temporary log credentials have the required permissions.
 

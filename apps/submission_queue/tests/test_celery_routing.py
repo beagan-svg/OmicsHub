@@ -1,8 +1,7 @@
-"""Every scheduled task must land on a queue a worker is actually listening to.
+"""Verify that scheduled tasks use queues consumed by the deployment's workers.
 
-The deployment runs two workers, `-Q catalog-sync` and `-Q ocs-submissions`. Celery's own
-default queue is named "celery", so dropping `CELERY_TASK_DEFAULT_QUEUE` publishes every
-unrouted task to a queue nobody consumes.
+The deployment runs workers for `catalog-sync` and `ocs-submissions`. Celery's default queue
+is named `celery`, so an unrouted task would not be consumed.
 """
 
 from __future__ import annotations

@@ -8,9 +8,8 @@ User = get_user_model()
 class LoginForm(AuthenticationForm):
     """Style `AuthenticationForm` and set browser autofill hints.
 
-    Subclassed rather than hand-written in the template so the form decides what to say:
-    an inactive account and a wrong password are different answers, and a template that
-    prints one sentence for `form.errors` reports both as a typo.
+    Use the form's field-specific validation so inactive accounts and invalid passwords
+    produce distinct errors.
     """
 
     def __init__(self, *args, **kwargs):

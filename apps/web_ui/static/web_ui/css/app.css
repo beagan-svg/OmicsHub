@@ -982,6 +982,8 @@ main.container-fluid {
 }
 
 .monitor-logs-column {
+  max-width: 4rem;
+  min-width: 4rem;
   width: 4rem;
   white-space: nowrap;
 }

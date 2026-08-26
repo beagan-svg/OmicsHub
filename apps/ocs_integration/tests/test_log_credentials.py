@@ -471,7 +471,7 @@ def test_fetch_job_logs_walks_nested_executions_to_find_the_job(request_, monkey
             "logGroupName": log_credentials.LOG_GROUP,
             "logStreamName": "stream-1",
             "startFromHead": True,
-            "limit": 200,
+            "limit": 10_000,
         },
     )
     logs_stub.activate()
@@ -487,6 +487,55 @@ def test_fetch_job_logs_walks_nested_executions_to_find_the_job(request_, monkey
     assert events == [{"timestamp": 1, "message": "hello"}, {"timestamp": 2, "message": "world"}]
     sfn_stub.assert_no_pending_responses()
     batch_stub.assert_no_pending_responses()
+    logs_stub.assert_no_pending_responses()
+
+
+def test_read_log_stream_returns_events_from_all_pages():
+    logs_client, logs_stub = make_stubbed_client("logs")
+    logs_stub.add_response(
+        "get_log_events",
+        {
+            "events": [{"timestamp": 1, "message": "start"}],
+            "nextForwardToken": "page-2",
+        },
+        {
+            "logGroupName": log_credentials.LOG_GROUP,
+            "logStreamName": "stream-1",
+            "startFromHead": True,
+            "limit": 10_000,
+        },
+    )
+    logs_stub.add_response(
+        "get_log_events",
+        {
+            "events": [{"timestamp": 2, "message": "finish"}],
+            "nextForwardToken": "page-3",
+        },
+        {
+            "logGroupName": log_credentials.LOG_GROUP,
+            "logStreamName": "stream-1",
+            "startFromHead": True,
+            "limit": 10_000,
+            "nextToken": "page-2",
+        },
+    )
+    logs_stub.add_response(
+        "get_log_events",
+        {"events": [], "nextForwardToken": "page-3"},
+        {
+            "logGroupName": log_credentials.LOG_GROUP,
+            "logStreamName": "stream-1",
+            "startFromHead": True,
+            "limit": 10_000,
+            "nextToken": "page-3",
+        },
+    )
+    logs_stub.activate()
+
+    assert log_credentials._read_log_stream(FakeSession({"logs": logs_client}), "stream-1") == [
+        {"timestamp": 1, "message": "start"},
+        {"timestamp": 2, "message": "finish"},
+    ]
     logs_stub.assert_no_pending_responses()
 
 
@@ -545,7 +594,7 @@ def test_fetch_job_logs_finds_batch_job_in_failed_task_cause(request_, monkeypat
             "logGroupName": log_credentials.LOG_GROUP,
             "logStreamName": "stream-1",
             "startFromHead": True,
-            "limit": 200,
+            "limit": 10_000,
         },
     )
     logs_stub.activate()
@@ -616,7 +665,7 @@ def test_fetch_job_logs_only_ever_calls_the_allowlisted_operations(request_, mon
             "logGroupName": log_credentials.LOG_GROUP,
             "logStreamName": "stream-1",
             "startFromHead": True,
-            "limit": 200,
+            "limit": 10_000,
         },
     )
     logs_stub.activate()

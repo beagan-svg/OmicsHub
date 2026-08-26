@@ -1,9 +1,7 @@
-"""Whole journeys through OmicsHub, driven the way a person drives it.
+"""Test OmicsHub user journeys through real URLs and responses.
 
-Every test here goes through a real URL with the test client: sign in, filter, choose
-columns, fill a cart, plan a submission, confirm it, then manage what came back. Nothing
-calls a view function or a service directly, because the thing being checked is what the
-user gets, not what the code does on the way there.
+Each test signs in, filters, selects columns, fills a cart, plans and confirms a submission,
+or inspects the resulting response.
 """
 
 from __future__ import annotations
@@ -549,7 +547,7 @@ class TestCartJourney:
 
         response = review(["GEX-1"])
 
-        # Said out loud: the user ticked one sample and is about to see two.
+        # Report the partner added to the selected sample.
         assert b"Added 1 multiome partner(s) to the selection: ATAC-1." in response.content
         assert response.context["submission"]["fastq_names"] == ["GEX-1", "ATAC-1"]
 

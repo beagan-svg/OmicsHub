@@ -208,7 +208,7 @@ Before finishing a UI change, inspect the complete diff and confirm:
 - The live region, request ownership, and event ordering remain clear.
 - No polling path uses AWS credentials implicitly.
 - No credential or log error is exposed outside the log-viewing flow.
-- No dead listener, duplicate helper, fallback path, or unused selector was added.
+- No dead listener, duplicate helper, substitute path, or unused selector was added.
 - The page remains usable after refresh, filtering, pagination, resizing, scrolling,
   opening and closing disclosures, and changing viewport size.
 - Tests cover the user-visible race or interaction that motivated the change.

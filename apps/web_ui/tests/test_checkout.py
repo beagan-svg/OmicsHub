@@ -457,7 +457,7 @@ class TestUntouchedCommandDoesNotOutrankTheMenus:
     """The editor posts its textarea whether or not anybody typed in it.
 
     A hand-edited command outranks the menus, so an untouched textarea used to outrank a
-    reference the user had just chosen , changing Reference did nothing at all, silently.
+        reference the user chose, changing Reference did not update the command.
     The rendered command is posted alongside it so the two cases can be told apart.
     """
 

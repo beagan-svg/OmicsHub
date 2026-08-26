@@ -106,12 +106,10 @@ def test_at_the_job_limit_nothing_is_submitted_and_the_job_is_not_dropped(active
 
 
 def test_the_limit_queues_no_retry_of_its_own(active_config, pending_entry, ocs):
-    """Beat is the only thing that retries, so nothing can accumulate while OCS is full.
+    """Celery Beat is the only retry mechanism for a full OCS queue.
 
-    The task used to schedule its own retry here. Beat calls it every 60 seconds anyway, so
-    one delayed task piled up per tick for as long as the limit held , and every one of them
-    was already past its countdown when capacity freed, so the whole backlog submitted with
-    no spacing between jobs.
+    Scheduling retries from the task would create one delayed task per Beat interval and
+    could submit the backlog without the configured spacing.
     """
     ocs.in_progress = 50
 

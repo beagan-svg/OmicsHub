@@ -1,9 +1,7 @@
-"""The queue API driven as a client would drive it, and checked against the web UI.
+"""Test the queue API and web UI against the same planner.
 
-The API and the pages are meant to be two doors onto one planner. These tests walk the
-API's own plan → confirm → list → cancel journey, then plan the same selection through
-both doors and insist the answers match. This is what breaks when
-either side starts deciding something for itself.
+Each test compares planning, confirmation, listing, and cancellation results from both
+interfaces.
 """
 
 from __future__ import annotations

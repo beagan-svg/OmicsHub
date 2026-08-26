@@ -461,7 +461,7 @@ class TestFullSweep:
         assert sample.stage_demand_id(Stage.EXPORT) == "d-1"
 
     def test_discovers_a_sample_not_yet_in_the_mirror(self, swept, ocs):
-        """History for an unmirrored sample means OCS just started work on it, so it
+        """History for an unmirrored sample means OCS started work on it, so it
         appears on this sweep rather than waiting for the nightly metadata pass."""
         ocs.metadata = [{**METADATA, "fastq_name": "BRAND-NEW", "batch_name_from_vendor": "MTX-9"}]
 

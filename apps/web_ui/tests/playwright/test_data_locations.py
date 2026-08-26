@@ -60,5 +60,5 @@ def test_contents_column_has_a_fixed_compact_width(data_location_page):
     page = data_location_page
     header = page.locator("th.location-contents-column")
     cell = page.locator("td.location-contents-column").filter(has=page.locator("button"))
-    assert header.bounding_box()["width"] == pytest.approx(88, abs=1)
-    assert cell.bounding_box()["width"] == pytest.approx(88, abs=1)
+    assert header.bounding_box()["width"] == pytest.approx(96, abs=1)
+    assert cell.bounding_box()["width"] == pytest.approx(96, abs=1)

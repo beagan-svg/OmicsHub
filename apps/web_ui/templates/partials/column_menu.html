@@ -38,8 +38,8 @@
         {% for column in group.columns %}
           {% if column.key == locked_column %}
           {% comment %}
-          Not a disabled checkbox: a checkbox you cannot move reads as a bug until you find
-          out why. The lock and the note say the reason on the line itself.
+          Render the locked column as a non-interactive option rather than a disabled checkbox.
+          Display the lock icon and explanation beside it.
           {% endcomment %}
           <div class="column-option column-option--locked"
                data-column-option data-column-label="{{ column.label|lower }}">

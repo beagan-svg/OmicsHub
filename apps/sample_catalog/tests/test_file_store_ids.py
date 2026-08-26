@@ -75,8 +75,8 @@ class TestExtraction:
         ],
     )
     def test_anything_that_is_not_a_gfs_path_is_refused(self, path):
-        """The column is what someone pastes into OCS tooling. Storing a near-miss makes
-        the dashboard confidently wrong instead of visibly empty."""
+        """The column stores the value pasted into OCS tooling. Storing an invalid value
+        would display unusable data instead of an empty result."""
         assert dynamodb.file_store_id(history_row("align", "d-6", [path], fastq_gfs_path=None)) == ""
 
 

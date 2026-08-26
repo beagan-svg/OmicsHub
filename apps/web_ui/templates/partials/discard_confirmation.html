@@ -2,9 +2,9 @@
 The confirmation shown when someone tries to leave a submission modal that holds choices.
 
 Rendered inside the modal it guards rather than as a second modal on top of it: a dialog
-stacked on a dialog has two backdrops, two Escape handlers and a focus order nobody can
-predict. This is one panel over the content it is asking about, which is also the honest
-picture. The submission has not gone anywhere. It is waiting behind the question.
+stacked on a dialog has two backdrops, two Escape handlers, and an ambiguous focus order.
+Render one confirmation panel over the existing modal. The submission remains in the current
+modal until the user chooses an action.
 
 Hidden until needed, and shown by the handler in base.html for *every* way out of the
 modal, not just the Cancel button. Expects `id_prefix`.
@@ -21,8 +21,7 @@ modal, not just the Cancel button. Expects `id_prefix`.
     </p>
     <div class="discard-confirm__actions">
       {% comment %}
-      Keep editing comes first and takes focus: the safe answer should be the one already
-      under the finger, and the destructive one should take a deliberate move to reach.
+      Place `Keep editing` first and focus it by default. Place the destructive action second.
       {% endcomment %}
       <button type="button" class="btn btn-outline-secondary" data-discard="keep">Keep editing</button>
       <button type="button" class="btn btn-danger" data-discard="confirm">Discard changes</button>

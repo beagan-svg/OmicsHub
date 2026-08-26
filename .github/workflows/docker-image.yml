@@ -1,9 +1,8 @@
 # Build the image on every pull request, so a Dockerfile that no longer builds is found
 # here rather than during a release.
 #
-# Nothing is pushed. The point is only "does this still build" — and it catches the things
-# the test job cannot: a dependency with no wheel for linux/amd64, a lock file that no
-# longer resolves, a COPY of a path that .dockerignore now excludes.
+# This job verifies that the image still builds. It also checks platform dependencies, lockfile
+# resolution, and Dockerfile paths that the test job does not cover.
 name: Docker image
 
 on:

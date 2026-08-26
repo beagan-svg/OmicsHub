@@ -158,9 +158,8 @@ def missing_required_values(command_config: dict, placeholders: dict) -> list[st
     """Return placeholders in a template that resolve to empty values.
 
     `probe_set` and `chemistry` are looked up by library prep method, so a prep the config
-    does not list resolves both to "". Substituted anyway, that emits a flag with no value
-    after it, such as `--cellflex-probe-set-name  --cellranger-addopts --chemistry`, which is a
-    command OCS is asked to make sense of rather than one anybody chose to send.
+    does not list resolves both to "". Substituted anyway, that emits a flag with no value,
+    such as `--cellflex-probe-set-name  --cellranger-addopts --chemistry`.
 
     `input_name_flag` is excluded: it is part of a flag's spelling, never a value, and it is
     always one of two literals.

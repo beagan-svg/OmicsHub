@@ -1,8 +1,6 @@
-"""The production instrumentation: correlation ids, log redaction, and error monitoring.
+"""Test correlation IDs, log redaction, and error monitoring instrumentation.
 
-None of this changes what the app computes, which is exactly why it needs tests , a
-correlation id that quietly stops being emitted, or a redaction that stops matching, fails
-silently and is only noticed during the incident it was meant to help with.
+These tests detect missing correlation IDs and redaction failures before deployment.
 """
 
 from __future__ import annotations

@@ -67,12 +67,7 @@ def test_database_check_reports_ok_when_reachable(broker_up):
 
 
 class TestSubmissionsWorkerCheck:
-    """A queue nobody consumes accepts jobs forever and submits none of them.
-
-    Every other signal looks healthy in that state , the broker is up, pages render, entries
-    queue , so this is the check that tells the difference. It went missing once, and three
-    dead workers reported green for an hour.
-    """
+    """Detect an unconsumed queue even when the broker and web pages remain healthy."""
 
     def test_ok_when_the_task_has_run_recently(self):
         cache.set(WORKER_HEARTBEAT_KEY, "2026-08-16T00:00:00+00:00", WORKER_HEARTBEAT_TTL)

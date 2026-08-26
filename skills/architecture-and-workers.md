@@ -91,7 +91,7 @@ conversation differ.
   history, AWS Batch job details, and CloudWatch Logs. It follows the stored execution ARN for
   normal records. Failed demands use the demand's workflow mapping to find the execution, then
   resolve nested Step Functions history to the Batch job and its container log stream.
-- There is no credential fallback. If the supplied identity lacks permission or the demand
+- There is no alternate credential path. If the supplied identity lacks permission or the demand
   has no usable execution record, report that exact condition.
 
 ## Contributor rules
@@ -107,7 +107,7 @@ conversation differ.
   local PostgreSQL; the scheduled sync is the only normal path that pulls new AWS data.
 - Preserve open log panels and user selections during HTML refreshes. Cancel stale requests,
   ignore responses for detached or closed panels, and avoid overlapping refresh requests.
-- Use short, concrete names and docstrings. Remove dead branches, redundant fallbacks,
+- Use short, concrete names and docstrings. Remove dead branches, redundant substitute paths,
   wrappers with no behavior, duplicate queries, and speculative validation.
 - Never commit `.env.docker`, AWS credentials, session tokens, private keys, or live sample
   access material. Use placeholders in documentation and test fakes at the AWS boundary.
