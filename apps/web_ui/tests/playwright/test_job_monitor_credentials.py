@@ -18,7 +18,7 @@ from apps.sample_catalog.models import Stage
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
-FAKE_ACCESS_KEY = "AKIAFAKEFAKEFAKEFAKE"
+FAKE_ACCESS_KEY = "test-access-key"
 FAKE_SECRET_KEY = "fake-secret-not-a-real-value-000000000000"
 FAKE_SESSION_TOKEN = "fake-session-token-not-a-real-value"
 
