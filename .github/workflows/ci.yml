@@ -86,6 +86,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: omicshub.settings.prod
           CREDENTIAL_ENCRYPTION_KEY: 2fPuizO90Xj1avGhT1E3AAVDfKZT1T1cgccHh5p_6a8=
+          CACHE_URL: redis://localhost:6379/0
           ALLOWED_HOSTS: localhost
           CSRF_TRUSTED_ORIGINS: https://localhost
           SECURE_SSL_REDIRECT: "True"
