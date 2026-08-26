@@ -23,7 +23,9 @@
     const columns = new Map(
       [...table.querySelectorAll("col[data-column-key]")].map((column) => [column.dataset.columnKey, column]),
     );
-    const lastColumn = [...columns.values()].at(-1);
+    const stretchColumn = table.dataset.stretchColumn
+      ? columns.get(table.dataset.stretchColumn)
+      : [...columns.values()].at(-1);
     const minimumTableWidth = table.parentElement.clientWidth;
     const widths = readWidths(tableName);
     const cols = [...table.querySelectorAll("col")];
@@ -34,8 +36,11 @@
 
     cols.forEach((column, index) => {
       const key = column.dataset.columnKey;
+      const fixedWidth = Number.parseFloat(column.dataset.fixedWidth);
       const savedWidth = key && widths[key];
-      const width = savedWidth
+      const width = Number.isFinite(fixedWidth)
+        ? fixedWidth
+        : savedWidth
         ? Math.max(minimumWidth, savedWidth)
         : headerCells[index].getBoundingClientRect().width;
       column.style.width = `${width}px`;
@@ -46,8 +51,8 @@
     const columnWidth = (column) => Number.parseFloat(column.style.width);
 
     let tableWidth = cols.reduce((total, column) => total + columnWidth(column), 0);
-    if (lastColumn && tableWidth < minimumTableWidth) {
-      lastColumn.style.width = `${columnWidth(lastColumn) + minimumTableWidth - tableWidth}px`;
+    if (stretchColumn && tableWidth < minimumTableWidth) {
+      stretchColumn.style.width = `${columnWidth(stretchColumn) + minimumTableWidth - tableWidth}px`;
       tableWidth = minimumTableWidth;
     }
     table.style.tableLayout = "fixed";
@@ -56,7 +61,7 @@
     table.querySelectorAll("th[data-column-key]").forEach((header) => {
       const key = header.dataset.columnKey;
       const column = columns.get(key);
-      if (!column) return;
+      if (!column || column.dataset.fixedWidth) return;
 
       const handle = document.createElement("button");
       handle.type = "button";
@@ -70,7 +75,7 @@
         const currentWidth = columnWidth(column);
         let nextWidth = Math.max(minimumWidth, Math.round(width));
         const nextTableWidth = tableWidth + nextWidth - currentWidth;
-        if (column === lastColumn && nextTableWidth < minimumTableWidth) {
+        if (column === stretchColumn && nextTableWidth < minimumTableWidth) {
           nextWidth += minimumTableWidth - nextTableWidth;
         }
         column.style.width = `${nextWidth}px`;

@@ -85,13 +85,14 @@
 
   <div class="table-responsive table-scroll">
     <table class="table table-sticky table-pinned align-middle mb-0 data-locations-table"
-           data-resizable-table="data-locations" data-live-status-url="{% url 'web_ui:live-status' %}">
+           data-resizable-table="data-locations" data-stretch-column="s3_uri"
+           data-live-status-url="{% url 'web_ui:live-status' %}">
       <colgroup>
         <col style="width: 44px">
         <col data-column-key="fastq_name">
         {% for column in columns %}<col data-column-key="{{ column.key }}">{% endfor %}
         <col data-column-key="s3_uri">
-        <col data-column-key="contents">
+        <col data-column-key="contents" data-fixed-width="96">
       </colgroup>
       <caption class="visually-hidden">S3 locations matching the current filters. Page {{ page.number }} of {{ page.paginator.num_pages }}, {{ page.paginator.count }} samples in total.</caption>
       <thead>
