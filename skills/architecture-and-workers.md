@@ -64,10 +64,11 @@ conversation differ.
 - Before claiming, the worker checks for an active capacity hold and spacing hold. It counts
   `IN_PROGRESS` alignment and post-alignment demands in the OCS demand registry before sending
   a command. When OCS is at the configured limit, it stores a Redis capacity hold.
-- After a successful submission, the worker stores the demand ID and opens the configured
-  spacing hold. The current implementation also schedules the next queue task with the
-  spacing countdown. Beat continues its regular one-minute queue task. Both paths are safe
-  only because the Redis holds and database claim transaction prevent duplicate submissions.
+- After a successful submission, the worker stores the demand ID, opens the configured spacing
+  hold, and currently schedules one delayed copy of the queue task. Beat also publishes its
+  regular one-minute queue task. The Redis hold and database claim transaction prevent either
+  path from submitting during the same spacing window. Change the task and its tests together
+  if the scheduler is changed to Beat-only.
 - A CLI submission error marks the claimed entry `FAILED`. An unexpected error also records a
   failure and is allowed to reach Celery so the worker reports it.
 - Do not add a second submission worker, a second queue implementation, or an unbounded retry

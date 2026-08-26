@@ -4,7 +4,10 @@ Read these guides before changing OmicsHub. They record the current architecture
 
 ## Guides
 
+- [OmicsHub skill](SKILL.md) is the entry point for an AI coding agent working in this repository.
 - [Architecture and workers](architecture-and-workers.md) explains the Django apps, PostgreSQL records, AWS mirrors, Celery workers, Beat, Redis, queue rules, and sync flow.
+- [OCS integration](ocs-integration.md) explains OCS command discovery, demand tracing, AWS resource mapping, and the separate log-credential path.
+- [Maintainability and review](maintainability-and-review.md) explains how to review diffs, remove dead code, preserve Django boundaries, and validate changes.
 - [UI and browser quality](ui-and-browser-quality.md) explains the dashboard layout, shared controls, live polling, monitor log panels, refresh races, and Playwright checks.
 - [Security and deployment](security-and-deployment.md) explains AWS identity boundaries, temporary log-viewer credentials, Docker services, secrets, rebuilds, and release checks.
 
