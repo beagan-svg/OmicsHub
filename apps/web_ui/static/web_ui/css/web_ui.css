@@ -1172,6 +1172,11 @@ main.container-fluid {
   min-height: 46px;
 }
 
+.timeline__row > .timeline__label {
+  align-items: center;
+  display: flex;
+}
+
 .timeline__row:last-child {
   border-bottom: 0;
 }
