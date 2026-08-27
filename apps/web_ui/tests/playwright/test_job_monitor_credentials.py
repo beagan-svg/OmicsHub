@@ -81,7 +81,7 @@ def finished_demand(make_sample):
 @pytest.fixture
 def credentials_form(live_server, user, running_demand, page):
     login(page, live_server, user.username, "password")
-    page.goto(f"{live_server.url}/jobs/")
+    page.goto(f"{live_server.url}/monitor/")
     page.wait_for_selector("#job-log-credentials")
     return page
 
@@ -89,7 +89,7 @@ def credentials_form(live_server, user, running_demand, page):
 @pytest.fixture
 def finished_credentials_form(live_server, user, finished_demand, page):
     login(page, live_server, user.username, "password")
-    page.goto(f"{live_server.url}/jobs/")
+    page.goto(f"{live_server.url}/monitor/")
     page.wait_for_selector("#job-log-credentials")
     return page
 
@@ -433,5 +433,5 @@ class TestMonitorTableLayout:
         status.click()
         page.wait_for_timeout(100)
 
-        assert page.url.endswith("/jobs/")
+        assert page.url.endswith("/monitor/")
         assert navigations == []

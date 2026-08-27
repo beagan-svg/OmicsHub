@@ -358,7 +358,7 @@ queue entry. It rejects invalid command input before sending the command.
 | /checkout/ | Review samples, select the manifest, and review commands. |
 | /queue/ | View and cancel pending queue entries. |
 | /data-locations/ | View file-store and S3 locations and download selected files. |
-| /jobs/ | View running and recently finished jobs. |
+| /monitor/ | View running and recently finished jobs. |
 | /failed/ | Retry or delete this user's failed submissions and running failures. |
 | /configs/ | Upload and activate a workflow manifest as a staff user. |
 

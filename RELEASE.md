@@ -212,7 +212,7 @@ Run these checks after the stack starts.
    that the worker, the cache and OCS all work together, which the health endpoint cannot
    tell you.
 
-4. **The queue and monitor pages.** Open `/queue/`, `/jobs/`, and `/failed/`. Confirm that
+4. **The queue and monitor pages.** Open `/queue/`, `/monitor/`, and `/failed/`. Confirm that
    they render and that existing entries retain their states.
 
 ## When a submission fails
