@@ -45,7 +45,9 @@
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="nav">
-          <ul class="navbar-nav me-auto">
+          <div class="navbar-nav navbar-nav--sections me-auto">
+          <div class="navbar-nav__group" role="group" aria-label="Data">
+          <ul class="navbar-nav">
             {% active_class 'dashboard' as dashboard_active %}
             <li class="nav-item">
               <a class="nav-link {{ dashboard_active }}" href="{% url 'web_ui:dashboard' %}"
@@ -58,8 +60,20 @@
                  {% if data_locations_active %}aria-current="page"{% endif %}>
                 <i class="bi bi-folder2-open" aria-hidden="true"></i> Data Locations</a>
             </li>
+            {% if user.is_staff %}
+            {% active_class 'configs' as configs_active %}
+            <li class="nav-item">
+              <a class="nav-link {{ configs_active }}" href="{% url 'web_ui:configs' %}"
+                 {% if configs_active %}aria-current="page"{% endif %}>
+                <i class="bi bi-sliders" aria-hidden="true"></i> Configs</a>
+            </li>
+            {% endif %}
+          </ul>
+          </div>
+          <div class="navbar-nav__group" role="group" aria-label="Submission">
+          <ul class="navbar-nav">
             {% active_class 'checkout' as checkout_active %}
-            <li class="nav-item nav-item--section-start">
+            <li class="nav-item">
               <a class="nav-link {{ checkout_active }}" href="{% url 'web_ui:checkout' %}"
                  {% if checkout_active %}aria-current="page"{% endif %}>
                 <i class="bi bi-bag" aria-hidden="true"></i> Checkout
@@ -74,8 +88,12 @@
                 </span>
               </a>
             </li>
+          </ul>
+          </div>
+          <div class="navbar-nav__group" role="group" aria-label="Job operations">
+          <ul class="navbar-nav">
             {% active_class 'queue' as queue_active %}
-            <li class="nav-item nav-item--section-start">
+            <li class="nav-item">
               <a class="nav-link {{ queue_active }}" href="{% url 'web_ui:queue' %}"
                  {% if queue_active %}aria-current="page"{% endif %}>
                 <i class="bi bi-list-ol" aria-hidden="true"></i> Queue</a>
@@ -99,15 +117,9 @@
                 <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Failures
                 {% if failure_count %}<span class="count"><span class="visually-hidden">{{ failure_count }} </span>{{ failure_count }}</span>{% endif %}</a>
             </li>
-            {% if user.is_staff %}
-            {% active_class 'configs' as configs_active %}
-            <li class="nav-item">
-              <a class="nav-link {{ configs_active }}" href="{% url 'web_ui:configs' %}"
-                 {% if configs_active %}aria-current="page"{% endif %}>
-                <i class="bi bi-sliders" aria-hidden="true"></i> Configs</a>
-            </li>
-            {% endif %}
           </ul>
+          </div>
+          </div>
           <ul class="navbar-nav align-items-lg-center">
             <li class="nav-item">
               {% comment %}

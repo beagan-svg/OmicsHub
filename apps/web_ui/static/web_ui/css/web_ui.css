@@ -269,14 +269,33 @@ hr { border-color: var(--line); opacity: 1; }
   background: none;
 }
 
-.navbar .nav-item--section-start {
+.navbar-nav--sections {
+  align-items: center;
+  flex-direction: row;
+}
+
+.navbar-nav__group {
+  align-items: center;
+  display: flex;
+}
+
+.navbar-nav__group + .navbar-nav__group {
   border-left: 1px solid var(--line);
   margin-left: 8px;
   padding-left: 8px;
 }
 
 @media (max-width: 991.98px) {
-  .navbar .nav-item--section-start {
+  .navbar-nav--sections {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .navbar-nav__group {
+    align-items: stretch;
+  }
+
+  .navbar-nav__group + .navbar-nav__group {
     border-left: 0;
     margin-left: 0;
     padding-left: 0;
