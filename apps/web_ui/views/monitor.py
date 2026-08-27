@@ -1,6 +1,7 @@
 """Render monitor pages and actions."""
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -33,6 +34,46 @@ _MONITOR_FINISHED_STATUS_OPTIONS = [
 ]
 
 
+@dataclass
+class MonitorRow:
+    """Represent one OCS demand and its fastq samples in a monitor table."""
+
+    stage_status: StageStatus
+    fastq_names: list[str]
+
+    @property
+    def sample(self):
+        return self.stage_status.sample
+
+    @property
+    def stage(self):
+        return self.stage_status.stage
+
+    @property
+    def status(self):
+        return self.stage_status.status
+
+    @property
+    def demand_id(self):
+        return self.stage_status.demand_id
+
+    @property
+    def queued_here(self):
+        return self.stage_status.queued_here
+
+    @property
+    def started_at(self):
+        return self.stage_status.started_at
+
+    @property
+    def duration_display(self):
+        return self.stage_status.duration_display
+
+    @property
+    def last_update_time(self):
+        return self.stage_status.last_update_time
+
+
 def job_monitor(request):
     """Show OCS stages that are running or finished."""
     submitted_here = QueueEntry.objects.filter(demand_id=OuterRef("demand_id")).exclude(demand_id="")
@@ -55,16 +96,16 @@ def job_monitor(request):
     running_stages = stages.filter(status__in=RUNNING_OCS_STATUSES)
     # OCS limits the number of running stages. Finished stages use a separate display cap.
     running_rows = list(running_stages.order_by(F("started_at").desc(nulls_last=True)))
-    finished = list(_finished_stages_queryset(stages, finished_stage, finished_status))
-    all_monitor_running, monitor_finished = _collapse_multiome_monitor_rows(running_rows, finished)
-    monitor_running = [
-        row for row in all_monitor_running if not running_stage or row.stage == running_stage
-    ]
-    monitor_fastq_names = list(dict.fromkeys(row.sample.fastq_name for row in [*monitor_running, *finished]))
+    finished_stages = list(_finished_stages_queryset(stages, finished_stage, finished_status))
+    all_running_rows, finished_rows = _collapse_multiome_monitor_rows(running_rows, finished_stages)
+    monitor_running = [row for row in all_running_rows if not running_stage or row.stage == running_stage]
+    monitor_fastq_names = list(
+        dict.fromkeys(name for row in [*monitor_running, *finished_rows] for name in row.fastq_names)
+    )
     running_page_size = _page_size(request, "running_page_size")
     finished_page_size = _page_size(request, "finished_page_size")
     running_page = Paginator(monitor_running, running_page_size).get_page(request.GET.get("running_page"))
-    finished_page = Paginator(monitor_finished, finished_page_size).get_page(request.GET.get("finished_page"))
+    finished_page = Paginator(finished_rows, finished_page_size).get_page(request.GET.get("finished_page"))
 
     context = {
         "running": running_page,
@@ -92,9 +133,9 @@ def job_monitor(request):
             page_param="finished_page",
         ),
         "counts": {
-            "align": sum(1 for row in all_monitor_running if row.stage == Stage.ALIGN),
-            "post_align": sum(1 for row in all_monitor_running if row.stage == Stage.POST_ALIGN),
-            "total": len(all_monitor_running),
+            "align": sum(1 for row in all_running_rows if row.stage == Stage.ALIGN),
+            "post_align": sum(1 for row in all_running_rows if row.stage == Stage.POST_ALIGN),
+            "total": len(all_running_rows),
         },
         **_status_sync_context(),
         # The queue is this app's own, so these two stay scoped to the reader.
@@ -228,10 +269,10 @@ def _monitor_filter_options(request, *, options, param, page_param):
 
 
 def _collapse_multiome_monitor_rows(
-    running: Sequence[StageStatus], finished: Sequence[StageStatus]
-) -> tuple[list[StageStatus], list[StageStatus]]:
-    """Represent each MTX/ATX pair as one MTX monitor row."""
-    rows = [*running, *finished]
+    running: Sequence[StageStatus], finished_stages: Sequence[StageStatus]
+) -> tuple[list[MonitorRow], list[MonitorRow]]:
+    """Collapse MTX/ATX pairs and group each stage demand into one monitor row."""
+    rows = [*running, *finished_stages]
     prefixes_by_stage_and_load: dict[tuple[str, str], set[str]] = {}
     for row in rows:
         if row.sample.load_name and row.sample.batch_prefix in MULTIOME_PREFIXES:
@@ -242,6 +283,7 @@ def _collapse_multiome_monitor_rows(
         key for key, prefixes in prefixes_by_stage_and_load.items() if set(MULTIOME_PREFIXES) <= prefixes
     }
     selected: dict[tuple[str, str | int], StageStatus] = {}
+    names_by_key: dict[tuple[str, str | int], list[str]] = {}
     order: list[tuple[str, str | int]] = []
 
     for row in rows:
@@ -251,6 +293,7 @@ def _collapse_multiome_monitor_rows(
             if (row.stage, sample.load_name) in multiome_keys
             else ("sample", row.pk)
         )
+        names_by_key.setdefault(key, []).append(sample.fastq_name)
         current = selected.get(key)
         if current is None:
             selected[key] = row
@@ -266,10 +309,20 @@ def _collapse_multiome_monitor_rows(
         ):
             selected[key] = row
 
-    collapsed = [selected[key] for key in order]
+    collapsed = [MonitorRow(selected[key], list(dict.fromkeys(names_by_key[key]))) for key in order]
+    grouped: dict[tuple[str, str], MonitorRow] = {}
+    for row in collapsed:
+        key = (row.stage, row.demand_id)
+        current = grouped.get(key)
+        if current is None:
+            grouped[key] = row
+        else:
+            current.fastq_names.extend(name for name in row.fastq_names if name not in current.fastq_names)
+
+    grouped_rows = list(grouped.values())
     return (
-        [row for row in collapsed if row.status in RUNNING_OCS_STATUSES],
-        [row for row in collapsed if row.status in FINISHED_OCS_STATUSES],
+        [row for row in grouped_rows if row.status in RUNNING_OCS_STATUSES],
+        [row for row in grouped_rows if row.status in FINISHED_OCS_STATUSES],
     )
 
 

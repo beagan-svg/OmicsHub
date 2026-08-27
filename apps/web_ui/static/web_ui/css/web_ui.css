@@ -285,6 +285,16 @@ hr { border-color: var(--line); opacity: 1; }
   padding-left: 8px;
 }
 
+.monitor-fastq-details {
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.monitor-fastq-details summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+
 @media (max-width: 991.98px) {
   .navbar-nav--sections {
     align-items: stretch;

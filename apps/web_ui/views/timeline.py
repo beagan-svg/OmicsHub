@@ -372,7 +372,7 @@ def _collapse_timeline_stages(stages):
     running = [stage for stage in stages if stage.status in RUNNING_OCS_STATUSES]
     finished = [stage for stage in stages if stage.status in FINISHED_OCS_STATUSES]
     collapsed_running, collapsed_finished = _collapse_multiome_monitor_rows(running, finished)
-    return [*collapsed_running, *collapsed_finished]
+    return [row.stage_status for row in [*collapsed_running, *collapsed_finished]]
 
 
 def _timeline_bar(stage_status, window_start, window_end, now):

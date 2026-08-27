@@ -25,6 +25,23 @@ class TestJobMonitor:
         assert b"demand-123" in response.content
         assert response.context["counts"]["align"] == 1
 
+    def test_one_demand_with_multiple_fastqs_counts_as_one_running_job(self, logged_in, make_sample):
+        fastq_names = [f"BATCHED-{index}" for index in range(8)]
+        for fastq_name in fastq_names:
+            sample = make_sample(fastq_name, batch_name_from_vendor="RFX-38026")
+            sample.stage_statuses.create(
+                stage=Stage.ALIGN,
+                status="IN_PROGRESS",
+                demand_id="one-demand",
+            )
+
+        response = logged_in.get(reverse("web_ui:job-monitor"))
+
+        assert len(response.context["running"]) == 1
+        assert response.context["counts"] == {"align": 1, "post_align": 0, "total": 1}
+        assert response.context["running"][0].fastq_names == fastq_names
+        assert set(response.context["monitor_fastq_names"]) == set(fastq_names)
+
     def test_running_and_finished_stages_show_sample_metadata(self, logged_in, make_sample):
         running = make_sample(
             "RUNNING-METADATA",
@@ -254,9 +271,7 @@ class TestJobMonitor:
     def test_same_load_name_does_not_collapse_unrelated_rfx_samples(self, logged_in, make_sample):
         for name in ("RFX-1", "RFX-2"):
             sample = make_sample(name, batch_name_from_vendor="RFX-38026", load_name="SHARED-LOAD")
-            sample.stage_statuses.create(
-                stage=Stage.ALIGN, status="IN_PROGRESS", demand_id=f"{name}-demand"
-            )
+            sample.stage_statuses.create(stage=Stage.ALIGN, status="IN_PROGRESS", demand_id=f"{name}-demand")
 
         response = logged_in.get(reverse("web_ui:job-monitor"))
 

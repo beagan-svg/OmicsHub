@@ -32,7 +32,9 @@
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ request.get_full_path }}">
         {% for row in running %}
-        <input type="hidden" name="fastq_names" value="{{ row.sample.fastq_name }}">
+        {% for fastq_name in row.fastq_names %}
+        <input type="hidden" name="fastq_names" value="{{ fastq_name }}">
+        {% endfor %}
         {% endfor %}
         <button class="btn btn-sm btn-outline-secondary btn-icon" type="submit"
                 aria-label="Sync this page's running jobs from AWS" title="Sync this page's running jobs from AWS"
@@ -58,7 +60,15 @@
       <tbody>
         {% for row in running %}
         <tr>
-          <td class="mono">{{ row.sample.fastq_name }}</td>
+          <td class="mono">
+            {{ row.fastq_names|first }}{% if row.fastq_names|length > 1 %}
+            <span class="text-secondary">+ {{ row.fastq_names|length|add:"-1" }} more</span>
+            {% endif %}
+            <details class="monitor-fastq-details">
+              <summary>View {{ row.fastq_names|length }} fastq samples</summary>
+              {% for fastq_name in row.fastq_names %}<div>{{ fastq_name }}</div>{% endfor %}
+            </details>
+          </td>
           <td><span class="tag">{{ row.stage }}</span></td>
           <td><span class="tag tag--accent">{{ row.sample.modality }}</span></td>
           <td>{{ row.sample.organism_common_name }}</td>
@@ -118,7 +128,9 @@
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ request.get_full_path }}">
         {% for row in finished %}
-        <input type="hidden" name="fastq_names" value="{{ row.sample.fastq_name }}">
+        {% for fastq_name in row.fastq_names %}
+        <input type="hidden" name="fastq_names" value="{{ fastq_name }}">
+        {% endfor %}
         {% endfor %}
         <button class="btn btn-sm btn-outline-secondary btn-icon" type="submit"
                 aria-label="Sync this page's finished jobs from AWS" title="Sync this page's finished jobs from AWS"
@@ -147,7 +159,15 @@
       <tbody>
         {% for row in finished %}
         <tr>
-          <td class="mono">{{ row.sample.fastq_name }}</td>
+          <td class="mono">
+            {{ row.fastq_names|first }}{% if row.fastq_names|length > 1 %}
+            <span class="text-secondary">+ {{ row.fastq_names|length|add:"-1" }} more</span>
+            {% endif %}
+            <details class="monitor-fastq-details">
+              <summary>View {{ row.fastq_names|length }} fastq samples</summary>
+              {% for fastq_name in row.fastq_names %}<div>{{ fastq_name }}</div>{% endfor %}
+            </details>
+          </td>
           <td><span class="tag">{{ row.stage }}</span></td>
           <td><span class="tag tag--accent">{{ row.sample.modality }}</span></td>
           <td>{{ row.sample.organism_common_name }}</td>
