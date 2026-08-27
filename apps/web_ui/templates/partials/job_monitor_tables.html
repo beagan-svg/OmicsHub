@@ -61,13 +61,13 @@
         {% for row in running %}
         <tr>
           <td class="mono">
-            {{ row.fastq_names|first }}{% if row.fastq_names|length > 1 %}
+            {{ row.sample.fastq_name }}{% if row.show_fastq_details and row.fastq_names|length > 1 %}
             <span class="text-secondary">+ {{ row.fastq_names|length|add:"-1" }} more</span>
-            {% endif %}
             <details class="monitor-fastq-details">
               <summary>View {{ row.fastq_names|length }} fastq samples</summary>
               {% for fastq_name in row.fastq_names %}<div>{{ fastq_name }}</div>{% endfor %}
             </details>
+            {% endif %}
           </td>
           <td><span class="tag">{{ row.stage }}</span></td>
           <td><span class="tag tag--accent">{{ row.sample.modality }}</span></td>
@@ -160,13 +160,13 @@
         {% for row in finished %}
         <tr>
           <td class="mono">
-            {{ row.fastq_names|first }}{% if row.fastq_names|length > 1 %}
+            {{ row.sample.fastq_name }}{% if row.show_fastq_details and row.fastq_names|length > 1 %}
             <span class="text-secondary">+ {{ row.fastq_names|length|add:"-1" }} more</span>
-            {% endif %}
             <details class="monitor-fastq-details">
               <summary>View {{ row.fastq_names|length }} fastq samples</summary>
               {% for fastq_name in row.fastq_names %}<div>{{ fastq_name }}</div>{% endfor %}
             </details>
+            {% endif %}
           </td>
           <td><span class="tag">{{ row.stage }}</span></td>
           <td><span class="tag tag--accent">{{ row.sample.modality }}</span></td>

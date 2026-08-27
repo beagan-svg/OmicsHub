@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.ocs_integration import log_credentials
-from apps.sample_catalog.models import MULTIOME_PREFIXES, BatchPrefix, Stage, StageStatus
+from apps.sample_catalog.models import MULTIOME_PREFIXES, BatchPrefix, Sample, Stage, StageStatus
 from apps.submission_queue.models import QueueEntry
 
 from .common import (
@@ -40,10 +40,12 @@ class MonitorRow:
 
     stage_status: StageStatus
     fastq_names: list[str]
+    show_fastq_details: bool
+    display_sample: Sample
 
     @property
     def sample(self):
-        return self.stage_status.sample
+        return self.display_sample
 
     @property
     def stage(self):
@@ -271,16 +273,23 @@ def _monitor_filter_options(request, *, options, param, page_param):
 def _collapse_multiome_monitor_rows(
     running: Sequence[StageStatus], finished_stages: Sequence[StageStatus]
 ) -> tuple[list[MonitorRow], list[MonitorRow]]:
-    """Collapse MTX/ATX pairs and group each stage demand into one monitor row."""
+    """Collapse MTX/ATX pairs and group samples from the same demand."""
     rows = [*running, *finished_stages]
-    prefixes_by_stage_and_load: dict[tuple[str, str], set[str]] = {}
-    for row in rows:
-        if row.sample.load_name and row.sample.batch_prefix in MULTIOME_PREFIXES:
-            key = (row.stage, row.sample.load_name)
-            prefixes_by_stage_and_load.setdefault(key, set()).add(row.sample.batch_prefix)
-
-    multiome_keys = {
-        key for key, prefixes in prefixes_by_stage_and_load.items() if set(MULTIOME_PREFIXES) <= prefixes
+    load_names = {
+        row.sample.load_name
+        for row in rows
+        if row.sample.load_name and row.sample.batch_prefix in MULTIOME_PREFIXES
+    }
+    multiome_samples_by_load: dict[str, dict[str, Sample]] = {}
+    if load_names:
+        for sample in Sample.objects.filter(
+            load_name__in=load_names, batch_prefix__in=MULTIOME_PREFIXES
+        ).only("fastq_name", "load_name", "batch_prefix"):
+            multiome_samples_by_load.setdefault(sample.load_name, {})[sample.batch_prefix] = sample
+    multiome_samples_by_load = {
+        load_name: samples
+        for load_name, samples in multiome_samples_by_load.items()
+        if set(MULTIOME_PREFIXES) <= samples.keys()
     }
     selected: dict[tuple[str, str | int], StageStatus] = {}
     names_by_key: dict[tuple[str, str | int], list[str]] = {}
@@ -288,12 +297,12 @@ def _collapse_multiome_monitor_rows(
 
     for row in rows:
         sample = row.sample
-        key = (
-            (row.stage, sample.load_name)
-            if (row.stage, sample.load_name) in multiome_keys
-            else ("sample", row.pk)
-        )
+        pair_samples = multiome_samples_by_load.get(sample.load_name, {})
+        key = (row.stage, sample.load_name) if pair_samples else ("sample", row.pk)
         names_by_key.setdefault(key, []).append(sample.fastq_name)
+        for pair_sample in pair_samples.values():
+            if pair_sample.fastq_name not in names_by_key[key]:
+                names_by_key[key].append(pair_sample.fastq_name)
         current = selected.get(key)
         if current is None:
             selected[key] = row
@@ -309,7 +318,18 @@ def _collapse_multiome_monitor_rows(
         ):
             selected[key] = row
 
-    collapsed = [MonitorRow(selected[key], list(dict.fromkeys(names_by_key[key]))) for key in order]
+    collapsed = []
+    for key in order:
+        stage_status = selected[key]
+        pair_samples = multiome_samples_by_load.get(stage_status.sample.load_name, {})
+        collapsed.append(
+            MonitorRow(
+                stage_status,
+                list(dict.fromkeys(names_by_key[key])),
+                not pair_samples,
+                pair_samples.get(BatchPrefix.MTX, stage_status.sample),
+            )
+        )
     grouped: dict[tuple[str, str], MonitorRow] = {}
     for row in collapsed:
         key = (row.stage, row.demand_id)
@@ -318,6 +338,7 @@ def _collapse_multiome_monitor_rows(
             grouped[key] = row
         else:
             current.fastq_names.extend(name for name in row.fastq_names if name not in current.fastq_names)
+            current.show_fastq_details |= row.show_fastq_details
 
     grouped_rows = list(grouped.values())
     return (

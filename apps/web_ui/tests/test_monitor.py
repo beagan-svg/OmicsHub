@@ -25,7 +25,7 @@ class TestJobMonitor:
         assert b"demand-123" in response.content
         assert response.context["counts"]["align"] == 1
 
-    def test_one_demand_with_multiple_fastqs_counts_as_one_running_job(self, logged_in, make_sample):
+    def test_fastqs_in_one_demand_collapse_with_fastq_details(self, logged_in, make_sample):
         fastq_names = [f"BATCHED-{index}" for index in range(8)]
         for fastq_name in fastq_names:
             sample = make_sample(fastq_name, batch_name_from_vendor="RFX-38026")
@@ -40,6 +40,8 @@ class TestJobMonitor:
         assert len(response.context["running"]) == 1
         assert response.context["counts"] == {"align": 1, "post_align": 0, "total": 1}
         assert response.context["running"][0].fastq_names == fastq_names
+        assert response.context["running"][0].show_fastq_details
+        assert b"View 8 fastq samples" in response.content
         assert set(response.context["monitor_fastq_names"]) == set(fastq_names)
 
     def test_running_and_finished_stages_show_sample_metadata(self, logged_in, make_sample):
@@ -230,7 +232,7 @@ class TestJobMonitor:
             library_prep_method_name="10xMultX_ATAC",
             load_name="LOAD-PAIR",
         )
-        for sample in (gex, atac):
+        for sample in (atac, gex):
             sample.stage_statuses.create(
                 stage=Stage.ALIGN, status="IN_PROGRESS", demand_id=f"{sample.pk}-demand"
             )
@@ -240,8 +242,32 @@ class TestJobMonitor:
         assert len(response.context["running"]) == 1
         assert response.context["running"][0].sample == gex
         assert response.context["running"][0].sample.modality == "MTX"
+        assert response.context["running"][0].fastq_names == [atac.fastq_name, gex.fastq_name]
+        assert not response.context["running"][0].show_fastq_details
+        assert b"View 2 fastq samples" not in response.content
         assert response.context["counts"]["total"] == 1
         assert set(response.context["monitor_fastq_names"]) == {gex.fastq_name, atac.fastq_name}
+
+    def test_running_atx_row_uses_completed_mtx_partner(self, logged_in, make_sample):
+        gex = make_sample(
+            "GEX-COMPLETED",
+            batch_name_from_vendor="MTX-32013",
+            load_name="LOAD-RUNNING-PAIR",
+        )
+        atac = make_sample(
+            "ATAC-RUNNING",
+            batch_name_from_vendor="ATX-36013",
+            load_name="LOAD-RUNNING-PAIR",
+        )
+        gex.stage_statuses.create(stage=Stage.ALIGN, status="COMPLETED", demand_id="gex-demand")
+        atac.stage_statuses.create(stage=Stage.ALIGN, status="IN_PROGRESS", demand_id="atac-demand")
+
+        response = logged_in.get(reverse("web_ui:job-monitor"))
+
+        row = response.context["running"][0]
+        assert row.sample == gex
+        assert row.fastq_names == [atac.fastq_name, gex.fastq_name]
+        assert response.context["counts"]["total"] == 1
 
     def test_a_shared_load_collapses_regardless_of_library_prep_name(self, logged_in, make_sample):
         """Collapse an MTX/ATX pair even when the prep names differ."""
@@ -365,5 +391,5 @@ class TestJobMonitor:
             sample.stage_statuses.create(stage=Stage.ALIGN, status="IN_PROGRESS", demand_id=f"demand-{index}")
         logged_in.get(reverse("web_ui:job-monitor"))
 
-        with django_assert_num_queries(8):
+        with django_assert_num_queries(9):
             logged_in.get(reverse("web_ui:job-monitor"))

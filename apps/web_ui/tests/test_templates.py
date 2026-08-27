@@ -147,6 +147,7 @@ def test_job_monitor_demand_ids_are_copyable():
     assert '{% include "partials/copy_value.html" with value=row.demand_id label="Demand ID" %}' in text
     assert "data-copy-demand-id" not in text
     assert "navigator.clipboard.writeText" not in text
+    assert "monitor-fastq-details" in text
     assert ">Duration<" in text
 
 
