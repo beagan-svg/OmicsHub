@@ -215,14 +215,6 @@ Run these checks after the stack starts.
 4. **The queue and monitor pages.** Open `/queue/`, `/jobs/`, and `/failed/`. Confirm that
    they render and that existing entries retain their states.
 
-## Starting after a host reboot
-
-`restart: unless-stopped` restarts containers after the Docker daemon starts. On macOS,
-install the LaunchAgent in `deploy/launchd/` so Docker Desktop and this Compose project start
-after login.
-
-After an unattended reboot, run the readiness, worker-log, and page checks above.
-
 ## When a submission fails
 
 The worker records a submission as `SUBMITTED` only when `ocs` returns a successful response

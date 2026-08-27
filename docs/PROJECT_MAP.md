@@ -35,8 +35,6 @@ Reusable template fragments live in `apps/web_ui/templates/partials/` and use na
 
 `docker_tools/setup_docker.sh` is the supported setup and startup command. `docker_tools/healthcheck.py` is the web container readiness probe. `docker_tools/vendor_gcs.sh` prepares the OCS package sources used by the image build.
 
-`deploy/launchd/` contains an optional macOS LaunchAgent. It starts Docker Compose after Docker Desktop is available. It does not start Django or Celery directly.
-
 ## Configuration and build inputs
 
 `workflow_manifests/` contains an example workflow manifest for operators. A manifest is uploaded and stored in `WorkflowConfig` before it can drive submissions.
@@ -49,4 +47,4 @@ Reusable template fragments live in `apps/web_ui/templates/partials/` and use na
 
 ## Where new code belongs
 
-Put a change in the app that owns its data or external boundary. Put shared Django runtime behavior in `omicshub/`. Put Docker setup in `docker_tools/` or `compose.yaml`. Put host startup automation in `deploy/launchd/`. Put validation in the nearest app test package. Keep credentials, generated artifacts, local caches, and machine specific files out of Git.
+Put a change in the app that owns its data or external boundary. Put shared Django runtime behavior in `omicshub/`. Put Docker setup in `docker_tools/` or `compose.yaml`. Put validation in the nearest app test package. Keep credentials, generated artifacts, local caches, and machine specific files out of Git.

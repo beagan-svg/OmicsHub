@@ -274,7 +274,6 @@ Read docs/PROJECT_MAP.md for the directory ownership map:
 | apps/web_ui/ | Server-rendered pages, forms, templates, CSS, static assets, Data Locations queries, and browser tests. |
 | omicshub/ | Django settings, URLs, Celery setup, health checks, middleware, and logging. |
 | docker_tools/ | Docker setup, container health checks, and OCS package preparation. |
-| deploy/launchd/ | Optional macOS startup files for Docker Desktop. |
 | workflow_manifests/ | Example JSONC workflow manifests. |
 | vendor/gcs/ | Pinned OCS package source prepared before a Docker build. It is generated build input, not app code. |
 
@@ -448,26 +447,6 @@ Before using a VS Code port tunnel:
 
 The tunnel must terminate HTTPS. The Docker dashboard container can keep serving HTTP on its
 local port.
-
-## Start the stack at macOS login
-
-`deploy/launchd/` contains an optional macOS LaunchAgent. It waits for Docker Desktop and then
-runs Docker Compose. It does not start Django or Celery directly.
-
-Install it from the repository root:
-
-~~~bash
-sed "s|__OMICSHUB_DIR__|$PWD|g" deploy/launchd/org.alleninstitute.omicshub.stack.plist \
-  > ~/Library/LaunchAgents/org.alleninstitute.omicshub.stack.plist
-launchctl bootstrap gui/$UID ~/Library/LaunchAgents/org.alleninstitute.omicshub.stack.plist
-~~~
-
-Run or stop it manually:
-
-~~~bash
-launchctl kickstart -p gui/$UID/org.alleninstitute.omicshub.stack
-launchctl bootout gui/$UID/org.alleninstitute.omicshub.stack
-~~~
 
 ## Local development and tests
 
