@@ -2,7 +2,9 @@
 
 import calendar
 from datetime import date, datetime, timedelta
+from typing import Any
 
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDay, TruncMonth
@@ -25,6 +27,7 @@ TIMELINE_STAGE_LABELS = {
 }
 
 
+@login_required
 def job_timeline(request):
     """Show grouped workflow stages for a selected calendar range."""
     now = timezone.now()
@@ -37,6 +40,7 @@ def job_timeline(request):
         candidate_day = _timeline_date(request.GET.get("day"), now)
         if candidate_day.month == selected_date.month and candidate_day.year == selected_date.year:
             selected_day = candidate_day
+    context: dict[str, Any]
     if selected_view == "week":
         week_start = selected_date - timedelta(days=selected_date.weekday())
         window_start = timezone.make_aware(datetime.combine(week_start, datetime.min.time()))
@@ -71,12 +75,12 @@ def job_timeline(request):
         stages = stages.filter(status__in=TIMELINE_STATUS_GROUPS[selected_status])
 
     if selected_view == "week":
-        batch_rows = {}
+        batch_rows: dict[str, dict[str, list[StageStatus]]] = {}
         stage_rows = list(stages.order_by("started_at"))
         load_names = {
             stage_status.sample.load_name for stage_status in stage_rows if stage_status.sample.load_name
         }
-        mtx_batches = {}
+        mtx_batches: dict[str, str] = {}
         for load_name, batch_name in (
             Sample.objects.filter(load_name__in=load_names, batch_prefix=BatchPrefix.MTX)
             .order_by("batch_name_from_vendor")
@@ -91,7 +95,7 @@ def job_timeline(request):
             load_name = sample.load_name or sample.fastq_name
             batch_rows.setdefault(batch_name, {}).setdefault(load_name, []).append(stage_status)
 
-        timeline_groups = [
+        timeline_groups: list[dict[str, Any]] = [
             {
                 "batch": batch_name,
                 "fastq_count": len(
@@ -214,7 +218,7 @@ def _timeline_periods(stages, selected_view, selected_date, selected_day=None):
             )
         )
     }
-    by_period = {}
+    by_period: dict[date, dict[str, Any]] = {}
     for row in aggregate_rows:
         period = row["period"].date()
         period_data = by_period.setdefault(
@@ -291,7 +295,7 @@ def _timeline_day_batches(stages, selected_day):
         .distinct()
         .order_by("sample__batch_name_from_vendor", "sample__fastq_name", "stage")
     )
-    batches = {}
+    batches: dict[str, Any] = {}
     for batch_name, fastq_name, stage, status in rows:
         batch = batches.setdefault(batch_name or "Unassigned batch", {})
         sample = batch.setdefault(fastq_name, {})
@@ -348,7 +352,7 @@ def _period_status_items(stage_counts):
 
 
 def _period_status_summary(stage_counts):
-    summary = {}
+    summary: dict[str, list[dict[str, Any]]] = {}
     for item in _period_status_items(stage_counts):
         summary.setdefault(item["label"], []).append(item)
     return tuple({"label": label, "items": tuple(items)} for label, items in summary.items())
@@ -371,7 +375,9 @@ def _timeline_sample_row(fastq_names, stages, window_start, window_end, now):
 def _collapse_timeline_stages(stages):
     running = [stage for stage in stages if stage.status in RUNNING_OCS_STATUSES]
     finished = [stage for stage in stages if stage.status in FINISHED_OCS_STATUSES]
-    collapsed_running, collapsed_finished = _collapse_multiome_monitor_rows(running, finished)
+    collapsed_running, collapsed_finished = _collapse_multiome_monitor_rows(
+        running, finished, include_queue_status=False
+    )
     return [row.stage_status for row in [*collapsed_running, *collapsed_finished]]
 
 

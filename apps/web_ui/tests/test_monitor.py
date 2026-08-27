@@ -242,7 +242,7 @@ class TestJobMonitor:
         assert len(response.context["running"]) == 1
         assert response.context["running"][0].sample == gex
         assert response.context["running"][0].sample.modality == "MTX"
-        assert response.context["running"][0].fastq_names == [atac.fastq_name, gex.fastq_name]
+        assert response.context["running"][0].fastq_names == [gex.fastq_name, atac.fastq_name]
         assert not response.context["running"][0].show_fastq_details
         assert b"View 2 fastq samples" not in response.content
         assert response.context["counts"]["total"] == 1
@@ -266,7 +266,7 @@ class TestJobMonitor:
 
         row = response.context["running"][0]
         assert row.sample == gex
-        assert row.fastq_names == [atac.fastq_name, gex.fastq_name]
+        assert row.fastq_names == [gex.fastq_name, atac.fastq_name]
         assert response.context["counts"]["total"] == 1
 
     def test_a_shared_load_collapses_regardless_of_library_prep_name(self, logged_in, make_sample):

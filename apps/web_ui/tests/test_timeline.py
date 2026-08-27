@@ -61,7 +61,11 @@ class TestJobTimeline:
 
         response = logged_in.get(
             reverse("web_ui:job-timeline"),
-            {"view": "month", "date": timezone.localdate().isoformat()},
+            {
+                "view": "month",
+                "date": timezone.localdate().isoformat(),
+                "day": timezone.localdate().isoformat(),
+            },
         )
 
         today = next(

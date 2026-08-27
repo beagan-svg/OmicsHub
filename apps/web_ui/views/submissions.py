@@ -1,11 +1,13 @@
 """Render submissions pages and actions."""
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.sample_catalog import multiome_pairing as pairing
 from apps.sample_catalog.models import Sample, Stage
@@ -17,7 +19,7 @@ from apps.web_ui.forms import ConfigUploadForm, SubmissionForm
 from apps.workflow_engine import command_builder, config_loader, manifest_service, modality
 from apps.workflow_engine.models import WorkflowConfig
 
-from .common import OVERRIDABLE_FIELDS, PAGE_SIZE_OPTIONS, _page_size
+from .common import OVERRIDABLE_FIELDS, PAGE_SIZE_OPTIONS, _page_size, staff_required
 
 ARGUMENT_DESCRIPTIONS = {
     "--reference-names": (
@@ -56,11 +58,14 @@ STATUS_MAPPING_LABELS = {
 }
 
 
+@login_required
 def checkout(request):
     """Show the cart and the manifest used for its submissions."""
     return render(request, "checkout.html", _checkout_context(request))
 
 
+@login_required
+@require_POST
 def submit_review(request):
     """Build the plan showing commands, skips, and missing manifest values."""
     context = _submission_context(request)
@@ -71,6 +76,8 @@ def submit_review(request):
     )
 
 
+@login_required
+@require_POST
 def command_preview(request):
     """Build one fastq sample command from the submitted editor values."""
     config = _selected_config(request)
@@ -119,6 +126,8 @@ def command_preview(request):
     return JsonResponse({"error": "That sample is no longer part of this submission."}, status=409)
 
 
+@login_required
+@require_POST
 def submit_commands(request):
     """Build the confirmation view with exact commands and the OCS notification address."""
     context = _submission_context(request)
@@ -140,6 +149,8 @@ def _render_submission_step(request, context, *, partial, modal):
     return render(request, "checkout.html", {**context, "open_modal": modal})
 
 
+@login_required
+@require_POST
 def submit_confirm(request):
     """Queue the confirmed commands and remove queued samples from the cart."""
     context = _submission_context(request)
@@ -178,6 +189,8 @@ def submit_confirm(request):
     return redirect("web_ui:queue")
 
 
+@login_required
+@staff_required
 def configs(request):
     """Show settings for uploading and activating the submission manifest."""
     if request.method == "POST":
@@ -204,6 +217,9 @@ def configs(request):
     )
 
 
+@login_required
+@staff_required
+@require_POST
 def activate_config(request, pk):
     config = get_object_or_404(WorkflowConfig, pk=pk)
     config.activate()
@@ -266,6 +282,7 @@ def _command_config_rows(command_configs: list[dict]) -> list[dict]:
     return rows
 
 
+@login_required
 def config_detail(request, pk):
     """Show one uploaded config as raw text or organized sections."""
     config = get_object_or_404(WorkflowConfig, pk=pk)

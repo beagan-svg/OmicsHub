@@ -5,12 +5,14 @@ import logging
 
 from botocore.exceptions import BotoCoreError, ClientError
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Max
 from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import urlencode
+from django.views.decorators.http import require_POST
 
 from apps.sample_catalog import ocs_sync as sync
 from apps.sample_catalog.models import NOT_COMPLETED, BatchPrefix, Sample, Stage, StageStatus
@@ -41,11 +43,14 @@ from .common import (
 logger = logging.getLogger(__name__)
 
 
+@login_required
 def dashboard(request):
     """List fastq samples and start a submission."""
     return render(request, "dashboard.html", _dashboard_context(request))
 
 
+@login_required
+@require_POST
 def sync_samples(request):
     form = SyncForm(request.POST)
     if not form.is_valid():
@@ -69,6 +74,8 @@ def sync_samples(request):
     return redirect(f"{reverse('web_ui:dashboard')}?{query}")
 
 
+@login_required
+@require_POST
 def refresh_status(request):
     """Refresh the visible fastq samples' stage status from OCS."""
     # The POST body contains the rows currently shown. Deduplicate names before querying
@@ -92,6 +99,7 @@ def refresh_status(request):
     return redirect(_safe_next(request))
 
 
+@login_required
 def live_status(request):
     """Return current database status for the visible fastq samples."""
     fastq_names = request.GET.getlist("fastq_names")
@@ -109,6 +117,8 @@ def live_status(request):
     return JsonResponse({"rows": rows})
 
 
+@login_required
+@require_POST
 def set_columns(request):
     """Save the dashboard columns selected by the user."""
     scope = request.POST.get("scope", "samples")
@@ -124,6 +134,8 @@ def set_columns(request):
     return redirect(_safe_next(request))
 
 
+@login_required
+@require_POST
 def export_csv(request):
     """Return the current fastq sample selection as CSV.
 
@@ -166,6 +178,8 @@ def _export_value(sample, column):
     return f"'{text}" if text[:1] in ("=", "+", "-", "@") else text
 
 
+@login_required
+@require_POST
 def cart_add(request):
     """Add the selected dashboard samples to checkout.
 
@@ -248,6 +262,8 @@ def _cart_add_result(request, *, added=0, already=0, missing=0, error="", status
     return redirect(_safe_next(request))
 
 
+@login_required
+@require_POST
 def cart_remove(request):
     """Remove fastq samples from the cart."""
     fastq_names = request.POST.getlist("fastq_names")
@@ -257,6 +273,8 @@ def cart_remove(request):
     return redirect("web_ui:checkout")
 
 
+@login_required
+@require_POST
 def cart_clear(request):
     CartItem.objects.filter(user=request.user).delete()
     messages.success(request, "Cart emptied.")

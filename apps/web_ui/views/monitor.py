@@ -4,10 +4,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Exists, F, OuterRef, Q, Subquery
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.ocs_integration import log_credentials
 from apps.sample_catalog.models import MULTIOME_PREFIXES, BatchPrefix, Sample, Stage, StageStatus
@@ -42,6 +44,7 @@ class MonitorRow:
     fastq_names: list[str]
     show_fastq_details: bool
     display_sample: Sample
+    queued_here: bool
 
     @property
     def sample(self):
@@ -60,10 +63,6 @@ class MonitorRow:
         return self.stage_status.demand_id
 
     @property
-    def queued_here(self):
-        return self.stage_status.queued_here
-
-    @property
     def started_at(self):
         return self.stage_status.started_at
 
@@ -76,6 +75,7 @@ class MonitorRow:
         return self.stage_status.last_update_time
 
 
+@login_required
 def job_monitor(request):
     """Show OCS stages that are running or finished."""
     submitted_here = QueueEntry.objects.filter(demand_id=OuterRef("demand_id")).exclude(demand_id="")
@@ -99,7 +99,9 @@ def job_monitor(request):
     # OCS limits the number of running stages. Finished stages use a separate display cap.
     running_rows = list(running_stages.order_by(F("started_at").desc(nulls_last=True)))
     finished_stages = list(_finished_stages_queryset(stages, finished_stage, finished_status))
-    all_running_rows, finished_rows = _collapse_multiome_monitor_rows(running_rows, finished_stages)
+    all_running_rows, finished_rows = _collapse_multiome_monitor_rows(
+        running_rows, finished_stages, include_queue_status=True
+    )
     monitor_running = [row for row in all_running_rows if not running_stage or row.stage == running_stage]
     monitor_fastq_names = list(
         dict.fromkeys(name for row in [*monitor_running, *finished_rows] for name in row.fastq_names)
@@ -187,6 +189,8 @@ def _monitor_demand_is_visible(request, demand_id: str) -> bool:
     )
 
 
+@login_required
+@require_POST
 def job_credentials_submit(request):
     """Validate temporary AWS credentials and cache them for this session."""
     access_key = request.POST.get("access_key", "").strip()
@@ -199,12 +203,15 @@ def job_credentials_submit(request):
     return JsonResponse({"status": "valid", "account": identity.account, "arn": identity.arn})
 
 
+@login_required
+@require_POST
 def job_credentials_clear(request):
     """Drop this session's cached credentials, if any."""
     log_credentials.clear_credentials(request)
     return JsonResponse({"status": "cleared"})
 
 
+@login_required
 def job_credentials_status(request):
     """Return the cached credential status without making an AWS request."""
     identity = log_credentials.get_identity(request)
@@ -213,6 +220,7 @@ def job_credentials_status(request):
     return JsonResponse({"status": "valid", "account": identity.account, "arn": identity.arn})
 
 
+@login_required
 def job_demand_logs(request, demand_id):
     """Return recent container log lines for one demand, using this session's credentials.
 
@@ -271,7 +279,10 @@ def _monitor_filter_options(request, *, options, param, page_param):
 
 
 def _collapse_multiome_monitor_rows(
-    running: Sequence[StageStatus], finished_stages: Sequence[StageStatus]
+    running: Sequence[StageStatus],
+    finished_stages: Sequence[StageStatus],
+    *,
+    include_queue_status: bool,
 ) -> tuple[list[MonitorRow], list[MonitorRow]]:
     """Collapse MTX/ATX pairs and group samples from the same demand."""
     rows = [*running, *finished_stages]
@@ -298,47 +309,57 @@ def _collapse_multiome_monitor_rows(
     for row in rows:
         sample = row.sample
         pair_samples = multiome_samples_by_load.get(sample.load_name, {})
-        key = (row.stage, sample.load_name) if pair_samples else ("sample", row.pk)
-        names_by_key.setdefault(key, []).append(sample.fastq_name)
+        selected_key = (row.stage, sample.load_name) if pair_samples else ("sample", row.pk)
+        names_by_key.setdefault(selected_key, []).append(sample.fastq_name)
         for pair_sample in pair_samples.values():
-            if pair_sample.fastq_name not in names_by_key[key]:
-                names_by_key[key].append(pair_sample.fastq_name)
-        current = selected.get(key)
-        if current is None:
-            selected[key] = row
-            order.append(key)
+            if pair_sample.fastq_name not in names_by_key[selected_key]:
+                names_by_key[selected_key].append(pair_sample.fastq_name)
+        current_status = selected.get(selected_key)
+        if current_status is None:
+            selected[selected_key] = row
+            order.append(selected_key)
             continue
 
-        current_is_running = current.status in RUNNING_OCS_STATUSES
+        current_is_running = current_status.status in RUNNING_OCS_STATUSES
         row_is_running = row.status in RUNNING_OCS_STATUSES
-        current_is_mtx = current.sample.batch_prefix == BatchPrefix.MTX
+        current_is_mtx = current_status.sample.batch_prefix == BatchPrefix.MTX
         row_is_mtx = sample.batch_prefix == BatchPrefix.MTX
         if (row_is_running and not current_is_running) or (
             row_is_running == current_is_running and row_is_mtx and not current_is_mtx
         ):
-            selected[key] = row
+            selected[selected_key] = row
 
-    collapsed = []
-    for key in order:
-        stage_status = selected[key]
-        pair_samples = multiome_samples_by_load.get(stage_status.sample.load_name, {})
+    collapsed: list[MonitorRow] = []
+    for selection_key in order:
+        selected_status = selected[selection_key]
+        pair_samples = multiome_samples_by_load.get(selected_status.sample.load_name, {})
+        fastq_names = list(dict.fromkeys(names_by_key[selection_key]))
+        if pair_samples:
+            fastq_names = [
+                pair_samples[BatchPrefix.MTX].fastq_name,
+                *[name for name in fastq_names if name != pair_samples[BatchPrefix.MTX].fastq_name],
+            ]
         collapsed.append(
             MonitorRow(
-                stage_status,
-                list(dict.fromkeys(names_by_key[key])),
-                not pair_samples,
-                pair_samples.get(BatchPrefix.MTX, stage_status.sample),
+                stage_status=selected_status,
+                fastq_names=fastq_names,
+                show_fastq_details=not pair_samples,
+                display_sample=pair_samples.get(BatchPrefix.MTX, selected_status.sample),
+                queued_here=(selected_status.__dict__["queued_here"] if include_queue_status else False),
             )
         )
     grouped: dict[tuple[str, str], MonitorRow] = {}
-    for row in collapsed:
-        key = (row.stage, row.demand_id)
-        current = grouped.get(key)
-        if current is None:
-            grouped[key] = row
+    for monitor_row in collapsed:
+        grouped_key = (monitor_row.stage, monitor_row.demand_id)
+        current_row = grouped.get(grouped_key)
+        if current_row is None:
+            grouped[grouped_key] = monitor_row
         else:
-            current.fastq_names.extend(name for name in row.fastq_names if name not in current.fastq_names)
-            current.show_fastq_details |= row.show_fastq_details
+            current_row.fastq_names.extend(
+                name for name in monitor_row.fastq_names if name not in current_row.fastq_names
+            )
+            current_row.show_fastq_details |= monitor_row.show_fastq_details
+            current_row.queued_here |= monitor_row.queued_here
 
     grouped_rows = list(grouped.values())
     return (
@@ -347,6 +368,7 @@ def _collapse_multiome_monitor_rows(
     )
 
 
+@login_required
 def failed_jobs(request):
     owned = _owned(request).select_related("sample", "requested_by")
     entries = owned.filter(status__in=FAILED_STATUSES, demand_id="")
@@ -366,6 +388,8 @@ def failed_jobs(request):
     )
 
 
+@login_required
+@require_POST
 def retry_job(request, pk):
     """Return a retryable failed job to the pending queue."""
     entry = get_object_or_404(_owned(request), pk=pk)
@@ -386,6 +410,8 @@ def retry_job(request, pk):
     return redirect("web_ui:failed")
 
 
+@login_required
+@require_POST
 def delete_job(request, pk):
     entry = get_object_or_404(_owned(request), pk=pk)
     if entry.status not in FAILED_STATUSES:

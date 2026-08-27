@@ -9,11 +9,13 @@ from collections import deque
 from collections.abc import Buffer, Iterator
 
 from botocore.exceptions import BotoCoreError, ClientError
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import Http404, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.http import urlencode
+from django.views.decorators.http import require_POST
 
 from apps.ocs_integration import dynamodb, s3
 from apps.sample_catalog.models import NOT_COMPLETED, BatchPrefix, Sample, Stage, StageStatus
@@ -41,6 +43,7 @@ from .common import (
 logger = logging.getLogger(__name__)
 
 
+@login_required
 def data_locations(request):
     """List S3 locations for the visible fastq samples and OCS stages."""
     queryset = _sorted(_filtered_samples(request), request)
@@ -112,6 +115,8 @@ def data_locations(request):
     )
 
 
+@login_required
+@require_POST
 def export_data_locations_csv(request):
     """Return the selected or filtered Data Locations rows as CSV."""
     chosen = request.POST.getlist("fastq_names")
@@ -154,6 +159,7 @@ def export_data_locations_csv(request):
     return response
 
 
+@login_required
 def data_location_contents(request, sample_id: int, stage: str):
     """List one folder from a stage's registered S3 file store."""
     if stage not in Stage.values:
@@ -217,6 +223,8 @@ def data_location_contents(request, sample_id: int, stage: str):
     )
 
 
+@login_required
+@require_POST
 def download_data_location_files(request, sample_id: int, stage: str):
     """Stream selected S3 files and folders as one ZIP archive."""
     if stage not in Stage.values:

@@ -1,8 +1,10 @@
 """Render queue pages and actions."""
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.submission_queue import tasks
 from apps.submission_queue.models import QueueEntry
@@ -10,6 +12,7 @@ from apps.submission_queue.models import QueueEntry
 from .common import QUEUED_STATUSES, _owned
 
 
+@login_required
 def queue(request):
     entries = list(_owned(request).filter(status__in=QUEUED_STATUSES))
     next_entry = (
@@ -41,6 +44,8 @@ def _format_queue_wait(seconds: int) -> str:
     return f"{(seconds + 59) // 60} minutes"
 
 
+@login_required
+@require_POST
 def cancel(request, pk):
     entry = get_object_or_404(_owned(request), pk=pk)
     # Conditional on PENDING so the worker cannot claim it between the check and the write:
@@ -55,6 +60,8 @@ def cancel(request, pk):
     return redirect("web_ui:queue")
 
 
+@login_required
+@require_POST
 def toggle_queue_pause(request):
     """Pause or resume this user's pending queue entries."""
     request.user.queue_paused = not request.user.queue_paused
@@ -64,6 +71,8 @@ def toggle_queue_pause(request):
     return redirect("web_ui:queue")
 
 
+@login_required
+@require_POST
 def delete_queue_entry(request, pk):
     """Delete this user's pending queue entry without affecting OCS."""
     entry = get_object_or_404(_owned(request), pk=pk)
