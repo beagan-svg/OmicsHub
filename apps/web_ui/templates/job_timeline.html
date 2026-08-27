@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Job Timeline | OmicsHub{% endblock %}
+
+{% block page_head %}
+<div class="page-head">
+  <div class="page-head__text">
+    <h1>Job Timeline</h1>
+    <p class="page-head__desc">
+      Calendar view of all libraries processed.
+    </p>
+  </div>
+  <div class="page-head__actions">
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:job-monitor' %}">
+        <i class="bi bi-table" aria-hidden="true"></i> Monitor table
+      </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="card timeline-card" aria-label="Job timeline">
+  <div class="card-header timeline-toolbar">
+    <form class="timeline-filters" method="get">
+      <input type="hidden" name="view" value="{{ selected_view }}">
+      <fieldset class="timeline-view-switcher">
+        <legend class="visually-hidden">Timeline view</legend>
+        {% for option in view_options %}
+        <a href="?view={{ option }}&date={{ selected_date|date:'Y-m-d' }}&stage={{ selected_stage }}&status={{ selected_status }}" {% if selected_view == option %}aria-current="page"{% endif %}>{{ option|title }}</a>
+        {% endfor %}
+      </fieldset>
+      <label class="timeline-filter">
+        <span>Date</span>
+        <input class="form-control form-control-sm" type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+      </label>
+      <label class="timeline-filter">
+        <span>Stage</span>
+        <select class="form-select form-select-sm" name="stage">
+          <option value="">All stages</option>
+          {% for option in stage_options %}
+          <option value="{{ option.value }}" {% if selected_stage == option.value %}selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="timeline-filter">
+        <span>Status</span>
+        <select class="form-select form-select-sm" name="status">
+          <option value="">All statuses</option>
+          {% for option in status_options %}
+          <option value="{{ option.value }}" {% if selected_status == option.value %}selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="btn btn-sm btn-primary" type="submit">Apply filters</button>
+    </form>
+    <div class="timeline-toolbar__navigation">
+      <nav class="timeline-navigation" aria-label="Timeline date navigation">
+        <a class="btn btn-sm btn-outline-secondary" href="?view={{ selected_view }}&date={{ previous_date|date:'Y-m-d' }}&stage={{ selected_stage }}&status={{ selected_status }}" aria-label="Previous {{ selected_view }}">
+          <i class="bi bi-chevron-left" aria-hidden="true"></i>
+        </a>
+        <a class="btn btn-sm btn-outline-secondary" href="?view={{ selected_view }}&date={{ next_date|date:'Y-m-d' }}&stage={{ selected_stage }}&status={{ selected_status }}" aria-label="Next {{ selected_view }}">
+          <i class="bi bi-chevron-right" aria-hidden="true"></i>
+        </a>
+        <a class="btn btn-sm btn-outline-secondary" href="?view={{ selected_view }}&stage={{ selected_stage }}&status={{ selected_status }}">Today</a>
+      </nav>
+      <strong class="timeline-period-label">{{ period_label }}</strong>
+    </div>
+  </div>
+
+  {% if selected_view == 'week' %}
+  <div class="timeline-scroll">
+    <div class="timeline" style="--timeline-days: {{ timeline_days|length }}">
+      <div class="timeline__header">
+        <div class="timeline__label">Fastq Samples</div>
+        <div class="timeline__axis">
+          {% for day in timeline_days %}
+          <span>{{ day|date:"D M j" }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% for group in timeline_groups %}
+      <details class="timeline__group" {% if forloop.first %}open{% endif %}>
+        <summary class="timeline__group-heading">
+          <strong>{{ group.batch }}</strong>
+          <span>{{ group.fastq_count }} Fastq Sample{{ group.fastq_count|pluralize }}</span>
+        </summary>
+      {% for row in group.rows %}
+      <div class="timeline__row">
+        <div class="timeline__label">
+          {% if row.fastq_pair %}
+          <span class="mono timeline__fastq-name">{{ row.fastq_pair }}</span>
+          {% else %}
+          {% for fastq_name in row.fastq_names %}<span class="mono timeline__fastq-name">{{ fastq_name }}</span>{% endfor %}
+          {% endif %}
+        </div>
+        <div class="timeline__track">
+          {% for bar in row.bars %}
+          <span class="timeline__bar timeline__bar--{{ bar.status_class }} timeline__bar--stage-{{ bar.stage_class }}"
+             style="left: {{ bar.left }}%; width: {{ bar.width }}%;"
+             role="img"
+             aria-label="{{ row.sample }} · {{ bar.stage }} · {{ bar.duration }} · {{ bar.status|title }}"
+             title="{{ row.sample }} · {{ bar.stage }} · {{ bar.duration }} · {{ bar.status|title }}"></span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+      </details>
+      {% empty %}
+      <div class="empty-state py-5">
+        <i class="bi bi-bar-chart-steps" aria-hidden="true"></i>
+        <strong>No stages in this period.</strong>
+        <span>Completed stages need a recorded start time to appear here.</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="timeline-footer">
+    <span>{{ timeline_page.paginator.count }} Batch Name From Vendors</span>
+    <span>Page {{ timeline_page.number }} of {{ timeline_page.paginator.num_pages }}</span>
+    {% if timeline_page.has_previous %}<a href="?view=week&date={{ selected_date|date:'Y-m-d' }}&page={{ timeline_page.previous_page_number }}&stage={{ selected_stage }}&status={{ selected_status }}">Previous</a>{% endif %}
+    {% if timeline_page.has_next %}<a href="?view=week&date={{ selected_date|date:'Y-m-d' }}&page={{ timeline_page.next_page_number }}&stage={{ selected_stage }}&status={{ selected_status }}">Next</a>{% endif %}
+  </div>
+  {% else %}
+  {% if selected_view == 'month' %}
+  <div class="timeline-calendar" aria-label="Daily workflow summary">
+    <div class="timeline-calendar__weekday">Mon</div>
+    <div class="timeline-calendar__weekday">Tue</div>
+    <div class="timeline-calendar__weekday">Wed</div>
+    <div class="timeline-calendar__weekday">Thu</div>
+    <div class="timeline-calendar__weekday">Fri</div>
+    <div class="timeline-calendar__weekday">Sat</div>
+    <div class="timeline-calendar__weekday">Sun</div>
+    {% for cell in timeline_periods.cells %}
+    {% if cell %}
+    <a class="timeline-calendar__day" href="?view=month&date={{ selected_date|date:'Y-m-d' }}&day={{ cell.date|date:'Y-m-d' }}&stage={{ selected_stage }}&status={{ selected_status }}">
+      <strong>{{ cell.date|date:'j' }}</strong>
+      {% if cell.fastq_samples %}<span class="timeline-calendar__metric">{{ cell.fastq_samples }} Fastq Sample{{ cell.fastq_samples|pluralize }}</span>{% endif %}
+      {% if cell.batch_names %}<span class="timeline-calendar__metric">{{ cell.batch_names }} Batch Name From Vendor{{ cell.batch_names|pluralize }}</span>{% endif %}
+      <span class="timeline-calendar__statuses">
+      {% for item in cell.status_items %}
+        <span class="timeline-calendar__status timeline-calendar__status--{{ item.status }}" aria-label="{{ item.label }}: {{ item.count }} {{ item.status_label }}" title="{{ item.label }}: {{ item.count }} {{ item.status_label }}">
+          <span aria-hidden="true">{{ item.short_label }}</span> {{ item.count }}
+        </span>
+      {% endfor %}
+      </span>
+    </a>
+    {% else %}<div class="timeline-calendar__day timeline-calendar__day--empty" aria-hidden="true"></div>{% endif %}
+    {% endfor %}
+  </div>
+  {% for cell in timeline_periods.cells %}
+  {% if cell and selected_day == cell.date %}
+  <aside class="timeline-day-detail" aria-label="Details for {{ cell.date|date:'F j, Y' }}">
+    <div class="timeline-day-detail__header">
+      <strong>{{ cell.date|date:'F j, Y' }}</strong>
+      <span>{{ cell.fastq_samples }} Fastq Sample{{ cell.fastq_samples|pluralize }} across {{ cell.batch_names }} Batch Name From Vendor{{ cell.batch_names|pluralize }}</span>
+    </div>
+    <div class="timeline-day-detail__content">
+      <div class="timeline-day-detail__batches">
+        <h3>Batch Name From Vendor</h3>
+        <div class="timeline-day-detail__batch-grid">
+        {% for batch in cell.batches %}
+        <section>
+          <strong>{{ batch.name }}</strong>
+          <ul>
+            {% for fastq_sample in batch.fastq_samples %}
+            <li>
+              <span class="mono">{{ fastq_sample.name }}</span>
+              <span class="timeline-day-detail__stage-pills">
+                {% for stage in fastq_sample.stages %}
+                <span class="timeline-day-detail__stage-pill timeline-day-detail__stage-pill--{{ stage.status_class }}" aria-label="{{ stage.stage }}: {{ stage.status }}" title="{{ stage.stage }}: {{ stage.status }}">{{ stage.label }}</span>
+                {% endfor %}
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="timeline-day-detail__footer">
+      <div class="timeline-day-detail__statuses">
+        {% for group in cell.status_summary %}
+        <span class="timeline-day-detail__stage-summary">
+          <strong>{{ group.label }}:</strong>
+          {% for item in group.items %}<span class="timeline-day-detail__outcome timeline-day-detail__outcome--{{ item.status }}">{{ item.count }} {{ item.status_label }}</span>{% endfor %}
+        </span>
+        {% empty %}<span>No Alignment or Post-Alignment stages.</span>{% endfor %}
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" href="?view=week&date={{ cell.date|date:'Y-m-d' }}&stage={{ selected_stage }}&status={{ selected_status }}">Open week</a>
+    </div>
+  </aside>
+  {% endif %}
+  {% endfor %}
+  {% else %}
+  <div class="timeline-summary" aria-label="Monthly workflow summary">
+    {% for period in timeline_periods.months %}
+    <a class="timeline-summary__period" href="?view=month&date={{ period.date|date:'Y-m-d' }}&stage={{ selected_stage }}&status={{ selected_status }}">
+      <strong>{{ period.date|date:'F' }}</strong>
+      <span class="timeline-summary__metric">{{ period.fastq_samples }} Fastq Sample{{ period.fastq_samples|pluralize }}</span>
+      {% if period.batch_names %}<span class="timeline-summary__metric">{{ period.batch_names }} Batch Name From Vendor{{ period.batch_names|pluralize }}</span>{% endif %}
+      <span class="timeline-summary__statuses">
+        {% for item in period.status_items %}<span class="timeline-calendar__status timeline-calendar__status--{{ item.status }}" aria-label="{{ item.label }}: {{ item.count }} {{ item.status_label }}" title="{{ item.label }}: {{ item.count }} {{ item.status_label }}">{{ item.short_label }} {{ item.count }}</span>{% endfor %}
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
