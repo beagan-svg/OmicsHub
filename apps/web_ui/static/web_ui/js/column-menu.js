@@ -104,10 +104,18 @@
       const useAbove = below < chrome + MIN_LIST;
       panel.classList.toggle("column-menu__panel--above", useAbove);
       panel.style.maxHeight = `${Math.min(TALLEST, useAbove ? above : below)}px`;
-      const box = panel.getBoundingClientRect();
-      const nudge = box.left < GAP
-        ? GAP - box.left
-        : Math.min(0, window.innerWidth - GAP - box.right);
+      // Bootstrap's own dropdown-menu-end right-aligns the panel to the toggle, so its
+      // default (untransformed) left edge is the toggle's right edge minus the panel's
+      // own width. Reading panel.getBoundingClientRect() here instead would include the
+      // enter transition's transform (see .column-menu__panel's opacity/transform
+      // transition), which can measure a mid-transition box and under- or over-correct
+      // the nudge. offsetWidth is a layout property and ignores that transform entirely,
+      // same as the pinned branch below already relies on.
+      const rawLeft = anchor.right - panel.offsetWidth;
+      const rawRight = anchor.right;
+      const nudge = rawLeft < GAP
+        ? GAP - rawLeft
+        : Math.min(0, window.innerWidth - GAP - rawRight);
       if (nudge) panel.style.transform = `translateX(${Math.round(nudge)}px)`;
       return;
     }

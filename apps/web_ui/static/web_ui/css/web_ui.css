@@ -552,6 +552,24 @@ main.container-fluid {
 
 .table > tbody tr:last-child td { border-bottom: 0; }
 
+/* Row dividers sit at ~1.2:1 contrast against the panel in both themes -- a deliberate
+   subtle hairline, but on a table whose columns often repeat the same value down a
+   fastq/stage pair (Data Locations, the sample grid), the hairline is the only thing
+   telling rows apart and it is nearly invisible. Striping gives every other row its own
+   background instead, using the same --panel-sunk surface the rest of the app already
+   uses for a "recessed" area. Excludes an empty table: that single centered message row
+   should not get a stripe. */
+.table:not(:has(tbody .empty)) > tbody tr:nth-child(even) td {
+  background: var(--panel-sunk);
+}
+
+/* .table-pinned's sticky checkbox/first-data columns set their own solid background so
+   they stay opaque while the row scrolls under them (see the pin rules below); without
+   this they would stay --panel on a striped row and visibly not match the rest of it. */
+.table-pinned > tbody tr:nth-child(even) td:nth-child(-n + 2) {
+  background: var(--panel-sunk);
+}
+
 
 .table-sticky > thead th {
   position: sticky;
@@ -2844,6 +2862,18 @@ a:focus-visible {
 
   .timeline {
     min-width: 720px;
+  }
+
+  /* The column menu's translucent, blurred background (see .column-menu__panel above)
+     works as a small dropdown with page around it, but its own placement script opens it
+     "above" or "pinned" when there isn't room below -- on a phone that routinely means it
+     covers nearly the full screen height. At that size the blur just lets the table
+     underneath bleed through, reading as a stray floating panel rather than a menu. Fully
+     opaque and no blur here trades the glass look for a clean, legible sheet once it's
+     covering most of the viewport. */
+  .column-menu__panel {
+    background: var(--panel);
+    backdrop-filter: none;
   }
 }
 
