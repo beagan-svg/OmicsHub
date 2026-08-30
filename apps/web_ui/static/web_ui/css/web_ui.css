@@ -3372,3 +3372,53 @@ a:focus-visible {
 body.mobile-filter-sheet-open {
   overflow: hidden;
 }
+
+@media (max-width: 767.98px) {
+  /* Columns opens its own floating dropdown panel (see .column-menu__panel), positioned
+     by column-menu.js relative to the viewport. Once its toggle lives inside the mobile
+     filter sheet -- itself already a fixed, full-screen overlay -- that panel rendered as
+     a second overlay stacked on top of the sheet's own header instead of expanding in
+     place, the same disconnected-floating-box problem the sheet itself was built to fix.
+     Forcing it into normal flow here makes it expand inline in the sheet body instead,
+     the same way the More Filters disclosure already does. column-menu.js still sets
+     inline max-height/transform for its normal (non-sheet) floating use elsewhere, so
+     these need !important to actually win. */
+  .mobile-filter-sheet .column-menu__panel {
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    max-height: none !important;
+    width: 100%;
+    margin-top: 8px;
+    box-shadow: none;
+    border: 1px solid var(--line);
+  }
+
+  /* Footer polish: selection/cart actions and pagination read as one crowded row of
+     loose text and buttons without a clear line between "act on this page" and "move to
+     another page". A divider plus consistent gap gives each its own clearly separated
+     block instead. */
+  .dashboard-footer {
+    gap: 14px;
+  }
+
+  .dashboard-footer__pager {
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  #sample-selection-count {
+    font-size: var(--text-sm);
+  }
+
+  .locations-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .locations-footer > .pager {
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+}
