@@ -2706,6 +2706,11 @@ a:focus-visible {
   .navbar-toggler {
     border-color: var(--line-strong);
     padding: 8px;
+    /* The icon and padding alone land at ~36x39 -- under the 44px minimum every link in
+       the menu this opens already gets (.navbar .nav-link, below). The one control that
+       opens all of them should meet the same bar. */
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .navbar-toggler-icon {
