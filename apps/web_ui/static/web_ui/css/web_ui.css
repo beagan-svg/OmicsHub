@@ -295,7 +295,14 @@ hr { border-color: var(--line); opacity: 1; }
   cursor: pointer;
 }
 
-@media (max-width: 991.98px) {
+/* Matches .navbar-expand-xl in base.html: below that breakpoint the nav is a collapsible
+   hamburger panel (Bootstrap's own mechanism), so its sections stack vertically to fit
+   that panel. This used to read max-width: 991.98px, matching navbar-expand-lg -- between
+   992px and 1199px the panel was already collapsible per Bootstrap, but this rule's own
+   threshold was narrower, so .navbar-nav--sections' unconditional flex-direction: row (see
+   above) won out in that gap and the nav's real content (8+ links, theme toggle, admin,
+   username) didn't fit into one row, overflowing the page horizontally. */
+@media (max-width: 1199.98px) {
   .navbar-nav--sections {
     align-items: stretch;
     flex-direction: column;
