@@ -199,6 +199,10 @@ Stop the stack while retaining PostgreSQL data:
 docker compose --env-file .env.docker down
 ```
 
+Restart or redeploy the stack from [RELEASE.md](RELEASE.md#deploying). It covers the
+pre-restart check for an in-flight OCS submission, the restart order, and the health checks to
+run afterward.
+
 Do not add a second `ocs-submission-worker` or increase its concurrency. One worker with
 concurrency one is required to respect OCS capacity and configured submission spacing.
 
