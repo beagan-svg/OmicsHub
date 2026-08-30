@@ -3427,6 +3427,25 @@ body.mobile-filter-sheet-open {
     border-bottom: 1px solid var(--line);
   }
 
+  /* Flattens .dashboard-footer__cart-actions as a box (its own width: 100% is what forced
+     it, and everything inside it, onto its own line) so "0 in Cart" can share the first
+     line with the selection count, and Go to Checkout + Add Selected to Cart -- a
+     secondary action beside the actual primary one, not one more full-width row of its
+     own -- can share a second line instead of each claiming a whole row alone. Every row
+     this bar spends beyond those two is a row of table it covers below it. */
+  .mobile-footer-bar--fixed .dashboard-footer__cart-actions {
+    display: contents;
+  }
+
+  .mobile-footer-bar--fixed #go-to-checkout {
+    flex: 0 0 auto;
+  }
+
+  .mobile-footer-bar--fixed .dashboard-footer__cart-actions .btn-primary {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
   /* Rows per page travels into the Filters sheet instead (see table_pager.html's
      mobile_sheet_rows and column-menu's own place in that sheet) -- a page-size setting
      belongs with Columns, another "how the list looks" choice, not in a bar built for
@@ -3449,21 +3468,24 @@ body.mobile-filter-sheet-open {
     font-size: var(--text-sm);
   }
 
+  /* Shares its row with Clear selection instead of taking the full row alone: a single
+     compact button left by itself on an otherwise empty full-width line reads as broken,
+     not intentional, and stacking it under the summary made the bar taller than it needed
+     to be -- directly worse for how much of the table is left on screen below it. */
   #location-selection-summary {
     font-size: var(--text-sm);
-    width: 100%;
+    flex: 1 1 auto;
   }
 
   .locations-footer {
     gap: 10px;
+    justify-content: space-between;
   }
 
-  /* table-scroll's max-height already accounts for the header/toolbar chrome above it;
-     the fixed bar now covers the same amount of space at the bottom that its own height
-     (measured, since a cart confirmation message can add a line -- see
-     mobile-footer-bar.js) takes up, in place of the room an inline footer used to occupy
-     in normal flow. */
-  .table-scroll {
-    max-height: calc(100svh - 140px - var(--mobile-footer-bar-height, 0px));
-  }
+  /* table-scroll's max-height on a page with a fixed bar (Dashboard, Data Locations) is
+     set directly by mobile-footer-bar.js instead of here: it depends on this specific
+     page's real chrome height above the table and the bar's real height below it, neither
+     of which a flat `100svh minus a guessed constant` can account for reliably -- that
+     was the bug reports of the bar covering most of the table came from. Pages with
+     table-scroll but no fixed bar keep the plain calc() above. */
 }
