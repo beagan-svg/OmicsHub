@@ -212,7 +212,7 @@
     moved to the checkout page with the rest of the submission's options, because those are
     decisions about a submission rather than about browsing.
     {% endcomment %}
-    <div class="card-body is-toolbar dashboard-footer">
+    <div class="card-body is-toolbar dashboard-footer" data-mobile-footer-bar>
       <div class="dashboard-footer__left">
         <span class="text-secondary" id="sample-selection-count" aria-live="polite">0 Fastq Samples Selected</span>
         <div class="dashboard-footer__cart-actions">
@@ -243,7 +243,7 @@
       {% endcomment %}
       <span id="cart-feedback" aria-live="polite"></span>
       <div class="dashboard-footer__pager">
-        {% include "partials/table_pager.html" with pager_label="Sample pages" %}
+        {% include "partials/table_pager.html" with pager_label="Sample pages" mobile_sheet_rows=True %}
       </div>
     </div>
     {% endif %}

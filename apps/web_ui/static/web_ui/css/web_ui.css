@@ -3400,26 +3400,55 @@ body.mobile-filter-sheet-open {
     border: 1px solid var(--line);
   }
 
-  /* Footer polish: selection/cart actions and pagination read as one crowded row of
-     loose text and buttons without a clear line between "act on this page" and "move to
-     another page". A divider plus consistent gap gives each its own clearly separated
-     block instead. */
-  .dashboard-footer {
-    gap: 14px;
+  /* Pinned to the bottom of the screen (see mobile-footer-bar.js) rather than sitting at
+     the end of a long scrolling page -- the same reachable-without-scrolling selection bar
+     a native list view (Photos, Files) keeps while something is selected. Both footers get
+     the same shape here: the pager first (moving between pages is the one thing every
+     footer needs, regardless of what page-specific actions it has), a divider, then the
+     selection summary, then whatever actions this particular page adds below it. */
+  .mobile-footer-bar--fixed {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 900;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 24px -8px rgb(16 18 24 / 0.16);
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    gap: 10px;
   }
 
-  .dashboard-footer__pager {
-    padding-top: 14px;
-    border-top: 1px solid var(--line);
+  .dashboard-footer__pager,
+  .locations-footer > .pager {
+    order: -1;
+    width: 100%;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* Rows per page travels into the Filters sheet instead (see table_pager.html's
+     mobile_sheet_rows and column-menu's own place in that sheet) -- a page-size setting
+     belongs with Columns, another "how the list looks" choice, not in a bar built for
+     quick taps. With it gone the remaining range + prev/next comfortably share one row. */
+  .mobile-footer-bar--fixed .pager {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+  }
+
+  .mobile-footer-bar--fixed .pager__range {
+    order: 0;
+    width: auto;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   #sample-selection-count {
     font-size: var(--text-sm);
   }
 
-  /* Mirrors the dashboard footer's own shape one line up: a selection summary on its own
-     row, then a compact (not stretched -- Clear selection isn't the primary action the way
-     Add Selected to Cart is) action below it, then the pager set off by the same divider. */
   #location-selection-summary {
     font-size: var(--text-sm);
     width: 100%;
@@ -3429,9 +3458,12 @@ body.mobile-filter-sheet-open {
     gap: 10px;
   }
 
-  .locations-footer > .pager {
-    width: 100%;
-    padding-top: 14px;
-    border-top: 1px solid var(--line);
+  /* table-scroll's max-height already accounts for the header/toolbar chrome above it;
+     the fixed bar now covers the same amount of space at the bottom that its own height
+     (measured, since a cart confirmation message can add a line -- see
+     mobile-footer-bar.js) takes up, in place of the room an inline footer used to occupy
+     in normal flow. */
+  .table-scroll {
+    max-height: calc(100svh - 140px - var(--mobile-footer-bar-height, 0px));
   }
 }

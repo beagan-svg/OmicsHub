@@ -178,10 +178,10 @@
   </div>
 
   {% if page.paginator.count %}
-  <div class="card-body is-toolbar d-flex flex-wrap gap-2 align-items-center locations-footer">
+  <div class="card-body is-toolbar d-flex flex-wrap gap-2 align-items-center locations-footer" data-mobile-footer-bar>
     <span class="text-secondary" id="location-selection-summary"><span id="location-selection-count">0</span> selected</span>
     <button class="btn btn-sm btn-outline-secondary" type="button" id="clear-location-selection">Clear selection</button>
-    {% include "partials/table_pager.html" with pager_label="Data location pages" %}
+    {% include "partials/table_pager.html" with pager_label="Data location pages" mobile_sheet_rows=True %}
   </div>
   {% endif %}
 </div>

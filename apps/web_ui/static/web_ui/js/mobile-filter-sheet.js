@@ -23,15 +23,18 @@
   const trigger = document.querySelector("[data-mobile-filter-open]");
   const mq = window.matchMedia("(max-width: 767.98px)");
 
-  // Sheet order (Study Set/Stages, then Columns, then More Filters) is independent of the
-  // desktop toolbar's own DOM order, driven by each element's data-mobile-order instead of
-  // where it happens to sit in the template. Array.sort is stable, so elements sharing an
-  // order (Study Set and Stages both at "1") keep their original relative order.
-  const bodyItems = [...root.querySelectorAll('[data-mobile-move="sheet-body"]')].sort(
+  // Sheet order (Study Set/Stages, then Columns [and Rows per page, marked from the table
+  // pager below the table rather than the toolbar above it], then More Filters) is
+  // independent of the desktop toolbar's own DOM order, driven by each element's
+  // data-mobile-order instead of where it happens to sit in the template. Array.sort is
+  // stable, so elements sharing an order keep their original relative order. Queried from
+  // `document`, not `root` (the filter toolbar), since a marked element -- Rows per page --
+  // can live outside it, in the footer below the table.
+  const bodyItems = [...document.querySelectorAll('[data-mobile-move="sheet-body"]')].sort(
     (a, b) => Number(a.dataset.mobileOrder || 0) - Number(b.dataset.mobileOrder || 0),
   );
-  const footerItems = [...root.querySelectorAll('[data-mobile-move="sheet-footer"]')];
-  const toolbarItems = [...root.querySelectorAll('[data-mobile-move="toolbar"]')];
+  const footerItems = [...document.querySelectorAll('[data-mobile-move="sheet-footer"]')];
+  const toolbarItems = [...document.querySelectorAll('[data-mobile-move="toolbar"]')];
 
   // An advanced-filters disclosure panel travels with its own "More Filters" toggle,
   // found through the toggle's existing data-disclosure attribute rather than a second
