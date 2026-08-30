@@ -471,6 +471,16 @@ main.container-fluid {
   display: none;
 }
 
+/* An empty table is one unbroken row of prose (the hint text), and auto table layout
+   sizes a column to that text's unwrapped width rather than the container's width. On a
+   narrow screen that pushes the table wider than the viewport and forces a horizontal
+   scrollbar around a message that should just wrap. Fixed layout makes the single
+   remaining column fill the container instead, so the text wraps like normal prose. */
+.table:has(tbody .empty) {
+  table-layout: fixed;
+  width: 100%;
+}
+
 
 
 .table {
@@ -2766,7 +2776,14 @@ a:focus-visible {
     padding-inline: 12px;
   }
 
-  .card-body.is-toolbar > .row > [class*="col"] {
+  /* Only the search field (the one column with an explicit sm/lg width) needs the full
+     row: typing needs room. The col-auto controls (Study Set, More Filters, Clear, Apply
+     Filters, Columns, Export CSV) size to their own content and wrap via the row's
+     existing flex-wrap, so they sit two-plus to a line instead of one stacked control per
+     row -- the same toolbar a phone screen would otherwise turn into a wall of buttons
+     before any data is visible. */
+  .card-body.is-toolbar > .row > [class*="col-sm"],
+  .card-body.is-toolbar > .row > [class*="col-lg"] {
     width: 100%;
   }
 
@@ -2781,7 +2798,10 @@ a:focus-visible {
     -webkit-overflow-scrolling: touch;
   }
 
-  .table-responsive > .table {
+  /* Excludes an empty table: that one is a single message, not real columns, and should
+     wrap to the container width instead of forcing horizontal scroll (see the
+     table-layout: fixed rule for :has(tbody .empty) above). */
+  .table-responsive > .table:not(:has(tbody .empty)) {
     min-width: max-content;
   }
 
