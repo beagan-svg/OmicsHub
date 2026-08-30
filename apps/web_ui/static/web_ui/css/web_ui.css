@@ -3417,13 +3417,20 @@ body.mobile-filter-sheet-open {
     font-size: var(--text-sm);
   }
 
+  /* Mirrors the dashboard footer's own shape one line up: a selection summary on its own
+     row, then a compact (not stretched -- Clear selection isn't the primary action the way
+     Add Selected to Cart is) action below it, then the pager set off by the same divider. */
+  #location-selection-summary {
+    font-size: var(--text-sm);
+    width: 100%;
+  }
+
   .locations-footer {
-    flex-direction: column;
-    align-items: stretch;
     gap: 10px;
   }
 
   .locations-footer > .pager {
+    width: 100%;
     padding-top: 14px;
     border-top: 1px solid var(--line);
   }
