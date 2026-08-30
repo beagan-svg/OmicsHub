@@ -3419,53 +3419,68 @@ body.mobile-filter-sheet-open {
     gap: 10px;
   }
 
-  .dashboard-footer__pager,
-  .locations-footer > .pager {
-    order: -1;
-    width: 100%;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  /* Flattens .dashboard-footer__cart-actions as a box (its own width: 100% is what forced
-     it, and everything inside it, onto its own line) so "0 in Cart" can share the first
-     line with the selection count, and Go to Checkout + Add Selected to Cart -- a
-     secondary action beside the actual primary one, not one more full-width row of its
-     own -- can share a second line instead of each claiming a whole row alone. Every row
-     this bar spends beyond those two is a row of table it covers below it. */
-  .mobile-footer-bar--fixed .dashboard-footer__cart-actions {
-    display: contents;
-  }
-
-  .mobile-footer-bar--fixed #go-to-checkout {
-    flex: 0 0 auto;
-  }
-
-  .mobile-footer-bar--fixed .dashboard-footer__cart-actions .btn-primary {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
   /* Rows per page travels into the Filters sheet instead (see table_pager.html's
      mobile_sheet_rows and column-menu's own place in that sheet) -- a page-size setting
      belongs with Columns, another "how the list looks" choice, not in a bar built for
-     quick taps. With it gone the remaining range + prev/next comfortably share one row. */
+     quick taps. The "of 16,291" half of the range is dropped here too (the page count in
+     "1 / 326" already says as much, just more usefully): together they free enough width
+     for the pager to share its line with the selection summary instead of claiming a
+     whole row for itself -- the single biggest cost driving how little of the table a
+     four-row bar left on screen. */
   .mobile-footer-bar--fixed .pager {
+    order: 1;
+    flex: 0 1 auto;
     flex-wrap: nowrap;
-    justify-content: space-between;
+    width: auto;
+    gap: 6px;
   }
 
   .mobile-footer-bar--fixed .pager__range {
     order: 0;
     width: auto;
     text-align: left;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  .mobile-footer-bar--fixed .pager__range .text-secondary {
+    display: none;
+  }
+
+  /* Flattens .dashboard-footer__pager and .dashboard-footer__cart-actions as boxes (each
+     one's own width: 100% is what forced it, and everything inside it, onto its own line)
+     so the pager and "0 in Cart" can both share the selection count's line, and Go to
+     Checkout + Add Selected to Cart -- a secondary action beside the actual primary one,
+     not one more full-width row of its own -- can share a second line instead of each
+     claiming a whole row alone. Every row this bar spends beyond those two is a row of
+     table it covers below it. */
+  .mobile-footer-bar--fixed .dashboard-footer__pager,
+  .mobile-footer-bar--fixed .dashboard-footer__cart-actions,
+  .mobile-footer-bar--fixed .dashboard-footer__left {
+    display: contents;
+  }
+
+  /* With .dashboard-footer__left also flattened, its former children and the pager are
+     now all direct items of .dashboard-footer itself -- this is the flex container their
+     order values actually need to share to interleave, not the box .dashboard-footer__left
+     used to be. */
+  .mobile-footer-bar--fixed.dashboard-footer {
+    justify-content: space-between;
+  }
+
   #sample-selection-count {
+    order: 0;
     font-size: var(--text-sm);
+  }
+
+  .mobile-footer-bar--fixed #go-to-checkout {
+    order: 3;
+    flex: 0 0 auto;
+  }
+
+  .mobile-footer-bar--fixed .dashboard-footer__cart-actions .btn-primary {
+    order: 4;
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   /* Shares its row with Clear selection instead of taking the full row alone: a single

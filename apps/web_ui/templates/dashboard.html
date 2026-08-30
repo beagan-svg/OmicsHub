@@ -289,10 +289,18 @@ value returns the user to that view.
   const navCartCount = document.getElementById("nav-cart-count");
   const navCartBadge = document.getElementById("nav-cart-badge");
 
+  // Matches the breakpoint the mobile fixed footer bar itself switches on (see
+  // mobile-footer-bar.js). The short form exists only because the long one is part of why
+  // that bar needed four rows for what's otherwise a two-row native selection toolbar --
+  // desktop has the room to spare and keeps the fuller wording.
+  const mobileBarMq = window.matchMedia("(max-width: 767.98px)");
+
   const updateSelectionCount = () => {
     if (!selectionCount) return;
     const count = [...boxes()].filter((box) => box.checked).length;
-    selectionCount.textContent = `${count} Fastq Sample${count === 1 ? "" : "s"} Selected`;
+    selectionCount.textContent = mobileBarMq.matches
+      ? `${count} selected`
+      : `${count} Fastq Sample${count === 1 ? "" : "s"} Selected`;
     if (addToCart) {
       addToCart.disabled = count === 0;
       addToCart.title = count === 0 ? "Select at least one sample first" : "";
@@ -307,6 +315,7 @@ value returns the user to that view.
   if (selectionCount) {
     boxes().forEach((box) => box.addEventListener("change", updateSelectionCount));
     updateSelectionCount();
+    mobileBarMq.addEventListener("change", updateSelectionCount);
   }
 
   // --- adding to the cart ----------------------------------------------------------------
