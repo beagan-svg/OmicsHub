@@ -2805,6 +2805,19 @@ a:focus-visible {
     min-width: max-content;
   }
 
+  /* The config select, "Use this", and the view-config icon button don't fit in one row
+     on a phone. Without this, the flex row shrinks whichever child has the smallest
+     min-content -- the icon button -- down below a tappable width instead of wrapping.
+     Letting the select take its own full-width row first fixes that without touching the
+     buttons' sizing at all. */
+  .checkout-config-picker {
+    flex-wrap: wrap;
+  }
+
+  .checkout-config-picker .form-select {
+    flex: 1 1 100%;
+  }
+
   .table-scroll {
     max-height: calc(100svh - 260px);
   }
