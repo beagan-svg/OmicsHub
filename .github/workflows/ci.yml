@@ -82,9 +82,8 @@ jobs:
         # makemigrations would have written anything; --dry-run keeps it from writing.
         run: uv run python manage.py makemigrations --check --dry-run
 
-      - name: Check production settings
+      - name: Check staging and production settings
         env:
-          DJANGO_SETTINGS_MODULE: omicshub.settings.prod
           CREDENTIAL_ENCRYPTION_KEY: 2fPuizO90Xj1avGhT1E3AAVDfKZT1T1cgccHh5p_6a8=
           CACHE_URL: redis://localhost:6379/0
           ALLOWED_HOSTS: localhost
@@ -95,9 +94,13 @@ jobs:
           SECURE_HSTS_PRELOAD: "True"
           SESSION_COOKIE_SECURE: "True"
           CSRF_COOKIE_SECURE: "True"
-        # Use production settings with CI-only values. The deploy check validates settings
-        # and does not need a live database, AWS account, or Celery worker.
-        run: uv run python manage.py check --deploy
+        # The deploy check validates settings and does not need a live database, AWS
+        # account, or Celery worker.
+        run: |
+          ENVIRONMENT=staging DJANGO_SETTINGS_MODULE=omicshub.settings.staging \
+            uv run python manage.py check --deploy
+          ENVIRONMENT=production DJANGO_SETTINGS_MODULE=omicshub.settings.prod \
+            uv run python manage.py check --deploy
 
       - name: Type check
         run: uv run mypy apps omicshub docker_tools

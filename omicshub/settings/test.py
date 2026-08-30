@@ -7,6 +7,7 @@ os.environ.setdefault("DATABASE_URL", "postgres://omicshub:omicshub@localhost:54
 os.environ.setdefault("CELERY_BROKER_URL", "memory://")
 os.environ.setdefault("OCS_ENV_BASE", "test")
 os.environ.setdefault("OCS_AWS_REGION", "us-west-2")
+os.environ["ENVIRONMENT"] = "test"
 # Obviously-fake, valid-format Fernet key: real key material must never appear in test
 # settings, but Fernet(key) itself must not raise, so this is a deterministic throwaway.
 os.environ["CREDENTIAL_ENCRYPTION_KEY"] = "2fPuizO90Xj1avGhT1E3AAVDfKZT1T1cgccHh5p_6a8="
@@ -44,3 +45,5 @@ STORAGES = {
     **STORAGES,  # noqa: F405
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
+
+DEBUG = False

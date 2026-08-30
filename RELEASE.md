@@ -6,6 +6,21 @@ before the application processes start. The web process runs `collectstatic` bef
 
 Use these steps for the Compose stack. Run every application process in Docker.
 
+## Deployment environments
+
+Staging and production run the same Compose services and production security settings. Each
+environment must have its own host, `.env.docker`, PostgreSQL volume, Redis data, AWS profile,
+and OCS environment.
+
+```bash
+docker_tools/setup_docker.sh staging
+docker_tools/setup_docker.sh production
+```
+
+The first command is for the staging host. The second is for the production host. The setup
+script selects `omicshub.settings.staging` or `omicshub.settings.prod`, validates the environment,
+applies migrations, and starts the application processes.
+
 ## Environment
 
 The app reads the variables listed below from `env(...)` calls in `omicshub/settings/`.
@@ -37,7 +52,7 @@ These settings have defaults:
 | `AWS_SHARED_CREDENTIALS_FILE` | empty | the app-scoped credentials file; see the README |
 | `OCS_CLI_TIMEOUT` | `300` | seconds for one `ocs` call |
 | `CONN_MAX_AGE` | `60` | seconds a database connection is reused |
-| `LOG_VIEWER_CREDENTIAL_TTL_SECONDS` | `18000` | maximum cache lifetime for temporary log credentials |
+| `LOG_VIEWER_CREDENTIAL_TTL_SECONDS` | `28800` | maximum cache lifetime for temporary log credentials |
 | `SENTRY_DSN` | empty | enables Sentry when set |
 | `SENTRY_RELEASE` | `GIT_SHA` or empty | source revision reported to Sentry |
 | `ENVIRONMENT` | `production` | deployment name reported to Sentry |
@@ -83,11 +98,17 @@ The command prints zero when no submission is in flight. If it is not zero, wait
 current `ocs` call to finish. The next entry is claimed only after the previous entry's
 spacing period.
 
-Then run the setup command. It prepares the OCS packages, validates the environment, and
-starts the full stack.
+Deploy to staging first. It prepares the OCS packages, validates the environment, and starts
+the full stack with the same security settings used by production.
 
 ```bash
-docker_tools/setup_docker.sh
+docker_tools/setup_docker.sh staging
+```
+
+After the staging checks pass, run the production command on the production host:
+
+```bash
+docker_tools/setup_docker.sh production
 ```
 
 The Compose migration service exits successfully before the web process, workers, or Beat

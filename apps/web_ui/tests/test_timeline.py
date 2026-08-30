@@ -158,18 +158,24 @@ class TestJobTimeline:
             for cell in response.context["timeline_periods"]["cells"]
             if cell and cell["date"] == timezone.localdate()
         )
-        assert today["fastq_samples"] == 4
-        assert today["batch_names"] == 4
+        assert today["fastq_samples"] == 2
+        assert today["batch_names"] == 2
         assert [batch["name"] for batch in today["batches"]] == [
             "MTX-22096",
-            "ATX-26096",
-            "RFX-38025",
             "RFX-38026",
         ]
-        assert today["batches"][0]["fastq_samples"][0]["name"] == "NY-MX22096-1"
-        assert today["batches"][0]["fastq_samples"][0]["stages"][0]["label"] == "P"
-        assert today["batches"][2]["fastq_samples"][0]["name"] == "RFX-PAIR-1"
-        assert today["batches"][3]["fastq_samples"][0]["name"] == "RFX-1 + 1 more"
+        grouped_pair = today["batches"][0]["fastq_samples"][0]
+        assert grouped_pair["name"] == "NY-MX22096-1 + 2 more"
+        assert grouped_pair["fastq_names"] == (
+            "NY-MX22096-1",
+            "NY-AT26096-1",
+            "RFX-PAIR-1",
+        )
+        assert grouped_pair["stages"][0]["label"] == "P"
+
+        grouped_demand = today["batches"][1]["fastq_samples"][0]
+        assert grouped_demand["name"] == "RFX-1 + 1 more"
+        assert grouped_demand["fastq_names"] == ("RFX-1", "RFX-2")
 
     def test_year_view_has_one_card_per_month(self, logged_in):
         response = logged_in.get(

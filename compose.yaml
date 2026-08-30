@@ -21,6 +21,7 @@ x-app: &app
     AWS_DEFAULT_REGION: ${OCS_AWS_REGION}
     OCS_CLI_PATH: /opt/venv/bin/ocs
     DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-omicshub.settings.prod}
+    ENVIRONMENT: ${ENVIRONMENT:-production}
   depends_on:
     postgres:
       condition: service_healthy

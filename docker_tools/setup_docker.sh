@@ -5,6 +5,28 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env.docker"
 EXAMPLE_FILE="$ROOT_DIR/.env.docker.example"
 
+deployment_environment=${1:-production}
+if [ "$#" -gt 1 ]; then
+    echo "Usage: docker_tools/setup_docker.sh [staging|production]" >&2
+    exit 1
+fi
+
+case "$deployment_environment" in
+    staging)
+        DJANGO_SETTINGS_MODULE="omicshub.settings.staging"
+        ;;
+    production)
+        DJANGO_SETTINGS_MODULE="omicshub.settings.prod"
+        ;;
+    *)
+        echo "Environment must be staging or production." >&2
+        exit 1
+        ;;
+esac
+export DJANGO_SETTINGS_MODULE
+ENVIRONMENT="$deployment_environment"
+export ENVIRONMENT
+
 cd "$ROOT_DIR"
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -89,5 +111,5 @@ docker_tools/vendor_gcs.sh
 docker compose --env-file "$ENV_FILE" config --quiet
 docker compose --env-file "$ENV_FILE" up -d --build --wait
 
-echo "OmicsHub is running at http://127.0.0.1:$web_port"
+echo "OmicsHub $deployment_environment is running at http://127.0.0.1:$web_port"
 echo "Use 'docker compose --env-file .env.docker logs -f web-ui' to view web UI logs."

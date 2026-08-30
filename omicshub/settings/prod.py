@@ -1,3 +1,7 @@
+import os
+
+os.environ.setdefault("ENVIRONMENT", "production")
+
 from .base import *  # noqa: F403
 from .base import env
 
