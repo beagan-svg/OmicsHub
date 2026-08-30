@@ -74,13 +74,13 @@
                  placeholder="Search Fastq, Load, Batch Name" form="filter-form"
                  data-submit-on-enter data-submit-form="filter-form">
         </div>
-        <div class="col-auto" data-mobile-move="sheet-body">
+        <div class="col-auto" data-mobile-move="sheet-body" data-mobile-order="1">
           {% include "partials/study_set_filter.html" with filter_form_id="filter-form" %}
         </div>
         {% if selected_prefix %}
         <input type="hidden" name="batch_prefix" value="{{ selected_prefix }}" form="filter-form">
         {% endif %}
-        <div class="col-auto" data-mobile-move="sheet-body">
+        <div class="col-auto" data-mobile-move="sheet-body" data-mobile-order="3">
           {% comment %}
           Not Bootstrap's collapse: that one locks input for the length of its own
           transition, so a panel opened by mistake cannot be closed until it has finished
@@ -103,7 +103,7 @@
           <button class="btn btn-sm btn-primary" type="submit" form="filter-form">Apply Filters</button>
         </div>
 
-        <div class="col-auto ms-auto" data-mobile-move="sheet-body">
+        <div class="col-auto ms-auto" data-mobile-move="sheet-body" data-mobile-order="2">
           {% include "partials/column_menu.html" %}
         </div>
         <div class="col-auto" data-mobile-move="toolbar">

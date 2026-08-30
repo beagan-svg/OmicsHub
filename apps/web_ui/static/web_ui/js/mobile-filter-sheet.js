@@ -23,19 +23,26 @@
   const trigger = document.querySelector("[data-mobile-filter-open]");
   const mq = window.matchMedia("(max-width: 767.98px)");
 
-  const bodyItems = [...root.querySelectorAll('[data-mobile-move="sheet-body"]')];
+  // Sheet order (Study Set/Stages, then Columns, then More Filters) is independent of the
+  // desktop toolbar's own DOM order, driven by each element's data-mobile-order instead of
+  // where it happens to sit in the template. Array.sort is stable, so elements sharing an
+  // order (Study Set and Stages both at "1") keep their original relative order.
+  const bodyItems = [...root.querySelectorAll('[data-mobile-move="sheet-body"]')].sort(
+    (a, b) => Number(a.dataset.mobileOrder || 0) - Number(b.dataset.mobileOrder || 0),
+  );
   const footerItems = [...root.querySelectorAll('[data-mobile-move="sheet-footer"]')];
   const toolbarItems = [...root.querySelectorAll('[data-mobile-move="toolbar"]')];
 
   // An advanced-filters disclosure panel travels with its own "More Filters" toggle,
   // found through the toggle's existing data-disclosure attribute rather than a second
   // marker -- disclosure.js looks the panel up by id at click time regardless of where
-  // in the DOM either element lives, so moving both together is enough to keep it working.
-  bodyItems.slice().forEach((item) => {
-    const toggle = item.querySelector("[data-disclosure]");
+  // in the DOM either element lives, so moving both together (right after the toggle, so
+  // expanding it doesn't visually jump to the wrong spot) is enough to keep it working.
+  for (let i = bodyItems.length - 1; i >= 0; i -= 1) {
+    const toggle = bodyItems[i].querySelector("[data-disclosure]");
     const panel = toggle && document.getElementById(toggle.dataset.disclosure);
-    if (panel && !bodyItems.includes(panel)) bodyItems.push(panel);
-  });
+    if (panel && !bodyItems.includes(panel)) bodyItems.splice(i + 1, 0, panel);
+  }
 
   // Recorded once, before anything moves, so a real desktop resize (not just a phone
   // rotating) can put every element back exactly where the template rendered it.

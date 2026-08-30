@@ -3382,12 +3382,18 @@ body.mobile-filter-sheet-open {
      Forcing it into normal flow here makes it expand inline in the sheet body instead,
      the same way the More Filters disclosure already does. column-menu.js still sets
      inline max-height/transform for its normal (non-sheet) floating use elsewhere, so
-     these need !important to actually win. */
+     these need !important to actually win.
+
+     max-height stays bounded here (not none): .column-menu__body underneath is already
+     `flex: 1 1 auto; overflow-y: auto`, built to scroll internally within whatever height
+     the panel gives it -- same self-contained header/scrollable-list/footer shape as
+     Study Set's own menu (.study-filter-menu). Without a bound here the panel just grows
+     to fit every column instead, leaving nothing for that overflow to do. */
   .mobile-filter-sheet .column-menu__panel {
     position: static !important;
     inset: auto !important;
     transform: none !important;
-    max-height: none !important;
+    max-height: min(28rem, calc(100vh - 16rem)) !important;
     width: 100%;
     margin-top: 8px;
     box-shadow: none;
