@@ -154,12 +154,17 @@ If the queue is too slow, lower `spacing` in the config. Do not scale the worker
 
 ## Migrations that need care
 
-`apps/sample_catalog/migrations/0009_stagestatus_catalog_sta_stage_c0b808_idx.py` adds an
-index to `catalog_stagestatus` with a regular `AddIndex`. Review the lock time for this
-operation before applying it to a large production table.
+`apps/sample_catalog/migrations/0009_stagestatus_catalog_sta_stage_c0b808_idx.py` added an
+index to `catalog_stagestatus` with a regular `AddIndex`, which takes an ACCESS EXCLUSIVE lock
+for the length of the build. This migration is already applied on staging; confirm it is
+applied on production too before treating this as resolved everywhere.
 
-Review future migrations for table rewrites and locks on tables written by the scheduled
-status synchronization.
+`django.contrib.postgres` is not in `INSTALLED_APPS`, so this migration could not use
+`AddIndexConcurrently` to avoid the lock. Add that app and use `AddIndexConcurrently` (with
+`atomic = False` on the migration) for any future index on a table this size, especially
+`catalog_stagestatus` and other tables written by the scheduled status synchronization.
+Concurrent index builds only avoid the lock for adding an index; a column addition or other
+table rewrite on these tables still needs a reviewed maintenance window.
 
 ## Rolling back
 
