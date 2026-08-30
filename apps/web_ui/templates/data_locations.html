@@ -38,19 +38,25 @@
   </div>
 
   <div class="card-body is-toolbar">
-    <form method="get" class="row g-2 align-items-center" id="locations-filter-form">
+    <form method="get" class="row g-2 align-items-center" id="locations-filter-form" data-mobile-filter-root>
       <div class="col-sm-4 col-lg-3">
         <label class="visually-hidden" for="locations-search">Search Fastq, Load, Batch Name</label>
         <input type="search" name="fastq_name" id="locations-search" value="{{ search }}"
                class="form-control form-control-sm" placeholder="Search Fastq, Load, Batch Name" form="locations-filter-form"
                data-submit-on-enter data-submit-form="locations-filter-form">
       </div>
-      <div class="col-auto">
+      <div class="col-auto" data-mobile-move="sheet-body">
         {% include "partials/study_set_filter.html" with filter_form_id="locations-filter-form" %}
       </div>
-      <div class="col-auto">
+      <div class="col-auto" data-mobile-move="sheet-body">
         <label class="visually-hidden" for="locations-stage-filter">Stage</label>
-        <select name="location_stage" id="locations-stage-filter" class="form-select form-select-sm w-auto">
+        {% comment %}
+        Explicit form= (unlike a plain descendant field) so this keeps submitting with
+        locations-filter-form after mobile-filter-sheet.js moves it out of this <form>
+        element and into the mobile filter sheet, which lives elsewhere in the DOM.
+        {% endcomment %}
+        <select name="location_stage" id="locations-stage-filter" class="form-select form-select-sm w-auto"
+                form="locations-filter-form">
           <option value="">Stages: All</option>
           {% for stage in location_stages %}
           <option value="{{ stage.value }}" {% if selected_location_stage == stage.value %}selected{% endif %}>{{ stage.label }}</option>
@@ -58,27 +64,29 @@
         </select>
       </div>
       {% if selected_prefix %}<input type="hidden" name="batch_prefix" value="{{ selected_prefix }}">{% endif %}
-      <div class="col-auto">
+      <div class="col-auto" data-mobile-move="sheet-body">
         <button class="btn btn-sm btn-outline-secondary" type="button" data-disclosure="locations-advanced-filters"
                 aria-controls="locations-advanced-filters" aria-expanded="{% if filters_open %}true{% else %}false{% endif %}">
           <i class="bi bi-funnel" aria-hidden="true"></i> More Filters
           {% if active_filter_count %}<span class="count">{{ active_filter_count }}<span class="visually-hidden"> filters active</span></span>{% endif %}
         </button>
       </div>
-      <div class="col-auto"><a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:data-locations' %}">Clear</a></div>
-      <div class="col-auto">
+      <div class="col-auto" data-mobile-move="sheet-footer"><a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:data-locations' %}">Clear</a></div>
+      <div class="col-auto" data-mobile-move="sheet-footer">
         <button class="btn btn-sm btn-primary" type="submit" form="locations-filter-form">Apply Filters</button>
       </div>
-      <div class="col-auto ms-auto">
+      <div class="col-auto ms-auto" data-mobile-move="sheet-body">
         {% include "partials/column_menu.html" with form_id="location-columns-form" %}
       </div>
-      <div class="col-auto">
+      <div class="col-auto" data-mobile-move="toolbar">
         <button class="btn btn-sm btn-outline-secondary" type="submit" form="locations-export-form"
                 data-bs-toggle="tooltip" title="Export selected samples, or every sample in this tab and filter">
           <i class="bi bi-download" aria-hidden="true"></i> Export CSV
         </button>
       </div>
     </form>
+
+    {% include "partials/mobile_filter_sheet.html" %}
 
     {% include "partials/sample_advanced_filters.html" with filter_form_id="locations-filter-form" disclosure_id="locations-advanced-filters" id_prefix="locations-" %}
   </div>

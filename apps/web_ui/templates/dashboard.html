@@ -66,7 +66,7 @@
     </div>
 
     <div class="card-body is-toolbar">
-      <div class="row g-2 align-items-center">
+      <div class="row g-2 align-items-center" data-mobile-filter-root>
         <div class="col-sm-4 col-lg-3">
           <label class="visually-hidden" for="fastq-search">Search Fastq, Load, Batch Name</label>
           <input type="search" name="fastq_name" id="fastq-search" value="{{ search }}"
@@ -74,13 +74,13 @@
                  placeholder="Search Fastq, Load, Batch Name" form="filter-form"
                  data-submit-on-enter data-submit-form="filter-form">
         </div>
-        <div class="col-auto">
+        <div class="col-auto" data-mobile-move="sheet-body">
           {% include "partials/study_set_filter.html" with filter_form_id="filter-form" %}
         </div>
         {% if selected_prefix %}
         <input type="hidden" name="batch_prefix" value="{{ selected_prefix }}" form="filter-form">
         {% endif %}
-        <div class="col-auto">
+        <div class="col-auto" data-mobile-move="sheet-body">
           {% comment %}
           Not Bootstrap's collapse: that one locks input for the length of its own
           transition, so a panel opened by mistake cannot be closed until it has finished
@@ -96,17 +96,17 @@
             {% if active_filter_count %}<span class="count">{{ active_filter_count }}<span class="visually-hidden"> filters active</span></span>{% endif %}
           </button>
         </div>
-        <div class="col-auto">
+        <div class="col-auto" data-mobile-move="sheet-footer">
           <a class="btn btn-sm btn-outline-secondary" href="{% url 'web_ui:dashboard' %}">Clear</a>
         </div>
-        <div class="col-auto">
+        <div class="col-auto" data-mobile-move="sheet-footer">
           <button class="btn btn-sm btn-primary" type="submit" form="filter-form">Apply Filters</button>
         </div>
 
-        <div class="col-auto ms-auto">
+        <div class="col-auto ms-auto" data-mobile-move="sheet-body">
           {% include "partials/column_menu.html" %}
         </div>
-        <div class="col-auto">
+        <div class="col-auto" data-mobile-move="toolbar">
           <button class="btn btn-sm btn-outline-secondary" type="submit"
                   formaction="{% url 'web_ui:export' %}?{{ request.GET.urlencode }}"
                   data-bs-toggle="tooltip"
@@ -115,6 +115,8 @@
           </button>
         </div>
       </div>
+
+      {% include "partials/mobile_filter_sheet.html" %}
 
       {% include "partials/sample_advanced_filters.html" with filter_form_id="filter-form" disclosure_id="advanced-filters" id_prefix="" %}
     </div>

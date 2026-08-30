@@ -3201,3 +3201,174 @@ a:focus-visible {
 .job-log-viewer__msg {
   color: #d7dbe2;
 }
+
+
+/* ==========================================================================
+   Mobile filter sheet
+
+   Consolidates a page's scattered filter/action controls into one bottom
+   sheet on a phone (see mobile-filter-sheet.js). Every rule here is scoped
+   under the same 767.98px breakpoint the rest of the mobile CSS uses, or is
+   display:none outside it by default -- desktop's toolbar is untouched.
+   ========================================================================== */
+
+.mobile-filter-trigger-row {
+  display: none;
+}
+
+.mobile-filter-sheet {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .mobile-filter-trigger-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .mobile-filter-trigger-row .btn {
+    min-height: 44px;
+  }
+
+  .mobile-filter-trigger {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  /* Export CSV is the one control that stays in the toolbar instead of moving into the
+     sheet (see mobile-filter-sheet.js): it's a one-off export action, not a filter
+     setting, so burying it a tap deeper inside the filters workflow would only slow down
+     the one thing it does. It sits beside Filters at a fixed, compact width instead of
+     stretching like the trigger does. */
+  .mobile-filter-trigger-row [data-mobile-move="toolbar"] {
+    flex: 0 0 auto;
+  }
+
+  .mobile-filter-sheet:not([hidden]) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1060;
+  }
+
+  .mobile-filter-sheet__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 0.5);
+    opacity: 1;
+    transition: opacity var(--t-panel) var(--ease-out);
+  }
+
+  .mobile-filter-sheet.is-closing .mobile-filter-sheet__backdrop {
+    opacity: 0;
+  }
+
+  @starting-style {
+    .mobile-filter-sheet:not([hidden]) .mobile-filter-sheet__backdrop {
+      opacity: 0;
+    }
+  }
+
+  .mobile-filter-sheet__panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border-radius: 16px 16px 0 0;
+    box-shadow: var(--shadow-modal);
+    transform: translateY(0);
+    transition: transform var(--t-panel) var(--ease-out);
+  }
+
+  .mobile-filter-sheet.is-closing .mobile-filter-sheet__panel {
+    transform: translateY(100%);
+  }
+
+  @starting-style {
+    .mobile-filter-sheet:not([hidden]) .mobile-filter-sheet__panel {
+      transform: translateY(100%);
+    }
+  }
+
+  .mobile-filter-sheet__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+  }
+
+  .mobile-filter-sheet__head h2 {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+
+  .mobile-filter-sheet__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--panel-sunk);
+    color: var(--ink-secondary);
+  }
+
+  .mobile-filter-sheet__body {
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    flex: 1 1 auto;
+  }
+
+  /* Everything relocated here rendered as a flex/grid item in the desktop toolbar's row
+     (.col-auto etc.); a plain div has no such context, so each becomes a normal block
+     that this stretches to the sheet's full width, and its own interactive control
+     (button, select, dropdown) along with it. */
+  .mobile-filter-sheet__body > * {
+    width: 100%;
+  }
+
+  .mobile-filter-sheet__body .btn,
+  .mobile-filter-sheet__body .form-select,
+  .mobile-filter-sheet__body .dropdown,
+  .mobile-filter-sheet__body .dropdown-toggle {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .mobile-filter-sheet__body .disclosure {
+    width: 100%;
+  }
+
+  .mobile-filter-sheet__footer {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    flex: 0 0 auto;
+  }
+
+  .mobile-filter-sheet__footer > * {
+    flex: 1 1 0;
+  }
+
+  .mobile-filter-sheet__footer .btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+body.mobile-filter-sheet-open {
+  overflow: hidden;
+}

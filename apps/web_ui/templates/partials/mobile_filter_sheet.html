@@ -1,0 +1,30 @@
+{% comment %}
+Mobile-only "Filters" entry point and the bottom sheet its button opens. mobile-filter-sheet.js
+relocates the calling page's own filter controls into data-mobile-filter-body/-footer at
+runtime -- this partial only renders the trigger, the empty sheet shell, and (on the toolbar
+row) the slot Export CSV moves into. Desktop never sees any of this: everything here is
+display:none above the mobile breakpoint (see .mobile-filter-sheet and
+.mobile-filter-trigger in web_ui.css), and nothing is relocated unless that breakpoint matches.
+{% endcomment %}
+<div class="mobile-filter-trigger-row" data-mobile-filter-toolbar-slot>
+  <button type="button" class="btn btn-sm btn-outline-secondary mobile-filter-trigger"
+          data-mobile-filter-open aria-haspopup="dialog" aria-controls="mobile-filter-sheet"
+          aria-expanded="false">
+    <i class="bi bi-funnel" aria-hidden="true"></i> Filters
+    {% if active_filter_count %}<span class="count">{{ active_filter_count }}<span class="visually-hidden"> filters active</span></span>{% endif %}
+  </button>
+</div>
+
+<div class="mobile-filter-sheet" id="mobile-filter-sheet" hidden>
+  <div class="mobile-filter-sheet__backdrop" data-mobile-filter-close></div>
+  <div class="mobile-filter-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="mobile-filter-sheet-title">
+    <div class="mobile-filter-sheet__head">
+      <h2 id="mobile-filter-sheet-title">Filters</h2>
+      <button type="button" class="mobile-filter-sheet__close" data-mobile-filter-close aria-label="Close filters">
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="mobile-filter-sheet__body" data-mobile-filter-body></div>
+    <div class="mobile-filter-sheet__footer" data-mobile-filter-footer></div>
+  </div>
+</div>
