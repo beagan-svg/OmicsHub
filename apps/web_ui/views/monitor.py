@@ -170,7 +170,7 @@ def _finished_stages_queryset(stages, finished_stage, finished_status):
 
 
 def _monitor_demand_is_visible(request, demand_id: str) -> bool:
-    """Return whether the log viewer may fetch this demand's logs."""
+    """Return whether the log viewer may fetch logs for the demand."""
     stages = StageStatus.objects.exclude(demand_id="")
     if stages.filter(demand_id=demand_id, status__in=RUNNING_OCS_STATUSES).exists():
         return True
@@ -192,7 +192,7 @@ def _monitor_demand_is_visible(request, demand_id: str) -> bool:
 @login_required
 @require_POST
 def job_credentials_submit(request):
-    """Validate temporary AWS credentials and cache them for this session."""
+    """Validate temporary AWS credentials and cache them for the request session."""
     access_key = request.POST.get("access_key", "").strip()
     secret_key = request.POST.get("secret_key", "").strip()
     session_token = request.POST.get("session_token", "").strip()
@@ -206,7 +206,7 @@ def job_credentials_submit(request):
 @login_required
 @require_POST
 def job_credentials_clear(request):
-    """Drop this session's cached credentials, if any."""
+    """Drop cached credentials for the request session, if present."""
     log_credentials.clear_credentials(request)
     return JsonResponse({"status": "cleared"})
 
@@ -350,7 +350,11 @@ def _collapse_multiome_monitor_rows(
         )
     grouped: dict[tuple[str, str], MonitorRow] = {}
     for monitor_row in collapsed:
-        grouped_key = (monitor_row.stage, monitor_row.demand_id)
+        grouped_key = (
+            (monitor_row.stage, monitor_row.demand_id)
+            if monitor_row.demand_id
+            else (monitor_row.stage, f"sample:{monitor_row.stage_status.pk}")
+        )
         current_row = grouped.get(grouped_key)
         if current_row is None:
             grouped[grouped_key] = monitor_row

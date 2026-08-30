@@ -162,7 +162,7 @@ def build_plan(
     """Build one alignment or post-alignment plan for each fastq sample.
 
     `modality` is the user's confirmed choice and applies to every sample; without it the
-    modality is inferred from each sample's vendor batch name. `force` is a stage value
+    modality is inferred from each sample's batch name from the vendor. `force` is a stage value
     ("align" or "post-align") that overrides the skip rules for that stage.
 
     `command_config_choices` maps (stage, library prep) to the name of a command config the
@@ -187,7 +187,7 @@ def build_plan(
 
     # Two samples sharing a load_name are one multiome job, aligned together , nothing
     # about their library prep decides that. load_name alone is not quite enough on its
-    # own either: 262 load_names in the real mirror are shared by unrelated samples, so a
+    # own either: 262 load_names in the real DynamoDB data are shared by unrelated samples, so a
     # group only counts as a real pair once it actually has one MTX and one ATX side, the
     # one thing about a load_name's samples that a coincidence would not produce. Callers
     # pass every sample in the job; the dashboard and the API each expand the selection

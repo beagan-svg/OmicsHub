@@ -12,7 +12,7 @@ class StageStatusInline(admin.TabularInline):
 
 @admin.register(Sample)
 class SampleAdmin(admin.ModelAdmin):
-    """Prevent edits because this table mirrors OCS data."""
+    """Prevent edits because this table stores synced OCS data."""
 
     list_display = [
         "fastq_name",
@@ -27,7 +27,7 @@ class SampleAdmin(admin.ModelAdmin):
 
     # Half a million rows. Django otherwise runs a second, unfiltered COUNT(*) on every
     # filtered or searched page, only to print "(N total)" beside the result count. A full
-    # scan of the whole mirror for a number nobody acts on. The paginator's own count still
+    # scan of the whole local database for a number nobody acts on. The paginator's own count still
     # runs, so the page numbers stay real.
     show_full_result_count = False
 
@@ -38,7 +38,7 @@ class SampleAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        # Deleting a mirror row achieves nothing a re-sync would not undo, and queue
+        # Deleting a synced row achieves nothing a re-sync would not undo, and queue
         # entries reference it. The only effect would be a ProtectedError or, worse,
         # confusion about where a sample went.
         return False

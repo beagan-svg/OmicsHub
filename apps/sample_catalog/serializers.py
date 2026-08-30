@@ -29,7 +29,7 @@ class SampleSerializer(serializers.ModelSerializer):
 
 
 class SyncRequestSerializer(serializers.Serializer):
-    """Validate a request for one vendor batch or a set of fastq names."""
+    """Validate a request for one batch name from the vendor or fastq names."""
 
     batch_name_from_vendor = serializers.CharField(required=False)
     fastq_names = serializers.ListField(child=serializers.CharField(), required=False)

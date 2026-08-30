@@ -38,6 +38,7 @@ from .common import (
     _sorted,
     _status_sync_context,
     _study_options,
+    export_csv_filename,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,7 @@ def refresh_status(request):
     try:
         sync.sync_stage_statuses(samples)
     except (BotoCoreError, ClientError) as error:
-        # The mirror is still there and still readable; only this refresh failed.
+        # The local data is still readable; only this refresh failed.
         logger.warning("Live status refresh failed: %s", error)
         messages.error(request, "Could not reach OCS. The table still shows the last sweep.")
     else:
@@ -140,7 +141,7 @@ def export_csv(request):
     """Return the current fastq sample selection as CSV.
 
     Streams, and iterates the queryset in chunks, because this is pointed at the whole
-    mirror: buffering hundreds of thousands of rows into one response is how an export
+    local data: buffering hundreds of thousands of rows into one response is how an export
     endpoint takes the web worker down with it.
 
     Exports the columns the user has chosen, so the file matches the table they are
@@ -161,7 +162,7 @@ def export_csv(request):
         for sample in samples.iterator(chunk_size=2000):
             yield writer.writerow([_export_value(sample, column) for column in visible])
 
-    filename = "omicshub-samples.csv"
+    filename = export_csv_filename()
     response = StreamingHttpResponse(rows(), content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
@@ -171,7 +172,7 @@ def _export_value(sample, column):
     """Return one cell as spreadsheet text.
 
     A leading "=", "+", "-" or "@" is treated as a formula by Excel, so those are prefixed
-    to stop a vendor batch name executing when the file is opened.
+    to stop a batch name from the vendor executing when the file is opened.
     """
     value = column.value_for(sample, raw=True)
     text = "" if value is None else str(value)
@@ -235,7 +236,7 @@ def _cart_add_result(request, *, added=0, already=0, missing=0, error="", status
     if already:
         parts.append(f"{already} already in the cart.")
     if missing:
-        parts.append(f"{missing} no longer in the mirror.")
+        parts.append(f"{missing} no longer exists in the local database.")
     if not parts and not error:
         parts.append("Nothing to add.")
 
@@ -290,7 +291,7 @@ def _dashboard_context(request):
     metadata_synced_at = Sample.objects.aggregate(at=Max("synced_at"))["at"]
 
     # The tab, and only the tab. The advanced-filter menus are built from this rather than
-    # the whole mirror so they offer values that can return rows, and rather than
+    # the whole local database so they offer values that can return rows, and rather than
     # from the fully-filtered queryset so choosing an organism does not empty the batch menu.
     prefix = request.GET.get("batch_prefix")
     scope = Sample.objects.all()
@@ -331,9 +332,9 @@ def _dashboard_context(request):
         "studies": _study_options(),
         "selected_studies": request.GET.getlist("study"),
         "modalities": modality.available_modalities(config.data) if config else [],
-        # Filter options come from the mirror, so a dropdown never
+        # Filter options come from the local database, so a dropdown never
         # offers a value that would return nothing. That is what keeps the batch menu
-        # short: OCS has nearly two thousand batches, the mirror only the synced ones.
+        # short: OCS has nearly two thousand batches, the local database only has synced ones.
         # Scoped to the selected tab. On the MTX tab the batch menu lists MTX batches and
         # nothing else. Offering RTX batches there produces a filter combination that can
         # only ever return an empty table.
@@ -347,6 +348,6 @@ def _dashboard_context(request):
         # current filter state without opening the panel.
         "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.getlist(field))
         + sum(1 for row in stage_filters if row["selected"]),
-        # Display the mirror's synchronization timestamp in the header.
+        # Display the local database synchronization timestamp in the header.
         "metadata_synced_at": metadata_synced_at,
     }

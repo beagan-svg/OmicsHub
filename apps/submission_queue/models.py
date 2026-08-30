@@ -8,11 +8,11 @@ class QueueEntry(models.Model):
     """Store one OCS job requested by a user."""
 
     class Status(models.TextChoices):
-        PENDING = "PENDING", "Pending"
-        SUBMITTING = "SUBMITTING", "Submitting"
-        SUBMITTED = "SUBMITTED", "Submitted"
-        FAILED = "FAILED", "Failed"
-        CANCELLED = "CANCELLED", "Cancelled"
+        PENDING = "PENDING", "PENDING"
+        SUBMITTING = "SUBMITTING", "SUBMITTING"
+        SUBMITTED = "SUBMITTED", "SUBMITTED"
+        FAILED = "FAILED", "FAILED"
+        CANCELLED = "CANCELLED", "CANCELLED"
 
     class ModalitySource(models.TextChoices):
         INFERRED = "inferred", "Inferred from batch name"
@@ -23,7 +23,7 @@ class QueueEntry(models.Model):
         (Stage.POST_ALIGN.value, Stage.POST_ALIGN.label),
     ]
 
-    # PROTECT, not CASCADE: Sample is a mirror that a sync can rebuild, while a submitted
+    # PROTECT, not CASCADE: Sample is a local copy that a sync can rebuild, while a submitted
     # entry and its demand id are the only local record that a job was ever sent to OCS.
     # Removing a sample must not take that with it.
     sample = models.ForeignKey(Sample, on_delete=models.PROTECT, related_name="queue_entries")
@@ -82,7 +82,7 @@ class CartItem(models.Model):
         related_name="cart_items",
     )
     # CASCADE, unlike QueueEntry.sample: a cart item is a staged intention, not a record
-    # that a job was sent. If the mirror drops the sample there is nothing to preserve.
+    # that a job was sent. If the sync removes the sample there is nothing to preserve.
     sample = models.ForeignKey(Sample, on_delete=models.CASCADE, related_name="cart_items")
     added_at = models.DateTimeField(auto_now_add=True)
 

@@ -69,7 +69,7 @@ class TestSelectCommandConfig:
 
 
 class TestOrganismNameFolding:
-    """`macaque_nemestrina` in the config must find `macaque-nemestrina` in the mirror.
+    """`macaque_nemestrina` in the config must find `macaque-nemestrina` in local data.
 
     OCS uses both separators and the config was only ever written with one, which stranded
     125 real samples on "No references entry for organism".

@@ -120,7 +120,7 @@ def test_history_reads_the_env_prefixed_table(fake_boto):
 
 
 @override_settings(OCS_ENV_BASE="prod")
-def test_batch_metadata_query_uses_the_vendor_batch_index(fake_boto):
+def test_batch_metadata_query_uses_the_batch_name_from_vendor_index(fake_boto):
     resource = fake_boto(FakeResource(pages=[{"Items": []}]))
 
     dynamodb.get_metadata_by_batch("MTX-22068")

@@ -1,10 +1,10 @@
-"""Check which mirrored fastq samples a manifest can build commands for.
+"""Check which synced fastq samples a manifest can build commands for.
 
 `config_loader.validate` checks whether a manifest is structurally valid. This command
 checks whether the manifest names a command and reference for the lab's fastq samples
 before activation, rather than finding one missing value at a time after activation.
 
-Three outcomes per (modality, library prep, organism) combination in the mirror:
+Three outcomes per (modality, library prep, organism) combination in the local database:
 
 * **covered**: a command config matches and every value it substitutes resolves.
 * **stage n/a**: no command config lists that library prep, so the stage does not run
@@ -31,7 +31,7 @@ STAGES = ((Stage.ALIGN, "ALIGNMENT"), (Stage.POST_ALIGN, "POST-ALIGNMENT"))
 
 
 class Command(BaseCommand):
-    help = "Report which samples in the mirror a workflow config can build commands for."
+    help = "Report which samples in the local database a workflow config can build commands for."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -50,7 +50,7 @@ class Command(BaseCommand):
         data = self._load(options["config_file"])
         limit = options["show"]
 
-        # Grouped by the database: the mirror holds hundreds of thousands of rows and only
+        # Grouped by the database: the local table holds hundreds of thousands of rows and only
         # the distinct combinations matter.
         combos = [
             ((row["modality"], row["library_prep_method_name"], row["organism_common_name"]), row["total"])
@@ -59,7 +59,7 @@ class Command(BaseCommand):
             ).annotate(total=Count("pk"))
         ]
         if not combos:
-            raise CommandError("The mirror is empty. Sync some samples first.")
+            raise CommandError("The local database is empty. Sync some samples first.")
 
         broken_total = 0
         for stage, label in STAGES:
@@ -86,7 +86,7 @@ class Command(BaseCommand):
             # right one to activate. The exit is the same either way; the count is the point.
             self.stdout.write(self.style.WARNING(f"{broken_total} samples would fail to build a command."))
         else:
-            self.stdout.write(self.style.SUCCESS("Every combination in the mirror is covered."))
+            self.stdout.write(self.style.SUCCESS("Every combination in the local database is covered."))
 
     def _load(self, path: str | None) -> dict:
         if path is None:

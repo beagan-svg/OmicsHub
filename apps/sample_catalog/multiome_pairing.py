@@ -1,11 +1,11 @@
 """Match the GEX and ATAC fastq samples in a multiome pair.
 
 A multiome experiment is sequenced as two halves, a GEX library and an ATAC library,
-that arrive as separate fastq entries under different vendor batches (MTX-32013 and
+that arrive as separate fastq entries under different batch names from the vendor (MTX-32013 and
 ATX-36013, say). They are the same biological sample and are aligned together, so
 submitting one without the other produces a run that cannot complete.
 
-The two halves are matched on `load_name` and vendor batch prefix (MTX/ATX), not on
+The two halves are matched on `load_name` and batch-name-from-vendor prefix (MTX/ATX), not on
 library prep name , a vendor's naming for the two halves varies, so the prep name is
 not a reliable signal, and load_name alone is not enough either (see MULTIOME_PREFIXES).
 """

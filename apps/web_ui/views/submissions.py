@@ -482,7 +482,7 @@ def _submission_context(request):
 
 
 def _batch_groups(plan, stage: str, config: dict) -> list[dict]:
-    """Return planned entries for one stage grouped by vendor batch.
+    """Return planned entries for one stage grouped by batch name from the vendor.
 
     Each entry carries what its editor needs, including alternative command configs for its
     modality and stage and the reference and chemistry values the manifest offers for its

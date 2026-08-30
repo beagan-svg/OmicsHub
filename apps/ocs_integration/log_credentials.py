@@ -1,7 +1,7 @@
 """View a demand's AWS Batch container logs using credentials the viewer supplies.
 
 This is deliberately separate from dynamodb.py and s3.py. The execution ARN comes from
-the local StageStatus mirror. The temporary session built here is used only for the
+the local StageStatus data. The temporary session built here is used only for the
 Step Functions, Batch, and CloudWatch Logs calls needed to read one job's logs.
 
 The AWS operations below are the entire allowlist: sts:GetCallerIdentity,

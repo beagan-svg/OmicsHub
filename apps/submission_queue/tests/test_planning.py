@@ -108,7 +108,7 @@ class TestModality:
         assert plan.entries[0].modality_source == "inferred"
 
     def test_an_unrecognised_prefix_is_rtx_rather_than_unknown(self, config, make_sample):
-        """Most of the mirror has a bare 10X* batch name; none of it is an error case."""
+        """Most local data has a bare 10X* batch name; none of it is an error case."""
         sample = make_sample(batch_name_from_vendor="ZZZ-1", library_prep_method_name="10xV4")
 
         plan = plan_for(sample, config)

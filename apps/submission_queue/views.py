@@ -128,7 +128,7 @@ class QueueViewSet(
                 raise ValidationError(
                     f"No samples for batch {params['batch_name_from_vendor']!r}. Sync it first."
                 )
-            # A vendor batch can contain one half of a multiome pair. Add its partner.
+            # A batch name from the vendor can contain one half of a multiome pair. Add its partner.
             return pairing.with_multiome_partners(samples)[0]
 
         samples = list(queryset.filter(fastq_name__in=params["fastq_names"]))

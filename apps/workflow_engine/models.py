@@ -30,7 +30,7 @@ class WorkflowConfig(models.Model):
         return f"{self.name} ({'active' if self.is_active else 'inactive'})"
 
     def activate(self):
-        """Activate this manifest for new submissions."""
+        """Activate the manifest for new submissions."""
         with transaction.atomic():
             WorkflowConfig.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
             self.is_active = True

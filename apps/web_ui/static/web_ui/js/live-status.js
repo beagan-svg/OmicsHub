@@ -12,7 +12,6 @@
     CANCELLED: "queued",
     FAILED: "fail",
     ABORTED: "fail",
-    ABANDONED: "warn",
   };
   let inFlight = false;
 

@@ -12,7 +12,7 @@ from django.utils import timezone
 
 register = template.Library()
 
-# Mirrors views.DEFAULT_SORT; imported lazily there would be a circular import.
+# Matches views.DEFAULT_SORT; imported lazily there would be a circular import.
 DEFAULT_SORT_KEY = "batch_name_from_vendor"
 
 # OCS reports thirteen status labels; the design system has six meanings. This is the map
@@ -37,9 +37,6 @@ STATUS_STATES = {
     "CANCELLED": "queued",
     "FAILED": "fail",
     "ABORTED": "fail",
-    # A demand OCS left unfinished and stopped updating. Warning rather than fail: the job
-    # did not fail, it stopped being reported on, and the stage is free to run again.
-    "ABANDONED": "warn",
     "NOT COMPLETED": "unknown",
 }
 
@@ -50,7 +47,6 @@ STATUS_NOTES = {
     "IN_PROGRESS": "OCS is running this stage now.",
     "SUBMITTING": "The worker is handing this command to OCS.",
     "SUBMITTED": "OCS accepted the command and has not reported progress yet.",
-    "ABANDONED": "OCS stopped reporting on this demand. It did not fail, and the stage can be run again.",
     "ABORTED": "The stage was stopped before it finished.",
     "NOT COMPLETED": "OCS has no status for this stage yet.",
 }

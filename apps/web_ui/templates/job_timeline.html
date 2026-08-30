@@ -54,6 +54,11 @@
       <button class="btn btn-sm btn-primary" type="submit">Apply filters</button>
     </form>
     <div class="timeline-toolbar__navigation">
+      <div class="timeline-legend" aria-label="Timeline status legend">
+        <span><i class="timeline-legend__swatch timeline-legend__swatch--running" aria-hidden="true"></i>In progress</span>
+        <span><i class="timeline-legend__swatch timeline-legend__swatch--completed" aria-hidden="true"></i>Completed</span>
+        <span><i class="timeline-legend__swatch timeline-legend__swatch--failed" aria-hidden="true"></i>Failed</span>
+      </div>
       <nav class="timeline-navigation" aria-label="Timeline date navigation">
         <a class="btn btn-sm btn-outline-secondary" href="?view={{ selected_view }}&date={{ previous_date|date:'Y-m-d' }}&stage={{ selected_stage }}&status={{ selected_status }}" aria-label="Previous {{ selected_view }}">
           <i class="bi bi-chevron-left" aria-hidden="true"></i>
@@ -87,10 +92,18 @@
       {% for row in group.rows %}
       <div class="timeline__row">
         <div class="timeline__label">
-          {% if row.fastq_pair %}
-          <span class="mono timeline__fastq-name">{{ row.fastq_pair }}</span>
+          {% if row.fastq_names|length > 2 and row.show_fastq_details %}
+          <details class="timeline__fastq-details">
+            <summary class="timeline__fastq-summary">
+              <span class="mono timeline__fastq-name">{{ row.fastq_names.0 }}</span>
+              <span class="timeline__fastq-more">View {{ row.fastq_names|length|add:"-1" }} more</span>
+            </summary>
+            <div class="timeline__fastq-list">
+              {% for fastq_name in row.fastq_names %}<span class="mono">{{ fastq_name }}</span>{% endfor %}
+            </div>
+          </details>
           {% else %}
-          {% for fastq_name in row.fastq_names %}<span class="mono timeline__fastq-name">{{ fastq_name }}</span>{% endfor %}
+          <span class="mono timeline__fastq-name">{{ row.display_name }}</span>
           {% endif %}
         </div>
         <div class="timeline__track">
@@ -98,8 +111,8 @@
           <span class="timeline__bar timeline__bar--{{ bar.status_class }} timeline__bar--stage-{{ bar.stage_class }}"
              style="left: {{ bar.left }}%; width: {{ bar.width }}%;"
              role="img"
-             aria-label="{{ row.sample }} · {{ bar.stage }} · {{ bar.duration }} · {{ bar.status|title }}"
-             title="{{ row.sample }} · {{ bar.stage }} · {{ bar.duration }} · {{ bar.status|title }}"></span>
+             aria-label="{{ row.display_name }} · {{ bar.stage }} · {{ bar.duration }} · {{ bar.status|title }}"
+             title="{{ row.display_name }} · {{ bar.stage }} · {{ bar.duration }} · {{ bar.status|title }}"></span>
           {% endfor %}
         </div>
       </div>
@@ -164,7 +177,19 @@
           <ul>
             {% for fastq_sample in batch.fastq_samples %}
             <li>
+              {% if fastq_sample.show_fastq_details and fastq_sample.fastq_names|length > 1 %}
+              <details class="timeline-day-detail__fastq-details">
+                <summary>
+                  <span class="mono">{{ fastq_sample.fastq_names.0 }}</span>
+                  <span class="timeline-day-detail__fastq-count">{{ fastq_sample.fastq_names|length }} Fastq Samples</span>
+                </summary>
+                <div class="timeline-day-detail__fastq-list">
+                  {% for fastq_name in fastq_sample.fastq_names %}<span class="mono">{{ fastq_name }}</span>{% endfor %}
+                </div>
+              </details>
+              {% else %}
               <span class="mono">{{ fastq_sample.name }}</span>
+              {% endif %}
               <span class="timeline-day-detail__stage-pills">
                 {% for stage in fastq_sample.stages %}
                 <span class="timeline-day-detail__stage-pill timeline-day-detail__stage-pill--{{ stage.status_class }}" aria-label="{{ stage.stage }}: {{ stage.status }}" title="{{ stage.stage }}: {{ stage.status }}">{{ stage.label }}</span>

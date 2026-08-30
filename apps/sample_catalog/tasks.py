@@ -1,4 +1,4 @@
-"""Refresh the local mirror from OCS."""
+"""Refresh the local database from OCS."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def sync_all_stage_statuses():
     job in flight but could never discover one, so a sample whose alignment started
     outside this app stayed NOT COMPLETED forever. Both source tables are small enough to
     sweep whole in seconds, so this covers everything in scope and picks up samples that
-    are new to the mirror on the way.
+    are new to the local database on the way.
 
     Beat fires this every five minutes against a fifteen-minute time limit, so a sweep
     slowed by a large catalogue would otherwise overlap itself, with both copies writing.
@@ -49,7 +49,7 @@ def sync_all_stage_statuses():
 
 @shared_task(acks_late=True)
 def sync_all_metadata():
-    """Load new fastq-metadata entries into the local mirror.
+    """Load new fastq-metadata entries into the local database.
 
     Scoped to the batches the active config has workflows for; without a config there is
     nothing to scope by, so the sweep is skipped rather than pulling the whole table and

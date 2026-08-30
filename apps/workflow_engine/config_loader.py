@@ -71,7 +71,7 @@ def load_jsonc(text: str) -> dict:
 
 
 def validate(config: dict) -> None:
-    """Raise ValidationError when the manifest cannot build a submission command."""
+    """Raise ValidationError when the manifest cannot build a command."""
     if not isinstance(config, dict):
         raise ValidationError(f"Config must be an object, not {_type_name(config)}")
 

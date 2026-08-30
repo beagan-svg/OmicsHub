@@ -26,7 +26,7 @@ class TestCheckConfigCoverage:
         output = run()
 
         assert "ALIGNMENT" in output
-        assert "Every combination in the mirror is covered." in output
+        assert "Every combination in the local database is covered." in output
 
     def test_a_listed_prep_with_no_reference_is_broken(self, active_config, make_sample):
         """The failure this exists to catch: the prep matches, the organism has no genome."""
@@ -90,6 +90,6 @@ class TestCheckConfigCoverage:
         with pytest.raises(CommandError, match="No active config"):
             run()
 
-    def test_an_empty_mirror_is_refused(self, active_config):
-        with pytest.raises(CommandError, match="mirror is empty"):
+    def test_an_empty_local_database_is_refused(self, active_config):
+        with pytest.raises(CommandError, match="local database is empty"):
             run()

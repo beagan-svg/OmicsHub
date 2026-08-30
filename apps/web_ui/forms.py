@@ -4,7 +4,7 @@ from apps.sample_catalog.models import Stage
 
 
 class SyncForm(forms.Form):
-    """Load a vendor batch into the local mirror."""
+    """Sync a batch name from the vendor into the local database."""
 
     batch_name_from_vendor = forms.CharField(
         label="Batch name from vendor",

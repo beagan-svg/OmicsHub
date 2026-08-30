@@ -1,8 +1,8 @@
-"""The scheduled tasks that keep the mirror in step with OCS.
+"""The scheduled tasks that keep the local database in step with OCS.
 
 The guard these mostly exist for is the no-active-config check. Without a config there is
 no set of batch prefixes, and an empty set reaches `_prune_out_of_scope` as "nothing is in
-scope" , which, before that function refused it, meant deleting the entire mirror.
+scope" , which, before that function refused it, meant deleting the entire local database.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ def calls(monkeypatch):
         sync, "sync_all_stage_statuses", lambda batch_prefixes: recorded.append(batch_prefixes) or "swept"
     )
     monkeypatch.setattr(
-        sync, "sync_all_samples", lambda batch_prefixes: recorded.append(batch_prefixes) or "mirrored"
+        sync, "sync_all_samples", lambda batch_prefixes: recorded.append(batch_prefixes) or "synced"
     )
     return recorded
 
@@ -44,11 +44,11 @@ def calls(monkeypatch):
 class TestScope:
     def test_the_sweep_runs_over_the_active_configs_prefixes(self, active_config, calls):
         assert tasks.sync_all_stage_statuses() == "swept"
-        # ATX rides on MTX: it has no workflow of its own but must still be mirrored.
+        # ATX rides on MTX: it has no workflow of its own but must still be synced.
         assert calls == [{"MTX", "ATX", "RTX"}]
 
     def test_the_metadata_sweep_runs_over_the_same_prefixes(self, active_config, calls):
-        assert tasks.sync_all_metadata() == "mirrored"
+        assert tasks.sync_all_metadata() == "synced"
 
         assert calls == [{"MTX", "ATX", "RTX"}]
 
@@ -60,7 +60,7 @@ class TestScope:
 
 
 class TestNoActiveConfig:
-    """An empty prefix set must prevent the task from pruning the mirror."""
+    """An empty prefix set must prevent the task from pruning the local database."""
 
     def test_the_stage_status_sweep_returns_without_calling_sync(self, calls):
         assert tasks.sync_all_stage_statuses() is None
@@ -73,7 +73,7 @@ class TestNoActiveConfig:
         assert calls == []
 
     def test_the_metadata_sweep_never_reaches_the_prune(self, make_sample, monkeypatch):
-        """End to end, against the real sync: no config must not empty the mirror."""
+        """End to end, against the real sync: no config must not empty the local database."""
         make_sample("KEEP-ME-1")
         monkeypatch.setattr(sync.dynamodb, "scan_metadata", lambda batch_prefixes=None: iter([]))
 

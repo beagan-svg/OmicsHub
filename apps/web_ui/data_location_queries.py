@@ -1,4 +1,4 @@
-"""Build the Data Locations rows from mirrored stage and GFS records."""
+"""Build Data Locations rows from synced stage and GFS records."""
 
 from __future__ import annotations
 

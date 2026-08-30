@@ -4,7 +4,7 @@ from django.utils import timezone
 
 
 class BatchPrefix(models.TextChoices):
-    """Define vendor batch families used by dashboard filters."""
+    """Define batch-name-from-vendor families used by dashboard filters."""
 
     MTX = "MTX", "MTX"
     RFX = "RFX", "RFX"
@@ -35,9 +35,9 @@ FALLBACK_MODALITY = Modality.RTX
 
 
 def prefixes_for_workflows(workflow_names) -> set[str]:
-    """Return vendor prefixes to mirror for the workflows in a manifest.
+    """Return batch-name-from-vendor prefixes to sync for manifest workflows.
 
-    Use more than workflow names because ATX has no workflow of its own but must be mirrored
+    Use more than workflow names because ATX has no workflow of its own but must be synced
     whenever MTX is configured, because an MTX submission cannot align without its ATAC
     half. Scoping the sync to workflow names alone is what silently prunes ATX away.
     """
@@ -50,14 +50,14 @@ def prefixes_for_workflows(workflow_names) -> set[str]:
 # The multiome pair: MTX (GEX) and ATX (ATAC) batches sharing a load_name. Not the
 # library prep name , a vendor's naming for the two halves varies (real synced data has
 # used "10xRSeq_Mult"/"10xATAC_Mult" as well as "10xMultX_GEX"/"10xMultX_ATAC") , and not
-# load_name alone either: 262 load_names in the real mirror are shared by unrelated
+# load_name alone either: 262 load_names in the real DynamoDB data are shared by unrelated
 # samples, so requiring one MTX and one ATX side is what tells a real pair apart from a
 # coincidence.
 MULTIOME_PREFIXES = (BatchPrefix.MTX, BatchPrefix.ATX)
 
 
 class Stage(models.TextChoices):
-    """Define OCS stages stored in the mirror."""
+    """Define OCS stages stored by the sync."""
 
     INGEST = "ingest", "Ingest"
     ALIGN = "align", "Alignment"
@@ -72,7 +72,7 @@ NOT_COMPLETED = "NOT COMPLETED"
 
 
 class Sample(models.Model):
-    """Store one OCS fastq metadata entry in the local mirror."""
+    """Store one OCS fastq metadata entry locally."""
 
     fastq_name = models.CharField(max_length=255, unique=True)
 
@@ -81,7 +81,7 @@ class Sample(models.Model):
     batch_name_from_vendor = models.CharField(max_length=255, db_index=True)
     sequencing_vendor = models.CharField(max_length=255, blank=True)
 
-    # Both are derived from the vendor batch prefix by the database, not the sync: a
+    # Both are derived from the batch-name-from-vendor prefix by the database, not the sync: a
     # generated column cannot drift, so no partial sync, fixture or shell edit can write a
     # sample whose modality disagrees with its batch name.
     #
@@ -147,7 +147,7 @@ class Sample(models.Model):
     class Meta:
         ordering = ["fastq_name"]
         indexes = [
-            # Backs the dashboard's family toggle, which filters the whole mirror. There is
+            # Backs the dashboard's family toggle, which filters the local data. There is
             # deliberately no matching index on `modality`: nothing filters by it, and the
             # one aggregate that groups by it groups by three columns, which a single-column
             # index cannot serve.
@@ -170,14 +170,14 @@ class Sample(models.Model):
         return None
 
     def stage_record(self, stage: str):
-        """Return the mirrored status for one stage, or None without a record."""
+        """Return the synced status for one stage, or None without a record."""
         for record in self.stage_statuses.all():
             if record.stage == stage:
                 return record
         return None
 
     def stage_status(self, stage: str) -> str:
-        """Return the OCS status label or NOT COMPLETED when no row exists."""
+        """Return the raw OCS status, or NOT COMPLETED when no row exists."""
         record = self.stage_record(stage)
         return record.status if record else NOT_COMPLETED
 

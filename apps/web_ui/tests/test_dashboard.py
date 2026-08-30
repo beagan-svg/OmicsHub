@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from django.test import Client
 from django.urls import reverse
@@ -247,7 +249,7 @@ class TestDashboard:
             response = logged_in.get(reverse(f"web_ui:{page_name}"), filters)
             assert {sample.fastq_name for sample in response.context["page"].object_list} == {"A-1", "B-1"}
 
-    def test_searches_fastq_load_and_vendor_batch_names(self, logged_in, make_sample):
+    def test_searches_fastq_load_and_batch_name_from_vendor_values(self, logged_in, make_sample):
         make_sample("FASTQ-1", load_name="LOAD-1", batch_name_from_vendor="MTX-22068")
         make_sample("FASTQ-2", load_name="LOAD-2", batch_name_from_vendor="RTX-34056")
 
@@ -286,7 +288,7 @@ class TestDashboard:
         assert b"Refreshed status for 55 samples from OCS" in response.content
 
     def test_refresh_status_survives_ocs_being_unreachable(self, logged_in, monkeypatch, make_sample):
-        """The mirror is still readable; only the live read failed, and the table stays up."""
+        """The local data is still readable; only the live read failed, and the table stays up."""
         from botocore.exceptions import EndpointConnectionError
 
         from apps.sample_catalog import ocs_sync as sync_service
@@ -370,7 +372,7 @@ class TestSignedOut:
 
 class TestDashboardFilters:
     @pytest.fixture(autouse=True)
-    def mirror(self, make_sample):
+    def local_database(self, make_sample):
         make_sample("MOUSE-MTX", batch_name_from_vendor="MTX-100", organism_common_name="mouse")
         make_sample(
             "HUMAN-RTX",
@@ -446,7 +448,7 @@ class TestDashboardFilters:
         assert response.context["active_filter_count"] == 2
         assert response.context["filters_open"] is True
 
-    def test_a_study_the_mirror_has_never_heard_of_returns_nothing(self, logged_in):
+    def test_a_study_the_local_database_has_never_heard_of_returns_nothing(self, logged_in):
         response = logged_in.get(reverse("web_ui:dashboard"), {"study": "NoSuchStudy"})
 
         assert response.status_code == 200
@@ -459,7 +461,7 @@ class TestDashboardFilters:
         )
 
         # The tab links used to be hand-built hrefs that carried only batch_prefix, so
-        # clicking a family quietly widened the view back to the whole mirror.
+        # clicking a family quietly widened the view back to the whole local database.
         html = messages_in(response)
         for tab_link in [line for line in html.splitlines() if "batch_prefix=" in line]:
             assert "organism_common_name=human" in tab_link
@@ -663,7 +665,10 @@ class TestCsvExport:
 
         body = csv_body(response)
         assert "HUMAN-1" in body and "MOUSE-1" not in body
-        assert response["Content-Disposition"] == 'attachment; filename="omicshub-samples.csv"'
+        assert re.fullmatch(
+            r'attachment; filename="\d{2}-\d{2}-\d{4}_\d{4}_export\.csv"',
+            response["Content-Disposition"],
+        )
 
     def test_a_ticked_selection_narrows_the_export_further(self, logged_in, make_sample):
         make_sample("HUMAN-1", organism_common_name="human")

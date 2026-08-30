@@ -6,21 +6,21 @@ from typing import Any
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
-from django.db.models.functions import TruncDay, TruncMonth
+from django.db.models import Q
 from django.shortcuts import render
 from django.utils import timezone
 
-from apps.sample_catalog.models import BatchPrefix, Sample, Stage, StageStatus
+from apps.sample_catalog.models import Stage, StageStatus
 
 from .common import FINISHED_OCS_STATUSES, RUNNING_OCS_STATUSES, TIMELINE_DAYS, TIMELINE_PAGE_SIZE
 from .monitor import _collapse_multiome_monitor_rows
 
 TIMELINE_STATUS_GROUPS = {
     "IN_PROGRESS": RUNNING_OCS_STATUSES,
-    "FAILED": ("FAILED", "ABORTED", "STRANDED", "ABANDONED"),
+    "FAILED": ("FAILED", "ABORTED", "STRANDED"),
     "COMPLETED": ("COMPLETED", "ARCHIVED"),
 }
+TIMELINE_STATUS_OPTIONS = ("IN_PROGRESS", "FAILED", "COMPLETED", "ABORTED")
 TIMELINE_STAGE_LABELS = {
     Stage.ALIGN: "Alignment",
     Stage.POST_ALIGN: "Post-Alignment",
@@ -56,7 +56,7 @@ def job_timeline(request):
     if selected_stage not in {Stage.ALIGN.value, Stage.POST_ALIGN.value}:
         selected_stage = ""
     selected_status = request.GET.get("status", "")
-    if selected_status not in TIMELINE_STATUS_GROUPS:
+    if selected_status not in TIMELINE_STATUS_OPTIONS:
         selected_status = ""
 
     stages = StageStatus.objects.select_related("sample")
@@ -72,43 +72,42 @@ def job_timeline(request):
     if selected_stage:
         stages = stages.filter(stage=selected_stage)
     if selected_status:
-        stages = stages.filter(status__in=TIMELINE_STATUS_GROUPS[selected_status])
+        stages = stages.filter(status=selected_status)
 
     if selected_view == "week":
-        batch_rows: dict[str, dict[str, list[StageStatus]]] = {}
         stage_rows = list(stages.order_by("started_at"))
-        load_names = {
-            stage_status.sample.load_name for stage_status in stage_rows if stage_status.sample.load_name
-        }
-        mtx_batches: dict[str, str] = {}
-        for load_name, batch_name in (
-            Sample.objects.filter(load_name__in=load_names, batch_prefix=BatchPrefix.MTX)
-            .order_by("batch_name_from_vendor")
-            .values_list("load_name", "batch_name_from_vendor")
-        ):
-            mtx_batches.setdefault(load_name, batch_name)
-        for stage_status in stage_rows:
-            sample = stage_status.sample
-            batch_name = sample.batch_name_from_vendor or "Unassigned batch"
-            if sample.batch_prefix == BatchPrefix.ATX:
-                batch_name = mtx_batches.get(sample.load_name, batch_name)
-            load_name = sample.load_name or sample.fastq_name
-            batch_rows.setdefault(batch_name, {}).setdefault(load_name, []).append(stage_status)
+        running = [row for row in stage_rows if row.status in RUNNING_OCS_STATUSES]
+        finished = [row for row in stage_rows if row.status in FINISHED_OCS_STATUSES]
+        collapsed_running, collapsed_finished = _collapse_multiome_monitor_rows(
+            running, finished, include_queue_status=False
+        )
+        batch_rows: dict[str, dict[tuple[str, str | int], dict[str, Any]]] = {}
+        for row in [*collapsed_running, *collapsed_finished]:
+            logical_key = _timeline_logical_key(row)
+            batch_name = row.sample.batch_name_from_vendor or "Unassigned batch"
+            logical_row = batch_rows.setdefault(batch_name, {}).setdefault(
+                logical_key,
+                {"fastq_names": [], "stages": {}, "show_fastq_details": row.show_fastq_details},
+            )
+            logical_row["show_fastq_details"] |= row.show_fastq_details
+            logical_row["fastq_names"].extend(
+                name for name in row.fastq_names if name not in logical_row["fastq_names"]
+            )
+            logical_row["stages"][row.stage] = row.stage_status
 
         timeline_groups: list[dict[str, Any]] = [
             {
                 "batch": batch_name,
-                "fastq_count": len(
-                    {stage.sample.fastq_name for rows in load_groups.values() for stage in rows}
-                ),
+                "fastq_count": len(load_groups),
                 "rows": [
                     _timeline_sample_row(
-                        sorted({stage.sample.fastq_name for stage in loads}),
-                        _collapse_timeline_stages(loads),
+                        loads["fastq_names"],
+                        loads["stages"].values(),
                         window_start,
                         window_end,
                         now,
                     )
+                    | {"show_fastq_details": loads["show_fastq_details"]}
                     for loads in load_groups.values()
                 ],
             }
@@ -148,11 +147,7 @@ def job_timeline(request):
             "selected_stage": selected_stage,
             "selected_status": selected_status,
             "stage_options": (Stage.ALIGN, Stage.POST_ALIGN),
-            "status_options": (
-                {"value": "IN_PROGRESS", "label": "In progress"},
-                {"value": "FAILED", "label": "Failed"},
-                {"value": "COMPLETED", "label": "Completed"},
-            ),
+            "status_options": tuple({"value": status, "label": status} for status in TIMELINE_STATUS_OPTIONS),
         },
     )
 
@@ -187,45 +182,7 @@ def _timeline_period_label(selected_view, selected_date):
 
 def _timeline_periods(stages, selected_view, selected_date, selected_day=None):
     """Build status counts for each day in a month or month in a year."""
-    truncation = TruncDay if selected_view == "month" else TruncMonth
-    aggregate_rows = (
-        stages.annotate(period=truncation("started_at"))
-        .values("period", "stage")
-        .annotate(
-            total_stages=Count("pk"),
-            fastq_samples=Count("sample_id", distinct=True),
-            completed_stages=Count("pk", filter=Q(status__in=TIMELINE_STATUS_GROUPS["COMPLETED"])),
-            failed_stages=Count("pk", filter=Q(status__in=TIMELINE_STATUS_GROUPS["FAILED"])),
-            running_stages=Count("pk", filter=Q(status__in=TIMELINE_STATUS_GROUPS["IN_PROGRESS"])),
-        )
-        .order_by("period", "stage")
-    )
-    sample_counts = {
-        row["period"].date(): row["fastq_samples"]
-        for row in stages.annotate(period=truncation("started_at"))
-        .values("period")
-        .annotate(fastq_samples=Count("sample_id", distinct=True))
-    }
-    batch_counts = {
-        row["period"].date(): row["batch_names"]
-        for row in stages.annotate(period=truncation("started_at"))
-        .values("period")
-        .annotate(
-            batch_names=Count(
-                "sample__batch_name_from_vendor",
-                distinct=True,
-                filter=~Q(sample__batch_name_from_vendor=""),
-            )
-        )
-    }
-    by_period: dict[date, dict[str, Any]] = {}
-    for row in aggregate_rows:
-        period = row["period"].date()
-        period_data = by_period.setdefault(
-            period,
-            {"stages": {}},
-        )
-        period_data["stages"][row["stage"]] = row
+    by_period, sample_counts, batch_counts = _timeline_logical_period_data(stages, selected_view)
 
     selected_day_batches = _timeline_day_batches(stages, selected_day) if selected_day else ()
 
@@ -283,41 +240,123 @@ def _period_card_data(period, by_period, sample_counts, batch_counts, batches=()
 
 
 def _timeline_day_batches(stages, selected_day):
-    """Return Batch Name From Vendor groups and Fastq Samples for one day."""
-    rows = (
-        stages.filter(started_at__date=selected_day)
-        .values_list(
-            "sample__batch_name_from_vendor",
-            "sample__fastq_name",
-            "stage",
-            "status",
+    """Return collapsed Batch Name From Vendor groups and Fastq Samples for one day."""
+    day_rows = list(stages.filter(started_at__date=selected_day).order_by("started_at"))
+    running = [row for row in day_rows if row.status in RUNNING_OCS_STATUSES]
+    finished = [row for row in day_rows if row.status in FINISHED_OCS_STATUSES]
+    collapsed_running, collapsed_finished = _collapse_multiome_monitor_rows(
+        running, finished, include_queue_status=False
+    )
+
+    logical_rows: dict[tuple[str, tuple[str, str | int]], dict[str, Any]] = {}
+    order: list[tuple[str, tuple[str, str | int]]] = []
+    for row in [*collapsed_running, *collapsed_finished]:
+        sample = row.sample
+        batch_name = sample.batch_name_from_vendor or "Unassigned batch"
+        key = (batch_name, _timeline_logical_key(row))
+        logical_row = logical_rows.get(key)
+        if logical_row is None:
+            logical_row = {
+                "batch_name": batch_name,
+                "fastq_names": [],
+                "show_fastq_details": row.show_fastq_details,
+                "stages": {},
+            }
+            logical_rows[key] = logical_row
+            order.append(key)
+        for fastq_name in row.fastq_names:
+            if fastq_name not in logical_row["fastq_names"]:
+                logical_row["fastq_names"].append(fastq_name)
+        logical_row["show_fastq_details"] |= row.show_fastq_details
+        logical_row["stages"][row.stage] = {
+            "label": "A" if row.stage == Stage.ALIGN else "P",
+            "stage": TIMELINE_STAGE_LABELS[Stage(row.stage)],
+            "status": row.status.replace("_", " ").capitalize(),
+            "status_class": row.status.lower().replace("_", "-"),
+        }
+
+    batches: dict[str, list[dict[str, Any]]] = {}
+    for key in order:
+        logical_row = logical_rows[key]
+        fastq_names = logical_row["fastq_names"]
+        if len(fastq_names) > 1 and logical_row["show_fastq_details"]:
+            display_name = f"{fastq_names[0]} + {len(fastq_names) - 1} more"
+        else:
+            display_name = fastq_names[0]
+        batches.setdefault(logical_row["batch_name"], []).append(
+            {
+                "name": display_name,
+                "fastq_names": tuple(fastq_names),
+                "show_fastq_details": logical_row["show_fastq_details"],
+                "stages": tuple(
+                    logical_row["stages"][stage]
+                    for stage in (Stage.ALIGN, Stage.POST_ALIGN)
+                    if stage in logical_row["stages"]
+                ),
+            }
         )
-        .distinct()
-        .order_by("sample__batch_name_from_vendor", "sample__fastq_name", "stage")
-    )
-    batches: dict[str, Any] = {}
-    for batch_name, fastq_name, stage, status in rows:
-        batch = batches.setdefault(batch_name or "Unassigned batch", {})
-        sample = batch.setdefault(fastq_name, {})
-        sample[stage] = {
-            "label": "A" if stage == Stage.ALIGN else "P",
-            "stage": TIMELINE_STAGE_LABELS[Stage(stage)],
-            "status": status.replace("_", " ").capitalize(),
-            "status_class": status.lower().replace("_", "-"),
-        }
     return tuple(
-        {
-            "name": batch_name,
-            "fastq_samples": tuple(
-                {
-                    "name": fastq_name,
-                    "stages": tuple(sample.values()),
-                }
-                for fastq_name, sample in fastq_names.items()
-            ),
-        }
-        for batch_name, fastq_names in batches.items()
+        {"name": batch_name, "fastq_samples": tuple(fastq_samples)}
+        for batch_name, fastq_samples in batches.items()
     )
+
+
+def _timeline_logical_period_data(stages, selected_view):
+    """Build logical sample, batch, and stage counts for each calendar period."""
+    rows = list(stages.order_by("started_at"))
+    running = [row for row in rows if row.status in RUNNING_OCS_STATUSES]
+    finished = [row for row in rows if row.status in FINISHED_OCS_STATUSES]
+    collapsed_running, collapsed_finished = _collapse_multiome_monitor_rows(
+        running, finished, include_queue_status=False
+    )
+    logical_rows: dict[tuple[str, tuple[str, str | int]], dict[str, Any]] = {}
+    for row in [*collapsed_running, *collapsed_finished]:
+        sample = row.sample
+        batch_name = sample.batch_name_from_vendor or "Unassigned batch"
+        key = (batch_name, _timeline_logical_key(row))
+        logical_row = logical_rows.setdefault(
+            key,
+            {"periods": set(), "batch_name": batch_name, "stages": {}},
+        )
+        period = row.started_at.date()
+        if selected_view == "year":
+            period = period.replace(day=1)
+        logical_row["periods"].add(period)
+        logical_row["stages"][row.stage] = (period, row.status)
+
+    sample_periods: dict[date, set[tuple[str, tuple[str, str | int]]]] = {}
+    batch_periods: dict[date, set[str]] = {}
+    period_stages: dict[date, dict[str, dict[str, int]]] = {}
+    for key, logical_row in logical_rows.items():
+        for period in logical_row["periods"]:
+            sample_periods.setdefault(period, set()).add(key)
+            if logical_row["batch_name"]:
+                batch_periods.setdefault(period, set()).add(logical_row["batch_name"])
+        for stage, (period, status) in logical_row["stages"].items():
+            counts = period_stages.setdefault(period, {}).setdefault(
+                stage,
+                {"total_stages": 0, "completed_stages": 0, "failed_stages": 0, "running_stages": 0},
+            )
+            counts["total_stages"] += 1
+            if status in TIMELINE_STATUS_GROUPS["COMPLETED"]:
+                counts["completed_stages"] += 1
+            elif status in TIMELINE_STATUS_GROUPS["FAILED"]:
+                counts["failed_stages"] += 1
+            elif status in TIMELINE_STATUS_GROUPS["IN_PROGRESS"]:
+                counts["running_stages"] += 1
+    return (
+        {period: {"stages": stages} for period, stages in period_stages.items()},
+        {period: len(keys) for period, keys in sample_periods.items()},
+        {period: len(names) for period, names in batch_periods.items()},
+    )
+
+
+def _timeline_logical_key(row):
+    if row.demand_id:
+        return ("demand", row.demand_id)
+    if not row.show_fastq_details and row.sample.load_name:
+        return ("load", row.sample.load_name)
+    return ("sample", row.sample.fastq_name)
 
 
 def _period_status_items(stage_counts):
@@ -360,25 +399,18 @@ def _period_status_summary(stage_counts):
 
 def _timeline_sample_row(fastq_names, stages, window_start, window_end, now):
     bars = [_timeline_bar(stage_status, window_start, window_end, now) for stage_status in stages]
+    if len(fastq_names) == 2:
+        display_name = " & ".join(fastq_names)
+    elif len(fastq_names) > 2:
+        display_name = f"{fastq_names[0]} + {len(fastq_names) - 1} more"
+    else:
+        display_name = fastq_names[0]
     return {
         "sample": fastq_names[0],
         "fastq_names": fastq_names,
-        "fastq_pair": (
-            " & ".join(sorted(fastq_names, key=lambda name: "-MX" not in name))
-            if len(fastq_names) == 2
-            else ""
-        ),
+        "display_name": display_name,
         "bars": bars,
     }
-
-
-def _collapse_timeline_stages(stages):
-    running = [stage for stage in stages if stage.status in RUNNING_OCS_STATUSES]
-    finished = [stage for stage in stages if stage.status in FINISHED_OCS_STATUSES]
-    collapsed_running, collapsed_finished = _collapse_multiome_monitor_rows(
-        running, finished, include_queue_status=False
-    )
-    return [row.stage_status for row in [*collapsed_running, *collapsed_finished]]
 
 
 def _timeline_bar(stage_status, window_start, window_end, now):

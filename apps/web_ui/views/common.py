@@ -38,14 +38,14 @@ TAB_ORDER = (BatchPrefix.RTX, BatchPrefix.RFX, BatchPrefix.MTX, BatchPrefix.ATX)
 QUEUED_STATUSES = [QueueEntry.Status.PENDING, QueueEntry.Status.SUBMITTING]
 FAILED_STATUSES = [QueueEntry.Status.FAILED]
 
-# OCS's own labels, as they arrive in the mirror. The monitor reads these rather than queue
+# OCS's own labels, as they arrive from DynamoDB. The monitor reads these rather than queue
 # statuses so it covers demands this app never submitted. AWAITING_TRIGGER and PENDING are
 # running rather than finished: OCS has the job and has not started it, which is still work
 # in flight from anyone watching the pipeline.
 RUNNING_OCS_STATUSES = ("IN_PROGRESS", "SUBMITTED", "SUBMITTING", "PENDING", "AWAITING_TRIGGER")
-FINISHED_OCS_STATUSES = ("COMPLETED", "ARCHIVED", "FAILED", "ABORTED", "STRANDED", "ABANDONED")
+FINISHED_OCS_STATUSES = ("COMPLETED", "ARCHIVED", "FAILED", "ABORTED", "STRANDED")
 
-# The mirror holds every stage OCS has run for half a million samples. The monitor shows
+# The local database holds every stage OCS has run for half a million samples. The monitor shows
 # the most recent, and says so on the page rather than implying it is the whole picture.
 MONITOR_ROWS = 1000
 TIMELINE_DAYS = 7
@@ -217,7 +217,7 @@ def _sorted(queryset, request):
 def _is_stale(synced_at, tolerance_seconds) -> bool:
     """Return whether a stage-status sweep is late enough to flag as stale.
 
-    Never synced counts as stale: an empty mirror and a dead scheduler look identical from
+    Never synced counts as stale: an empty local database and a dead scheduler look identical from
     the dashboard, and both want the same response from the reader.
     """
     if synced_at is None:
@@ -242,18 +242,25 @@ def _scoped_distinct(scope, field) -> list[str]:
 
 
 def batch_sort_key(name: str) -> tuple[int, str]:
-    """Sort vendor batch names by numeric suffix, then by name."""
+    """Sort batch names from the vendor by numeric suffix, then by name."""
     digits = "".join(character for character in name if character.isdigit())
     return (int(digits) if digits else -1, name)
 
 
 def _batch_options(selected: Sequence[str], scope) -> list[str]:
-    """Return vendor batch names for the current filter scope."""
+    """Return batch names from the vendor for the current filter scope."""
     batches = _scoped_distinct(scope, "batch_name_from_vendor")
     for value in selected:
         if value not in batches:
             batches.append(value)
     return sorted(batches, key=batch_sort_key, reverse=True)
+
+
+def export_csv_filename(*, data_locations: bool = False) -> str:
+    """Build a timestamped filename for a CSV export."""
+    timestamp = timezone.localtime(timezone.now()).strftime("%m-%d-%Y_%H%M")
+    suffix = "export_s3" if data_locations else "export"
+    return f"{timestamp}_{suffix}.csv"
 
 
 def _scoped_statuses(scope) -> list[str]:
@@ -269,7 +276,7 @@ def _scoped_statuses(scope) -> list[str]:
 def _prefix_counts() -> list[dict]:
     """Return each vendor family with its fastq sample count in display order.
 
-    Counted over the whole mirror rather than the current filter, so the numbers do not
+    Counted over the whole local database rather than the current filter, so the numbers do not
     move as you click between families.
     """
     counts = dict(
@@ -286,7 +293,7 @@ def _study_options() -> list[str]:
 
     `studies` is a JSON array, so the values are unnested in Postgres rather than read
     into Python: the answer is tens of names, but reading it row by row meant pulling the
-    column off every sample in the mirror on every dashboard render. Cached because it
+    column off every sample in the local database on every dashboard render. Cached because it
     only changes when a sync runs.
     """
     studies = cache.get(sync.STUDY_OPTIONS_KEY)

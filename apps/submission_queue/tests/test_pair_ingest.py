@@ -95,7 +95,7 @@ class TestPairIngestGate:
         assert plan.skipped[0].reason == planning.SkipReason.LIBRARY_PREP_UNCONFIGURED
 
     def test_a_non_multiome_sample_is_unaffected(self, config):
-        """The gate must not touch the 99% of the mirror that has no pair."""
+        """The gate must not touch the 99% of local data that has no pair."""
         plain = make("PLAIN-1", "10X120", "10xV4", load="3492_A01")
 
         plan = plan_for([plain], config)

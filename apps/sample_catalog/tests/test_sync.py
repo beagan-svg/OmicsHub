@@ -1,4 +1,4 @@
-"""Syncing the local mirror from the OCS tables."""
+"""Syncing the local database from the OCS tables."""
 
 from __future__ import annotations
 
@@ -204,7 +204,7 @@ class TestAbandonedDemands:
         status = StageStatus.objects.get(stage=Stage.ALIGN)
         assert (status.demand_id, status.status) == ("done", "COMPLETED")
 
-    def test_a_stale_unfinished_demand_alone_reads_as_abandoned(self, ocs):
+    def test_a_stale_unfinished_demand_keeps_the_ocs_status(self, ocs):
         ocs.history["NY-MX22068-2"] = [
             {"demand_type": "align", "demand_id": "stuck", "last_update_time": when(850)}
         ]
@@ -212,7 +212,7 @@ class TestAbandonedDemands:
 
         sync.sync_batch("MTX-22068")
 
-        assert StageStatus.objects.get(stage=Stage.ALIGN).status == sync.ABANDONED
+        assert StageStatus.objects.get(stage=Stage.ALIGN).status == "IN_PROGRESS"
 
     def test_a_job_that_really_is_running_still_reads_as_in_progress(self, ocs):
         """The rule must not touch live work , an alignment takes hours, not a fortnight."""
@@ -238,8 +238,8 @@ class TestAbandonedDemands:
         assert [(s.stage, s.status) for s in StageStatus.objects.all()] == [(Stage.INGEST, "COMPLETED")]
 
 
-class TestMirrorScope:
-    """The mirror holds only batches this app has a workflow for."""
+class TestSyncScope:
+    """The local database holds only batches this app has a workflow for."""
 
     @pytest.fixture
     def scanned(self, monkeypatch):
@@ -252,20 +252,20 @@ class TestMirrorScope:
     def test_keeps_batches_with_a_configured_workflow(self, scanned):
         result = scanned([{**METADATA, "fastq_name": "KEEP-1", "batch_name_from_vendor": "MTX-1"}])
 
-        assert result["mirrored"] == 1
+        assert result["synced"] == 1
         assert Sample.objects.get().fastq_name == "KEEP-1"
 
     def test_drops_batches_without_one(self, scanned):
         """RSC samples have no OCS ingest, so this app could never submit them."""
         result = scanned([{**METADATA, "fastq_name": "RSC-1", "batch_name_from_vendor": "RSC-301"}])
 
-        assert result["mirrored"] == 0
+        assert result["synced"] == 0
         assert result["skipped"] == 1
         assert not Sample.objects.exists()
 
     def test_an_entry_missing_a_key_attribute_is_skipped_rather_than_fatal(self, scanned):
         """DynamoDB items are schemaless. One entry without the attribute the scope is
-        judged by used to raise KeyError and abandon the rest of the mirror mid-page."""
+        judged by used to raise KeyError and abandon the rest of the local database mid-page."""
         result = scanned(
             [
                 {"fastq_name": "NO-BATCH"},
@@ -274,7 +274,7 @@ class TestMirrorScope:
             ]
         )
 
-        assert result["mirrored"] == 1
+        assert result["synced"] == 1
         assert Sample.objects.get().fastq_name == "KEEP-1"
 
     def test_over_long_vendor_text_does_not_lose_the_batch(self, scanned):
@@ -291,12 +291,12 @@ class TestMirrorScope:
             ]
         )
 
-        assert result["mirrored"] == 1
+        assert result["synced"] == 1
         assert Sample.objects.get().library_prep_name == "x" * 255
 
     def test_pruning_with_nothing_in_scope_is_refused(self):
         """The highest-consequence line in the app: an empty scope excludes nothing, so
-        without this the prune would delete every mirrored sample."""
+        without this the prune would delete every synced sample."""
         with pytest.raises(ValueError):
             sync._prune_out_of_scope(set())
 
@@ -460,8 +460,8 @@ class TestFullSweep:
         assert sample.stage_status(Stage.EXPORT) == "COMPLETED"
         assert sample.stage_demand_id(Stage.EXPORT) == "d-1"
 
-    def test_discovers_a_sample_not_yet_in_the_mirror(self, swept, ocs):
-        """History for an unmirrored sample means OCS started work on it, so it
+    def test_discovers_a_sample_not_yet_in_the_local_database(self, swept, ocs):
+        """History for a missing sample means OCS started work on it, so it
         appears on this sweep rather than waiting for the nightly metadata pass."""
         ocs.metadata = [{**METADATA, "fastq_name": "BRAND-NEW", "batch_name_from_vendor": "MTX-9"}]
 

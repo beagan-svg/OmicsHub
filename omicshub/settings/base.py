@@ -166,7 +166,7 @@ CREDENTIAL_ENCRYPTION_KEY = env("CREDENTIAL_ENCRYPTION_KEY")
 # that it cannot be determined. This is purely how long an unused cache entry may live
 # before it is dropped regardless. Eviction happens sooner, immediately, the moment AWS
 # itself rejects the credentials (expired or otherwise) on any call.
-LOG_VIEWER_CREDENTIAL_TTL_SECONDS = env.int("LOG_VIEWER_CREDENTIAL_TTL_SECONDS", default=5 * 60 * 60)
+LOG_VIEWER_CREDENTIAL_TTL_SECONDS = env.int("LOG_VIEWER_CREDENTIAL_TTL_SECONDS", default=8 * 60 * 60)
 
 # --- Celery ---------------------------------------------------------------
 CELERY_BROKER_URL = env("CELERY_BROKER_URL")

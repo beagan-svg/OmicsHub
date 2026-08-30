@@ -72,7 +72,7 @@ def test_a_non_multiome_sample_has_no_partner(db):
 def test_a_sample_sharing_a_load_name_is_not_dragged_in(pair):
     """load_name is not unique on its own, so the batch prefix has to match too.
 
-    262 load_names in the real mirror are shared by more than one sample; matching on
+    262 load_names in the real DynamoDB data are shared by more than one sample; matching on
     load_name alone would sweep unrelated samples into someone's submission. An RTX
     sample sharing a load with a real MTX/ATX pair is not itself part of that pair.
     """

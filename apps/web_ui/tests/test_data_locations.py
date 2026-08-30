@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 
 import pytest
@@ -127,7 +128,7 @@ class TestDataLocations:
         assert b"Sort by Fastq Name" in response.content
 
     def test_data_locations_empty_state_matches_the_dashboard_pattern(self, logged_in):
-        """No samples in the mirror at all, so every filter combination is empty."""
+        """No samples in the local database, so every filter combination is empty."""
         response = logged_in.get(reverse("web_ui:data-locations"))
 
         assert b"No samples match these filters." in response.content
@@ -255,6 +256,10 @@ class TestDataLocations:
         assert b"S3 Location" in body
         assert b"s3://bucket/results" in body
         assert b"A-1" in body
+        assert re.fullmatch(
+            r'attachment; filename="\d{2}-\d{2}-\d{4}_\d{4}_export_s3\.csv"',
+            response["Content-Disposition"],
+        )
 
     def test_data_locations_export_respects_the_active_tab(self, logged_in, monkeypatch, make_sample):
         make_sample("MTX-1", batch_name_from_vendor="MTX-10")

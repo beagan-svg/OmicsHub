@@ -11,7 +11,7 @@ FILTER_FIELDS = ("batch_name_from_vendor", "organism_common_name", "library_prep
 
 
 class SampleViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-    """List fastq samples mirrored from OCS. Refresh them with `sync`."""
+    """List locally synced OCS fastq samples and refresh them with `sync`."""
 
     serializer_class = SampleSerializer
     permission_classes = [IsAuthenticated]
@@ -29,7 +29,7 @@ class SampleViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
 
     @action(detail=False, methods=["post"])
     def sync(self, request):
-        """Load metadata and stage status for a vendor batch or fastq names."""
+        """Sync metadata and stage status for a batch name from the vendor or fastq names."""
         serializer = SyncRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

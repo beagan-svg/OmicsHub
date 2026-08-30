@@ -38,6 +38,7 @@ from .common import (
     _sorted,
     _status_sync_context,
     _study_options,
+    export_csv_filename,
 )
 
 logger = logging.getLogger(__name__)
@@ -155,7 +156,7 @@ def export_data_locations_csv(request):
             yield writer.writerow([csv_text(row["fastq_name"]), *values, csv_text(row["s3_uri"])])
 
     response = StreamingHttpResponse(csv_rows(), content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="omicshub-data-locations.csv"'
+    response["Content-Disposition"] = f'attachment; filename="{export_csv_filename(data_locations=True)}"'
     return response
 
 

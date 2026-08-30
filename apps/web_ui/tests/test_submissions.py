@@ -83,7 +83,7 @@ class TestSubmitReview:
         assert b"Select a workflow" in response.content
 
     def test_an_unrecognised_prefix_no_longer_asks(self, logged_in, active_config, make_sample):
-        """The regression this replaced: 98% of the mirror rendered as an unknown workflow."""
+        """The regression this replaced: 98% of the local database rendered as an unknown workflow."""
         make_sample("ODD-2", batch_name_from_vendor="10X120", library_prep_method_name="10xV4")
 
         response = logged_in.post(reverse("web_ui:submit-review"), {"fastq_names": ["ODD-2"]})
@@ -240,7 +240,7 @@ class TestCartJourney:
         assert b"Cart emptied" in cleared.content
         assert not CartItem.objects.filter(user=user).exists()
 
-    def test_a_fastq_name_the_mirror_no_longer_holds_is_reported(self, logged_in, make_sample, user):
+    def test_a_fastq_name_the_local_database_no_longer_holds_is_reported(self, logged_in, make_sample, user):
         make_sample("READY-1")
 
         response = logged_in.post(
@@ -248,13 +248,13 @@ class TestCartJourney:
         )
 
         assert b"Added 1 sample to the cart" in response.content
-        assert b"1 no longer in the mirror" in response.content
+        assert b"1 no longer exists in the local database" in response.content
         assert CartItem.objects.filter(user=user).count() == 1
 
     def test_a_cart_of_only_ghosts_says_so_rather_than_reporting_success(self, logged_in, user):
         response = logged_in.post(reverse("web_ui:cart-add"), {"fastq_names": ["GHOST-1"]}, follow=True)
 
-        assert b"1 no longer in the mirror" in response.content
+        assert b"1 no longer exists in the local database" in response.content
         assert not CartItem.objects.filter(user=user).exists()
 
     def test_the_dashboards_add_button_answers_without_leaving_the_page(self, logged_in, make_sample):
@@ -976,7 +976,7 @@ class TestCart:
         assert response.status_code == 200
         assert CartItem.objects.filter(user=user).count() == 1
 
-    def test_a_sample_no_longer_in_the_mirror_is_reported(self, logged_in, make_sample):
+    def test_a_sample_no_longer_in_the_local_database_is_reported(self, logged_in, make_sample):
         """A page open since before a re-sync can still list a sample that has since gone."""
         make_sample("READY-1")
 
@@ -984,7 +984,7 @@ class TestCart:
             reverse("web_ui:cart-add"), {"fastq_names": ["READY-1", "GONE-1"]}, follow=True
         )
 
-        assert b"1 no longer in the mirror" in response.content
+        assert b"1 no longer exists in the local database" in response.content
 
 
 class TestCartAddFeedback:
@@ -1268,7 +1268,7 @@ class TestConfigDrivesTheSubmission:
 class TestSubmitModalRenders:
     """The modal's own controls, since a template that half-renders still returns 200."""
 
-    def test_groups_commands_by_vendor_batch(self, logged_in, active_config, make_sample):
+    def test_groups_commands_by_batch_name_from_vendor(self, logged_in, active_config, make_sample):
         make_sample("A-1", batch_name_from_vendor="MTX-22068")
         make_sample("B-1", batch_name_from_vendor="MTX-22069")
 

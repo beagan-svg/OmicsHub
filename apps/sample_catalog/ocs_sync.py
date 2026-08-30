@@ -1,4 +1,4 @@
-"""Load OCS metadata and stage status into the local mirror."""
+"""Sync OCS metadata and stage status into the local database."""
 
 from __future__ import annotations
 
@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 # network calls, so they are made concurrently.
 HISTORY_FETCH_WORKERS = 8
 
-# Rows per INSERT during the full mirror. Large enough that 500k rows is a few hundred
+# Rows per INSERT during the full sync. Large enough that 500k rows is a few hundred
 # statements, small enough to stay well under Postgres' parameter limit.
 BULK_BATCH_SIZE = 500
 
-# Fastq names per lookup when mapping history rows back to mirror rows.
+# Fastq names per lookup when mapping history rows back to local rows.
 SAMPLE_LOOKUP_CHUNK = 5000
 
 # Post-alignment requests identify their input with this request parameter prefix.
@@ -45,7 +45,7 @@ PRUNE_CHUNK = 5000
 LAST_STATUS_SWEEP_KEY = "catalog:last-status-sweep"
 
 #: The dashboard's study filter, cached because unnesting a JSON column over the whole
-#: mirror is the most expensive thing on that page. Held here rather than in the web app
+#: the local database is the most expensive thing on that page. Held here rather than in the web app
 #: because this module is what makes it stale: a sync that brings in a new study has to
 #: drop it, or the study is in the table and missing from the menu it is filtered by,
 #: which reads as the sync having failed.
@@ -54,17 +54,12 @@ STUDY_OPTIONS_KEY = "web_ui:study-options"
 # OCS statuses that mean "this demand has not reached an outcome yet".
 UNFINISHED_STATUSES = frozenset({"IN_PROGRESS", "PENDING", "SUBMITTED"})
 
-# What this app calls a demand that never reached an outcome and that OCS has stopped
-# updating. This is not an OCS status. OCS has no such label, so those
-# demands sit at IN_PROGRESS forever.
-ABANDONED = "ABANDONED"
-
 # How long a demand may sit unfinished before it is read as abandoned rather than running.
 # Alignment takes hours, and this matches the fortnight `count_in_progress` already treats
 # as the window in-flight work lives in, so nothing genuinely running is ever caught by it.
 ABANDONED_AFTER = dt.timedelta(days=14)
 
-# Every field the mirror keeps. Text fields default to "" and numeric ones to None, so a
+# Every field the local database keeps. Text fields default to "" and numeric ones to None, so a
 # metadata entry missing an optional attribute maps cleanly rather than failing.
 TEXT_FIELDS = (
     "batch_name",
@@ -103,7 +98,7 @@ NO_ACTIVE_CONFIG = "No active workflow config, so nothing defines which batches 
 
 
 def sync_batch(batch_name_from_vendor: str) -> list[Sample]:
-    """Load every fastq sample in a vendor batch, then refresh stage status."""
+    """Sync every fastq sample for a batch name from the vendor, then refresh statuses."""
     entries = dynamodb.get_metadata_by_batch(batch_name_from_vendor)
     samples = _upsert_samples(entries)
     sync_stage_statuses(samples)
@@ -138,7 +133,7 @@ def _as_int(value):
 
 
 def _upsert_samples(entries: list[dict]) -> list[Sample]:
-    """Write fastq metadata entries to the mirror and return the rows."""
+    """Write fastq metadata entries locally and return the rows."""
     samples = Sample.objects.bulk_create(
         [Sample(fastq_name=entry["fastq_name"], **sample_fields(entry)) for entry in entries],
         update_conflicts=True,
@@ -153,7 +148,7 @@ def _upsert_samples(entries: list[dict]) -> list[Sample]:
 
 
 def _in_scope(entries: list[dict], batch_prefixes: set[str]) -> list[dict]:
-    """Return entries whose vendor batch has a workflow in the manifest."""
+    """Return entries whose batch name from the vendor has a manifest workflow."""
     wanted = []
     for entry in entries:
         batch = entry.get("batch_name_from_vendor")
@@ -166,9 +161,9 @@ def _in_scope(entries: list[dict], batch_prefixes: set[str]) -> list[dict]:
 
 
 def batch_prefix(batch_name_from_vendor: str) -> str:
-    """Return the workflow prefix from a vendor batch name, such as MTX from MTX-22028.
+    """Return the workflow prefix from a batch name from the vendor, such as MTX from MTX-22028.
 
-    Same rule the submission logic infers a modality with, so the mirror holds exactly the
+    Use the same rule as submission planning, so the local database contains exactly the
     batches that could be submitted.
     """
     return batch_name_from_vendor.split("-")[0].upper()
@@ -195,17 +190,17 @@ def sync_all_samples(batch_prefixes: set[str], progress=None) -> dict[str, int]:
             progress(total)
 
     pruned = _prune_out_of_scope(batch_prefixes)
-    result = {"mirrored": total, "skipped": skipped, "pruned": pruned}
-    logger.info("Mirrored fastq-metadata: %s", result)
+    result = {"synced": total, "skipped": skipped, "pruned": pruned}
+    logger.info("Synced fastq-metadata: %s", result)
     return result
 
 
 def _prune_out_of_scope(batch_prefixes: set[str]) -> int:
-    """Delete mirrored samples outside the active manifest."""
+    """Delete locally stored samples outside the active manifest."""
     if not batch_prefixes:
         # exclude(Q()) contributes no WHERE clause, so an empty scope would match and delete
         # every sample. A scope this app cannot name is a config fault, not a
-        # licence to empty the mirror.
+        # licence to empty the local database.
         raise ValueError("Refusing to prune with no batch prefixes in scope.")
 
     keep = Q()
@@ -239,7 +234,7 @@ def sync_all_stage_statuses(batch_prefixes: set[str]) -> dict[str, int]:
         """Keep the highest ranked demand for a fastq sample and stage."""
         stage = stage.lower()
         # OCS runs demand types this app does not model, such as transfer. Storing
-        # rows the dashboard can never show would just be junk in the mirror.
+        # rows the dashboard can never show would just be junk in the local database.
         if stage not in TRACKED_STAGES:
             return
         key = (fastq_name, stage)
@@ -286,13 +281,13 @@ def sync_all_stage_statuses(batch_prefixes: set[str]) -> dict[str, int]:
     fastq_names = {fastq_name for fastq_name, _ in latest}
     sample_ids = _sample_ids(fastq_names)
 
-    # A fastq name in history that is not mirrored is a sample OCS has just begun working
+    # A fastq name in history that is not local is a sample OCS has just begun working
     # on. Fetching those here is what lets a new sample appear within this sweep rather
     # than waiting for the nightly metadata pass.
     discovered = _discover_samples(fastq_names - set(sample_ids), batch_prefixes)
     sample_ids |= discovered
 
-    # What the mirror already says, so the sweep can write only what moved. Reading the
+    # What the local database already says, so the sweep can write only what moved. Reading the
     # table costs one query; writing it costs a new row version per row, every five
     # minutes, whether or not OCS changed anything. This produced about 13M row writes a day to
     # restate values that were already correct.
@@ -312,7 +307,7 @@ def sync_all_stage_statuses(batch_prefixes: set[str]) -> dict[str, int]:
             file_store_ids.get((fastq_name, stage, demand["demand_id"]), ""),
         )
         # Compared against the row itself rather than a stored high-water mark, so it is
-        # self-correcting: anything the mirror does not already say gets written, and a
+        # self-correcting: anything the local database does not already say gets written, and a
         # lost write is repaired by the next sweep rather than skipped forever.
         if existing.get((sample_id, stage)) == tuple(fields[name] for name in STAGE_STATUS_FIELDS):
             unchanged += 1
@@ -398,7 +393,7 @@ def _upsert_stage_statuses(statuses: list[StageStatus]) -> None:
 
 
 def _existing_stage_rows() -> dict[tuple[int, str], tuple]:
-    """Return each mirrored stage status as the tuple used for comparison.
+    """Return each locally stored stage status as the tuple used for comparison.
 
     Ordered by STAGE_STATUS_FIELDS so the comparison and the write agree by construction:
     a column added to `stage_status_fields` joins both at once, rather than being written
@@ -409,7 +404,7 @@ def _existing_stage_rows() -> dict[tuple[int, str], tuple]:
 
 
 def _discover_samples(missing: set[str], batch_prefixes: set[str]) -> dict[str, int]:
-    """Load fastq samples with OCS history that are missing from the mirror.
+    """Load fastq samples with OCS history that are missing locally.
 
     Scoped to the configured workflows for the same reason the metadata sweep is: OCS
     processes batches this app has no workflow for, and they would only be noise here.
@@ -423,7 +418,7 @@ def _discover_samples(missing: set[str], batch_prefixes: set[str]) -> dict[str, 
         return {}
 
     samples = _upsert_samples(wanted)
-    logger.info("Discovered %d samples new to the mirror", len(samples))
+    logger.info("Discovered %d samples new to the local database", len(samples))
     return {sample.fastq_name: sample.pk for sample in samples}
 
 
@@ -510,7 +505,7 @@ def stage_status_fields(demand_id: str, demand: dict, file_store_id: str = "") -
     return {
         "demand_id": demand_id,
         "execution_arn": demand.get("request", {}).get("execution_metadata", {}).get("arn", ""),
-        "status": demand_status(demand),
+        "status": demand["status"],
         "last_update_time": _parse_time(demand["last_update_time"]),
         "started_at": _optional_time(demand, "start_time"),
         "duration_seconds": _duration_seconds(demand),
@@ -598,11 +593,6 @@ def is_abandoned(demand: dict) -> bool:
     if demand["status"] not in UNFINISHED_STATUSES:
         return False
     return _parse_time(demand["last_update_time"]) < dt.datetime.now(dt.UTC) - ABANDONED_AFTER
-
-
-def demand_status(demand: dict) -> str:
-    """Return the status to store for a demand, including abandoned status."""
-    return ABANDONED if is_abandoned(demand) else demand["status"]
 
 
 def _demand_rank(demand: dict) -> tuple[int, dt.datetime]:

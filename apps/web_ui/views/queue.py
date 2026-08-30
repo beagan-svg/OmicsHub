@@ -63,7 +63,7 @@ def cancel(request, pk):
 @login_required
 @require_POST
 def toggle_queue_pause(request):
-    """Pause or resume this user's pending queue entries."""
+    """Pause or resume the requesting user's pending queue entries."""
     request.user.queue_paused = not request.user.queue_paused
     request.user.save(update_fields=["queue_paused"])
     state = "paused" if request.user.queue_paused else "resumed"
@@ -74,7 +74,7 @@ def toggle_queue_pause(request):
 @login_required
 @require_POST
 def delete_queue_entry(request, pk):
-    """Delete this user's pending queue entry without affecting OCS."""
+    """Delete the requesting user's pending queue entry without affecting OCS."""
     entry = get_object_or_404(_owned(request), pk=pk)
     deleted, _ = QueueEntry.objects.filter(pk=entry.pk, status=QueueEntry.Status.PENDING).delete()
     if deleted:

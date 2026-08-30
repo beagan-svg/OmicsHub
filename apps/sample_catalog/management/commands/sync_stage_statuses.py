@@ -18,7 +18,7 @@ class Command(BaseCommand):
         result = sync.sync_all_stage_statuses(batch_prefixes=prefixes)
         self.stdout.write(self.style.SUCCESS(f"Wrote {result['statuses']} stage statuses."))
         if result["discovered"]:
-            self.stdout.write(f"  Discovered {result['discovered']} samples new to the mirror.")
+            self.stdout.write(f"  Discovered {result['discovered']} samples new to the local database.")
         if result["out_of_scope"]:
             self.stdout.write(
                 f"  {result['out_of_scope']} skipped. Batch is outside the configured workflows."

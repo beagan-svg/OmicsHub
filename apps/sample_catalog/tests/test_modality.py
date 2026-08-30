@@ -30,7 +30,7 @@ def make(fastq_name: str, batch: str, prep: str = "10xV4", load: str = "") -> Sa
         ("RTX-34056", BatchPrefix.RTX, Modality.RTX),
         # The ATAC half of a multiome pair: its own family, but it runs as MTX.
         ("ATX-36013", BatchPrefix.ATX, Modality.MTX),
-        # The shape most of the mirror actually has. There is no recognised prefix.
+        # The shape most of the local data actually has. There is no recognised prefix.
         ("10X120", BatchPrefix.RTX, Modality.RTX),
         ("10X172-4", BatchPrefix.RTX, Modality.RTX),
     ],
@@ -59,7 +59,7 @@ def test_lowercase_prefix_falls_through_to_rtx():
     """Documents a real limit: the derivation is case-sensitive.
 
     Postgres will not accept `upper()` inside a generated column , it is collation
-    dependent, so the expression is not immutable. Every vendor batch name OCS has ever
+    dependent, so the expression is not immutable. Every batch name from the vendor OCS has ever
     sent is uppercase, so this is a recorded assumption rather than a live problem; if a
     lowercase prefix ever appears it classifies as RTX instead of failing loudly.
     """
@@ -134,7 +134,7 @@ def test_prefix_mapping_matches_the_generated_columns():
 
 def test_sync_scope_includes_atx_whenever_mtx_is_configured():
     """The bug this guards: scoping the sync by workflow name never fetches ATX, and the
-    out-of-scope prune then deletes any ATX samples already mirrored."""
+    out-of-scope prune then deletes any ATX samples already synced."""
     from apps.sample_catalog.models import prefixes_for_workflows
 
     assert prefixes_for_workflows({"MTX", "RFX", "RTX"}) == {"MTX", "ATX", "RFX", "RTX"}

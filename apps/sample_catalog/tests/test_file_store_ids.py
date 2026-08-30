@@ -105,7 +105,7 @@ class TestSweep:
     def sample(self):
         return Sample.objects.create(fastq_name="NY-MX2147-9", batch_name_from_vendor="MTX-2147")
 
-    def test_the_id_reaches_the_mirror(self, swept, sample):
+    def test_the_id_reaches_the_local_database(self, swept, sample):
         swept(
             history=[history_row("align", "d-1", [ALIGN_OUTPUT])],
             demands=[{"demand_id": "d-1", "status": "COMPLETED", "last_update_time": "2026-01-01T00:00:00Z"}],
@@ -175,7 +175,7 @@ class TestSweep:
 class TestPerSampleRefresh:
     """Refresh file store ids for one batch through per-sample history queries."""
 
-    def test_the_id_reaches_the_mirror(self, monkeypatch):
+    def test_the_id_reaches_the_local_database(self, monkeypatch):
         sample = Sample.objects.create(fastq_name="NY-MX2147-9", batch_name_from_vendor="MTX-2147")
         monkeypatch.setattr(
             sync.dynamodb,

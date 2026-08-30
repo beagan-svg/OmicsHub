@@ -36,7 +36,7 @@ UNPROCESSED_MAX_RETRIES = 5
 
 # A GFS path is the "gfs://" scheme plus a file store id, which gcs_core defines as the
 # sha1 of the S3 URI, with forty lowercase hex characters. Matching that shape rather than
-# just stripping the scheme keeps malformed rows out of the mirror instead of storing an
+# just stripping the scheme keeps malformed rows out of the local database instead of storing an
 # invalid OCS file-store ID.
 GFS_PATH = re.compile(r"^gfs://([0-9a-f]{40})$")
 
@@ -192,7 +192,7 @@ def _scan(table_name: str, page_size: int, **kwargs):
 
 
 def get_metadata_by_batch(batch_name_from_vendor: str) -> list[dict[str, Any]]:
-    """Return every fastq-metadata entry in a vendor batch."""
+    """Return every fastq-metadata entry for a batch name from the vendor."""
     return _query_all(
         _table(FASTQ_METADATA_TABLE),
         IndexName=f"{settings.OCS_ENV_BASE}-{FASTQ_METADATA_BATCH_INDEX}",

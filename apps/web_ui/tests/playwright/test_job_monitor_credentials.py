@@ -266,7 +266,7 @@ class TestFullCredentialFlow:
         page.click("[data-job-log-credentials-submit]")
         page.wait_for_selector('[data-job-log-credentials-status-pill]:has-text("Credentials valid")')
 
-        # Mirrors exactly what job_monitor.html's own 30-second refreshTables() and
+        # Matches exactly what job_monitor.html's own 30-second refreshTables() and
         # live-fragments.js's refresh() both do: replace the region's innerHTML, then
         # dispatch joblog:refreshed so job-log-credentials.js re-binds/re-enables
         # whatever's now in the DOM. Skipping the dispatch here would test an incomplete
