@@ -12,8 +12,8 @@ from django.utils import timezone
 
 from apps.sample_catalog.models import Stage, StageStatus
 
-from .common import FINISHED_OCS_STATUSES, RUNNING_OCS_STATUSES, TIMELINE_DAYS, TIMELINE_PAGE_SIZE
-from .monitor import _collapse_multiome_monitor_rows
+from .monitor import collapse_multiome_monitor_rows
+from .view_helpers import FINISHED_OCS_STATUSES, RUNNING_OCS_STATUSES, TIMELINE_DAYS, TIMELINE_PAGE_SIZE
 
 TIMELINE_STATUS_GROUPS = {
     "IN_PROGRESS": RUNNING_OCS_STATUSES,
@@ -78,7 +78,7 @@ def job_timeline(request):
         stage_rows = list(stages.order_by("started_at"))
         running = [row for row in stage_rows if row.status in RUNNING_OCS_STATUSES]
         finished = [row for row in stage_rows if row.status in FINISHED_OCS_STATUSES]
-        collapsed_running, collapsed_finished = _collapse_multiome_monitor_rows(
+        collapsed_running, collapsed_finished = collapse_multiome_monitor_rows(
             running, finished, include_queue_status=False
         )
         batch_rows: dict[str, dict[tuple[str, str | int], dict[str, Any]]] = {}
@@ -244,7 +244,7 @@ def _timeline_day_batches(stages, selected_day):
     day_rows = list(stages.filter(started_at__date=selected_day).order_by("started_at"))
     running = [row for row in day_rows if row.status in RUNNING_OCS_STATUSES]
     finished = [row for row in day_rows if row.status in FINISHED_OCS_STATUSES]
-    collapsed_running, collapsed_finished = _collapse_multiome_monitor_rows(
+    collapsed_running, collapsed_finished = collapse_multiome_monitor_rows(
         running, finished, include_queue_status=False
     )
 
@@ -306,7 +306,7 @@ def _timeline_logical_period_data(stages, selected_view):
     rows = list(stages.order_by("started_at"))
     running = [row for row in rows if row.status in RUNNING_OCS_STATUSES]
     finished = [row for row in rows if row.status in FINISHED_OCS_STATUSES]
-    collapsed_running, collapsed_finished = _collapse_multiome_monitor_rows(
+    collapsed_running, collapsed_finished = collapse_multiome_monitor_rows(
         running, finished, include_queue_status=False
     )
     logical_rows: dict[tuple[str, tuple[str, str | int]], dict[str, Any]] = {}

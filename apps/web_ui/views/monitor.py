@@ -12,10 +12,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.ocs_integration import log_credentials
+from apps.sample_catalog import multiome_pairing as pairing
 from apps.sample_catalog.models import MULTIOME_PREFIXES, BatchPrefix, Sample, Stage, StageStatus
 from apps.submission_queue.models import QueueEntry
 
-from .common import (
+from .view_helpers import (
     FAILED_STATUSES,
     FINISHED_OCS_STATUSES,
     MONITOR_ROWS,
@@ -99,7 +100,7 @@ def job_monitor(request):
     # OCS limits the number of running stages. Finished stages use a separate display cap.
     running_rows = list(running_stages.order_by(F("started_at").desc(nulls_last=True)))
     finished_stages = list(_finished_stages_queryset(stages, finished_stage, finished_status))
-    all_running_rows, finished_rows = _collapse_multiome_monitor_rows(
+    all_running_rows, finished_rows = collapse_multiome_monitor_rows(
         running_rows, finished_stages, include_queue_status=True
     )
     monitor_running = [row for row in all_running_rows if not running_stage or row.stage == running_stage]
@@ -266,7 +267,7 @@ def _monitor_filter_options(request, *, options, param, page_param):
     Shared by the stage and finished-status filters. Both provide an empty `All` option and
     a fixed list of values.
     """
-    result = []
+    links = []
     for value, label in options:
         query = request.GET.copy()
         query.pop(page_param, None)
@@ -274,11 +275,11 @@ def _monitor_filter_options(request, *, options, param, page_param):
             query[param] = value
         else:
             query.pop(param, None)
-        result.append({"label": label, "value": value, "url": f"?{query.urlencode()}"})
-    return result
+        links.append({"label": label, "value": value, "url": f"?{query.urlencode()}"})
+    return links
 
 
-def _collapse_multiome_monitor_rows(
+def collapse_multiome_monitor_rows(
     running: Sequence[StageStatus],
     finished_stages: Sequence[StageStatus],
     *,
@@ -291,17 +292,7 @@ def _collapse_multiome_monitor_rows(
         for row in rows
         if row.sample.load_name and row.sample.batch_prefix in MULTIOME_PREFIXES
     }
-    multiome_samples_by_load: dict[str, dict[str, Sample]] = {}
-    if load_names:
-        for sample in Sample.objects.filter(
-            load_name__in=load_names, batch_prefix__in=MULTIOME_PREFIXES
-        ).only("fastq_name", "load_name", "batch_prefix"):
-            multiome_samples_by_load.setdefault(sample.load_name, {})[sample.batch_prefix] = sample
-    multiome_samples_by_load = {
-        load_name: samples
-        for load_name, samples in multiome_samples_by_load.items()
-        if set(MULTIOME_PREFIXES) <= samples.keys()
-    }
+    multiome_samples_by_load = pairing.paired_samples_by_load_name(load_names)
     selected: dict[tuple[str, str | int], StageStatus] = {}
     names_by_key: dict[tuple[str, str | int], list[str]] = {}
     order: list[tuple[str, str | int]] = []

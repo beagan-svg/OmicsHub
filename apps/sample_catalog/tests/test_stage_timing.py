@@ -30,7 +30,7 @@ def create_sample(fastq_name="NW-MX32013-1") -> Sample:
 
 def demand(demand_id="d-1", stage="align", **overrides) -> dict:
     """A demand-registry item shaped exactly as DynamoDB returns one."""
-    item = {
+    demand_record = {
         "demand_id": demand_id,
         "demand_type": stage,
         "status": "COMPLETED",
@@ -39,8 +39,8 @@ def demand(demand_id="d-1", stage="align", **overrides) -> dict:
         # DynamoDB numbers deserialise as Decimal, never int.
         "duration": Decimal("10102"),
     }
-    item.update(overrides)
-    return item
+    demand_record.update(overrides)
+    return demand_record
 
 
 class TestProjection:
@@ -74,10 +74,10 @@ class TestParsing:
 
     def test_a_missing_duration_is_none_not_zero(self):
         """A running stage has no duration; zero would claim it finished instantly."""
-        item = demand()
-        del item["duration"]
+        demand_record = demand()
+        del demand_record["duration"]
 
-        assert sync._duration_seconds(item) is None
+        assert sync._duration_seconds(demand_record) is None
 
     def test_a_negative_duration_is_dropped(self):
         """Clock skew at OCS produces these; the column is unsigned."""
@@ -88,10 +88,10 @@ class TestParsing:
 
     def test_a_missing_start_time_is_none(self):
         """Demands predating the field carry no start_time."""
-        item = demand()
-        del item["start_time"]
+        demand_record = demand()
+        del demand_record["start_time"]
 
-        assert sync._optional_time(item, "start_time") is None
+        assert sync._optional_time(demand_record, "start_time") is None
 
     def test_start_time_parses_to_an_aware_datetime(self):
         parsed = sync._optional_time(demand(), "start_time")

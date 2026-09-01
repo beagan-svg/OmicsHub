@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 from django.urls import reverse
 
-TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
+from .conftest import TEMPLATES
 
 
 def test_no_multiline_inline_comments():

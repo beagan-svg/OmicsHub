@@ -22,7 +22,7 @@ from apps.sample_catalog.models import NOT_COMPLETED, BatchPrefix, Sample, Stage
 from apps.web_ui import columns
 from apps.web_ui import data_location_queries as locations
 
-from .common import (
+from .view_helpers import (
     DEFAULT_SORT,
     DOWNLOAD_SELECTION_LIMIT,
     FILTER_FIELDS,
@@ -38,6 +38,7 @@ from .common import (
     _sorted,
     _status_sync_context,
     _study_options,
+    csv_safe_text,
     export_csv_filename,
 )
 
@@ -47,9 +48,9 @@ logger = logging.getLogger(__name__)
 @login_required
 def data_locations(request):
     """List S3 locations for the visible fastq samples and OCS stages."""
-    queryset = _sorted(_filtered_samples(request), request)
+    samples = _sorted(_filtered_samples(request), request)
     page_size = _page_size(request)
-    page = Paginator(queryset, page_size).get_page(request.GET.get("page"))
+    page = Paginator(samples, page_size).get_page(request.GET.get("page"))
     stage_filters = [
         {"stage": stage, "selected": request.GET.get(f"{stage.value}_status", "")}
         for stage in columns.LOCATION_STAGES
@@ -86,7 +87,7 @@ def data_locations(request):
             "visible_column_keys": [column.key for column in columns.visible_location_columns(request.user)],
             "batch_prefixes": _prefix_counts(),
             "selected_prefix": request.GET.get("batch_prefix", ""),
-            "search": request.GET.get("fastq_name") or "",
+            "search": (request.GET.get("fastq_name") or "").strip(),
             "studies": _study_options(),
             "selected_studies": request.GET.getlist("study"),
             # Stage.POST_ALIGN's own label is "Post-alignment": overridden here rather than
@@ -134,10 +135,6 @@ def export_data_locations_csv(request):
     writer = csv.writer(_Echo())
     headers = ["Fastq Name", *(column.label for column in visible), "S3 Location"]
 
-    def csv_text(value) -> str:
-        text = "" if value is None else str(value)
-        return f"'{text}" if text[:1] in ("=", "+", "-", "@") else text
-
     def csv_rows():
         yield writer.writerow(headers)
         for row in rows:
@@ -152,8 +149,8 @@ def export_data_locations_csv(request):
                 )
                 if isinstance(value, list):
                     value = ", ".join(value)
-                values.append(csv_text(value))
-            yield writer.writerow([csv_text(row["fastq_name"]), *values, csv_text(row["s3_uri"])])
+                values.append(csv_safe_text(value))
+            yield writer.writerow([csv_safe_text(row["fastq_name"]), *values, csv_safe_text(row["s3_uri"])])
 
     response = StreamingHttpResponse(csv_rows(), content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{export_csv_filename(data_locations=True)}"'

@@ -182,8 +182,15 @@ class TestListingAndCancelling:
         assert response.status_code == 200
         assert entry.status == QueueEntry.Status.CANCELLED
 
-    def test_a_submitted_entry_cannot_be_cancelled(self, api_client, active_config, make_sample):
-        """It already has a demand at OCS; cancelling here would misrepresent that."""
+    def test_a_submitted_entry_is_left_alone_rather_than_cancelled(
+        self, api_client, active_config, make_sample
+    ):
+        """It already has a demand at OCS; cancelling here would misrepresent that.
+
+        A no-op, not an error: the worker claiming an entry ahead of a cancel request is an
+        ordinary race, not a client mistake, so this matches the web_ui cancel view's own
+        forgiving handling of the same race rather than treating it as a 400.
+        """
         make_sample("READY-1")
         api_client.post("/api/queue/", {"fastq_names": ["READY-1"]}, format="json")
         entry = QueueEntry.objects.get()
@@ -192,7 +199,9 @@ class TestListingAndCancelling:
 
         response = api_client.post(f"/api/queue/{entry.pk}/cancel/")
 
-        assert response.status_code == 400
+        entry.refresh_from_db()
+        assert response.status_code == 200
+        assert entry.status == QueueEntry.Status.SUBMITTED
 
     def test_entries_can_be_filtered_by_status(self, api_client, active_config, make_sample):
         make_sample("READY-1")

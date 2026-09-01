@@ -39,7 +39,7 @@ def test_selecting_the_gex_half_pulls_in_the_atac_half(pair):
 
 
 @pytest.mark.django_db
-def test_it_works_in_the_other_direction(pair):
+def test_selecting_the_atac_half_pulls_in_the_gex_half(pair):
     gex, atac = pair
 
     samples, added = with_multiome_partners([atac])

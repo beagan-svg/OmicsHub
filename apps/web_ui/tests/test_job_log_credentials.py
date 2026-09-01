@@ -15,6 +15,8 @@ from apps.ocs_integration import dynamodb, log_credentials, s3
 from apps.sample_catalog.models import Stage
 from apps.submission_queue.models import QueueEntry
 
+from .conftest import stub_valid_sts
+
 pytestmark = pytest.mark.django_db
 
 FAKE_ACCESS_KEY = "test-access-key"
@@ -30,26 +32,6 @@ def submit(client, **overrides):
     }
     payload.update(overrides)
     return client.post(reverse("web_ui:job-credentials-submit"), payload)
-
-
-class _FakeStsClient:
-    def get_caller_identity(self):
-        return {"UserId": "AID1", "Account": "1", "Arn": "arn:aws:sts::1:x"}
-
-
-class _FakeSession:
-    def client(self, service_name, **kwargs):
-        assert service_name == "sts"
-        return _FakeStsClient()
-
-
-def stub_valid_sts(monkeypatch):
-    """Patch one level below validate_credentials, not validate_credentials itself, so
-    its real caching side effect actually runs -- a test that replaces
-    validate_credentials wholesale would see job_credentials_submit return "valid" but
-    leave the cache empty, since the caching happens inside the function being replaced.
-    """
-    monkeypatch.setattr(log_credentials, "_session", lambda *a: _FakeSession())
 
 
 class TestCredentialsSubmit:

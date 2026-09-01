@@ -114,7 +114,7 @@ def _filtered_samples(request):
         if values:
             queryset = queryset.filter(**{f"{field}__in": values})
 
-    search = request.GET.get("fastq_name")
+    search = (request.GET.get("fastq_name") or "").strip()
     if search:
         queryset = queryset.filter(
             Q(fastq_name__icontains=search)
@@ -261,6 +261,16 @@ def export_csv_filename(*, data_locations: bool = False) -> str:
     timestamp = timezone.localtime(timezone.now()).strftime("%m-%d-%Y_%H%M")
     suffix = "export_s3" if data_locations else "export"
     return f"{timestamp}_{suffix}.csv"
+
+
+def csv_safe_text(value) -> str:
+    """Return one CSV cell as text, defused against Excel formula injection.
+
+    A leading "=", "+", "-" or "@" is treated as a formula by Excel, so those are prefixed
+    to stop a batch name from the vendor executing when the file is opened.
+    """
+    text = "" if value is None else str(value)
+    return f"'{text}" if text[:1] in ("=", "+", "-", "@") else text
 
 
 def _scoped_statuses(scope) -> list[str]:

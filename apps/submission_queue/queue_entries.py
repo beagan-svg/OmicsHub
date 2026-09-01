@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from django.db import IntegrityError, transaction
 
-from apps.submission_queue.models import QueueEntry
+from apps.submission_queue.models import CartItem, QueueEntry
 from apps.submission_queue.queue_planning import Plan, PlannedEntry
 
 
@@ -71,3 +71,33 @@ def enqueue(
                 created.append(row)
 
     return EnqueueResult(created=created, already_queued=already_queued)
+
+
+def enqueue_and_clear_cart(
+    *,
+    plan: Plan,
+    user,
+    notify_email: str,
+    forced: bool = False,
+    batch_processing: bool = False,
+) -> EnqueueResult:
+    """Queue a confirmed plan and remove now-queued samples from the user's cart.
+
+    Queueing and clearing the cart are one unit: a failure between them leaves the jobs
+    queued and still staged, so the user confirms the same submission again.
+    """
+    with transaction.atomic():
+        result = enqueue(
+            plan=plan,
+            user=user,
+            notify_email=notify_email,
+            forced=forced,
+            batch_processing=batch_processing,
+        )
+        # Only samples added to the queue leave the cart. Samples skipped while ingest is
+        # running remain staged for a later submission.
+        queued_names = {entry.sample.fastq_name for entry in result.created}
+        queued_names |= {entry.sample.fastq_name for entry in result.already_queued}
+        if queued_names:
+            CartItem.objects.filter(user=user, sample__fastq_name__in=queued_names).delete()
+    return result

@@ -4,7 +4,6 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -19,7 +18,7 @@ from apps.web_ui.forms import ConfigUploadForm, SubmissionForm
 from apps.workflow_engine import command_builder, config_loader, manifest_service, modality
 from apps.workflow_engine.models import WorkflowConfig
 
-from .common import OVERRIDABLE_FIELDS, PAGE_SIZE_OPTIONS, _page_size, staff_required
+from .view_helpers import OVERRIDABLE_FIELDS, PAGE_SIZE_OPTIONS, _page_size, staff_required
 
 ARGUMENT_DESCRIPTIONS = {
     "--reference-names": (
@@ -162,22 +161,13 @@ def submit_confirm(request):
         messages.error(request, "Choose a modality for the samples that need one.")
         return redirect("web_ui:checkout")
 
-    # Queueing and clearing the cart are one unit: a failure between them leaves the jobs
-    # queued and still staged, and the user confirms the same submission again.
-    with transaction.atomic():
-        result = enqueue_service.enqueue(
-            plan=plan,
-            user=request.user,
-            notify_email=context["submission"]["email"],
-            forced=bool(context["submission"]["force"]),
-            batch_processing=context["submission"]["batch_processing"],
-        )
-        # Only samples added to the queue leave the cart. Samples skipped while ingest is
-        # running remain staged for a later submission.
-        queued_names = {entry.sample.fastq_name for entry in result.created}
-        queued_names |= {entry.sample.fastq_name for entry in result.already_queued}
-        if queued_names:
-            CartItem.objects.filter(user=request.user, sample__fastq_name__in=queued_names).delete()
+    result = enqueue_service.enqueue_and_clear_cart(
+        plan=plan,
+        user=request.user,
+        notify_email=context["submission"]["email"],
+        forced=bool(context["submission"]["force"]),
+        batch_processing=context["submission"]["batch_processing"],
+    )
 
     if result.created:
         messages.success(request, f"Queued {len(result.created)} jobs.")
@@ -383,7 +373,7 @@ def _checkout_context(request, config=None):
         "checkout_page_param": "checkout_page",
         "checkout_page_size_param": "checkout_page_size",
         "page_size_options": PAGE_SIZE_OPTIONS,
-        # Fixed, not the user's dashboard choice. See columns.CHECKOUT_COLUMNS.
+        # Fixed, not the user's dashboard choice. See columns.CHECKOUT_COLUMN_LIST.
         "columns": columns.CHECKOUT_COLUMN_LIST,
         "config": config,
         # The picker only ever shows a name and an upload date; .only() skips fetching

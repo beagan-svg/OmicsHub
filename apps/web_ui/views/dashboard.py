@@ -22,7 +22,7 @@ from apps.web_ui.forms import SyncForm
 from apps.workflow_engine import modality
 from apps.workflow_engine.models import WorkflowConfig
 
-from .common import (
+from .view_helpers import (
     DEFAULT_SORT,
     FILTER_FIELDS,
     PAGE_SIZE_OPTIONS,
@@ -38,6 +38,7 @@ from .common import (
     _sorted,
     _status_sync_context,
     _study_options,
+    csv_safe_text,
     export_csv_filename,
 )
 
@@ -169,14 +170,8 @@ def export_csv(request):
 
 
 def _export_value(sample, column):
-    """Return one cell as spreadsheet text.
-
-    A leading "=", "+", "-" or "@" is treated as a formula by Excel, so those are prefixed
-    to stop a batch name from the vendor executing when the file is opened.
-    """
-    value = column.value_for(sample, raw=True)
-    text = "" if value is None else str(value)
-    return f"'{text}" if text[:1] in ("=", "+", "-", "@") else text
+    """Return one cell as spreadsheet-safe text."""
+    return csv_safe_text(column.value_for(sample, raw=True))
 
 
 @login_required
@@ -194,9 +189,9 @@ def cart_add(request):
     samples = list(Sample.objects.filter(fastq_name__in=fastq_names))
     in_cart = _cart_sample_ids(request.user, samples)
 
-    # `ignore_conflicts` rather than trusting the read above. Between that query and this
-    # A concurrent insert can trigger the unique constraint, so use ignore_conflicts to make
-    # the operation idempotent.
+    # A concurrent insert between the read above and this write can trigger the unique
+    # constraint, so use ignore_conflicts rather than trusting that read to make this
+    # operation idempotent.
     CartItem.objects.bulk_create(
         [CartItem(user=request.user, sample=sample) for sample in samples if sample.pk not in in_cart],
         ignore_conflicts=True,
@@ -222,13 +217,13 @@ def _cart_sample_ids(user, samples) -> set[int]:
 def _cart_add_result(request, *, added=0, already=0, missing=0, error="", status=200):
     """Return a cart-add result as dashboard JSON or a redirect.
 
-        The dashboard adds without leaving the page, because the confirmation belongs where the
-        action is: the button sits at the bottom of a table that scrolls inside its own box, so
-        a message banner at the top of the document lands the better part of a screen away from
-        where the user is looking, and reads as nothing having happened.
+    The dashboard adds without leaving the page, because the confirmation belongs where the
+    action is: the button sits at the bottom of a table that scrolls inside its own box, so
+    a message banner at the top of the document lands the better part of a screen away from
+    where the user is looking, and reads as nothing having happened.
 
-    The redirect is what happens with JavaScript off, and the tests exercise it because
-        same counts, same wording, carried as messages instead.
+    The redirect is what happens with JavaScript off; it carries the same counts and wording
+    as messages instead, and the tests exercise it directly.
     """
     parts = []
     if added:
@@ -283,7 +278,7 @@ def cart_clear(request):
 
 
 def _dashboard_context(request):
-    queryset = _sorted(_filtered_samples(request), request)
+    samples = _sorted(_filtered_samples(request), request)
     stage_filters = [
         {"stage": stage, "selected": request.GET.get(f"{stage.value}_status", "")} for stage in Stage
     ]
@@ -300,7 +295,7 @@ def _dashboard_context(request):
 
     config = WorkflowConfig.objects.filter(is_active=True).first()
     page_size = _page_size(request)
-    page = Paginator(queryset, page_size).get_page(request.GET.get("page"))
+    page = Paginator(samples, page_size).get_page(request.GET.get("page"))
 
     return {
         "page": page,
@@ -316,10 +311,10 @@ def _dashboard_context(request):
         # round trip, so it ships with the page rather than being fetched on click.
         "default_column_keys": columns.DEFAULT_COLUMNS,
         "visible_column_keys": request.user.visible_columns or columns.DEFAULT_COLUMNS,
-        "search": request.GET.get("fastq_name") or "",
+        "search": (request.GET.get("fastq_name") or "").strip(),
         "filters": {field: request.GET.getlist(field) for field in FILTER_FIELDS},
         "stage_filters": stage_filters,
-        # Which column the table is ordered by, so the header can show the arrow.
+        # Needed by the header to render the sort arrow.
         "sort": request.GET.get("sort") if request.GET.get("sort") in SORTABLE else DEFAULT_SORT,
         "dir": "asc" if request.GET.get("dir") == "asc" else "desc",
         "sortable_keys": list(SORTABLE),
@@ -344,10 +339,8 @@ def _dashboard_context(request):
         "statuses": [NOT_COMPLETED, *_scoped_statuses(scope)],
         "filters_open": any(request.GET.getlist(field) for field in FILTER_FIELDS)
         or any(row["selected"] for row in stage_filters),
-        # Show the active-filter count on the collapsed panel button so users can see the
-        # current filter state without opening the panel.
+        # So users can see filter state without opening the panel.
         "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.getlist(field))
         + sum(1 for row in stage_filters if row["selected"]),
-        # Display the local database synchronization timestamp in the header.
         "metadata_synced_at": metadata_synced_at,
     }

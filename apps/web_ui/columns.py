@@ -134,7 +134,9 @@ LOCATION_COLUMN_GROUPS = [
 LOCATION_STAGES = [Stage.INGEST, Stage.ALIGN, Stage.POST_ALIGN]
 
 
-# Checkout always shows the fields used to build the command.
+# Checkout always shows the fields used to build the command. This happens to match
+# DEFAULT_COLUMNS today, but the two lists exist for different reasons (that one is the
+# user's dashboard default, this one is fixed) and are not derived from each other.
 CHECKOUT_COLUMNS = [
     "fastq_name",
     "studies",

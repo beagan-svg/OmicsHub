@@ -33,7 +33,7 @@ Reusable template fragments live in `apps/web_ui/templates/partials/` and use na
 
 `.env.docker.example` documents required Docker settings. `.env.docker` is local configuration and is ignored by Git. AWS credentials are mounted into the containers from the path in `AWS_CREDENTIALS_FILE`.
 
-`docker_tools/setup_docker.sh` is the supported setup and startup command. `docker_tools/healthcheck.py` is the web container readiness probe. `docker_tools/vendor_gcs.sh` prepares the OCS package sources used by the image build.
+`docker_tools/setup_docker.sh` is the supported setup and startup command. `docker_tools/healthcheck.py` is the web container readiness probe. `docker_tools/vendor_gcs.sh` prepares the OCS package sources used by the image build. `docker_tools/test.sh` runs the test suite locally against a throwaway Postgres container.
 
 ## Configuration and build inputs
 

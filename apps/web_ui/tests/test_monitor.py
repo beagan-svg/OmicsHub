@@ -315,8 +315,8 @@ class TestJobMonitor:
         assert not response.context["running"][0].queued_here
         assert b"External" in response.content
 
-    def test_a_demand_this_app_queued_is_labelled_as_such(self, logged_in, queued):
-        entry = queued("OURS-1")
+    def test_a_demand_this_app_queued_is_labelled_as_such(self, logged_in, queued_entry):
+        entry = queued_entry("OURS-1")
         entry.status = QueueEntry.Status.SUBMITTED
         entry.demand_id = "demand-ours"
         entry.save()

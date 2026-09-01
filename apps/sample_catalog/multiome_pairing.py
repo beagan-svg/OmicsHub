@@ -34,15 +34,38 @@ def with_multiome_partners(samples) -> tuple[list[Sample], list[Sample]]:
     if not wanted:
         return samples, []
 
-    candidates = Sample.objects.filter(
+    candidate_samples = Sample.objects.filter(
         load_name__in={load_name for load_name, _ in wanted},
         batch_prefix__in=MULTIOME_PREFIXES,
     ).prefetch_related("stage_statuses")
 
     partners = [
         candidate
-        for candidate in candidates
+        for candidate in candidate_samples
         if (candidate.load_name, candidate.batch_prefix) in wanted
         and candidate.fastq_name not in selected_names
     ]
     return samples + partners, partners
+
+
+def paired_samples_by_load_name(load_names) -> dict[str, dict[str, Sample]]:
+    """Return complete MTX/ATX pairs among the given load names, keyed by load name.
+
+    A load name is only included if both halves of the pair exist; a load name with just
+    one half present (the partner has not arrived, or isn't a multiome sample at all) is
+    left out entirely, since callers group rows by a complete pair or not at all.
+    """
+    if not load_names:
+        return {}
+
+    samples_by_load: dict[str, dict[str, Sample]] = {}
+    for sample in Sample.objects.filter(load_name__in=load_names, batch_prefix__in=MULTIOME_PREFIXES).only(
+        "fastq_name", "load_name", "batch_prefix"
+    ):
+        samples_by_load.setdefault(sample.load_name, {})[sample.batch_prefix] = sample
+
+    return {
+        load_name: samples
+        for load_name, samples in samples_by_load.items()
+        if set(MULTIOME_PREFIXES) <= samples.keys()
+    }

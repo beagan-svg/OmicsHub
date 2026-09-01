@@ -76,7 +76,6 @@ class Sample(models.Model):
 
     fastq_name = models.CharField(max_length=255, unique=True)
 
-    # Batch and vendor
     batch_name = models.CharField(max_length=255, blank=True)
     batch_name_from_vendor = models.CharField(max_length=255, db_index=True)
     sequencing_vendor = models.CharField(max_length=255, blank=True)
@@ -119,23 +118,19 @@ class Sample(models.Model):
         db_persist=True,
     )
 
-    # Organism
     organism_common_name = models.CharField(max_length=255, db_index=True)
     organism_name = models.CharField(max_length=255, blank=True)
 
-    # Library prep
     library_prep_method_name = models.CharField(max_length=255, db_index=True)
     library_prep_method_id = models.BigIntegerField(null=True, blank=True)
     library_prep_name = models.CharField(max_length=255, blank=True)
 
-    # Sample
     sample_id = models.BigIntegerField(null=True, blank=True)
     sample_names = models.JSONField(default=list)
     sample_type = models.CharField(max_length=255, blank=True)
     cell_capture = models.IntegerField(null=True, blank=True)
     cell_prep_type = models.CharField(max_length=255, blank=True)
 
-    # Amplification
     amplification_id = models.BigIntegerField(null=True, blank=True)
     amplification_name = models.CharField(max_length=255, blank=True)
 

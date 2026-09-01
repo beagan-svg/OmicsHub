@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.sample_catalog.models import Stage
-from apps.sample_catalog.serializers import StageStatusSerializer
+from apps.sample_catalog.serializers import StageStatusSerializer, require_exactly_one_field
 from apps.submission_queue.models import QueueEntry
 
 
@@ -57,6 +57,5 @@ class SubmissionRequestSerializer(serializers.Serializer):
     notify_email = serializers.EmailField(required=False)
 
     def validate(self, attrs):
-        if bool(attrs.get("fastq_names")) == bool(attrs.get("batch_name_from_vendor")):
-            raise serializers.ValidationError("Provide exactly one of fastq_names or batch_name_from_vendor.")
+        require_exactly_one_field(attrs, "fastq_names", "batch_name_from_vendor")
         return attrs

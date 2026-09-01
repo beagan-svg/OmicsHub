@@ -7,7 +7,9 @@ import sys
 import urllib.error
 import urllib.request
 
-URL = f"http://127.0.0.1:{os.environ.get('HEALTHCHECK_PORT', '8000')}/healthz/"
+# Always 8000: this runs inside the web-ui container against gunicorn's own bind port,
+# which is not the host-side WEB_PORT mapping.
+URL = "http://127.0.0.1:8000/healthz/"
 TIMEOUT = 15
 
 

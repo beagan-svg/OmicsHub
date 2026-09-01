@@ -99,6 +99,9 @@ services:
       --max-requests 512 --max-requests-jitter 64"
     ports:
       - "127.0.0.1:${WEB_PORT:-8000}:8000"
+      # Local developer's LAN IP, for testing the app on a phone over the local network via
+      # a devtunnel. Postgres and Redis stay bound to 127.0.0.1 only.
+      - "10.0.0.7:${WEB_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "/app/docker_tools/healthcheck.py"]
       interval: 30s

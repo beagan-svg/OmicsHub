@@ -71,6 +71,11 @@ conversation differ.
   if the scheduler is changed to Beat-only.
 - A CLI submission error marks the claimed entry `FAILED`. An unexpected error also records a
   failure and is allowed to reach Celery so the worker reports it.
+- Cancelling a `QueueEntry` is conditional on it still being `PENDING`
+  (`QueueEntry.objects.filter(pk=..., status=PENDING).update(...)`), so the worker cannot claim
+  an entry the same moment a user cancels it. Losing that race is an ordinary outcome, not a
+  client mistake: both `apps/web_ui/views/queue.py`'s cancel view and `QueueViewSet.cancel`
+  return success with the entry's current status rather than raising or returning 400.
 - Do not add a second submission worker, a second queue implementation, or an unbounded retry
   loop. Any change to scheduling must preserve one command per claimed entry and the configured
   spacing between OCS submissions.

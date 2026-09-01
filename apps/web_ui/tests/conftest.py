@@ -1,10 +1,47 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from django.test import Client
 from django.urls import reverse
 
+from apps.ocs_integration import log_credentials
 from apps.submission_queue.models import QueueEntry
+
+TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
+
+
+def messages_in(response) -> str:
+    return response.content.decode()
+
+
+class FakeStsClient:
+    """A stand-in for a boto3 STS client, returning a fixed fake identity."""
+
+    def get_caller_identity(self):
+        return {
+            "UserId": "AID1",
+            "Account": "123456789012",
+            "Arn": "arn:aws:sts::123456789012:assumed-role/x/y",
+        }
+
+
+class FakeStsSession:
+    """A stand-in for a boto3 Session that only ever hands out FakeStsClient."""
+
+    def client(self, service_name, **kwargs):
+        assert service_name == "sts"
+        return FakeStsClient()
+
+
+def stub_valid_sts(monkeypatch):
+    """Patch one level below validate_credentials, not validate_credentials itself, so
+    its real caching side effect actually runs -- a test that replaces
+    validate_credentials wholesale would see job_credentials_submit return "valid" but
+    leave the cache empty, since the caching happens inside the function being replaced.
+    """
+    monkeypatch.setattr(log_credentials, "_session", lambda *a: FakeStsSession())
 
 
 @pytest.fixture
@@ -51,16 +88,6 @@ def review(logged_in):
         return logged_in.post(reverse("web_ui:submit-review"), {"fastq_names": list(fastq_names), **extra})
 
     return _review
-
-
-@pytest.fixture
-def queued(logged_in, active_config, make_sample):
-    def _queue(fastq_name="READY-1", **sample_kwargs):
-        make_sample(fastq_name, **sample_kwargs)
-        logged_in.post(reverse("web_ui:submit-confirm"), {"fastq_names": [fastq_name]})
-        return QueueEntry.objects.get(sample__fastq_name=fastq_name)
-
-    return _queue
 
 
 @pytest.fixture

@@ -28,6 +28,12 @@ class SampleSerializer(serializers.ModelSerializer):
         ]
 
 
+def require_exactly_one_field(attrs, field_a: str, field_b: str) -> None:
+    """Raise a validation error unless exactly one of two request fields was given."""
+    if bool(attrs.get(field_a)) == bool(attrs.get(field_b)):
+        raise serializers.ValidationError(f"Provide exactly one of {field_a} or {field_b}.")
+
+
 class SyncRequestSerializer(serializers.Serializer):
     """Validate a request for one batch name from the vendor or fastq names."""
 
@@ -35,6 +41,5 @@ class SyncRequestSerializer(serializers.Serializer):
     fastq_names = serializers.ListField(child=serializers.CharField(), required=False)
 
     def validate(self, attrs):
-        if bool(attrs.get("batch_name_from_vendor")) == bool(attrs.get("fastq_names")):
-            raise serializers.ValidationError("Provide exactly one of batch_name_from_vendor or fastq_names.")
+        require_exactly_one_field(attrs, "batch_name_from_vendor", "fastq_names")
         return attrs

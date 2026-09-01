@@ -13,14 +13,11 @@ from apps.sample_catalog import ocs_sync as sync
 from apps.sample_catalog.models import NOT_COMPLETED, Sample, Stage
 from apps.submission_queue.models import CartItem
 from apps.web_ui import columns
-from apps.web_ui import columns as column_defs
 from apps.web_ui import views as web_views
 
+from .conftest import messages_in
+
 pytestmark = pytest.mark.django_db
-
-
-def messages_in(response) -> str:
-    return response.content.decode()
 
 
 def csv_body(response) -> str:
@@ -610,7 +607,7 @@ class TestColumnChoices:
 
         their_columns = other_client.get(reverse("web_ui:dashboard")).context["columns"]
 
-        assert {c.key for c in their_columns} == set(column_defs.DEFAULT_COLUMNS)
+        assert {c.key for c in their_columns} == set(columns.DEFAULT_COLUMNS)
 
     def test_the_fastq_name_column_cannot_be_dropped(self, logged_in, make_sample, user):
         make_sample("READY-1")

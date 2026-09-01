@@ -22,6 +22,19 @@ def test_validation_errors_are_wrapped(api_client, make_sample):
     assert isinstance(response.json()["error"]["message"], dict)
 
 
+def test_a_serializer_validate_error_lands_under_the_same_key_as_a_view_raised_one(api_client):
+    """A non-field error from a serializer's own `validate()` (this one, from
+    `require_exactly_one_field`) must land under the same key a plain
+    `raise ValidationError("...")` in view code would use -- otherwise a client reading one
+    key would silently miss the other, even though both mean "an error not about one field".
+    """
+    response = api_client.post("/api/queue/plan/", {}, format="json")
+
+    message = response.json()["error"]["message"]
+    assert "non_field_errors" not in message
+    assert isinstance(message["detail"], list)
+
+
 def test_field_errors_keep_their_structure(api_client):
     """A api_client has to know which field failed, so the shape inside is preserved."""
     response = api_client.post("/api/samples/sync/", {"fastq_names": "not-a-list"}, format="json")

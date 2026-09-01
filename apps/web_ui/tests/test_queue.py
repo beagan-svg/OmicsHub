@@ -12,8 +12,8 @@ pytestmark = pytest.mark.django_db
 
 
 class TestQueue:
-    def test_lists_pending_entries_and_the_next_one(self, logged_in, queued):
-        queued("READY-1")
+    def test_lists_pending_entries_and_the_next_one(self, logged_in, queued_entry):
+        queued_entry("READY-1")
 
         response = logged_in.get(reverse("web_ui:queue"))
 
@@ -22,23 +22,23 @@ class TestQueue:
         assert f"requested by {response.wsgi_request.user}".encode() in response.content
         assert b"Queue status" in response.content
 
-    def test_users_do_not_see_each_others_queues(self, logged_in, queued, client, django_user_model):
-        queued("READY-1")
+    def test_users_do_not_see_each_others_queues(self, logged_in, queued_entry, client, django_user_model):
+        queued_entry("READY-1")
         other = django_user_model.objects.create_user(username="other", email="o@b.org")
         client.force_login(other)
 
         assert b"READY-1" not in client.get(reverse("web_ui:queue")).content
 
-    def test_cancelling_a_pending_entry(self, logged_in, queued):
-        entry = queued("READY-1")
+    def test_cancelling_a_pending_entry(self, logged_in, queued_entry):
+        entry = queued_entry("READY-1")
 
         logged_in.post(reverse("web_ui:cancel", args=[entry.pk]), follow=True)
 
         entry.refresh_from_db()
         assert entry.status == QueueEntry.Status.CANCELLED
 
-    def test_pausing_hides_the_next_submission_and_persists(self, logged_in, user, queued):
-        queued("READY-1")
+    def test_pausing_hides_the_next_submission_and_persists(self, logged_in, user, queued_entry):
+        queued_entry("READY-1")
 
         logged_in.post(reverse("web_ui:toggle-queue-pause"), follow=True)
 
@@ -48,8 +48,8 @@ class TestQueue:
         assert response.context["queue_paused"] is True
         assert b"Next eligible submission" not in response.content
 
-    def test_resuming_restores_the_next_submission(self, logged_in, user, queued):
-        queued("READY-1")
+    def test_resuming_restores_the_next_submission(self, logged_in, user, queued_entry):
+        queued_entry("READY-1")
         user.queue_paused = True
         user.save(update_fields=["queue_paused"])
 
@@ -59,15 +59,17 @@ class TestQueue:
         assert user.queue_paused is False
         assert b"Next eligible submission" in logged_in.get(reverse("web_ui:queue")).content
 
-    def test_deleting_a_pending_entry_removes_it(self, logged_in, queued):
-        entry = queued("READY-1")
+    def test_deleting_a_pending_entry_removes_it(self, logged_in, queued_entry):
+        entry = queued_entry("READY-1")
 
         logged_in.post(reverse("web_ui:delete-queue-entry", args=[entry.pk]), follow=True)
 
         assert not QueueEntry.objects.filter(pk=entry.pk).exists()
 
-    def test_deleting_another_users_entry_is_refused(self, logged_in, queued, client, django_user_model):
-        entry = queued("READY-1")
+    def test_deleting_another_users_entry_is_refused(
+        self, logged_in, queued_entry, client, django_user_model
+    ):
+        entry = queued_entry("READY-1")
         other = django_user_model.objects.create_user(username="other", email="o@b.org")
         client.force_login(other)
 
@@ -76,8 +78,8 @@ class TestQueue:
         assert response.status_code == 404
         assert QueueEntry.objects.filter(pk=entry.pk).exists()
 
-    def test_deleting_a_submitting_entry_leaves_it_untouched(self, logged_in, queued):
-        entry = queued("READY-1")
+    def test_deleting_a_submitting_entry_leaves_it_untouched(self, logged_in, queued_entry):
+        entry = queued_entry("READY-1")
         entry.status = QueueEntry.Status.SUBMITTING
         entry.save(update_fields=["status"])
 
@@ -87,8 +89,8 @@ class TestQueue:
 
 
 class TestFailedJobs:
-    def test_lists_failures_with_the_error(self, logged_in, queued):
-        entry = queued("BAD-1")
+    def test_lists_failures_with_the_error(self, logged_in, queued_entry):
+        entry = queued_entry("BAD-1")
         entry.status = QueueEntry.Status.FAILED
         entry.error_message = "OCS rejected the demand"
         entry.save()
@@ -97,8 +99,8 @@ class TestFailedJobs:
 
         assert b"OCS rejected the demand" in response.content
 
-    def test_separates_running_ocs_failures_from_submission_failures(self, logged_in, queued):
-        entry = queued("OCS-FAILED-1")
+    def test_separates_running_ocs_failures_from_submission_failures(self, logged_in, queued_entry):
+        entry = queued_entry("OCS-FAILED-1")
         entry.status = QueueEntry.Status.FAILED
         entry.demand_id = "demand-1"
         entry.error_message = "Workflow failed in OCS."
@@ -111,11 +113,11 @@ class TestFailedJobs:
         assert b"Running job failures" in response.content
         assert b"Workflow failed in OCS." in response.content
 
-    def test_failure_badge_combines_submission_and_running_failures(self, logged_in, queued):
-        submission_failure = queued("SUBMISSION-FAILED-1")
+    def test_failure_badge_combines_submission_and_running_failures(self, logged_in, queued_entry):
+        submission_failure = queued_entry("SUBMISSION-FAILED-1")
         submission_failure.status = QueueEntry.Status.FAILED
         submission_failure.save()
-        running_failure = queued("RUNNING-FAILED-1")
+        running_failure = queued_entry("RUNNING-FAILED-1")
         running_failure.status = QueueEntry.Status.FAILED
         running_failure.demand_id = "demand-1"
         running_failure.save()
@@ -125,8 +127,8 @@ class TestFailedJobs:
         assert response.context["failure_count"] == 2
         assert b'<span class="visually-hidden">2 </span>2</span>' in response.content
 
-    def test_retry_puts_it_back_on_the_queue(self, logged_in, queued):
-        entry = queued("BAD-1")
+    def test_retry_puts_it_back_on_the_queue(self, logged_in, queued_entry):
+        entry = queued_entry("BAD-1")
         entry.status = QueueEntry.Status.FAILED
         entry.demand_id = "old-demand"
         entry.submitted_at = timezone.now()
@@ -141,8 +143,8 @@ class TestFailedJobs:
         assert entry.submitted_at is None
         assert entry.error_message == ""
 
-    def test_delete_removes_the_entry(self, logged_in, queued):
-        entry = queued("BAD-1")
+    def test_delete_removes_the_entry(self, logged_in, queued_entry):
+        entry = queued_entry("BAD-1")
         entry.status = QueueEntry.Status.FAILED
         entry.save()
 
@@ -150,8 +152,8 @@ class TestFailedJobs:
 
         assert not QueueEntry.objects.filter(pk=entry.pk).exists()
 
-    def test_a_submitted_entry_cannot_be_deleted(self, logged_in, queued):
-        entry = queued("RUNNING-1")
+    def test_a_submitted_entry_cannot_be_deleted(self, logged_in, queued_entry):
+        entry = queued_entry("RUNNING-1")
         entry.status = QueueEntry.Status.SUBMITTED
         entry.save()
 

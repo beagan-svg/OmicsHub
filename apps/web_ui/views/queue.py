@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 from apps.submission_queue import tasks
 from apps.submission_queue.models import QueueEntry
 
-from .common import QUEUED_STATUSES, _owned
+from .view_helpers import QUEUED_STATUSES, _owned
 
 
 @login_required

@@ -30,14 +30,14 @@ class SampleViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
     @action(detail=False, methods=["post"])
     def sync(self, request):
         """Sync metadata and stage status for a batch name from the vendor or fastq names."""
-        serializer = SyncRequestSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        sync_request_serializer = SyncRequestSerializer(data=request.data)
+        sync_request_serializer.is_valid(raise_exception=True)
 
-        batch_name = serializer.validated_data.get("batch_name_from_vendor")
+        batch_name = sync_request_serializer.validated_data.get("batch_name_from_vendor")
         if batch_name:
             samples = sync.sync_batch(batch_name)
         else:
-            samples = sync.sync_fastq_names(serializer.validated_data["fastq_names"])
+            samples = sync.sync_fastq_names(sync_request_serializer.validated_data["fastq_names"])
 
         refreshed = Sample.objects.filter(pk__in=[s.pk for s in samples]).prefetch_related("stage_statuses")
         return Response(SampleSerializer(refreshed, many=True).data, status=status.HTTP_200_OK)

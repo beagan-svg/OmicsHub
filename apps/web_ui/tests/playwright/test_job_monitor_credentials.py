@@ -16,30 +16,13 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from apps.ocs_integration import log_credentials
 from apps.sample_catalog.models import Stage
 
+from ..conftest import stub_valid_sts
+
 pytestmark = pytest.mark.django_db(transaction=True)
 
 FAKE_ACCESS_KEY = "test-access-key"
 FAKE_SECRET_KEY = "fake-secret-not-a-real-value-000000000000"
 FAKE_SESSION_TOKEN = "fake-session-token-not-a-real-value"
-
-
-class _FakeStsClient:
-    def get_caller_identity(self):
-        return {
-            "UserId": "AID1",
-            "Account": "123456789012",
-            "Arn": "arn:aws:sts::123456789012:assumed-role/x/y",
-        }
-
-
-class _FakeSession:
-    def client(self, service_name, **kwargs):
-        assert service_name == "sts"
-        return _FakeStsClient()
-
-
-def stub_valid_sts(monkeypatch):
-    monkeypatch.setattr(log_credentials, "_session", lambda *a: _FakeSession())
 
 
 def paste_block():

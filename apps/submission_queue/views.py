@@ -19,7 +19,13 @@ class QueueViewSet(
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
 ):
-    """List queue entries and create or cancel submissions."""
+    """List queue entries and create or cancel submissions.
+
+    A reduced-capability path relative to the web_ui checkout flow: it never supplies
+    `command_config_choices` or `sample_overrides` to `_build_plan`, so a sample whose
+    library prep needs a user-picked command config, or a hand-edited command, always plans
+    as skipped here even though the same sample submits fine through checkout.
+    """
 
     serializer_class = QueueEntrySerializer
     permission_classes = [IsAuthenticated]
@@ -54,7 +60,7 @@ class QueueViewSet(
                 }
             )
 
-        result = enqueue_service.enqueue(
+        enqueue_result = enqueue_service.enqueue(
             plan=plan,
             user=request.user,
             notify_email=params["notify_email"],
@@ -64,8 +70,8 @@ class QueueViewSet(
 
         return Response(
             {
-                "created": QueueEntrySerializer(result.created, many=True).data,
-                "already_queued": [entry.sample.fastq_name for entry in result.already_queued],
+                "created": QueueEntrySerializer(enqueue_result.created, many=True).data,
+                "already_queued": [entry.sample.fastq_name for entry in enqueue_result.already_queued],
                 "skipped": _serialize_skips(plan),
             },
             status=status.HTTP_201_CREATED,
@@ -73,14 +79,17 @@ class QueueViewSet(
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
-        """Cancel a pending queue entry."""
+        """Cancel a pending queue entry.
+
+        A no-op, not an error, when the worker claimed this entry first: that is an ordinary
+        race between this request and the submission worker, not a client mistake, and the
+        web_ui's own cancel view treats the same race the same forgiving way.
+        """
         entry = self.get_object()
         # Update only pending entries so the worker cannot claim this entry first.
-        cancelled = QueueEntry.objects.filter(pk=entry.pk, status=QueueEntry.Status.PENDING).update(
+        QueueEntry.objects.filter(pk=entry.pk, status=QueueEntry.Status.PENDING).update(
             status=QueueEntry.Status.CANCELLED
         )
-        if not cancelled:
-            raise ValidationError(f"Only pending entries can be cancelled; this one is {entry.status}.")
         entry.refresh_from_db()
         return Response(QueueEntrySerializer(entry).data)
 
@@ -91,9 +100,9 @@ class QueueViewSet(
         return config
 
     def _build_plan(self, request):
-        serializer = SubmissionRequestSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        params = serializer.validated_data
+        submission_request_serializer = SubmissionRequestSerializer(data=request.data)
+        submission_request_serializer.is_valid(raise_exception=True)
+        params = submission_request_serializer.validated_data
 
         config = self._config().data
 

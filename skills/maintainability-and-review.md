@@ -34,9 +34,16 @@ diff. Have one owner reconcile findings before editing.
   unreachable branches, unused imports, stale comments, and substitute paths without a real
   supported failure mode.
 - Use short domain names. Prefer `sample`, `stage`, `demand_id`, `file_store_id`, `log_stream`,
-  and `s3_uri` over generic names such as `data`, `item`, `result`, or `thing`.
+  and `s3_uri` over generic names such as `data`, `item`, `result`, or `thing`. Name a queryset
+  after the model it holds in plural (`samples`, not `queryset` or `scope`), and a DRF serializer
+  instance `<model>_serializer` (`sync_request_serializer`, not `serializer`) — unless a distinct
+  concept already has a clearer name (a queryset scoped to one filter tab, for example, is not
+  "the samples," and renaming it to match would erase the distinction).
 - Keep docstrings short, concrete, and action-oriented. Use terms such as fastq sample, library
   prep, alignment, post-alignment, command, manifest, demand ID, and log stream.
+- `apps/web_ui/views/view_helpers.py` is the one shared module for cross-view helpers in that
+  app (filters, sorting, CSV escaping, pagination, the staff-only check). Do not create a second
+  `common.py`/`utils.py` there; add a new shared helper to this file instead.
 
 ## Django and data safety
 
@@ -47,6 +54,27 @@ not only in a view. Use `update_fields` when updating a known subset of model fi
 Treat PostgreSQL as OmicsHub's local mirror and application database. Do not assume it contains
 every OCS record or use an empty AWS response to delete local records. Keep synchronization
 idempotent and keep AWS synchronization separate from page polling.
+
+## API and error-handling consistency
+
+Every DRF error passes through `omicshub/exception_handler.py` into one envelope shape,
+`{"error": {"message": {<field>: [<message>, ...]}}}`. A non-field error must land under the
+same key regardless of where it was raised — a `ValidationError` raised directly in view code and
+one raised inside a serializer's own `validate()` land under different DRF-internal keys
+(`detail` vs `non_field_errors`) unless the handler normalizes them; check this any time a new
+non-field validation error is added. When the same action exists on both a DRF `ViewSet` and a
+`web_ui` view (queue cancel, submission confirm), the two must agree on which errors are real
+client mistakes and which are ordinary races: losing a claim race with the submission worker is a
+no-op on both paths, not a 400.
+
+## Tests
+
+Split a test file once it covers several unrelated features in one flat file (a checkout test
+class next to a config-upload test class next to a command-editing test class, for example).
+Split along the same seams the code under test already uses — one test file per view-layer
+concern, not an arbitrary line-count target — and move any test-only helper duplicated across
+files (a fake AWS client, a `messages_in()`/`TEMPLATES` constant) into `conftest.py` once, rather
+than leaving each file with its own copy.
 
 ## Frontend review
 
@@ -90,3 +118,9 @@ git diff --check
 
 Report service or credential blockers instead of weakening a valid test. Do not commit or push
 unless the user explicitly requests it.
+
+`mypy`'s config does not set `disallow_untyped_defs` or `strict`. This is a known, accepted gap,
+not an oversight: enabling it surfaces roughly 200 errors, almost all Django view functions
+missing a `request: HttpRequest` annotation, which is a large mechanical rewrite with no real
+type-safety benefit here. Do not enable it as part of an unrelated change; if annotation coverage
+becomes a real priority, do it as its own deliberate pass.
