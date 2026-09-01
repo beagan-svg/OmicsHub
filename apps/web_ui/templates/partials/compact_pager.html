@@ -1,0 +1,31 @@
+{% load web_ui_extras %}
+{% comment %}
+Mobile-only compact pagination: a small rounded pill, centered, replacing the desktop
+pager's multi-line layout on a phone (see .compact-pager in web_ui.css -- display:none
+outside the mobile breakpoint, so this renders nothing on desktop). Always a
+prev/current/next pill -- a dot-per-page variant used to render here for small page
+counts, but it added a second pagination look for no real benefit over this one, so it
+was dropped in favor of always using this. Only included where the calling page also wants
+this treatment (Dashboard, Data Locations, Checkout, Timeline, Job Monitor).
+{% endcomment %}
+{% if page.paginator.num_pages > 1 %}
+<nav class="compact-pager" aria-label="{{ pager_label }}">
+  <div class="compact-pager__pill">
+    {% if page.has_previous %}
+    <a class="compact-pager__step" href="?{% with_params page=page.previous_page_number page_param=page_param page_size_param=page_size_param %}" aria-label="Previous page">
+      <i class="bi bi-chevron-left" aria-hidden="true"></i>
+    </a>
+    {% else %}
+    <span class="compact-pager__step is-disabled" aria-hidden="true"><i class="bi bi-chevron-left" aria-hidden="true"></i></span>
+    {% endif %}
+    <span class="compact-pager__current">{{ page.number }}<span class="compact-pager__sep">/</span>{{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}
+    <a class="compact-pager__step" href="?{% with_params page=page.next_page_number page_param=page_param page_size_param=page_size_param %}" aria-label="Next page">
+      <i class="bi bi-chevron-right" aria-hidden="true"></i>
+    </a>
+    {% else %}
+    <span class="compact-pager__step is-disabled" aria-hidden="true"><i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+    {% endif %}
+  </div>
+</nav>
+{% endif %}

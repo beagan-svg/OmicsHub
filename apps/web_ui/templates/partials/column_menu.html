@@ -1,9 +1,18 @@
-<div class="dropdown column-menu">
-  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+<div class="filter-field">
+  <span class="filter-field__label filter-field__label--mobile-only" aria-hidden="true">Columns</span>
+  <div class="dropdown column-menu">
+  <button class="btn btn-sm btn-outline-secondary dropdown-toggle filter-menu-toggle" type="button"
           id="column-menu-toggle" data-bs-toggle="dropdown"
           data-bs-auto-close="outside" data-bs-display="static" aria-expanded="false">
-    <i class="bi bi-layout-three-columns" aria-hidden="true"></i> Columns
+    <span class="filter-row__inline-label"><i class="bi bi-layout-three-columns" aria-hidden="true"></i> Columns</span>
     <span class="count" data-column-count>{{ visible_column_keys|length }}</span>
+    {% comment %}
+    Mobile-only suffix so the sheet reads "11 shown" instead of a bare number; the count
+    badge itself is untouched -- same element, same class, same live-updating JS (see
+    column-menu.js's countPill) -- desktop's own look and behavior don't change at all.
+    {% endcomment %}
+    <span class="filter-row__mobile-suffix" aria-hidden="true">shown</span>
+    <i class="bi bi-chevron-right filter-row__chevron" aria-hidden="true"></i>
   </button>
 
   <div class="dropdown-menu dropdown-menu-end column-menu__panel"
@@ -74,5 +83,6 @@
         Apply
       </button>
     </div>
+  </div>
   </div>
 </div>

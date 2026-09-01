@@ -1,11 +1,12 @@
-<div class="col-md-4">
-  <label class="label d-block mb-1" for="{{ filter_id }}">{{ label }}</label>
+<div class="col-md-4 filter-field">
+  <label class="label filter-field__label d-block mb-1" for="{{ filter_id }}">{{ label }}</label>
   <div class="dropdown">
     <button id="{{ filter_id }}" class="btn btn-sm btn-outline-secondary dropdown-toggle filter-menu-toggle" type="button"
             data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
             data-study-toggle>
       <span class="filter-menu-toggle__summary" data-study-summary
             title="{% if selected_values %}{{ selected_values|join:", " }}{% endif %}">{% if selected_values %}{{ selected_values|join:", " }}{% else %}All{% endif %}</span>
+      <i class="bi bi-chevron-right filter-row__chevron" aria-hidden="true"></i>
     </button>
     <div class="dropdown-menu study-filter-menu" data-filter-label="{{ menu_title|lower }}">
       <div class="study-filter__head">

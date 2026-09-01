@@ -9,6 +9,12 @@
     <h1>Data Locations</h1>
     <p class="page-head__desc">Browse the S3 files registered for each fastq sample and OCS stage.</p>
   </div>
+  <div class="page-head__actions">
+    {% comment %}
+    Mobile-only: see the matching comment on dashboard.html's own copy of this partial.
+    {% endcomment %}
+    <span class="page-head__sync">{% include "partials/sync_status.html" %}</span>
+  </div>
 </div>
 {% endblock %}
 
@@ -28,7 +34,7 @@
       {% endfor %}
     </div>
 
-    <span class="ms-auto d-flex align-items-center gap-2">
+    <span class="ms-auto d-flex align-items-center gap-2 toolbar-sync">
       {% include "partials/sync_status.html" %}
       <button class="btn btn-sm btn-outline-secondary" type="submit" form="refresh-locations-form"
               data-bs-toggle="tooltip" title="Re-read this page's rows from OCS now">
@@ -48,22 +54,56 @@
       <div class="col-auto" data-mobile-move="sheet-body" data-mobile-order="1">
         {% include "partials/study_set_filter.html" with filter_form_id="locations-filter-form" %}
       </div>
-      <div class="col-auto" data-mobile-move="sheet-body" data-mobile-order="1">
-        <label class="visually-hidden" for="locations-stage-filter">Stage</label>
+      <div class="col-auto filter-field" data-mobile-move="sheet-body" data-mobile-order="1">
         {% comment %}
-        Explicit form= (unlike a plain descendant field) so this keeps submitting with
-        locations-filter-form after mobile-filter-sheet.js moves it out of this <form>
-        element and into the mobile filter sheet, which lives elsewhere in the DOM.
+        Visually hidden on desktop, same as before (that select's own text already says
+        "Stages: All") -- shown only inside the mobile sheet, matching every other filter
+        row's label-above-the-control shape (see .filter-field__label--mobile-only).
         {% endcomment %}
-        <select name="location_stage" id="locations-stage-filter" class="form-select form-select-sm w-auto"
-                form="locations-filter-form">
-          <option value="">Stages: All</option>
-          {% for stage in location_stages %}
-          <option value="{{ stage.value }}" {% if selected_location_stage == stage.value %}selected{% endif %}>{{ stage.label }}</option>
-          {% endfor %}
-        </select>
+        {% comment %}
+        No aria-hidden here, unlike Study Set/Columns' own decorative mobile-only labels:
+        this is the select's only accessible name (visually-hidden, not aria-hidden, so a
+        screen reader still reads it on every breakpoint), so hiding it from the
+        accessibility tree would leave the control with no name at all once shown here.
+        {% endcomment %}
+        <label class="visually-hidden filter-field__label filter-field__label--mobile-only" for="locations-stage-filter">Stages</label>
+        {% comment %}
+        .filter-field__select-wrap gives the decoy overlay below (see
+        .filter-field__select-decoy in web_ui.css and filter-select-decoy.js) a sized,
+        position:relative box to line up against that's just the select -- not the label
+        above it too. The real select stays the interactive element (native picker, real
+        accessible name, real change/submit behavior) and visually on top for tap
+        targeting; the decoy sits behind it showing a clean "All" instead of the select's
+        own raw option text "Stages: All", which reads redundant next to the "STAGES"
+        label right above it in the mobile sheet (desktop has no such label, which is why
+        the select's own option text still needs to keep saying "Stages: All" there).
+        {% endcomment %}
+        <div class="filter-field__select-wrap">
+          {% comment %}
+          Explicit form= (unlike a plain descendant field) so this keeps submitting with
+          locations-filter-form after mobile-filter-sheet.js moves it out of this <form>
+          element and into the mobile filter sheet, which lives elsewhere in the DOM.
+          {% endcomment %}
+          <select name="location_stage" id="locations-stage-filter" class="form-select form-select-sm w-auto filter-field__select"
+                  form="locations-filter-form" data-select-decoy-source>
+            <option value="">Stages: All</option>
+            {% for stage in location_stages %}
+            <option value="{{ stage.value }}" {% if selected_location_stage == stage.value %}selected{% endif %}>{{ stage.label }}</option>
+            {% endfor %}
+          </select>
+          <i class="bi bi-chevron-right filter-field__select-chevron" aria-hidden="true"></i>
+          <span class="filter-field__select-decoy" aria-hidden="true" data-select-decoy-value></span>
+        </div>
       </div>
       {% if selected_prefix %}<input type="hidden" name="batch_prefix" value="{{ selected_prefix }}">{% endif %}
+      {% comment %}
+      Same reasoning as dashboard.html's own copy of this pair: without them, submitting
+      this form (Enter in the search box, or Apply Filters) would silently drop whatever
+      sort the table was in, since a plain <form method="get"> builds its query string only
+      from its own fields.
+      {% endcomment %}
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <input type="hidden" name="dir" value="{{ dir }}">
       <div class="col-auto" data-mobile-move="sheet-body" data-mobile-order="3">
         <button class="btn btn-sm btn-outline-secondary" type="button" data-disclosure="locations-advanced-filters"
                 aria-controls="locations-advanced-filters" aria-expanded="{% if filters_open %}true{% else %}false{% endif %}">
@@ -178,15 +218,16 @@
   </div>
 
   {% if page.paginator.count %}
-  <div class="card-body is-toolbar d-flex flex-wrap gap-2 align-items-center locations-footer" data-mobile-footer-bar>
+  <div class="card-body is-toolbar d-flex flex-wrap gap-2 align-items-center locations-footer">
     <span class="text-secondary" id="location-selection-summary"><span id="location-selection-count">0</span> selected</span>
     <button class="btn btn-sm btn-outline-secondary" type="button" id="clear-location-selection">Clear selection</button>
-    {% include "partials/table_pager.html" with pager_label="Data location pages" mobile_sheet_rows=True %}
+    {% include "partials/table_pager.html" with pager_label="Data location pages" %}
+    {% include "partials/compact_pager.html" with pager_label="Data location pages" %}
   </div>
   {% endif %}
 </div>
 
-<form method="post" id="refresh-locations-form" action="{% url 'web_ui:refresh-status' %}">
+<form method="post" id="refresh-locations-form" action="{% url 'web_ui:refresh-status' %}" data-mobile-refresh-form>
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ request.get_full_path }}">
   {% for sample in page %}<input type="hidden" name="fastq_names" value="{{ sample.fastq_name }}">{% endfor %}

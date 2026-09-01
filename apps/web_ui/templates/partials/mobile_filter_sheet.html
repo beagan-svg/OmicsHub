@@ -1,19 +1,22 @@
 {% comment %}
 Mobile-only "Filters" entry point and the bottom sheet its button opens. mobile-filter-sheet.js
 relocates the calling page's own filter controls into data-mobile-filter-body/-footer at
-runtime -- this partial only renders the trigger, the empty sheet shell, and (on the toolbar
-row) the slot Export CSV moves into. Desktop never sees any of this: everything here is
-display:none above the mobile breakpoint (see .mobile-filter-sheet and
-.mobile-filter-trigger in web_ui.css), and nothing is relocated unless that breakpoint matches.
+runtime, and moves the trigger button itself to the end of <body> (see the comment on that
+move in the script) so it can float free of the page as a circular button rather than sit
+in the toolbar. This partial also renders the toolbar-row slot Export CSV moves into.
+Desktop never sees any of this: everything here is display:none above the mobile breakpoint
+(see .mobile-filter-sheet and .mobile-filter-trigger in web_ui.css), and nothing is
+relocated unless that breakpoint matches.
 {% endcomment %}
-<div class="mobile-filter-trigger-row" data-mobile-filter-toolbar-slot>
-  <button type="button" class="btn btn-sm btn-outline-secondary mobile-filter-trigger"
-          data-mobile-filter-open aria-haspopup="dialog" aria-controls="mobile-filter-sheet"
-          aria-expanded="false">
-    <i class="bi bi-funnel" aria-hidden="true"></i> Filters
-    {% if active_filter_count %}<span class="count">{{ active_filter_count }}<span class="visually-hidden"> filters active</span></span>{% endif %}
-  </button>
-</div>
+<div class="mobile-filter-trigger-row" data-mobile-filter-toolbar-slot></div>
+
+<button type="button" class="mobile-filter-trigger"
+        data-mobile-filter-open aria-haspopup="dialog" aria-controls="mobile-filter-sheet"
+        aria-expanded="false">
+  <i class="bi bi-sliders" aria-hidden="true"></i>
+  <span class="visually-hidden">Filters</span>
+  {% if active_filter_count %}<span class="count mobile-filter-trigger__count">{{ active_filter_count }}<span class="visually-hidden"> filters active</span></span>{% endif %}
+</button>
 
 <div class="mobile-filter-sheet" id="mobile-filter-sheet" hidden>
   <div class="mobile-filter-sheet__backdrop" data-mobile-filter-close></div>

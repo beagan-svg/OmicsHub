@@ -23,10 +23,10 @@
 <div class="card mb-3">
   <div class="card-header monitor-table-header">
     <div class="monitor-table-header__title">
-      <span><i class="bi bi-activity" aria-hidden="true"></i> Running</span>
+      <span class="monitor-table-header__label"><i class="bi bi-activity" aria-hidden="true"></i> Running</span>
       {% include "partials/monitor_stage_filter.html" with stage_options=running_stage_options selected_stage=running_stage aria_label="Filter running jobs by stage" %}
     </div>
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 monitor-table-header__actions">
       {% include "partials/sync_status.html" %}
       <form method="post" action="{% url 'web_ui:refresh-status' %}">
         {% csrf_token %}
@@ -94,9 +94,10 @@
       </tbody>
     </table>
   </div>
-  <div class="card-body is-toolbar dashboard-footer">
+  <div class="card-body is-toolbar dashboard-footer monitor-mobile-footer">
     <div class="dashboard-footer__pager">
       {% include "partials/table_pager.html" with page=running_page page_size=running_page_size page_param="running_page" page_size_param="running_page_size" pager_label="Running job pages" %}
+      {% include "partials/compact_pager.html" with page=running_page page_param="running_page" page_size_param="running_page_size" pager_label="Running job pages" %}
     </div>
   </div>
 </div>
@@ -104,13 +105,13 @@
 <div class="card">
   <div class="card-header monitor-table-header">
     <div class="monitor-table-header__title">
-      <span><i class="bi bi-check2-all" aria-hidden="true"></i> Recently finished</span>
+      <span class="monitor-table-header__label"><i class="bi bi-check2-all" aria-hidden="true"></i> Recently finished</span>
       {% include "partials/monitor_stage_filter.html" with stage_options=finished_stage_options selected_stage=finished_stage aria_label="Filter finished jobs by stage" %}
       {% comment %}
       A visually hidden label left both controls displayed as `All`, so users could not
       distinguish them without opening a menu. Reuse the visible label pattern from `pager__size`.
       {% endcomment %}
-      <label class="pager__size">
+      <label class="pager__size monitor-status-filter">
         <span>Status</span>
         <select class="form-select form-select-sm" id="finished-status-filter"
                 aria-label="Filter finished jobs by status" onchange="window.location.href = this.value">
@@ -122,7 +123,7 @@
         </select>
       </label>
     </div>
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 monitor-table-header__actions">
       {% include "partials/sync_status.html" %}
       <form method="post" action="{% url 'web_ui:refresh-status' %}">
         {% csrf_token %}
@@ -192,10 +193,11 @@
       </tbody>
     </table>
   </div>
-  <div class="card-body is-toolbar dashboard-footer">
-    <span class="text-secondary">Showing the most recent {{ row_limit }} finished stages.</span>
+  <div class="card-body is-toolbar dashboard-footer monitor-mobile-footer">
+    <span class="text-secondary monitor-footer__count">Showing the most recent {{ row_limit }} finished stages.</span>
     <div class="dashboard-footer__pager">
       {% include "partials/table_pager.html" with page=finished_page page_size=finished_page_size page_param="finished_page" page_size_param="finished_page_size" pager_label="Finished job pages" %}
+      {% include "partials/compact_pager.html" with page=finished_page page_param="finished_page" page_size_param="finished_page_size" pager_label="Finished job pages" %}
     </div>
   </div>
 </div>

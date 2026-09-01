@@ -9,19 +9,22 @@
   const sheet = document.getElementById("mobile-filter-sheet");
   if (!root || !sheet) return;
 
-  // .mobile-filter-sheet is meant to cover the full viewport (position: fixed; inset: 0),
-  // but the toolbar it's included next to lives inside .card, which sets `contain: layout`
-  // (see that rule's own comment) -- and `contain: layout` on an ancestor, like a
-  // transform would, gives fixed-position descendants a new containing block scoped to
-  // that ancestor's box instead of the viewport. Moving the sheet to be a direct child of
-  // body sidesteps that entirely, which is the standard place for an overlay anyway.
-  document.body.append(sheet);
-
   const body = sheet.querySelector("[data-mobile-filter-body]");
   const footer = sheet.querySelector("[data-mobile-filter-footer]");
   const toolbarSlot = document.querySelector("[data-mobile-filter-toolbar-slot]");
   const trigger = document.querySelector("[data-mobile-filter-open]");
   const mq = window.matchMedia("(max-width: 767.98px)");
+
+  // Both are position: fixed overlays, but the toolbar they're included next to lives
+  // inside .card, which sets `contain: layout` (see that rule's own comment) -- and
+  // `contain: layout` on an ancestor, like a transform would, gives fixed-position
+  // descendants a new containing block scoped to that ancestor's box instead of the
+  // viewport. Moving both to be direct children of body sidesteps that entirely. The
+  // trigger has nowhere on desktop to go back to (it's a floating button only mobile ever
+  // shows), so unlike the sheet's own body/footer/toolbar items below, this move is
+  // permanent rather than something apply() reverses on a desktop-width resize.
+  document.body.append(sheet);
+  if (trigger) document.body.append(trigger);
 
   // Sheet order (Study Set/Stages, then Columns [and Rows per page, marked from the table
   // pager below the table rather than the toolbar above it], then More Filters) is
@@ -63,8 +66,18 @@
       bodyItems.forEach((el) => body.append(el));
       if (footer) footerItems.forEach((el) => footer.append(el));
       if (toolbarSlot) toolbarItems.forEach((el) => toolbarSlot.append(el));
+      // By this point `root` (the filter form/.row) has been emptied down to just its
+      // search-input column -- everything else just moved into the sheet or the toolbar
+      // slot above. Marking it here, in the same step, lets it collapse into its parent's
+      // flex row (see .mobile-filter-root--flat in web_ui.css) so the search input and
+      // Export CSV can share one row instead of Export CSV stranding itself alone on a
+      // near-empty row below. Added only now (not unconditionally in CSS) so nothing
+      // flashes into that flattened layout before the row's other children have actually
+      // been relocated.
+      root.classList.add("mobile-filter-root--flat");
     } else {
       homes.forEach((home, el) => home.parent.insertBefore(el, home.next));
+      root.classList.remove("mobile-filter-root--flat");
       closeSheet();
     }
   }

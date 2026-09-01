@@ -145,7 +145,14 @@
     </div>
 
     {% if cart_page.object_list %}
-    <div class="card-body is-toolbar dashboard-footer">
+    {% comment %}
+    checkout-mobile-footer: dashboard-footer/__left are shared verbatim with Samples' and
+    Job Monitor's own footers (same BEM-ish names, different pages) -- this page-specific
+    marker is what the new mobile-only CSS below scopes to, so none of it leaks onto those
+    other two pages' mobile view. See the matching comment on .samples-mobile-footer in
+    dashboard.html.
+    {% endcomment %}
+    <div class="card-body is-toolbar dashboard-footer checkout-mobile-footer">
       <div class="dashboard-footer__left">
         <label class="visually-hidden" for="force-select">Force a stage</label>
         <select name="force" id="force-select" class="form-select form-select-sm w-auto"
@@ -161,10 +168,10 @@
           <label class="form-check-label" for="batch-processing">Address by FASTQ name (RTX/RFX)</label>
         </div>
 
-        <button class="btn btn-sm btn-outline-secondary" type="submit" formaction="{% url 'web_ui:cart-remove' %}">
+        <button class="btn btn-sm btn-outline-secondary" type="submit" id="cart-remove-btn" formaction="{% url 'web_ui:cart-remove' %}">
           Remove selected
         </button>
-        <button class="btn btn-sm btn-outline-danger" type="submit" formaction="{% url 'web_ui:cart-clear' %}"
+        <button class="btn btn-sm btn-outline-danger" type="submit" id="cart-clear-btn" formaction="{% url 'web_ui:cart-clear' %}"
                 onclick="return confirm('Empty your cart? Every staged fastq sample will be removed, not just the selected ones.');">
           Empty cart
         </button>
@@ -172,6 +179,7 @@
 
       <div class="checkout-pager ms-auto">
         {% include "partials/table_pager.html" with page=cart_page page_size=cart_page_size page_param=checkout_page_param page_size_param=checkout_page_size_param pager_label="Checkout sample pages" %}
+        {% include "partials/compact_pager.html" with page=cart_page page_param=checkout_page_param page_size_param=checkout_page_size_param pager_label="Checkout sample pages" %}
       </div>
 
       <button class="btn btn-primary" type="submit" id="submit-selected"

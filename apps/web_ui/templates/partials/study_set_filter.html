@@ -1,12 +1,23 @@
-<div class="dropdown">
-  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
-          data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
-          data-study-toggle>
-    Study Set:
-    <span class="filter-menu-toggle__summary" data-study-summary
-          title="{% if selected_studies %}{{ selected_studies|join:", " }}{% endif %}">{% if selected_studies %}{{ selected_studies|join:", " }}{% else %}All{% endif %}</span>
-  </button>
-  <div class="dropdown-menu study-filter-menu" data-filter-label="study sets">
+<div class="filter-field">
+  {% comment %}
+  --mobile-only, not the plain .filter-field__label multi_value_filter.html uses: that one
+  is already visible on desktop (inside the existing "More Filters" panel), but Study Set
+  has no equivalent standalone label there today -- its desktop button already reads
+  "Study Set: <value>" inline, and this element exists only to give the mobile sheet the
+  same label-above-the-control shape every other filter row has (see
+  .filter-field__label--mobile-only in web_ui.css).
+  {% endcomment %}
+  <span class="filter-field__label filter-field__label--mobile-only" aria-hidden="true">Study Set</span>
+  <div class="dropdown">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle filter-menu-toggle" type="button"
+            data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
+            data-study-toggle>
+      <span class="filter-row__inline-label">Study Set:</span>
+      <span class="filter-menu-toggle__summary" data-study-summary
+            title="{% if selected_studies %}{{ selected_studies|join:", " }}{% endif %}">{% if selected_studies %}{{ selected_studies|join:", " }}{% else %}All{% endif %}</span>
+      <i class="bi bi-chevron-right filter-row__chevron" aria-hidden="true"></i>
+    </button>
+    <div class="dropdown-menu study-filter-menu" data-filter-label="study sets">
     <div class="study-filter__head">
       <div>
         <div class="study-filter__title">Study sets</div>
@@ -29,6 +40,7 @@
       {% empty %}
       <span class="dropdown-item-text text-muted">No study sets available</span>
       {% endfor %}
+    </div>
     </div>
   </div>
 </div>

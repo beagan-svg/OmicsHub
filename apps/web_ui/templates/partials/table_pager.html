@@ -1,7 +1,6 @@
 {% load web_ui_extras %}
 <nav class="pager" aria-label="{{ pager_label }}">
-  <label class="pager__size"
-         {% if mobile_sheet_rows %}data-mobile-move="sheet-body" data-mobile-order="2"{% endif %}>
+  <label class="pager__size">
     <span>Rows</span>
     <select class="form-select form-select-sm" aria-label="Rows per page"
             onchange="window.location.href = this.value">

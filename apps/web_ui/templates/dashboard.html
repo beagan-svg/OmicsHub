@@ -13,6 +13,14 @@
     </p>
   </div>
   <div class="page-head__actions">
+    {% comment %}
+    Mobile-only: the same sync-status pill the toolbar below shows on desktop, kept
+    compact beside the page title instead of on its own toolbar row (see
+    .page-head__sync in web_ui.css). The toolbar's own copy stays for desktop; each is
+    display:none on the other side of the mobile breakpoint, so this is a second render
+    of the same partial rather than something relocated by JS.
+    {% endcomment %}
+    <span class="page-head__sync">{% include "partials/sync_status.html" with include_metadata=True %}</span>
     <div class="dropdown">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
               data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
@@ -56,8 +64,15 @@
         {% endfor %}
       </div>
 
-      <span class="ms-auto d-flex align-items-center gap-2">
+      <span class="ms-auto d-flex align-items-center gap-2 toolbar-sync">
         {% include "partials/sync_status.html" with include_metadata=True %}
+        {% comment %}
+        Mobile hides this whole span, sync pill and Refresh button alike (see .toolbar-sync
+        in web_ui.css): the sync pill has its own compact copy up in the page head instead,
+        and pulling down from the top of the page re-reads these rows from OCS the same
+        native gesture Safari and every iOS list use for "refresh this" (see
+        pull-to-refresh.js). Desktop keeps both exactly as before.
+        {% endcomment %}
         <button class="btn btn-sm btn-outline-secondary" type="submit" form="refresh-status-form"
                 data-bs-toggle="tooltip" title="Re-read this page's rows from OCS now">
           <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh
@@ -80,6 +95,16 @@
         {% if selected_prefix %}
         <input type="hidden" name="batch_prefix" value="{{ selected_prefix }}" form="filter-form">
         {% endif %}
+        {% comment %}
+        Sort and direction aren't controls in this form -- they're set by clicking a column
+        header, which already preserves every other param via {% sort_query %}/with_params.
+        Without these two hidden fields, though, this form's own submission (Enter in the
+        search box, or Apply Filters) would silently drop whatever sort the table was in,
+        because a plain <form method="get"> builds its query string only from its own
+        fields, not from the URL it happened to be submitted from.
+        {% endcomment %}
+        <input type="hidden" name="sort" value="{{ sort }}" form="filter-form">
+        <input type="hidden" name="dir" value="{{ dir }}" form="filter-form">
         <div class="col-auto" data-mobile-move="sheet-body" data-mobile-order="3">
           {% comment %}
           Not Bootstrap's collapse: that one locks input for the length of its own
@@ -212,15 +237,31 @@
     moved to the checkout page with the rest of the submission's options, because those are
     decisions about a submission rather than about browsing.
     {% endcomment %}
-    <div class="card-body is-toolbar dashboard-footer" data-mobile-footer-bar>
+    {% comment %}
+    samples-mobile-footer: dashboard-footer/__left/__pager are shared verbatim with
+    Checkout's and Job Monitor's own footers (same BEM-ish names, different pages) --
+    this page-specific marker is what the new mobile-only CSS below scopes to, so none of
+    it leaks onto those other two pages' mobile view.
+    {% endcomment %}
+    <div class="card-body is-toolbar dashboard-footer samples-mobile-footer">
       <div class="dashboard-footer__left">
         <span class="text-secondary" id="sample-selection-count" aria-live="polite">0 Fastq Samples Selected</span>
         <div class="dashboard-footer__cart-actions">
-          <span class="text-secondary">
+          <span class="text-secondary samples-cart-summary">
             <i class="bi bi-bag" aria-hidden="true"></i>
             <span id="cart-count">{{ cart_count }}</span> in Cart
           </span>
-          <a class="btn btn-sm btn-outline-secondary" id="go-to-checkout" href="{% url 'web_ui:checkout' %}">Go to Checkout</a>
+          {% comment %}
+          Mobile shortens "Go to Checkout"/"Add Selected to Cart" to "Checkout"/"Add
+          Selected" (see .samples-action-bar__label--short in web_ui.css) -- toggled by
+          display, not aria-hidden, so whichever text is actually showing is the one thing
+          that gives each button its accessible name; the other is display:none and so
+          correctly excluded from it rather than silently duplicating or erasing it.
+          {% endcomment %}
+          <a class="btn btn-sm btn-outline-secondary" id="go-to-checkout" href="{% url 'web_ui:checkout' %}">
+            <span class="samples-action-bar__label">Go to Checkout</span>
+            <span class="samples-action-bar__label--short">Checkout</span>
+          </a>
           {% comment %}
           Not disabled here: with JavaScript off, nothing would ever flip it back, and the
           button still has to submit the form normally in that case. The JS below disables
@@ -229,7 +270,9 @@
           {% endcomment %}
           <button class="btn btn-sm btn-primary" type="submit" id="add-to-cart"
                   formaction="{% url 'web_ui:cart-add' %}">
-            <i class="bi bi-plus-lg" aria-hidden="true"></i> Add Selected to Cart
+            <i class="bi bi-plus-lg" aria-hidden="true"></i>
+            <span class="samples-action-bar__label">Add Selected to Cart</span>
+            <span class="samples-action-bar__label--short">Add Selected</span>
           </button>
         </div>
       </div>
@@ -243,7 +286,8 @@
       {% endcomment %}
       <span id="cart-feedback" aria-live="polite"></span>
       <div class="dashboard-footer__pager">
-        {% include "partials/table_pager.html" with pager_label="Sample pages" mobile_sheet_rows=True %}
+        {% include "partials/table_pager.html" with pager_label="Sample pages" %}
+        {% include "partials/compact_pager.html" with pager_label="Sample pages" %}
       </div>
     </div>
     {% endif %}
@@ -260,7 +304,7 @@
 Carries this page's row names so the refresh uses the current page and filters. The `next`
 value returns the user to that view.
 {% endcomment %}
-<form method="post" id="refresh-status-form" action="{% url 'web_ui:refresh-status' %}">
+<form method="post" id="refresh-status-form" action="{% url 'web_ui:refresh-status' %}" data-mobile-refresh-form>
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ request.get_full_path }}">
   {% for sample in page %}
@@ -289,11 +333,23 @@ value returns the user to that view.
   const navCartCount = document.getElementById("nav-cart-count");
   const navCartBadge = document.getElementById("nav-cart-badge");
 
-  // Matches the breakpoint the mobile fixed footer bar itself switches on (see
-  // mobile-footer-bar.js). The short form exists only because the long one is part of why
-  // that bar needed four rows for what's otherwise a two-row native selection toolbar --
-  // desktop has the room to spare and keeps the fuller wording.
+  // Matches the mobile breakpoint the rest of this page's CSS uses. The short selection-
+  // count form exists because the compact mobile action bar (see .samples-mobile-footer in
+  // web_ui.css) has much less room than desktop's own spread-out toolbar.
   const mobileBarMq = window.matchMedia("(max-width: 767.98px)");
+
+  // Go to Checkout can't be a real disabled <button> without giving up being a plain,
+  // bookmarkable link, so this drives the same look via a class instead -- only on mobile
+  // (see .is-disabled in web_ui.css, itself scoped to the same breakpoint): desktop's
+  // Checkout link has never disabled itself when the cart is empty, and this redesign is
+  // scoped to mobile only.
+  const updateCheckoutState = () => {
+    if (!goToCheckout || !cartCount) return;
+    const empty = (parseInt(cartCount.textContent, 10) || 0) === 0;
+    const disable = mobileBarMq.matches && empty;
+    goToCheckout.classList.toggle("is-disabled", disable);
+    goToCheckout.setAttribute("aria-disabled", String(disable));
+  };
 
   const updateSelectionCount = () => {
     if (!selectionCount) return;
@@ -317,6 +373,11 @@ value returns the user to that view.
     updateSelectionCount();
     mobileBarMq.addEventListener("change", updateSelectionCount);
   }
+  updateCheckoutState();
+  mobileBarMq.addEventListener("change", updateCheckoutState);
+  goToCheckout?.addEventListener("click", (event) => {
+    if (goToCheckout.classList.contains("is-disabled")) event.preventDefault();
+  });
 
   // --- adding to the cart ----------------------------------------------------------------
   // Adds without leaving the page, so the confirmation appears beside the button rather than
@@ -354,6 +415,7 @@ value returns the user to that view.
         cartCount.textContent = data.cart_count;
         if (navCartCount) navCartCount.textContent = data.cart_count;
         navCartBadge?.classList.toggle("d-none", !data.cart_count);
+        updateCheckoutState();
         if (response.ok && data.added) {
           // The samples are staged now, so leaving them ticked invites adding them twice.
           // Harmless, but it reads as though the first press did nothing. Dispatching

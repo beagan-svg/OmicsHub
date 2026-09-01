@@ -127,11 +127,23 @@
       {% endfor %}
     </div>
   </div>
-  <div class="timeline-footer">
+  {% comment %}
+  timeline-mobile-footer: same purpose as .samples-mobile-footer/.checkout-mobile-footer on
+  the other two redesigned pages -- a marker this page's own mobile CSS scopes to, though
+  here there's no shared-class collision risk to guard against (.timeline-footer isn't
+  reused elsewhere). Mobile swaps the plain "Page X of Y"/Previous/Next row for the same
+  compact_pager.html pill pagination used on Samples/Data Locations/Checkout, instead of a
+  second, differently-shaped pagination pattern just for this page. with_params (used
+  inside compact_pager.html) reads this page's own view/date/stage/status straight off the
+  current request's query string, so it carries them through exactly like the plain links
+  above did by hand.
+  {% endcomment %}
+  <div class="timeline-footer timeline-mobile-footer">
     <span>{{ timeline_page.paginator.count }} Batch Name From Vendors</span>
-    <span>Page {{ timeline_page.number }} of {{ timeline_page.paginator.num_pages }}</span>
-    {% if timeline_page.has_previous %}<a href="?view=week&date={{ selected_date|date:'Y-m-d' }}&page={{ timeline_page.previous_page_number }}&stage={{ selected_stage }}&status={{ selected_status }}">Previous</a>{% endif %}
-    {% if timeline_page.has_next %}<a href="?view=week&date={{ selected_date|date:'Y-m-d' }}&page={{ timeline_page.next_page_number }}&stage={{ selected_stage }}&status={{ selected_status }}">Next</a>{% endif %}
+    <span class="timeline-footer__page-text">Page {{ timeline_page.number }} of {{ timeline_page.paginator.num_pages }}</span>
+    {% if timeline_page.has_previous %}<a class="timeline-footer__link" href="?view=week&date={{ selected_date|date:'Y-m-d' }}&page={{ timeline_page.previous_page_number }}&stage={{ selected_stage }}&status={{ selected_status }}">Previous</a>{% endif %}
+    {% if timeline_page.has_next %}<a class="timeline-footer__link" href="?view=week&date={{ selected_date|date:'Y-m-d' }}&page={{ timeline_page.next_page_number }}&stage={{ selected_stage }}&status={{ selected_status }}">Next</a>{% endif %}
+    {% include "partials/compact_pager.html" with page=timeline_page pager_label="Timeline weeks" %}
   </div>
   {% else %}
   {% if selected_view == 'month' %}
