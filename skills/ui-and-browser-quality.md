@@ -8,7 +8,7 @@ with the existing Django templates and shared browser code.
 
 - Keep the interface quiet and information-dense. Use the existing cards, buttons,
   status pills, tags, disclosure panels, table footers, and spacing tokens.
-- Use direct labels such as `Fastq Name`, `Load Name`, `Batch Name from Vendor`,
+- Use direct labels such as `Fastq Name`, `Load Name`, `Batch Name From Vendor`,
   `Organism Common Name`, `Library Prep Method`, `Stage`, `Status`, `Duration`,
   and `Demand ID`.
 - Do not add duplicate labels, decorative panels, unexplained badges, or a second
@@ -37,7 +37,7 @@ Extend existing partials and scripts before creating new ones.
   multiple selections, show whether selections are active, provide one control that
   toggles between selecting all and selecting none, and apply the selected values to
   the table query.
-- Use the shared multi-value filter for Batch Name from Vendor, Organism Common Name,
+- Use the shared multi-value filter for Batch Name From Vendor, Organism Common Name,
   and Library Prep Method. The selected values must affect the table, not only the
   button summary.
 - Use the shared column menu for the Samples and Data Locations exports. CSV export
@@ -51,7 +51,7 @@ Extend existing partials and scripts before creating new ones.
 
 ## Filters and menus
 
-- A search for Fastq Name, Load Name, or Batch Name from Vendor must submit with
+- A search for Fastq Name, Load Name, or Batch Name From Vendor must submit with
   Enter. Keep an Apply Filters control when the form has several filters so users can
   submit all changes together.
 - Data Locations must offer a stage filter for Ingest, Alignment, and Post-alignment.

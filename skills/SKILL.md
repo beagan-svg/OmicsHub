@@ -29,6 +29,19 @@ Do not add a substitute credential source, wrapper, compatibility path, speculat
 or broad defensive branch. Use conditionals only for known application states or documented
 external responses. Do not use temporary log-viewer credentials for synchronization,
 submission, S3 browsing, or any other operation. Do not expose or persist real credentials.
+Never place credentials, tokens, or copied AWS output in this directory or in tests.
+
+Use the current code as the authority when a guide and the implementation differ. Fix the guide
+in the same change. When a change affects polling, workers, credentials, or a shared UI control,
+update the guide that owns that behavior and add a regression test for the user-visible result.
 
 After editing, inspect the complete diff, run focused tests, run the applicable formatter and
 linter, and report checks that could not run because of local services or credentials.
+
+## Writing style for these guides
+
+Use direct sentences and concrete project terms such as fastq sample, command, manifest,
+alignment, post-alignment, queue entry, demand ID, file-store ID, and log stream. "Manifest"
+names the JSONC file an operator uploads; once stored it is a "config" (`WorkflowConfig`, the
+`/configs/` pages), which is the word users see. Describe an action and its result. Avoid
+abstract claims, empty commentary, and speculative future behavior.

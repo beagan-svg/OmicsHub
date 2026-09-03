@@ -13,11 +13,6 @@ class WorkflowConfigSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "raw", "data", "uploaded_by", "uploaded_at", "is_active"]
 
 
-# A real config is tens of kilobytes. The whole file is held in memory and then stored
-# twice, as raw text and parsed JSON, so it is capped here. DATA_UPLOAD_MAX_MEMORY_SIZE
-# does not apply to file fields.
-MAX_CONFIG_BYTES = 2 * 1024 * 1024
-
 # The `name` column, which the filename falls back to.
 NAME_MAX_LENGTH = 255
 
@@ -29,9 +24,9 @@ class WorkflowConfigUploadSerializer(serializers.Serializer):
     name = serializers.CharField(required=False, max_length=NAME_MAX_LENGTH)
 
     def validate_file(self, uploaded):
-        if uploaded.size > MAX_CONFIG_BYTES:
+        if uploaded.size > manifest_service.MAX_CONFIG_BYTES:
             raise serializers.ValidationError(
-                f"Config file is {uploaded.size} bytes; the limit is {MAX_CONFIG_BYTES}."
+                f"Config file is {uploaded.size} bytes; the limit is {manifest_service.MAX_CONFIG_BYTES}."
             )
         return uploaded
 

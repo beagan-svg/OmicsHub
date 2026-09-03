@@ -1388,8 +1388,7 @@ main.container-fluid {
 
 .timeline__bar--failed,
 .timeline__bar--aborted,
-.timeline__bar--stranded,
-.timeline__bar--abandoned {
+.timeline__bar--stranded {
   background: #c23838;
 }
 
@@ -1663,8 +1662,7 @@ main.container-fluid {
 
 .timeline-day-detail__stage-pill--failed,
 .timeline-day-detail__stage-pill--aborted,
-.timeline-day-detail__stage-pill--stranded,
-.timeline-day-detail__stage-pill--abandoned {
+.timeline-day-detail__stage-pill--stranded {
   background: var(--state-fail-bg);
   color: var(--state-fail-ink);
 }
@@ -1709,25 +1707,19 @@ main.container-fluid {
   padding: 3px 6px;
 }
 
-.timeline-day-detail__outcome--completed,
-.timeline-day-detail__outcome--archived {
+/* The outcome pill takes the three grouped values _period_status_items emits
+   (completed/failed/running), not raw OCS statuses like its stage-pill sibling. */
+.timeline-day-detail__outcome--completed {
   background: var(--state-done-bg);
   color: var(--state-done-ink);
 }
 
-.timeline-day-detail__outcome--failed,
-.timeline-day-detail__outcome--aborted,
-.timeline-day-detail__outcome--stranded,
-.timeline-day-detail__outcome--abandoned {
+.timeline-day-detail__outcome--failed {
   background: var(--state-fail-bg);
   color: var(--state-fail-ink);
 }
 
-.timeline-day-detail__outcome--in-progress,
-.timeline-day-detail__outcome--submitted,
-.timeline-day-detail__outcome--submitting,
-.timeline-day-detail__outcome--pending,
-.timeline-day-detail__outcome--awaiting-trigger {
+.timeline-day-detail__outcome--running {
   background: var(--state-running-bg);
   color: var(--state-running-ink);
 }

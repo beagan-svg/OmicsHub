@@ -12,8 +12,13 @@ from django.utils import timezone
 
 from apps.sample_catalog.models import Stage, StageStatus
 
-from .monitor import collapse_multiome_monitor_rows
-from .view_helpers import FINISHED_OCS_STATUSES, RUNNING_OCS_STATUSES, TIMELINE_DAYS, TIMELINE_PAGE_SIZE
+from .view_helpers import (
+    FINISHED_OCS_STATUSES,
+    RUNNING_OCS_STATUSES,
+    TIMELINE_DAYS,
+    TIMELINE_PAGE_SIZE,
+    collapse_multiome_rows,
+)
 
 TIMELINE_STATUS_GROUPS = {
     "IN_PROGRESS": RUNNING_OCS_STATUSES,
@@ -75,14 +80,8 @@ def job_timeline(request):
         stages = stages.filter(status=selected_status)
 
     if selected_view == "week":
-        stage_rows = list(stages.order_by("started_at"))
-        running = [row for row in stage_rows if row.status in RUNNING_OCS_STATUSES]
-        finished = [row for row in stage_rows if row.status in FINISHED_OCS_STATUSES]
-        collapsed_running, collapsed_finished = collapse_multiome_monitor_rows(
-            running, finished, include_queue_status=False
-        )
         batch_rows: dict[str, dict[tuple[str, str | int], dict[str, Any]]] = {}
-        for row in [*collapsed_running, *collapsed_finished]:
+        for row in _collapsed_timeline_rows(stages):
             logical_key = _timeline_logical_key(row)
             batch_name = row.sample.batch_name_from_vendor or "Unassigned batch"
             logical_row = batch_rows.setdefault(batch_name, {}).setdefault(
@@ -182,7 +181,7 @@ def _timeline_period_label(selected_view, selected_date):
 
 def _timeline_periods(stages, selected_view, selected_date, selected_day=None):
     """Build status counts for each day in a month or month in a year."""
-    by_period, sample_counts, batch_counts = _timeline_logical_period_data(stages, selected_view)
+    by_period, sample_counts, batch_counts = _logical_period_counts(stages, selected_view)
 
     selected_day_batches = _timeline_day_batches(stages, selected_day) if selected_day else ()
 
@@ -191,7 +190,7 @@ def _timeline_periods(stages, selected_view, selected_date, selected_day=None):
         days_in_month = calendar.monthrange(selected_date.year, selected_date.month)[1]
         cells = [None] * month_start.weekday()
         cells.extend(
-            _period_card_data(
+            _period_card_context(
                 month_start + timedelta(days=offset),
                 by_period,
                 sample_counts,
@@ -206,11 +205,11 @@ def _timeline_periods(stages, selected_view, selected_date, selected_day=None):
     months = []
     for month in range(1, 13):
         month_date = date(selected_date.year, month, 1)
-        months.append(_period_card_data(month_date, by_period, sample_counts, batch_counts))
+        months.append(_period_card_context(month_date, by_period, sample_counts, batch_counts))
     return {"kind": "year", "months": months}
 
 
-def _period_card_data(period, by_period, sample_counts, batch_counts, batches=()):
+def _period_card_context(period, by_period, sample_counts, batch_counts, batches=()):
     """Return display counts for one calendar period."""
     period_data = by_period.get(period, {"stages": {}})
     stage_counts = period_data["stages"]
@@ -241,16 +240,9 @@ def _period_card_data(period, by_period, sample_counts, batch_counts, batches=()
 
 def _timeline_day_batches(stages, selected_day):
     """Return collapsed Batch Name From Vendor groups and Fastq Samples for one day."""
-    day_rows = list(stages.filter(started_at__date=selected_day).order_by("started_at"))
-    running = [row for row in day_rows if row.status in RUNNING_OCS_STATUSES]
-    finished = [row for row in day_rows if row.status in FINISHED_OCS_STATUSES]
-    collapsed_running, collapsed_finished = collapse_multiome_monitor_rows(
-        running, finished, include_queue_status=False
-    )
-
     logical_rows: dict[tuple[str, tuple[str, str | int]], dict[str, Any]] = {}
     order: list[tuple[str, tuple[str, str | int]]] = []
-    for row in [*collapsed_running, *collapsed_finished]:
+    for row in _collapsed_timeline_rows(stages.filter(started_at__date=selected_day)):
         sample = row.sample
         batch_name = sample.batch_name_from_vendor or "Unassigned batch"
         key = (batch_name, _timeline_logical_key(row))
@@ -301,16 +293,10 @@ def _timeline_day_batches(stages, selected_day):
     )
 
 
-def _timeline_logical_period_data(stages, selected_view):
+def _logical_period_counts(stages, selected_view):
     """Build logical sample, batch, and stage counts for each calendar period."""
-    rows = list(stages.order_by("started_at"))
-    running = [row for row in rows if row.status in RUNNING_OCS_STATUSES]
-    finished = [row for row in rows if row.status in FINISHED_OCS_STATUSES]
-    collapsed_running, collapsed_finished = collapse_multiome_monitor_rows(
-        running, finished, include_queue_status=False
-    )
     logical_rows: dict[tuple[str, tuple[str, str | int]], dict[str, Any]] = {}
-    for row in [*collapsed_running, *collapsed_finished]:
+    for row in _collapsed_timeline_rows(stages):
         sample = row.sample
         batch_name = sample.batch_name_from_vendor or "Unassigned batch"
         key = (batch_name, _timeline_logical_key(row))
@@ -349,6 +335,21 @@ def _timeline_logical_period_data(stages, selected_view):
         {period: len(keys) for period, keys in sample_periods.items()},
         {period: len(names) for period, names in batch_periods.items()},
     )
+
+
+def _collapsed_timeline_rows(stages):
+    """Collapse a stage queryset into multiome-merged rows, running rows first.
+
+    The week view, the month day panel, and the period counts all group the same
+    collapsed rows; only the payload they accumulate differs.
+    """
+    rows = list(stages.order_by("started_at"))
+    running = [row for row in rows if row.status in RUNNING_OCS_STATUSES]
+    finished = [row for row in rows if row.status in FINISHED_OCS_STATUSES]
+    collapsed_running, collapsed_finished = collapse_multiome_rows(
+        running, finished, include_queue_status=False
+    )
+    return [*collapsed_running, *collapsed_finished]
 
 
 def _timeline_logical_key(row):

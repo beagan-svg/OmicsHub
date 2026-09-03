@@ -37,7 +37,7 @@ META_REFRESH = re.compile(r"<meta[^>]*http-equiv\s*=\s*[\"']?refresh", re.IGNORE
 CAPTIONED = [
     "queue.html",
     "failed_jobs.html",
-    "workflow_manifests.html",
+    "configs.html",
     "data_locations.html",
 ]
 TABLE_TEMPLATES = [*CAPTIONED, "partials/job_monitor_tables.html"]
@@ -189,7 +189,7 @@ def test_row_actions_name_the_job_they_act_on():
     queue = (TEMPLATES / "queue.html").read_text()
     assert 'aria-label="Delete {{ entry.stage }} for {{ entry.sample.fastq_name }}"' in queue
 
-    configs = (TEMPLATES / "workflow_manifests.html").read_text()
+    configs = (TEMPLATES / "configs.html").read_text()
     assert 'aria-label="Activate {{ config.name }}"' in configs
 
 

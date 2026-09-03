@@ -6,7 +6,7 @@ OmicsHub is a Django application that mirrors OCS data into PostgreSQL, builds O
 
 `apps/accounts/` owns the user model, registration, login form, and account administration.
 
-`apps/sample_catalog/` owns the local OCS mirror. It contains fastq samples, stage statuses, the `ocs_sync.py` DynamoDB synchronization module, sync tasks, and sample API endpoints.
+`apps/sample_catalog/` owns the local OCS mirror. It contains fastq samples, stage statuses, the `ocs_sync.py` DynamoDB synchronization module, sync tasks, and sample API endpoints. Each app's REST API viewset lives in that app's `views.py`; the HTML pages all live in `apps/web_ui/views/`.
 
 `apps/ocs_integration/` owns external OCS boundaries. `dynamodb.py` reads OCS DynamoDB tables, `s3.py` reads S3 metadata and contents, and `cli.py` runs the `ocs` command for submissions. Tests in this package replace those external clients.
 
@@ -37,7 +37,7 @@ Reusable template fragments live in `apps/web_ui/templates/partials/` and use na
 
 ## Configuration and build inputs
 
-`workflow_manifests/` contains an example workflow manifest for operators. A manifest is uploaded and stored in `WorkflowConfig` before it can drive submissions.
+`workflow_manifests/` contains an example workflow manifest for operators. "Manifest" names the JSONC file itself; once uploaded and stored it is a "config" (`WorkflowConfig`, the `/configs/` pages), and only a config can drive submissions.
 
 `vendor/gcs/` contains the pinned OCS package source prepared by `docker_tools/vendor_gcs.sh`. Treat it as generated build input, not as OmicsHub application code. Do not add application logic there.
 

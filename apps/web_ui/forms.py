@@ -1,6 +1,7 @@
 from django import forms
 
 from apps.sample_catalog.models import Stage
+from apps.workflow_engine import manifest_service
 
 
 class SyncForm(forms.Form):
@@ -28,7 +29,7 @@ class SubmissionForm(forms.Form):
 class ConfigUploadForm(forms.Form):
     """Validate the uploaded manifest file and read its UTF-8 text."""
 
-    MAX_BYTES = 2 * 1024 * 1024
+    MAX_BYTES = manifest_service.MAX_CONFIG_BYTES
 
     file = forms.FileField(label="Config file")
 

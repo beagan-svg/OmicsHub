@@ -1,8 +1,5 @@
 """Render monitor pages and actions."""
 
-from collections.abc import Sequence
-from dataclasses import dataclass
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -12,8 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.ocs_integration import log_credentials
-from apps.sample_catalog import multiome_pairing as pairing
-from apps.sample_catalog.models import MULTIOME_PREFIXES, BatchPrefix, Sample, Stage, StageStatus
+from apps.sample_catalog.models import Stage, StageStatus
 from apps.submission_queue.models import QueueEntry
 
 from .view_helpers import (
@@ -26,6 +22,7 @@ from .view_helpers import (
     _owned,
     _page_size,
     _status_sync_context,
+    collapse_multiome_rows,
 )
 
 _MONITOR_STAGE_OPTIONS = [("", "All"), (Stage.ALIGN, "Alignment"), (Stage.POST_ALIGN, "Post-Alignment")]
@@ -35,45 +32,6 @@ _MONITOR_FINISHED_STATUS_OPTIONS = [
     ("FAILED", "Failed"),
     ("ABORTED", "Aborted"),
 ]
-
-
-@dataclass
-class MonitorRow:
-    """Represent one OCS demand and its fastq samples in a monitor table."""
-
-    stage_status: StageStatus
-    fastq_names: list[str]
-    show_fastq_details: bool
-    display_sample: Sample
-    queued_here: bool
-
-    @property
-    def sample(self):
-        return self.display_sample
-
-    @property
-    def stage(self):
-        return self.stage_status.stage
-
-    @property
-    def status(self):
-        return self.stage_status.status
-
-    @property
-    def demand_id(self):
-        return self.stage_status.demand_id
-
-    @property
-    def started_at(self):
-        return self.stage_status.started_at
-
-    @property
-    def duration_display(self):
-        return self.stage_status.duration_display
-
-    @property
-    def last_update_time(self):
-        return self.stage_status.last_update_time
 
 
 @login_required
@@ -100,7 +58,7 @@ def job_monitor(request):
     # OCS limits the number of running stages. Finished stages use a separate display cap.
     running_rows = list(running_stages.order_by(F("started_at").desc(nulls_last=True)))
     finished_stages = list(_finished_stages_queryset(stages, finished_stage, finished_status))
-    all_running_rows, finished_rows = collapse_multiome_monitor_rows(
+    all_running_rows, finished_rows = collapse_multiome_rows(
         running_rows, finished_stages, include_queue_status=True
     )
     monitor_running = [row for row in all_running_rows if not running_stage or row.stage == running_stage]
@@ -279,93 +237,9 @@ def _monitor_filter_options(request, *, options, param, page_param):
     return links
 
 
-def collapse_multiome_monitor_rows(
-    running: Sequence[StageStatus],
-    finished_stages: Sequence[StageStatus],
-    *,
-    include_queue_status: bool,
-) -> tuple[list[MonitorRow], list[MonitorRow]]:
-    """Collapse MTX/ATX pairs and group samples from the same demand."""
-    rows = [*running, *finished_stages]
-    load_names = {
-        row.sample.load_name
-        for row in rows
-        if row.sample.load_name and row.sample.batch_prefix in MULTIOME_PREFIXES
-    }
-    multiome_samples_by_load = pairing.paired_samples_by_load_name(load_names)
-    selected: dict[tuple[str, str | int], StageStatus] = {}
-    names_by_key: dict[tuple[str, str | int], list[str]] = {}
-    order: list[tuple[str, str | int]] = []
-
-    for row in rows:
-        sample = row.sample
-        pair_samples = multiome_samples_by_load.get(sample.load_name, {})
-        selected_key = (row.stage, sample.load_name) if pair_samples else ("sample", row.pk)
-        names_by_key.setdefault(selected_key, []).append(sample.fastq_name)
-        for pair_sample in pair_samples.values():
-            if pair_sample.fastq_name not in names_by_key[selected_key]:
-                names_by_key[selected_key].append(pair_sample.fastq_name)
-        current_status = selected.get(selected_key)
-        if current_status is None:
-            selected[selected_key] = row
-            order.append(selected_key)
-            continue
-
-        current_is_running = current_status.status in RUNNING_OCS_STATUSES
-        row_is_running = row.status in RUNNING_OCS_STATUSES
-        current_is_mtx = current_status.sample.batch_prefix == BatchPrefix.MTX
-        row_is_mtx = sample.batch_prefix == BatchPrefix.MTX
-        if (row_is_running and not current_is_running) or (
-            row_is_running == current_is_running and row_is_mtx and not current_is_mtx
-        ):
-            selected[selected_key] = row
-
-    collapsed: list[MonitorRow] = []
-    for selection_key in order:
-        selected_status = selected[selection_key]
-        pair_samples = multiome_samples_by_load.get(selected_status.sample.load_name, {})
-        fastq_names = list(dict.fromkeys(names_by_key[selection_key]))
-        if pair_samples:
-            fastq_names = [
-                pair_samples[BatchPrefix.MTX].fastq_name,
-                *[name for name in fastq_names if name != pair_samples[BatchPrefix.MTX].fastq_name],
-            ]
-        collapsed.append(
-            MonitorRow(
-                stage_status=selected_status,
-                fastq_names=fastq_names,
-                show_fastq_details=not pair_samples,
-                display_sample=pair_samples.get(BatchPrefix.MTX, selected_status.sample),
-                queued_here=(selected_status.__dict__["queued_here"] if include_queue_status else False),
-            )
-        )
-    grouped: dict[tuple[str, str], MonitorRow] = {}
-    for monitor_row in collapsed:
-        grouped_key = (
-            (monitor_row.stage, monitor_row.demand_id)
-            if monitor_row.demand_id
-            else (monitor_row.stage, f"sample:{monitor_row.stage_status.pk}")
-        )
-        current_row = grouped.get(grouped_key)
-        if current_row is None:
-            grouped[grouped_key] = monitor_row
-        else:
-            current_row.fastq_names.extend(
-                name for name in monitor_row.fastq_names if name not in current_row.fastq_names
-            )
-            current_row.show_fastq_details |= monitor_row.show_fastq_details
-            current_row.queued_here |= monitor_row.queued_here
-
-    grouped_rows = list(grouped.values())
-    return (
-        [row for row in grouped_rows if row.status in RUNNING_OCS_STATUSES],
-        [row for row in grouped_rows if row.status in FINISHED_OCS_STATUSES],
-    )
-
-
 @login_required
 def failed_jobs(request):
-    owned = _owned(request).select_related("sample", "requested_by")
+    owned = _owned(request)
     entries = owned.filter(status__in=FAILED_STATUSES, demand_id="")
     running_failures = owned.filter(status=QueueEntry.Status.FAILED).exclude(demand_id="")
     entries = list(entries)
@@ -408,11 +282,14 @@ def retry_job(request, pk):
 @login_required
 @require_POST
 def delete_job(request, pk):
+    """Delete a failed job entry."""
     entry = get_object_or_404(_owned(request), pk=pk)
-    if entry.status not in FAILED_STATUSES:
-        messages.error(request, "Only failed entries can be deleted.")
+    # Conditional on FAILED for the same reason `retry_job` is: `retry_job` can return the
+    # entry to PENDING between reading it and deleting it, and a pending entry belongs to
+    # the worker, not the trash.
+    deleted, _ = QueueEntry.objects.filter(pk=entry.pk, status__in=FAILED_STATUSES).delete()
+    if deleted:
+        messages.success(request, f"Deleted the failed entry for {entry.sample.fastq_name}.")
     else:
-        fastq_name = entry.sample.fastq_name
-        entry.delete()
-        messages.success(request, f"Deleted the failed entry for {fastq_name}.")
+        messages.error(request, "Only failed entries can be deleted.")
     return redirect("web_ui:failed")

@@ -48,8 +48,8 @@ def prefixes_for_workflows(workflow_names) -> set[str]:
 
 
 # The multiome pair: MTX (GEX) and ATX (ATAC) batches sharing a load_name. Not the
-# library prep name , a vendor's naming for the two halves varies (real synced data has
-# used "10xRSeq_Mult"/"10xATAC_Mult" as well as "10xMultX_GEX"/"10xMultX_ATAC") , and not
+# library prep name -- a vendor's naming for the two halves varies (real synced data has
+# used "10xRSeq_Mult"/"10xATAC_Mult" as well as "10xMultX_GEX"/"10xMultX_ATAC") -- and not
 # load_name alone either: 262 load_names in the real DynamoDB data are shared by unrelated
 # samples, so requiring one MTX and one ATX side is what tells a real pair apart from a
 # coincidence.
@@ -69,6 +69,12 @@ class Stage(models.TextChoices):
 # config's status_mappings list the labels that count as complete; anything not in those
 # lists, including this one, means the stage still has work to do.
 NOT_COMPLETED = "NOT COMPLETED"
+
+# The Sample fields users can filter by, shared by the dashboard's multi-value filter
+# panel and the REST API's query parameters so the two cannot silently diverge. The two
+# consumers apply it differently on purpose: the web UI accepts several values per field
+# (`getlist` + `__in`), the API one exact value per field.
+FILTER_FIELDS = ("batch_name_from_vendor", "organism_common_name", "library_prep_method_name")
 
 
 class Sample(models.Model):

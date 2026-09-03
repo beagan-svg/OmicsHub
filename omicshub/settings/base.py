@@ -255,8 +255,8 @@ LOGGING = {
     "root": {"handlers": ["console"], "level": LOG_LEVEL},
     "loggers": {
         # No handlers, propagate: Django's own default gives this logger a mail_admins
-        # handler, and Chapter 6 is explicit that logs should not be shipped by email.
-        # Unhandled 500s reach the root console handler here, and Sentry separately.
+        # handler, and logs should not be shipped by email. Unhandled 500s reach the
+        # root console handler here, and Sentry separately.
         "django": {"handlers": [], "level": LOG_LEVEL, "propagate": True},
         **{
             f"apps.{name}": {
@@ -270,9 +270,8 @@ LOGGING = {
 }
 
 # --- Error monitoring -----------------------------------------------------
-# Chapter 14: "A lot of beginners still use logs to detect raised exceptions. Error
-# monitoring tools are lifelines to detect any production exceptions raised." Logging says
-# what the system did; Sentry says what broke, with the input that broke it.
+# Logs are not an exception detector. Logging says what the system did; Sentry says
+# what broke, with the input that broke it.
 #
 # Initialised only when a DSN is present, so a developer machine and CI behave exactly as
 # they did before and no DSN is ever committed.
@@ -304,8 +303,8 @@ if SENTRY_DSN:
             # worker is invisible otherwise, because no user is watching a response.
             CeleryIntegration(),
             # Log records become breadcrumbs, never events. Turning warnings into issues
-            # is the "logging as error collection" mistake the book warns about, one level
-            # up: the dashboard fills with expected conditions and real 500s get lost.
+            # is the "logging as error collection" mistake one level up: the dashboard
+            # fills with expected conditions and real 500s get lost.
             LoggingIntegration(level=logging.INFO, event_level=None),
         ],
         # This app handles institutional email addresses and sample identifiers. Off means

@@ -28,9 +28,9 @@ class WorkflowConfigViewSet(
         return WorkflowConfigSerializer
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        config = serializer.save()
+        upload_serializer = self.get_serializer(data=request.data)
+        upload_serializer.is_valid(raise_exception=True)
+        config = upload_serializer.save()
         return Response(WorkflowConfigSerializer(config).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])

@@ -103,8 +103,8 @@ def test_history_splits_the_demand_type_and_id(fake_boto):
             "demand_type": "align",
             "demand_id": "0d1f-uuid",
             "last_update_time": "2026-01-01T00:00:00Z",
-            # See apps/sample_catalog/tests/test_file_store_ids.py for what the demand produced.
-            # how this is picked out of a row with several outputs.
+            # See apps/sample_catalog/tests/test_file_store_ids.py for what the demand
+            # produced and how this is picked out of a row with several outputs.
             "file_store_id": "b2b794e49df38f84a0271a2d76707b74beb80eb7",
         }
     ]

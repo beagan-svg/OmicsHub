@@ -8,7 +8,7 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
-from apps.workflow_engine import serializers
+from apps.workflow_engine import manifest_service, serializers
 from apps.workflow_engine.models import WorkflowConfig
 
 pytestmark = pytest.mark.django_db
@@ -70,7 +70,7 @@ class TestARejectedUpload:
         assert not WorkflowConfig.objects.exists()
 
     def test_a_file_over_the_size_limit(self, staff_api_client):
-        oversized = b"/* " + b"x" * serializers.MAX_CONFIG_BYTES + b" */"
+        oversized = b"/* " + b"x" * manifest_service.MAX_CONFIG_BYTES + b" */"
         body = SimpleUploadedFile("config.jsonc", oversized, content_type="application/json")
 
         response = staff_api_client.post("/api/configs/", {"file": body}, format="multipart")

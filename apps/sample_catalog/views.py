@@ -1,13 +1,21 @@
+from botocore.exceptions import BotoCoreError, ClientError
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.sample_catalog import ocs_sync as sync
-from apps.sample_catalog.models import Sample
+from apps.sample_catalog.models import FILTER_FIELDS, Sample
 from apps.sample_catalog.serializers import SampleSerializer, SyncRequestSerializer
 
-FILTER_FIELDS = ("batch_name_from_vendor", "organism_common_name", "library_prep_method_name")
+
+class OCSUnavailable(APIException):
+    """Report an unreachable OCS as a gateway problem, matching the web UI's treatment."""
+
+    status_code = status.HTTP_502_BAD_GATEWAY
+    default_detail = "Could not reach OCS. Nothing was synced."
+    default_code = "ocs_unavailable"
 
 
 class SampleViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -34,10 +42,15 @@ class SampleViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
         sync_request_serializer.is_valid(raise_exception=True)
 
         batch_name = sync_request_serializer.validated_data.get("batch_name_from_vendor")
-        if batch_name:
-            samples = sync.sync_batch(batch_name)
-        else:
-            samples = sync.sync_fastq_names(sync_request_serializer.validated_data["fastq_names"])
+        # OCS being unreachable is an expected external condition, reported the same way
+        # the web UI's sync reports it, not an unhandled 500.
+        try:
+            if batch_name:
+                samples = sync.sync_batch(batch_name)
+            else:
+                samples = sync.sync_fastq_names(sync_request_serializer.validated_data["fastq_names"])
+        except (BotoCoreError, ClientError) as error:
+            raise OCSUnavailable() from error
 
         refreshed = Sample.objects.filter(pk__in=[s.pk for s in samples]).prefetch_related("stage_statuses")
         return Response(SampleSerializer(refreshed, many=True).data, status=status.HTTP_200_OK)

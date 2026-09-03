@@ -33,12 +33,8 @@ def stage_rows(samples: Iterable[Sample]) -> list[dict[str, Any]]:
                     "sample_id": sample.pk,
                     "show_selector": stage == Stage.INGEST,
                     "fastq_name": sample.fastq_name,
-                    "studies": sample.studies,
-                    "load_name": sample.load_name,
-                    "batch_name_from_vendor": sample.batch_name_from_vendor,
-                    "modality": sample.modality,
-                    "organism_common_name": sample.organism_common_name,
-                    "library_prep_method_name": sample.library_prep_method_name,
+                    # Sample fields are read through column_values only, keyed the same
+                    # way the column chooser and CSV export look them up.
                     "column_values": {
                         column.key: getattr(sample, column.key)
                         for column in LOCATION_COLUMNS

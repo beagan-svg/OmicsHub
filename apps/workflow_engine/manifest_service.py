@@ -9,6 +9,12 @@ from __future__ import annotations
 from apps.workflow_engine import config_loader
 from apps.workflow_engine.models import WorkflowConfig
 
+# A real config is tens of kilobytes. The whole file is held in memory and then stored
+# twice, as raw text and parsed JSON, so uploads are capped. Both upload paths (the web
+# form and the API serializer) enforce this same limit; DATA_UPLOAD_MAX_MEMORY_SIZE does
+# not apply to file fields.
+MAX_CONFIG_BYTES = 2 * 1024 * 1024
+
 
 def create_config(*, raw: str, name: str, user) -> WorkflowConfig:
     """Parse and validate a JSONC manifest, then store it inactive.

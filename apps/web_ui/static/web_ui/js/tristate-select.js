@@ -18,7 +18,7 @@ document.querySelectorAll("[data-tristate-group]").forEach((selectAll) => {
 
   // Toggling every row through "select all" dispatches one "change" per row (see the
   // header comment), and each dispatch would otherwise re-scan every row in the group to
-  // recompute this same checked/indeterminate state , O(rows) work done once per row
+  // recompute this same checked/indeterminate state -- O(rows) work done once per row
   // toggled, so O(rows²) for a full select-all on a large table. Queuing it as a
   // microtask instead collapses however many rows changed in this pass into a single
   // recompute, since microtasks run once after the current synchronous work finishes,
@@ -38,7 +38,7 @@ document.querySelectorAll("[data-tristate-group]").forEach((selectAll) => {
   selectAll.addEventListener("change", () => {
     // Captured once rather than read fresh inside the loop below, in case a row's own
     // "change" listener (a page's, not this file's) ever reaches back and touches
-    // selectAll.checked itself , comparing against a live property could then compare
+    // selectAll.checked itself -- comparing against a live property could then compare
     // each row against whatever an earlier row's dispatch left it at, not the click that
     // started this.
     const target = selectAll.checked;

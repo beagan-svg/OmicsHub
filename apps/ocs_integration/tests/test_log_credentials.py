@@ -104,13 +104,6 @@ class FakeSession:
         return self._clients[service_name]
 
 
-@pytest.fixture(autouse=True)
-def clear_cache():
-    cache.clear()
-    yield
-    cache.clear()
-
-
 @pytest.fixture
 def request_():
     request = RequestFactory().get("/")

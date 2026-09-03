@@ -1,6 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
+from apps.web_ui.views.configs import activate_config, config_detail, configs
 from apps.web_ui.views.dashboard import (
     cart_add,
     cart_clear,
@@ -30,11 +31,8 @@ from apps.web_ui.views.monitor import (
 )
 from apps.web_ui.views.queue import cancel, delete_queue_entry, queue, toggle_queue_pause
 from apps.web_ui.views.submissions import (
-    activate_config,
     checkout,
     command_preview,
-    config_detail,
-    configs,
     submit_commands,
     submit_confirm,
     submit_review,

@@ -185,7 +185,7 @@ def build_plan(
     # per sample instead of once per combination it actually contains.
     command_config_cache: dict[tuple[str, str, str, str], tuple[dict | None, ConfigurationError | None]] = {}
 
-    # Two samples sharing a load_name are one multiome job, aligned together , nothing
+    # Two samples sharing a load_name are one multiome job, aligned together -- nothing
     # about their library prep decides that. load_name alone is not quite enough on its
     # own either: 262 load_names in the real DynamoDB data are shared by unrelated samples, so a
     # group only counts as a real pair once it actually has one MTX and one ATX side, the

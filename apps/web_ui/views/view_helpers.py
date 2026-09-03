@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from dataclasses import dataclass
 from functools import wraps
 
 from django.conf import settings
@@ -12,13 +13,21 @@ from django.db.models.functions import Cast, NullIf
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from apps.sample_catalog import multiome_pairing as pairing
 from apps.sample_catalog import ocs_sync as sync
-from apps.sample_catalog.models import NOT_COMPLETED, BatchPrefix, Sample, Stage, StageStatus
+from apps.sample_catalog.models import (
+    FILTER_FIELDS,
+    MULTIOME_PREFIXES,
+    NOT_COMPLETED,
+    BatchPrefix,
+    Sample,
+    Stage,
+    StageStatus,
+)
 from apps.submission_queue.models import QueueEntry
 
 logger = logging.getLogger(__name__)
 
-FILTER_FIELDS = ("batch_name_from_vendor", "organism_common_name", "library_prep_method_name")
 PAGE_SIZE = 50
 PAGE_SIZE_OPTIONS = (25, 50, 100, 200)
 DOWNLOAD_SELECTION_LIMIT = 1000
@@ -146,6 +155,16 @@ def _filtered_samples(request):
             queryset = queryset.filter(stage_statuses__stage=stage.value, stage_statuses__status=value)
 
     return queryset
+
+
+def _metadata_refresh_label() -> str:
+    """Return the metadata sweep cadence text, derived from the beat schedule.
+
+    Derived rather than written out so a schedule change cannot leave the dashboard
+    describing a cadence that no longer runs.
+    """
+    schedule = settings.CELERY_BEAT_SCHEDULE["sync-metadata"]["schedule"]
+    return f"nightly at {min(schedule.hour):02d}:{min(schedule.minute):02d}"
 
 
 def _status_sync_context():
@@ -318,6 +337,166 @@ def _study_options() -> list[str]:
         )
         cache.set(sync.STUDY_OPTIONS_KEY, studies, timeout=600)
     return studies
+
+
+def _filter_panel_context(request, stage_filters) -> dict:
+    """Return the filter-panel context shared by the Samples and Data Locations pages.
+
+    Menu options are scoped to the family tab rather than the whole local database, so
+    they only offer values that can return rows — and rather than the fully-filtered
+    queryset, so choosing an organism does not empty the batch menu.
+
+    `active_filter_count` and `filters_open` describe the More Filters panel only. The
+    study filter sits on the main bar outside that panel and shows its own selection
+    state, so it is deliberately not counted here: a badge on the panel's button must
+    not count a control the opened panel does not contain.
+    """
+    prefix = request.GET.get("batch_prefix")
+    scope = Sample.objects.all()
+    if prefix in BatchPrefix.values:
+        scope = scope.filter(batch_prefix=prefix)
+
+    return {
+        "search": (request.GET.get("fastq_name") or "").strip(),
+        "filters": {field: request.GET.getlist(field) for field in FILTER_FIELDS},
+        "stage_filters": stage_filters,
+        "batch_prefixes": _prefix_counts(),
+        "selected_prefix": request.GET.get("batch_prefix", ""),
+        "studies": _study_options(),
+        "selected_studies": request.GET.getlist("study"),
+        "batches": _batch_options(request.GET.getlist("batch_name_from_vendor"), scope),
+        "organisms": _scoped_distinct(scope, "organism_common_name"),
+        "library_preps": _scoped_distinct(scope, "library_prep_method_name"),
+        "statuses": [NOT_COMPLETED, *_scoped_statuses(scope)],
+        "filters_open": any(request.GET.getlist(field) for field in FILTER_FIELDS)
+        or any(row["selected"] for row in stage_filters),
+        "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.getlist(field))
+        + sum(1 for row in stage_filters if row["selected"]),
+        **_status_sync_context(),
+    }
+
+
+@dataclass
+class MonitorRow:
+    """Represent one OCS demand and its fastq samples in a monitor or timeline table."""
+
+    stage_status: StageStatus
+    fastq_names: list[str]
+    show_fastq_details: bool
+    display_sample: Sample
+    queued_here: bool
+
+    @property
+    def sample(self):
+        return self.display_sample
+
+    @property
+    def stage(self):
+        return self.stage_status.stage
+
+    @property
+    def status(self):
+        return self.stage_status.status
+
+    @property
+    def demand_id(self):
+        return self.stage_status.demand_id
+
+    @property
+    def started_at(self):
+        return self.stage_status.started_at
+
+    @property
+    def duration_display(self):
+        return self.stage_status.duration_display
+
+    @property
+    def last_update_time(self):
+        return self.stage_status.last_update_time
+
+
+def collapse_multiome_rows(
+    running: Sequence[StageStatus],
+    finished_stages: Sequence[StageStatus],
+    *,
+    include_queue_status: bool,
+) -> tuple[list[MonitorRow], list[MonitorRow]]:
+    """Collapse MTX/ATX pairs and group samples from the same demand."""
+    rows = [*running, *finished_stages]
+    load_names = {
+        row.sample.load_name
+        for row in rows
+        if row.sample.load_name and row.sample.batch_prefix in MULTIOME_PREFIXES
+    }
+    multiome_samples_by_load = pairing.paired_samples_by_load_name(load_names)
+    selected: dict[tuple[str, str | int], StageStatus] = {}
+    names_by_key: dict[tuple[str, str | int], list[str]] = {}
+    order: list[tuple[str, str | int]] = []
+
+    for row in rows:
+        sample = row.sample
+        pair_samples = multiome_samples_by_load.get(sample.load_name, {})
+        selected_key = (row.stage, sample.load_name) if pair_samples else ("sample", row.pk)
+        names_by_key.setdefault(selected_key, []).append(sample.fastq_name)
+        for pair_sample in pair_samples.values():
+            if pair_sample.fastq_name not in names_by_key[selected_key]:
+                names_by_key[selected_key].append(pair_sample.fastq_name)
+        current_status = selected.get(selected_key)
+        if current_status is None:
+            selected[selected_key] = row
+            order.append(selected_key)
+            continue
+
+        current_is_running = current_status.status in RUNNING_OCS_STATUSES
+        row_is_running = row.status in RUNNING_OCS_STATUSES
+        current_is_mtx = current_status.sample.batch_prefix == BatchPrefix.MTX
+        row_is_mtx = sample.batch_prefix == BatchPrefix.MTX
+        if (row_is_running and not current_is_running) or (
+            row_is_running == current_is_running and row_is_mtx and not current_is_mtx
+        ):
+            selected[selected_key] = row
+
+    collapsed: list[MonitorRow] = []
+    for selection_key in order:
+        selected_status = selected[selection_key]
+        pair_samples = multiome_samples_by_load.get(selected_status.sample.load_name, {})
+        fastq_names = list(dict.fromkeys(names_by_key[selection_key]))
+        if pair_samples:
+            fastq_names = [
+                pair_samples[BatchPrefix.MTX].fastq_name,
+                *[name for name in fastq_names if name != pair_samples[BatchPrefix.MTX].fastq_name],
+            ]
+        collapsed.append(
+            MonitorRow(
+                stage_status=selected_status,
+                fastq_names=fastq_names,
+                show_fastq_details=not pair_samples,
+                display_sample=pair_samples.get(BatchPrefix.MTX, selected_status.sample),
+                queued_here=(selected_status.__dict__["queued_here"] if include_queue_status else False),
+            )
+        )
+    grouped: dict[tuple[str, str], MonitorRow] = {}
+    for monitor_row in collapsed:
+        grouped_key = (
+            (monitor_row.stage, monitor_row.demand_id)
+            if monitor_row.demand_id
+            else (monitor_row.stage, f"sample:{monitor_row.stage_status.pk}")
+        )
+        current_row = grouped.get(grouped_key)
+        if current_row is None:
+            grouped[grouped_key] = monitor_row
+        else:
+            current_row.fastq_names.extend(
+                name for name in monitor_row.fastq_names if name not in current_row.fastq_names
+            )
+            current_row.show_fastq_details |= monitor_row.show_fastq_details
+            current_row.queued_here |= monitor_row.queued_here
+
+    grouped_rows = list(grouped.values())
+    return (
+        [row for row in grouped_rows if row.status in RUNNING_OCS_STATUSES],
+        [row for row in grouped_rows if row.status in FINISHED_OCS_STATUSES],
+    )
 
 
 def _safe_next(request, fallback="web_ui:dashboard"):

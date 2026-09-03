@@ -18,26 +18,20 @@ from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
 from apps.ocs_integration import dynamodb, s3
-from apps.sample_catalog.models import NOT_COMPLETED, BatchPrefix, Sample, Stage, StageStatus
+from apps.sample_catalog.models import Stage, StageStatus
 from apps.web_ui import columns
 from apps.web_ui import data_location_queries as locations
 
 from .view_helpers import (
     DEFAULT_SORT,
     DOWNLOAD_SELECTION_LIMIT,
-    FILTER_FIELDS,
     PAGE_SIZE_OPTIONS,
     SORTABLE,
-    _batch_options,
     _Echo,
+    _filter_panel_context,
     _filtered_samples,
     _page_size,
-    _prefix_counts,
-    _scoped_distinct,
-    _scoped_statuses,
     _sorted,
-    _status_sync_context,
-    _study_options,
     csv_safe_text,
     export_csv_filename,
 )
@@ -61,10 +55,6 @@ def data_locations(request):
         location_rows = [row for row in location_rows if row["stage"].value == selected_location_stage]
         for row in location_rows:
             row["show_selector"] = True
-    prefix = request.GET.get("batch_prefix")
-    scope = Sample.objects.all()
-    if prefix in BatchPrefix.values:
-        scope = scope.filter(batch_prefix=prefix)
     return render(
         request,
         "data_locations.html",
@@ -85,11 +75,6 @@ def data_locations(request):
             "locked_column": "",
             "default_column_keys": columns.LOCATION_DEFAULT_COLUMNS,
             "visible_column_keys": [column.key for column in columns.visible_location_columns(request.user)],
-            "batch_prefixes": _prefix_counts(),
-            "selected_prefix": request.GET.get("batch_prefix", ""),
-            "search": (request.GET.get("fastq_name") or "").strip(),
-            "studies": _study_options(),
-            "selected_studies": request.GET.getlist("study"),
             # Stage.POST_ALIGN's own label is "Post-alignment": overridden here rather than
             # in the model, since changing a TextChoices label needs a migration for what
             # is otherwise only a display string.
@@ -101,18 +86,7 @@ def data_locations(request):
                 for stage in columns.LOCATION_STAGES
             ],
             "selected_location_stage": selected_location_stage,
-            "filters": {field: request.GET.getlist(field) for field in FILTER_FIELDS},
-            "stage_filters": stage_filters,
-            "batches": _batch_options(request.GET.getlist("batch_name_from_vendor"), scope),
-            "organisms": _scoped_distinct(scope, "organism_common_name"),
-            "library_preps": _scoped_distinct(scope, "library_prep_method_name"),
-            "statuses": [NOT_COMPLETED, *_scoped_statuses(scope)],
-            "filters_open": any(request.GET.getlist(field) for field in FILTER_FIELDS)
-            or any(row["selected"] for row in stage_filters),
-            "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.getlist(field))
-            + sum(1 for row in stage_filters if row["selected"])
-            + bool(request.GET.getlist("study")),
-            **_status_sync_context(),
+            **_filter_panel_context(request, stage_filters),
         },
     )
 

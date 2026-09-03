@@ -21,8 +21,8 @@ OmicsHub has two deliberately separate credential paths.
 
 The application identity is configured by `AWS_PROFILE` and the AWS credential chain. In
 Docker Compose, the profile reads the host file mounted at `/run/aws/credentials` by the
-web service and both AWS workers. The mount is read-only. The scheduler does not receive the
-credential-file mount because it only publishes Celery tasks and does not call AWS.
+web service and both AWS workers. The mount is read-only. The scheduler and the one-shot
+`migrate` service do not receive the credential-file mount because neither calls AWS.
 
 The application identity is used for:
 
@@ -127,24 +127,24 @@ already defines it.
 
 ## Docker Compose services and boundaries
 
-The Compose stack contains seven services:
+The Compose stack contains eight services:
 
 - `postgres` stores the local Django database on the `pgdata` named volume;
 - `redis-broker` carries Celery messages;
 - `redis-cache` stores Django cache data, including encrypted log credentials and queue holds;
-- `web-ui` runs migrations, collects static files, and serves Gunicorn on port 8000;
+- `migrate` runs `manage.py migrate` once and exits (`restart: "no"`); it is the only migrator;
+- `web-ui` collects static files and serves Gunicorn on port 8000;
 - `ocs-submission-worker` consumes the `ocs-submissions` queue with concurrency 1;
 - `catalog-sync-worker` consumes the `catalog-sync` queue;
 - `celery-scheduler` publishes scheduled tasks.
 
-The list contains seven names because the first line describes the three supporting services
-and the four application processes. Do not add a second submission-worker replica or increase
-its concurrency. The single submission worker is part of the queue’s correctness guarantee.
+Do not add a second submission-worker replica or increase its concurrency. The single
+submission worker is part of the queue’s correctness guarantee.
 
 Compose service discovery uses `postgres`, `redis-broker`, and `redis-cache` as host names inside
 the network. Application containers must not use `localhost` to reach another Compose service.
-Health-based `depends_on` waits for PostgreSQL and both Redis services before starting the app
-processes. This controls startup order only. It does not replace application error handling or
+`depends_on` makes the app processes wait for healthy PostgreSQL and Redis and for `migrate` to
+complete. This controls startup order only. It does not replace application error handling or
 make a running service healthy forever.
 
 The web health check calls `/healthz/`. It covers the database, cache, broker, workflow config,
@@ -168,9 +168,10 @@ The runtime image runs as the non-root `app` user. Static files are collected at
 into the image’s writable `/app/staticfiles` directory. This is not a secret store and must not
 be used for credentials.
 
-Keep database, Redis, and web port publishing bound to `127.0.0.1` unless a deliberate reverse
-proxy or private network design changes the exposure. Never publish PostgreSQL or Redis directly
-to the public internet.
+Keep PostgreSQL and Redis port publishing bound to `127.0.0.1`. The web port is published on
+`127.0.0.1` and on the developer's LAN IP for phone testing over the local network; do not widen
+that further without a deliberate reverse proxy or private network design. Never publish
+PostgreSQL or Redis directly to the public internet.
 
 ## Rebuild and deployment rules
 

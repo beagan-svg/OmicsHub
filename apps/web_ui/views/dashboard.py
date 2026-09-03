@@ -15,7 +15,7 @@ from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
 from apps.sample_catalog import ocs_sync as sync
-from apps.sample_catalog.models import NOT_COMPLETED, BatchPrefix, Sample, Stage, StageStatus
+from apps.sample_catalog.models import Sample, Stage, StageStatus
 from apps.submission_queue.models import CartItem
 from apps.web_ui import columns
 from apps.web_ui.forms import SyncForm
@@ -24,20 +24,15 @@ from apps.workflow_engine.models import WorkflowConfig
 
 from .view_helpers import (
     DEFAULT_SORT,
-    FILTER_FIELDS,
     PAGE_SIZE_OPTIONS,
     SORTABLE,
-    _batch_options,
     _Echo,
+    _filter_panel_context,
     _filtered_samples,
+    _metadata_refresh_label,
     _page_size,
-    _prefix_counts,
     _safe_next,
-    _scoped_distinct,
-    _scoped_statuses,
     _sorted,
-    _status_sync_context,
-    _study_options,
     csv_safe_text,
     export_csv_filename,
 )
@@ -284,15 +279,6 @@ def _dashboard_context(request):
     ]
 
     metadata_synced_at = Sample.objects.aggregate(at=Max("synced_at"))["at"]
-
-    # The tab, and only the tab. The advanced-filter menus are built from this rather than
-    # the whole local database so they offer values that can return rows, and rather than
-    # from the fully-filtered queryset so choosing an organism does not empty the batch menu.
-    prefix = request.GET.get("batch_prefix")
-    scope = Sample.objects.all()
-    if prefix in BatchPrefix.values:
-        scope = scope.filter(batch_prefix=prefix)
-
     config = WorkflowConfig.objects.filter(is_active=True).first()
     page_size = _page_size(request)
     page = Paginator(samples, page_size).get_page(request.GET.get("page"))
@@ -311,36 +297,14 @@ def _dashboard_context(request):
         # round trip, so it ships with the page rather than being fetched on click.
         "default_column_keys": columns.DEFAULT_COLUMNS,
         "visible_column_keys": request.user.visible_columns or columns.DEFAULT_COLUMNS,
-        "search": (request.GET.get("fastq_name") or "").strip(),
-        "filters": {field: request.GET.getlist(field) for field in FILTER_FIELDS},
-        "stage_filters": stage_filters,
         # Needed by the header to render the sort arrow.
         "sort": request.GET.get("sort") if request.GET.get("sort") in SORTABLE else DEFAULT_SORT,
         "dir": "asc" if request.GET.get("dir") == "asc" else "desc",
         "sortable_keys": list(SORTABLE),
         # How often the two sweeps run, for the freshness clock tooltip. Otherwise
         # "3 minutes old" does not distinguish stale data from a sweep that is not yet due.
-        "metadata_refresh": "nightly at 03:00",
-        **_status_sync_context(),
-        "batch_prefixes": _prefix_counts(),
-        "selected_prefix": request.GET.get("batch_prefix", ""),
-        "studies": _study_options(),
-        "selected_studies": request.GET.getlist("study"),
+        "metadata_refresh": _metadata_refresh_label(),
+        **_filter_panel_context(request, stage_filters),
         "modalities": modality.available_modalities(config.data) if config else [],
-        # Filter options come from the local database, so a dropdown never
-        # offers a value that would return nothing. That is what keeps the batch menu
-        # short: OCS has nearly two thousand batches, the local database only has synced ones.
-        # Scoped to the selected tab. On the MTX tab the batch menu lists MTX batches and
-        # nothing else. Offering RTX batches there produces a filter combination that can
-        # only ever return an empty table.
-        "batches": _batch_options(request.GET.getlist("batch_name_from_vendor"), scope),
-        "organisms": _scoped_distinct(scope, "organism_common_name"),
-        "library_preps": _scoped_distinct(scope, "library_prep_method_name"),
-        "statuses": [NOT_COMPLETED, *_scoped_statuses(scope)],
-        "filters_open": any(request.GET.getlist(field) for field in FILTER_FIELDS)
-        or any(row["selected"] for row in stage_filters),
-        # So users can see filter state without opening the panel.
-        "active_filter_count": sum(1 for field in FILTER_FIELDS if request.GET.getlist(field))
-        + sum(1 for row in stage_filters if row["selected"]),
         "metadata_synced_at": metadata_synced_at,
     }

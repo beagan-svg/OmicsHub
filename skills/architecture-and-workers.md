@@ -1,8 +1,7 @@
 # OmicsHub architecture and worker rules
 
 This file is the operating guide for Django, the OCS data mirror, Celery, Redis, and the
-submission queue. Treat the current code as the source of truth when this guide and an old
-conversation differ.
+submission queue.
 
 ## Application boundaries
 
@@ -39,7 +38,8 @@ conversation differ.
 - `catalog-sync-worker` consumes the `catalog-sync` queue. `ocs-submission-worker` consumes
   `ocs-submissions` with concurrency one. Keep one submission worker unless the queue design
   is changed with an explicit concurrency and duplicate-submission analysis.
-- The web process, both workers, and Beat share one image but run different commands.
+- The web process, both workers, Beat, and the one-shot `migrate` service share one image but
+  run different commands. Only `migrate` applies database migrations.
 - Redis broker and Redis cache are separate services and databases. The broker carries Celery
   messages. The cache stores submission holds, worker heartbeat data, sync locks, and encrypted
   temporary log credentials. Do not use process memory for cross-worker coordination.
